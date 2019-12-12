@@ -482,7 +482,7 @@ impl StorageStage {
                 *slot_count += 1;
                 *last_root = slot;
 
-                if let Ok(entries) = block_buffer_pool.fetch_slit_items(slot, 0, None) {
+                if let Ok(entries) = block_buffer_pool.fetch_slot_entries(slot, 0, None) {
                     for entry in &entries {
                         // Go through the transactions, find proofs, and use them to update
                         // the storage_keys with their signatures
@@ -650,7 +650,7 @@ mod tests {
         let bank = Arc::new(Bank::new(&genesis_block));
         let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
         block_buffer_pool
-            .record_items(slot, 0, 0, ticks_per_slot, &entries)
+            .update_entries(slot, 0, 0, ticks_per_slot, &entries)
             .unwrap();
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
@@ -679,7 +679,7 @@ mod tests {
         let rooted_slots = (slot..slot + SLOTS_PER_SEGMENT + 1)
             .map(|i| {
                 block_buffer_pool
-                    .record_items(i, 0, 0, ticks_per_slot, &entries)
+                    .update_entries(i, 0, 0, ticks_per_slot, &entries)
                     .unwrap();
                 i
             })
@@ -740,7 +740,7 @@ mod tests {
         let entries = make_tiny_test_entries(128);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .record_items(1, 0, 0, ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, ticks_per_slot, &entries)
             .unwrap();
         let bank = Arc::new(Bank::new(&genesis_block));
         let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
@@ -780,7 +780,7 @@ mod tests {
 
         let proof_entries = vec![Entry::new(&Hash::default(), 1, mining_txs)];
         block_buffer_pool
-            .record_items(2, 0, 0, ticks_per_slot, &proof_entries)
+            .update_entries(2, 0, 0, ticks_per_slot, &proof_entries)
             .unwrap();
         slot_sender.send(vec![2]).unwrap();
 

@@ -1090,7 +1090,7 @@ impl NodeGroupInfo {
     ) -> Vec<SharedBlob> {
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the requested index in one of the slots
-            let blob = block_buffer_pool.fetch_info_obj(slot, blob_index);
+            let blob = block_buffer_pool.fetch_data_blob(slot, blob_index);
 
             if let Ok(Some(mut blob)) = blob {
                 inc_new_counter_debug!("node_group_info-window-request-ledger", 1);
@@ -1120,12 +1120,12 @@ impl NodeGroupInfo {
     ) -> Vec<SharedBlob> {
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the requested index in one of the slots
-            let meta = block_buffer_pool.meta_info(slot);
+            let meta = block_buffer_pool.meta(slot);
 
             if let Ok(Some(meta)) = meta {
                 if meta.received > highest_index {
                     // meta.received must be at least 1 by this point
-                    let blob = block_buffer_pool.fetch_info_obj(slot, meta.received - 1);
+                    let blob = block_buffer_pool.fetch_data_blob(slot, meta.received - 1);
 
                     if let Ok(Some(mut blob)) = blob {
                         blob.meta.set_addr(from_addr);
@@ -1147,11 +1147,11 @@ impl NodeGroupInfo {
         let mut res = vec![];
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the next "n" parent slots of the input slot
-            while let Ok(Some(meta)) = block_buffer_pool.meta_info(slot) {
+            while let Ok(Some(meta)) = block_buffer_pool.meta(slot) {
                 if meta.received == 0 {
                     break;
                 }
-                let blob = block_buffer_pool.fetch_info_obj(slot, meta.received - 1);
+                let blob = block_buffer_pool.fetch_data_blob(slot, meta.received - 1);
                 if let Ok(Some(mut blob)) = blob {
                     blob.meta.set_addr(from_addr);
                     res.push(Arc::new(RwLock::new(blob)));
@@ -2005,7 +2005,7 @@ mod tests {
                 .collect();
 
             block_buffer_pool
-                .record_objs(&blobs)
+                .update_blobs(&blobs)
                 .expect("Expect successful ledger write");
 
             let rv =
@@ -2041,7 +2041,7 @@ mod tests {
             let (blobs, _) = make_many_slot_entries(1, 3, 5);
 
             block_buffer_pool
-                .record_objs(&blobs)
+                .update_blobs(&blobs)
                 .expect("Expect successful ledger write");
 
             // We don't have slot 4, so we don't know how to service this requeset
@@ -2056,7 +2056,7 @@ mod tests {
                 .collect();
             let expected: Vec<_> = (1..=3)
                 .rev()
-                .map(|slot| block_buffer_pool.fetch_info_obj(slot, 4).unwrap().unwrap())
+                .map(|slot| block_buffer_pool.fetch_data_blob(slot, 4).unwrap().unwrap())
                 .collect();
             assert_eq!(rv, expected)
         }

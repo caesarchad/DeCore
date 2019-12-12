@@ -314,7 +314,7 @@ impl NodeGroupInfoFixListener {
                         // sending the blobs in this slot for repair, we expect these slots
                         // to be full.
                         if let Some(blob_data) = block_buffer_pool
-                            .fetch_info_obj_bytes(slot, blob_index as u64)
+                            .fetch_data_blob_bytes(slot, blob_index as u64)
                             .expect("Failed to read data blob from block_buffer_pool")
                         {
                             socket.send_to(&blob_data[..], repairee_tvu)?;
@@ -322,7 +322,7 @@ impl NodeGroupInfoFixListener {
                         }
 
                         if let Some(coding_bytes) = block_buffer_pool
-                            .fetch_encrypting_obj_bytes(slot, blob_index as u64)
+                            .fetch_coding_col_by_bytes(slot, blob_index as u64)
                             .expect("Failed to read coding blob from block_buffer_pool")
                         {
                             socket.send_to(&coding_bytes[..], repairee_tvu)?;
@@ -625,11 +625,11 @@ mod tests {
         let (blobs, _) = make_many_slot_entries(0, num_slots, blobs_per_slot);
 
         // Write slots in the range [0, num_slots] to block_buffer_pool
-        block_buffer_pool.punctuate_info_objs(&blobs).unwrap();
+        block_buffer_pool.insert_data_blobs(&blobs).unwrap();
 
         // Write roots so that these slots will qualify to be sent by the repairman
-        block_buffer_pool.config_base(0, 0).unwrap();
-        block_buffer_pool.config_base(num_slots - 1, 0).unwrap();
+        block_buffer_pool.set_genesis(0, 0).unwrap();
+        block_buffer_pool.set_genesis(num_slots - 1, 0).unwrap();
 
         // Set up my information
         let my_pubkey = Pubkey::new_rand();
@@ -701,11 +701,11 @@ mod tests {
         // Create blobs for first two epochs and write them to block_buffer_pool
         let total_slots = slots_per_epoch * 2;
         let (blobs, _) = make_many_slot_entries(0, total_slots, 1);
-        block_buffer_pool.punctuate_info_objs(&blobs).unwrap();
+        block_buffer_pool.insert_data_blobs(&blobs).unwrap();
 
         // Write roots so that these slots will qualify to be sent by the repairman
-        block_buffer_pool.config_base(0, 0).unwrap();
-        block_buffer_pool.config_base(slots_per_epoch * 2 - 1, 0).unwrap();
+        block_buffer_pool.set_genesis(0, 0).unwrap();
+        block_buffer_pool.set_genesis(slots_per_epoch * 2 - 1, 0).unwrap();
 
         // Set up my information
         let my_pubkey = Pubkey::new_rand();

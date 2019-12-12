@@ -95,9 +95,9 @@ pub fn fullnode_exit(entry_point_info: &ContactInfo, nodes: usize) {
 
 pub fn verify_ledger_ticks(ledger_path: &str, ticks_per_slot: usize) {
     let ledger = BlockBufferPool::open_ledger_file(ledger_path).unwrap();
-    let zeroth_slot = ledger.fetch_slit_items(0, 0, None).unwrap();
+    let zeroth_slot = ledger.fetch_slot_entries(0, 0, None).unwrap();
     let last_id = zeroth_slot.last().unwrap().hash;
-    let next_slots = ledger.fetch_slits_from(&[0]).unwrap().remove(&0).unwrap();
+    let next_slots = ledger.fetch_slot_from(&[0]).unwrap().remove(&0).unwrap();
     let mut pending_slots: Vec<_> = next_slots
         .into_iter()
         .map(|slot| (slot, 0, last_id))
@@ -105,7 +105,7 @@ pub fn verify_ledger_ticks(ledger_path: &str, ticks_per_slot: usize) {
     while !pending_slots.is_empty() {
         let (slot, parent_slot, last_id) = pending_slots.pop().unwrap();
         let next_slots = ledger
-            .fetch_slits_from(&[slot])
+            .fetch_slot_from(&[slot])
             .unwrap()
             .remove(&slot)
             .unwrap();
@@ -322,7 +322,7 @@ fn poll_all_nodes_for_signature(
 
 
 fn get_and_verify_slot_entries(block_buffer_pool: &BlockBufferPool, slot: u64, last_entry: &Hash) -> Vec<Entry> {
-    let entries = block_buffer_pool.fetch_slit_items(slot, 0, None).unwrap();
+    let entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap();
     assert!(entries.verify(last_entry));
     entries
 }

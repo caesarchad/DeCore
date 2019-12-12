@@ -63,7 +63,7 @@ fn main() {
         }
     };
 
-    let entries = match block_buffer_pool.extract_bill() {
+    let entries = match block_buffer_pool.fetch_iterator() {
         Ok(entries) => entries,
         Err(err) => {
             eprintln!("Failed to read ledger at {}: {}", ledger_path, err);

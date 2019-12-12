@@ -25,7 +25,7 @@ fn bench_write_blobs(bench: &mut Bencher, blobs: &mut Vec<Blob>, ledger_path: &s
             let index = blob.index();
 
             block_buffer_pool
-                .place_info_obj_bytes(
+                .insert_data_blob_bytes(
                     blob.slot(),
                     index,
                     &blob.data[..BLOB_HEADER_SIZE + blob.size()],
@@ -57,7 +57,7 @@ fn setup_read_bench(
         b.set_slot(slot);
     }
     block_buffer_pool
-        .record_objs(&blobs)
+        .update_blobs(&blobs)
         .expect("Expectd successful insertion of blobs into ledger");
 }
 
@@ -110,7 +110,7 @@ fn bench_read_sequential(bench: &mut Bencher) {
         // Generate random starting point in the range [0, total_blobs - 1], read num_reads blobs sequentially
         let start_index = rng.gen_range(0, num_small_blobs + num_large_blobs);
         for i in start_index..start_index + num_reads {
-            let _ = block_buffer_pool.fetch_info_obj(slot, i as u64 % total_blobs);
+            let _ = block_buffer_pool.fetch_data_blob(slot, i as u64 % total_blobs);
         }
     });
 
@@ -141,7 +141,7 @@ fn bench_read_random(bench: &mut Bencher) {
         .collect();
     bench.iter(move || {
         for i in indexes.iter() {
-            let _ = block_buffer_pool.fetch_info_obj(slot, *i as u64);
+            let _ = block_buffer_pool.fetch_data_blob(slot, *i as u64);
         }
     });
 
@@ -165,7 +165,7 @@ fn bench_insert_data_blob_small(bench: &mut Bencher) {
             let index = blob.index();
             blob.set_index(index + num_entries as u64);
         }
-        block_buffer_pool.record_objs(&blobs).unwrap();
+        block_buffer_pool.update_blobs(&blobs).unwrap();
     });
 
     BlockBufferPool::remove_ledger_file(&ledger_path).expect("Expected successful database destruction");

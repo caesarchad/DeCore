@@ -108,7 +108,7 @@ impl BankForks {
         self.working_bank.clone()
     }
 
-    pub fn config_base(&mut self, root: u64) {
+    pub fn set_genesis(&mut self, root: u64) {
         self.root = root;
         let set_root_start = Instant::now();
         let root_bank = self

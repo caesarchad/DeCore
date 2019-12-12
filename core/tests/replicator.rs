@@ -93,7 +93,7 @@ fn check_miner_connection(storage_miner_info: &ContactInfo) {
                         module_path!().to_string()
                     )
                 );
-                let entries = BlockBufferPool::deserialize_obj_info(&br.data()).unwrap();
+                let entries = BlockBufferPool::fetch_entry_from_deserialized_blob(&br.data()).unwrap();
                 for entry in &entries {
                     println!("{}",
                         printLn(

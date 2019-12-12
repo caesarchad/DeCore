@@ -485,12 +485,12 @@ pub mod test {
                     );
 
                     for idx in start_index..data_end {
-                        let opt_bytes = block_buffer_pool.fetch_info_obj_bytes(slot, idx).unwrap();
+                        let opt_bytes = block_buffer_pool.fetch_data_blob_bytes(slot, idx).unwrap();
                         assert!(opt_bytes.is_some());
                     }
 
                     for idx in start_index..coding_end {
-                        let opt_bytes = block_buffer_pool.fetch_encrypting_obj_bytes(slot, idx).unwrap();
+                        let opt_bytes = block_buffer_pool.fetch_coding_col_by_bytes(slot, idx).unwrap();
                         assert!(opt_bytes.is_some());
                     }
                 }
@@ -665,7 +665,7 @@ pub mod test {
                 for shared_coding_blob in erasure_set.coding.into_iter() {
                     let blob = shared_coding_blob.read().unwrap();
                     block_buffer_pool
-                        .place_encrypting_obj_bytes_plain(
+                        .insert_coding_blob_bytes_raw(
                             slot,
                             blob.index(),
                             &blob.data[..blob.size() + BLOB_HEADER_SIZE],

@@ -107,7 +107,7 @@ impl Broadcast {
             .collect();
 
         let blob_index = block_buffer_pool
-            .meta_info(bank.slot())
+            .meta(bank.slot())
             .expect("Database error")
             .map(|meta| meta.consumed)
             .unwrap_or(0);
@@ -377,7 +377,7 @@ mod test {
     #[test]
     fn test_broadcast_ledger() {
         morgan_logger::setup();
-        let ledger_path = fetch_interim_bill_route("test_broadcast_ledger");
+        let ledger_path = fetch_interim_ledger_location("test_broadcast_ledger");
 
         {
             // Create the leader scheduler
@@ -415,7 +415,7 @@ mod test {
             for i in 0..max_tick_height - start_tick_height {
                 let slot = (start_tick_height + i + 1) / ticks_per_slot;
 
-                let result = block_buffer_pool.fetch_info_obj(slot, blob_index).unwrap();
+                let result = block_buffer_pool.fetch_data_blob(slot, blob_index).unwrap();
 
                 blob_index += 1;
                 result.expect("expect blob presence");

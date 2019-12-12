@@ -307,9 +307,9 @@ impl AccountsDB {
 
     pub fn purge_fork(&self, fork: Fork) {
         //add_root should be called first
-        let is_base = self.accounts_index.read().unwrap().is_base(fork);
-        trace!("PURGING {} {}", fork, is_base);
-        if !is_base {
+        let is_genesis = self.accounts_index.read().unwrap().is_genesis(fork);
+        trace!("PURGING {} {}", fork, is_genesis);
+        if !is_genesis {
             self.storage.write().unwrap().retain(|_, v| {
                 trace!("PURGING {} {}", v.fork_id, fork);
                 v.fork_id != fork

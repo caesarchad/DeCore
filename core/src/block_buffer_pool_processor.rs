@@ -161,7 +161,7 @@ pub fn process_block_buffer_pool(
 
         // Load the metadata for this slot
         let meta = block_buffer_pool
-            .meta_info(slot)
+            .meta(slot)
             .map_err(|err| {
                 // warn!("Failed to load meta for slot {}: {:?}", slot, err);
                 println!(
@@ -178,7 +178,7 @@ pub fn process_block_buffer_pool(
         vec![(slot, meta, bank, entry_height, last_entry_hash)]
     };
 
-    block_buffer_pool.config_base(0, 0).expect("Couldn't set first root");
+    block_buffer_pool.set_genesis(0, 0).expect("Couldn't set first root");
 
     let leader_schedule_cache = LeaderScheduleCache::new(*pending_slots[0].2.epoch_schedule(), 0);
 
@@ -202,7 +202,7 @@ pub fn process_block_buffer_pool(
         }
 
         // Fetch all entries for this slot
-        let mut entries = block_buffer_pool.fetch_slit_items(slot, 0, None).map_err(|err| {
+        let mut entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).map_err(|err| {
             // warn!("Failed to load entries for slot {}: {:?}", slot, err);
             println!(
                 "{}",
@@ -280,9 +280,9 @@ pub fn process_block_buffer_pool(
 
         bank.freeze(); // all banks handled by this routine are created from complete slots
 
-        if block_buffer_pool.is_base(slot) {
+        if block_buffer_pool.is_genesis(slot) {
             root = slot;
-            leader_schedule_cache.config_base(slot);
+            leader_schedule_cache.set_genesis(slot);
             bank.squash();
             pending_slots.clear();
             fork_info.clear();
@@ -301,7 +301,7 @@ pub fn process_block_buffer_pool(
         // This is a fork point, create a new child bank for each fork
         for next_slot in meta.next_slots {
             let next_meta = block_buffer_pool
-                .meta_info(next_slot)
+                .meta(next_slot)
                 .map_err(|err| {
                     // warn!("Failed to load meta for slot {}: {:?}", slot, err);
                     println!(
@@ -431,7 +431,7 @@ pub mod tests {
         let last_entry_hash = entries.last().unwrap().hash;
 
         let blobs = entries_to_blobs(&entries, slot, parent_slot, true);
-        block_buffer_pool.punctuate_info_objs(blobs.iter()).unwrap();
+        block_buffer_pool.insert_data_blobs(blobs.iter()).unwrap();
 
         last_entry_hash
     }
@@ -474,7 +474,7 @@ pub mod tests {
             entries.pop();
 
             let blobs = entries_to_blobs(&entries, slot, parent_slot, false);
-            block_buffer_pool.punctuate_info_objs(blobs.iter()).unwrap();
+            block_buffer_pool.insert_data_blobs(blobs.iter()).unwrap();
         }
 
         // slot 2, points at slot 1
@@ -516,7 +516,7 @@ pub mod tests {
                /     |
             slot 3   |
                      |
-                   slot 4 <-- config_base(true)
+                   slot 4 <-- set_genesis(true)
 
         */
         let block_buffer_pool =
@@ -550,7 +550,7 @@ pub mod tests {
                 module_path!().to_string()
             )
         );
-        block_buffer_pool.config_base(4, 0).unwrap();
+        block_buffer_pool.set_genesis(4, 0).unwrap();
 
         let (bank_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
@@ -597,7 +597,7 @@ pub mod tests {
 
                  slot 0
                    |
-                 slot 1  <-- config_base(true)
+                 slot 1  <-- set_genesis(true)
                  /   \
             slot 2   |
                /     |
@@ -637,8 +637,8 @@ pub mod tests {
                 module_path!().to_string()
             )
         );
-        block_buffer_pool.config_base(0, 0).unwrap();
-        block_buffer_pool.config_base(1, 0).unwrap();
+        block_buffer_pool.set_genesis(0, 0).unwrap();
+        block_buffer_pool.set_genesis(1, 0).unwrap();
 
         let (bank_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
@@ -714,10 +714,10 @@ pub mod tests {
         }
 
         // Set a root on the last slot of the last confirmed epoch
-        block_buffer_pool.config_base(last_slot, 0).unwrap();
+        block_buffer_pool.set_genesis(last_slot, 0).unwrap();
 
         // Set a root on the next slot of the confrimed epoch
-        block_buffer_pool.config_base(last_slot + 1, last_slot).unwrap();
+        block_buffer_pool.set_genesis(last_slot + 1, last_slot).unwrap();
 
         // Check that we can properly restart the ledger / leader scheduler doesn't fail
         let (bank_forks, bank_forks_info, _) =
@@ -853,7 +853,7 @@ pub mod tests {
         let block_buffer_pool =
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to successfully open database ledger");
         block_buffer_pool
-            .record_items(1, 0, 0, genesis_block.ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, genesis_block.ticks_per_slot, &entries)
             .unwrap();
         let entry_height = genesis_block.ticks_per_slot + entries.len() as u64;
         let (bank_forks, bank_forks_info, _) =

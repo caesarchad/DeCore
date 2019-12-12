@@ -106,8 +106,8 @@ impl BlockstreamService {
         let timeout = Duration::new(1, 0);
         let (slot, slot_leader) = slot_full_receiver.recv_timeout(timeout)?;
 
-        let entries = block_buffer_pool.fetch_slit_items(slot, 0, None).unwrap();
-        let block_buffer_meta = block_buffer_pool.meta_info(slot).unwrap().unwrap();
+        let entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap();
+        let block_buffer_meta = block_buffer_pool.meta(slot).unwrap().unwrap();
         let _parent_slot = if slot == 0 {
             None
         } else {
@@ -207,7 +207,7 @@ mod test {
         let expected_tick_heights = [5, 6, 7, 8, 8, 9];
 
         block_buffer_pool
-            .record_items(1, 0, 0, ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, ticks_per_slot, &entries)
             .unwrap();
 
         slot_full_sender.send((1, leader_pubkey)).unwrap();

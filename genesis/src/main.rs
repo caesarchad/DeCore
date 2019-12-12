@@ -13,7 +13,7 @@ extern crate morgan_config_controller;
 extern crate morgan_exchange_controller;
 
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
-use morgan::block_buffer_pool::generate_new_bill;
+use morgan::block_buffer_pool::make_new_ledger_file;
 use morgan_interface::account::Account;
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::genesis_block::GenesisBlock;
@@ -256,7 +256,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         }
     }
 
-    generate_new_bill(ledger_path, &genesis_block)?;
+    make_new_ledger_file(ledger_path, &genesis_block)?;
     Ok(())
 }
 

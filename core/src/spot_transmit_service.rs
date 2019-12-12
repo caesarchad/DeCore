@@ -48,10 +48,10 @@ fn retransmit_blobs(blobs: &[SharedBlob], retransmit: &BlobSender, id: &Pubkey) 
 
 /// Process a blob: Add blob to the ledger window.
 fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>) -> Result<()> {
-    // make an iterator for punctuate_info_objs()
+    // make an iterator for insert_data_blobs()
     let blobs: Vec<_> = blobs.iter().map(move |blob| blob.read().unwrap()).collect();
 
-    block_buffer_pool.punctuate_info_objs(blobs.iter().filter_map(|blob| {
+    block_buffer_pool.insert_data_blobs(blobs.iter().filter_map(|blob| {
         if !blob.is_coding() {
             Some(&(**blob))
         } else {
@@ -65,7 +65,7 @@ fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>)
 
         // Insert the new blob into block tree
         if blob.is_coding() {
-            block_buffer_pool.place_encrypting_obj_bytes(
+            block_buffer_pool.insert_coding_blob_bytes(
                 blob.slot(),
                 blob.index(),
                 &blob.data[..BLOB_HEADER_SIZE + blob.size()],
@@ -294,7 +294,7 @@ mod test {
         }
 
         assert_eq!(
-            block_buffer_pool.fetch_slit_items(0, 0, None).unwrap(),
+            block_buffer_pool.fetch_slot_entries(0, 0, None).unwrap(),
             original_entries
         );
 

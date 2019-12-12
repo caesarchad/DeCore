@@ -31,11 +31,11 @@ impl LeaderScheduleCache {
             max_epoch: RwLock::new(0),
         };
 
-        cache.config_base(root);
+        cache.set_genesis(root);
         cache
     }
 
-    pub fn config_base(&self, root: u64) {
+    pub fn set_genesis(&self, root: u64) {
         *self.max_epoch.write().unwrap() = self.epoch_schedule.get_stakers_epoch(root);
     }
 
@@ -70,7 +70,7 @@ impl LeaderScheduleCache {
                 current_slot += 1;
                 if *pubkey == leader_schedule[i] {
                     if let Some(block_buffer_pool) = block_buffer_pool {
-                        if let Some(meta) = block_buffer_pool.meta_info(current_slot).unwrap() {
+                        if let Some(meta) = block_buffer_pool.meta(current_slot).unwrap() {
                             // We have already sent a blob for this slot, so skip it
                             if meta.received > 0 {
                                 continue;
@@ -332,7 +332,7 @@ mod tests {
             // Write a blob into slot 2 that chains to slot 1,
             // but slot 1 is empty so should not be skipped
             let (blobs, _) = make_slot_entries(2, 1, 1);
-            block_buffer_pool.record_objs(&blobs[..]).unwrap();
+            block_buffer_pool.update_blobs(&blobs[..]).unwrap();
             assert_eq!(
                 cache.next_leader_slot(&pubkey, 0, &bank, Some(&block_buffer_pool)),
                 Some(1)
@@ -342,7 +342,7 @@ mod tests {
             let (blobs, _) = make_slot_entries(1, 0, 1);
 
             // Check that slot 1 and 2 are skipped
-            block_buffer_pool.record_objs(&blobs[..]).unwrap();
+            block_buffer_pool.update_blobs(&blobs[..]).unwrap();
             assert_eq!(
                 cache.next_leader_slot(&pubkey, 0, &bank, Some(&block_buffer_pool)),
                 Some(3)
@@ -446,7 +446,7 @@ mod tests {
         assert!(bank2.epoch_vote_accounts(2).is_some());
 
         // Set root for a slot in epoch 1, so that epoch 2 is now confirmed
-        cache.config_base(95);
+        cache.set_genesis(95);
         assert_eq!(*cache.max_epoch.read().unwrap(), 2);
         assert!(cache.slot_leader_at(96, Some(&bank2)).is_some());
         assert_eq!(bank2.get_epoch_and_slot_index(223).0, 2);

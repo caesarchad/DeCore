@@ -334,13 +334,13 @@ impl ReplayStage {
             rooted_slots.push(root_bank.slot());
             let old_root = bank_forks.read().unwrap().root();
             block_buffer_pool
-                .config_base(new_root, old_root)
+                .set_genesis(new_root, old_root)
                 .expect("Ledger set root failed");
             // Set root first in leader schedule_cache before bank_forks because bank_forks.root
             // is consumed by repair_service to update gossip, so we don't want to get blobs for
             // repair on gossip before we update leader schedule, otherwise they may get dropped.
-            leader_schedule_cache.config_base(new_root);
-            bank_forks.write().unwrap().config_base(new_root);
+            leader_schedule_cache.set_genesis(new_root);
+            bank_forks.write().unwrap().set_genesis(new_root);
             Self::handle_new_root(&bank_forks, progress);
             root_slot_sender.send(rooted_slots)?;
         }
@@ -554,7 +554,7 @@ impl ReplayStage {
         let bank_progress = &mut progress
             .entry(bank_slot)
             .or_insert(ForkProgress::new(bank.last_blockhash()));
-        block_buffer_pool.fetch_slit_items_via_obj_amount(bank_slot, bank_progress.num_blobs as u64, None)
+        block_buffer_pool.fetch_slot_entries_by_blob_len(bank_slot, bank_progress.num_blobs as u64, None)
     }
 
     fn replay_entries_into_bank(
@@ -630,7 +630,7 @@ impl ReplayStage {
         let frozen_bank_slots: Vec<u64> = frozen_banks.keys().cloned().collect();
         trace!("frozen_banks {:?}", frozen_bank_slots);
         let next_slots = block_buffer_pool
-            .fetch_slits_from(&frozen_bank_slots)
+            .fetch_slot_from(&frozen_bank_slots)
             .expect("Db error");
         // Filter out what we've already seen
         trace!("generate new forks {:?}", next_slots);
@@ -697,7 +697,7 @@ mod test {
             let mut blob_slot_1 = Blob::default();
             blob_slot_1.set_slot(1);
             blob_slot_1.set_parent(0);
-            block_buffer_pool.punctuate_info_objs(&vec![blob_slot_1]).unwrap();
+            block_buffer_pool.insert_data_blobs(&vec![blob_slot_1]).unwrap();
             assert!(bank_forks.get(1).is_none());
             ReplayStage::generate_new_bank_forks(
                 &block_buffer_pool,
@@ -710,7 +710,7 @@ mod test {
             let mut blob_slot_2 = Blob::default();
             blob_slot_2.set_slot(2);
             blob_slot_2.set_parent(0);
-            block_buffer_pool.punctuate_info_objs(&vec![blob_slot_2]).unwrap();
+            block_buffer_pool.insert_data_blobs(&vec![blob_slot_2]).unwrap();
             assert!(bank_forks.get(2).is_none());
             ReplayStage::generate_new_bank_forks(
                 &block_buffer_pool,
