@@ -1,0 +1,18 @@
+[package]
+authors = ["bitconch core dev <dev@bitconch.io>"]
+edition = "2018"
+name = "morgan-storage-miner"
+version = "1.2.0"
+repository = "https://github.com/bitconch/bitconch-core"
+license = "Apache-2.0"
+homepage = "https://bitconch.io/"
+
+[dependencies]
+clap = "2.33.0"
+morgan = { path = "../core", version = "0.15.3"     }
+morgan-logger = { path = "../logger", version = "0.15.3"     }
+morgan-netutil = { path = "../netutil", version = "0.15.3"     }
+morgan-interface = { path = "../interface", version = "0.15.3"     }
+[features]
+chacha = ["morgan/chacha"]
+cuda = ["morgan/cuda"]
