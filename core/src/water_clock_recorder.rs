@@ -216,7 +216,7 @@ impl WaterClockRecorder {
         trace!("new working treasury");
         self.working_treasury = Some(working_treasury);
     }
-    pub fn set_bank(&mut self, treasury: &Arc<Bank>) {
+    pub fn set_treasury(&mut self, treasury: &Arc<Bank>) {
         let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
         let working_treasury = WorkingBank {
             treasury: treasury.clone(),
@@ -1034,7 +1034,7 @@ mod tests {
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.set_bank(&treasury);
+            waterclock_recorder.set_treasury(&treasury);
             waterclock_recorder.clear_bank();
             assert!(receiver.try_recv().is_ok());
         }
@@ -1321,7 +1321,7 @@ mod tests {
             );
 
             // If we set the working treasury, the node should be leader within next 2 slots
-            waterclock_recorder.set_bank(&treasury);
+            waterclock_recorder.set_treasury(&treasury);
             assert_eq!(
                 waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 true

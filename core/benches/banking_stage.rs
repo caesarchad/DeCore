@@ -165,7 +165,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
             verified_receiver,
             vote_receiver,
         );
-        waterclock_recorder.lock().unwrap().set_bank(&treasury);
+        waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let half_len = verified.len() / 2;
         let mut start = 0;
@@ -291,7 +291,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
             verified_receiver,
             vote_receiver,
         );
-        waterclock_recorder.lock().unwrap().set_bank(&treasury);
+        waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let mut id = genesis_block.hash();
         for _ in 0..(MAX_RECENT_BLOCKHASHES * DEFAULT_TICKS_PER_SLOT as usize) {

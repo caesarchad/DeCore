@@ -260,7 +260,7 @@ impl ReplayStage {
                                 tpu_bank.slot(),
                                 next_leader
                             );
-                            waterclock_recorder.lock().unwrap().set_bank(&tpu_bank);
+                            waterclock_recorder.lock().unwrap().set_treasury(&tpu_bank);
                         }
                     }
                 })

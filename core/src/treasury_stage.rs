@@ -842,7 +842,7 @@ pub fn create_test_recorder(
         &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
         &waterclock_config,
     );
-    waterclock_recorder.set_bank(&treasury);
+    waterclock_recorder.set_treasury(&treasury);
 
     let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
     let waterclock_service = WaterClockService::new(waterclock_recorder.clone(), &waterclock_config, &exit);
