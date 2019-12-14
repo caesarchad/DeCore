@@ -200,7 +200,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
 
 #[bench]
 #[ignore]
-fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
+fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let progs = 4;
     let num_threads = BankingStage::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races
