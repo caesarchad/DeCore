@@ -725,7 +725,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bench_tps_bank_client() {
+    fn test_bench_tps_treasury_client() {
         let (genesis_block, id) = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let clients = vec![BankClient::new(treasury)];
