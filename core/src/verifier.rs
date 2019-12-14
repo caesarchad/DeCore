@@ -99,7 +99,7 @@ impl Validator {
 
         let (
             treasury_forks,
-            bank_forks_info,
+            treasury_forks_info,
             block_buffer_pool,
             ledger_signal_receiver,
             completed_slots_receiver,
@@ -109,7 +109,7 @@ impl Validator {
 
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
-        let bank_info = &bank_forks_info[0];
+        let bank_info = &treasury_forks_info[0];
         let treasury = treasury_forks[bank_info.bank_slot].clone();
 
         // info!(
@@ -348,13 +348,13 @@ pub fn new_banks_from_block_buffer(
         BlockBufferPool::open_by_message(block_buffer_pool_path)
             .expect("Expected to successfully open database ledger");
 
-    let (treasury_forks, bank_forks_info, leader_schedule_cache) =
+    let (treasury_forks, treasury_forks_info, leader_schedule_cache) =
         block_buffer_pool_processor::process_block_buffer_pool(&genesis_block, &block_buffer_pool, account_paths)
             .expect("process_block_buffer_pool failed");
 
     (
         treasury_forks,
-        bank_forks_info,
+        treasury_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,
         completed_slots_receiver,
