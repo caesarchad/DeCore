@@ -185,10 +185,10 @@ impl WindowService {
             + std::marker::Send
             + std::marker::Sync,
     {
-        let bank_forks = match repair_strategy {
+        let treasury_forks = match repair_strategy {
             RepairStrategy::RepairRange(_) => None,
 
-            RepairStrategy::RepairAll { ref bank_forks, .. } => Some(bank_forks.clone()),
+            RepairStrategy::RepairAll { ref treasury_forks, .. } => Some(treasury_forks.clone()),
         };
 
         let repair_service = RepairService::new(
@@ -201,7 +201,7 @@ impl WindowService {
         let exit = exit.clone();
         let hash = *genesis_blockhash;
         let blob_filter = Arc::new(blob_filter);
-        let bank_forks = bank_forks.clone();
+        let treasury_forks = treasury_forks.clone();
         let t_window = Builder::new()
             .name("morgan-window".to_string())
             .spawn(move || {
@@ -217,9 +217,9 @@ impl WindowService {
                         blob_filter(
                             &id,
                             blob,
-                            bank_forks
+                            treasury_forks
                                 .as_ref()
-                                .map(|bank_forks| bank_forks.read().unwrap().working_bank()),
+                                .map(|treasury_forks| treasury_forks.read().unwrap().working_bank()),
                         )
                     }) {
                         match e {
@@ -261,7 +261,7 @@ impl Service for WindowService {
 #[cfg(test)]
 mod test {
     use super::*;
-    // use crate::bank_forks::BankForks;
+    // use crate::treasury_forks::BankForks;
     use crate::treasury_forks::BankForks;
     use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
@@ -369,11 +369,11 @@ mod test {
         let block_buffer_pool = Arc::new(block_buffer_pool);
 
         let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks: bank_forks.clone(),
+            treasury_forks: treasury_forks.clone(),
             completed_slots_receiver,
-            epoch_schedule: bank_forks
+            epoch_schedule: treasury_forks
                 .read()
                 .unwrap()
                 .working_bank()
@@ -456,10 +456,10 @@ mod test {
 
         let block_buffer_pool = Arc::new(block_buffer_pool);
         let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
-        let epoch_schedule = *bank_forks.read().unwrap().working_bank().epoch_schedule();
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let epoch_schedule = *treasury_forks.read().unwrap().working_bank().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks,
+            treasury_forks,
             completed_slots_receiver,
             epoch_schedule,
         };

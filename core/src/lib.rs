@@ -5,7 +5,7 @@
 //! command-line tools to spin up fullnodes and a Rust library
 //!
 
-// pub mod bank_forks;
+// pub mod treasury_forks;
 pub mod treasury_forks;
 pub mod treasury_stage;
 pub mod fetch_spot_stage;

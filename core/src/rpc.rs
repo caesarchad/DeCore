@@ -1,6 +1,6 @@
 //! The `rpc` module implements the Morgan RPC interface.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::connection_info::ContactInfo;
@@ -41,7 +41,7 @@ impl Default for JsonRpcConfig {
 
 #[derive(Clone)]
 pub struct JsonRpcRequestProcessor {
-    bank_forks: Arc<RwLock<BankForks>>,
+    treasury_forks: Arc<RwLock<BankForks>>,
     storage_state: StorageState,
     config: JsonRpcConfig,
     fullnode_exit: Arc<AtomicBool>,
@@ -49,17 +49,17 @@ pub struct JsonRpcRequestProcessor {
 
 impl JsonRpcRequestProcessor {
     fn treasury(&self) -> Arc<Bank> {
-        self.bank_forks.read().unwrap().working_bank()
+        self.treasury_forks.read().unwrap().working_bank()
     }
 
     pub fn new(
         storage_state: StorageState,
         config: JsonRpcConfig,
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<BankForks>>,
         fullnode_exit: &Arc<AtomicBool>,
     ) -> Self {
         JsonRpcRequestProcessor {
-            bank_forks,
+            treasury_forks,
             storage_state,
             config,
             fullnode_exit: fullnode_exit.clone(),
@@ -654,8 +654,8 @@ mod tests {
     fn start_rpc_handler_with_tx(
         pubkey: &Pubkey,
     ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, Pubkey) {
-        let (bank_forks, alice) = new_bank_forks();
-        let treasury = bank_forks.read().unwrap().working_bank();
+        let (treasury_forks, alice) = new_bank_forks();
+        let treasury = treasury_forks.read().unwrap().working_bank();
         let exit = Arc::new(AtomicBool::new(false));
 
         let blockhash = treasury.confirmed_last_blockhash();
@@ -668,7 +668,7 @@ mod tests {
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
             StorageState::default(),
             JsonRpcConfig::default(),
-            bank_forks,
+            treasury_forks,
             &exit,
         )));
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
@@ -692,12 +692,12 @@ mod tests {
     fn test_rpc_request_processor_new() {
         let bob_pubkey = Pubkey::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
-        let (bank_forks, alice) = new_bank_forks();
-        let treasury = bank_forks.read().unwrap().working_bank();
+        let (treasury_forks, alice) = new_bank_forks();
+        let treasury = treasury_forks.read().unwrap().working_bank();
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
             JsonRpcConfig::default(),
-            bank_forks,
+            treasury_forks,
             &exit,
         );
         thread::spawn(move || {

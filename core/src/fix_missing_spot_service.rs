@@ -1,7 +1,7 @@
 //! The `repair_service` module implements the tools necessary to generate a thread which
 //! regularly finds missing blobs in the ledger and sends repair requests for those blobs
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver, MetaInfoCol};
 use crate::node_group_info::NodeGroupInfo;
@@ -30,7 +30,7 @@ pub const MAX_ORPHANS: usize = 5;
 pub enum RepairStrategy {
     RepairRange(RepairSlotRange),
     RepairAll {
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<BankForks>>,
         completed_slots_receiver: CompletedSlotsReceiver,
         epoch_schedule: EpochSchedule,
     },
@@ -113,12 +113,12 @@ impl RepairService {
         let id = node_group_info.read().unwrap().id();
         let mut current_root = 0;
         if let RepairStrategy::RepairAll {
-            ref bank_forks,
+            ref treasury_forks,
             ref epoch_schedule,
             ..
         } = repair_strategy
         {
-            current_root = bank_forks.read().unwrap().root();
+            current_root = treasury_forks.read().unwrap().root();
             Self::initialize_epoch_slots(
                 id,
                 block_buffer_pool,
@@ -144,11 +144,11 @@ impl RepairService {
                     }
 
                     RepairStrategy::RepairAll {
-                        ref bank_forks,
+                        ref treasury_forks,
                         ref completed_slots_receiver,
                         ..
                     } => {
-                        let new_root = bank_forks.read().unwrap().root();
+                        let new_root = treasury_forks.read().unwrap().root();
                         Self::update_epoch_slots(
                             id,
                             new_root,

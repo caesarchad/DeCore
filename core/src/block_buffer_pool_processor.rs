@@ -1,4 +1,4 @@
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::{Entry, EntrySlice};
@@ -326,7 +326,7 @@ pub fn process_block_buffer_pool(
                     next_slot,
                 ));
                 trace!("Add child treasury for slot={}", next_slot);
-                // bank_forks.insert(*next_slot, child_bank);
+                // treasury_forks.insert(*next_slot, child_bank);
                 pending_slots.push((
                     next_slot,
                     next_meta,
@@ -349,7 +349,7 @@ pub fn process_block_buffer_pool(
     }
 
     let (banks, bank_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
-    let bank_forks = BankForks::new_from_banks(&banks, root);
+    let treasury_forks = BankForks::new_from_banks(&banks, root);
     // info!(
     //     "{}",
     //     Info(format!("processing ledger...complete in {}ms, forks={}...",
@@ -400,7 +400,7 @@ pub fn process_block_buffer_pool(
             module_path!().to_string()
         )
     );
-    Ok((bank_forks, bank_forks_info, leader_schedule_cache))
+    Ok((treasury_forks, bank_forks_info, leader_schedule_cache))
 }
 
 #[cfg(test)]
@@ -552,7 +552,7 @@ pub mod tests {
         );
         block_buffer_pool.set_genesis(4, 0).unwrap();
 
-        let (bank_forks, bank_forks_info, _) =
+        let (treasury_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(bank_forks_info.len(), 1); // One fork, other one is ignored b/c not a descendant of the root
@@ -564,20 +564,20 @@ pub mod tests {
                 entry_height: ticks_per_slot * 3,
             }
         );
-        assert!(&bank_forks[4]
+        assert!(&treasury_forks[4]
             .parents()
             .iter()
             .map(|treasury| treasury.slot())
             .collect::<Vec<_>>()
             .is_empty());
 
-        // Ensure bank_forks holds the right banks
+        // Ensure treasury_forks holds the right banks
         for info in bank_forks_info {
-            assert_eq!(bank_forks[info.bank_slot].slot(), info.bank_slot);
-            assert!(bank_forks[info.bank_slot].is_frozen());
+            assert_eq!(treasury_forks[info.bank_slot].slot(), info.bank_slot);
+            assert!(treasury_forks[info.bank_slot].is_frozen());
         }
 
-        assert_eq!(bank_forks.root(), 4);
+        assert_eq!(treasury_forks.root(), 4);
     }
 
     #[test]
@@ -640,7 +640,7 @@ pub mod tests {
         block_buffer_pool.set_genesis(0, 0).unwrap();
         block_buffer_pool.set_genesis(1, 0).unwrap();
 
-        let (bank_forks, bank_forks_info, _) =
+        let (treasury_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(bank_forks_info.len(), 2); // There are two forks
@@ -652,7 +652,7 @@ pub mod tests {
             }
         );
         assert_eq!(
-            &bank_forks[3]
+            &treasury_forks[3]
                 .parents()
                 .iter()
                 .map(|treasury| treasury.slot())
@@ -667,7 +667,7 @@ pub mod tests {
             }
         );
         assert_eq!(
-            &bank_forks[4]
+            &treasury_forks[4]
                 .parents()
                 .iter()
                 .map(|treasury| treasury.slot())
@@ -675,12 +675,12 @@ pub mod tests {
             &[1]
         );
 
-        assert_eq!(bank_forks.root(), 1);
+        assert_eq!(treasury_forks.root(), 1);
 
-        // Ensure bank_forks holds the right banks
+        // Ensure treasury_forks holds the right banks
         for info in bank_forks_info {
-            assert_eq!(bank_forks[info.bank_slot].slot(), info.bank_slot);
-            assert!(bank_forks[info.bank_slot].is_frozen());
+            assert_eq!(treasury_forks[info.bank_slot].slot(), info.bank_slot);
+            assert!(treasury_forks[info.bank_slot].is_frozen());
         }
     }
 
@@ -720,7 +720,7 @@ pub mod tests {
         block_buffer_pool.set_genesis(last_slot + 1, last_slot).unwrap();
 
         // Check that we can properly restart the ledger / leader scheduler doesn't fail
-        let (bank_forks, bank_forks_info, _) =
+        let (treasury_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(bank_forks_info.len(), 1); // There is one fork
@@ -733,7 +733,7 @@ pub mod tests {
         );
 
         // The latest root should have purged all its parents
-        assert!(&bank_forks[last_slot + 1]
+        assert!(&treasury_forks[last_slot + 1]
             .parents()
             .iter()
             .map(|treasury| treasury.slot())
@@ -856,11 +856,11 @@ pub mod tests {
             .update_entries(1, 0, 0, genesis_block.ticks_per_slot, &entries)
             .unwrap();
         let entry_height = genesis_block.ticks_per_slot + entries.len() as u64;
-        let (bank_forks, bank_forks_info, _) =
+        let (treasury_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(bank_forks_info.len(), 1);
-        assert_eq!(bank_forks.root(), 0);
+        assert_eq!(treasury_forks.root(), 0);
         assert_eq!(
             bank_forks_info[0],
             BankForksInfo {
@@ -869,7 +869,7 @@ pub mod tests {
             }
         );
 
-        let treasury = bank_forks[1].clone();
+        let treasury = treasury_forks[1].clone();
         assert_eq!(
             treasury.get_balance(&mint_keypair.pubkey()),
             mint - deducted_from_mint
@@ -887,7 +887,7 @@ pub mod tests {
         let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
 
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
-        let (bank_forks, bank_forks_info, _) =
+        let (treasury_forks, bank_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(bank_forks_info.len(), 1);
@@ -898,7 +898,7 @@ pub mod tests {
                 entry_height: 1,
             }
         );
-        let treasury = bank_forks[0].clone();
+        let treasury = treasury_forks[0].clone();
         assert_eq!(treasury.tick_height(), 0);
     }
 

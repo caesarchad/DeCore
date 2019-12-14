@@ -1,6 +1,6 @@
 //! The `retransmit_stage` retransmits blobs between validators
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
@@ -23,7 +23,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::Duration;
 
 fn retransmit(
-    bank_forks: &Arc<RwLock<BankForks>>,
+    treasury_forks: &Arc<RwLock<BankForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     r: &BlobReceiver,
@@ -37,7 +37,7 @@ fn retransmit(
 
     datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
 
-    let r_bank = bank_forks.read().unwrap().working_bank();
+    let r_bank = treasury_forks.read().unwrap().working_bank();
     let bank_epoch = r_bank.get_stakers_epoch(r_bank.slot());
     let (neighbors, children) = compute_retransmit_peers(
         staking_utils::staked_nodes_at_epoch(&r_bank, bank_epoch).as_ref(),
@@ -67,12 +67,12 @@ fn retransmit(
 /// * `r` - Receive channel for blobs to be retransmitted to all the layer 1 nodes.
 fn retransmitter(
     sock: Arc<UdpSocket>,
-    bank_forks: Arc<RwLock<BankForks>>,
+    treasury_forks: Arc<RwLock<BankForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: Arc<RwLock<NodeGroupInfo>>,
     r: BlobReceiver,
 ) -> JoinHandle<()> {
-    let bank_forks = bank_forks.clone();
+    let treasury_forks = treasury_forks.clone();
     let leader_schedule_cache = leader_schedule_cache.clone();
     Builder::new()
         .name("morgan-retransmitter".to_string())
@@ -80,7 +80,7 @@ fn retransmitter(
             trace!("retransmitter started");
             loop {
                 if let Err(e) = retransmit(
-                    &bank_forks,
+                    &treasury_forks,
                     &leader_schedule_cache,
                     &node_group_info,
                     &r,
@@ -173,7 +173,7 @@ impl RetransmitStage {
     #[allow(clippy::new_ret_no_self)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<BankForks>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -189,14 +189,14 @@ impl RetransmitStage {
 
         let t_retransmit = retransmitter(
             retransmit_socket,
-            bank_forks.clone(),
+            treasury_forks.clone(),
             leader_schedule_cache,
             node_group_info.clone(),
             retransmit_receiver,
         );
 
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks,
+            treasury_forks,
             completed_slots_receiver,
             epoch_schedule,
         };

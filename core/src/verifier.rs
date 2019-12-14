@@ -1,6 +1,6 @@
 //! The `fullnode` module hosts all the fullnode microservices.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::block_buffer_pool_processor::{self, BankForksInfo};
@@ -98,7 +98,7 @@ impl Validator {
         let genesis_blockhash = treasury.last_blockhash();
 
         let (
-            bank_forks,
+            treasury_forks,
             bank_forks_info,
             block_buffer_pool,
             ledger_signal_receiver,
@@ -110,7 +110,7 @@ impl Validator {
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
         let bank_info = &bank_forks_info[0];
-        let treasury = bank_forks[bank_info.bank_slot].clone();
+        let treasury = treasury_forks[bank_info.bank_slot].clone();
 
         // info!(
         //     "{}",
@@ -175,7 +175,7 @@ impl Validator {
                 module_path!().to_string()
             )
         );
-        let bank_forks = Arc::new(RwLock::new(bank_forks));
+        let treasury_forks = Arc::new(RwLock::new(treasury_forks));
 
         node.info.wallclock = timestamp();
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new(
@@ -193,7 +193,7 @@ impl Validator {
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), node.info.rpc.port()),
                 storage_state.clone(),
                 config.rpc_config.clone(),
-                bank_forks.clone(),
+                treasury_forks.clone(),
                 &exit,
             ))
         };
@@ -218,7 +218,7 @@ impl Validator {
         let gossip_service = GossipService::new(
             &node_group_info,
             Some(block_buffer_pool.clone()),
-            Some(bank_forks.clone()),
+            Some(treasury_forks.clone()),
             node.sockets.gossip,
             &exit,
         );
@@ -262,7 +262,7 @@ impl Validator {
             vote_account,
             voting_keypair,
             storage_keypair,
-            &bank_forks,
+            &treasury_forks,
             &node_group_info,
             sockets,
             block_buffer_pool.clone(),
@@ -348,12 +348,12 @@ pub fn new_banks_from_block_buffer(
         BlockBufferPool::open_by_message(block_buffer_pool_path)
             .expect("Expected to successfully open database ledger");
 
-    let (bank_forks, bank_forks_info, leader_schedule_cache) =
+    let (treasury_forks, bank_forks_info, leader_schedule_cache) =
         block_buffer_pool_processor::process_block_buffer_pool(&genesis_block, &block_buffer_pool, account_paths)
             .expect("process_block_buffer_pool failed");
 
     (
-        bank_forks,
+        treasury_forks,
         bank_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,

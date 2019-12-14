@@ -1,6 +1,6 @@
 //! The `rpc_service` module implements the Morgan JSON RPC service.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::rpc::*;
@@ -28,7 +28,7 @@ impl JsonRpcService {
         rpc_addr: SocketAddr,
         storage_state: StorageState,
         config: JsonRpcConfig,
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<BankForks>>,
         exit: &Arc<AtomicBool>,
     ) -> Self {
         // info!("{}", Info(format!("rpc bound to {:?}", rpc_addr).to_string()));
@@ -48,7 +48,7 @@ impl JsonRpcService {
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
             storage_state,
             config,
-            bank_forks,
+            treasury_forks,
             exit,
         )));
         let request_processor_ = request_processor.clone();
@@ -188,13 +188,13 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             morgan_netutil::find_available_port_in_range((10000, 65535)).unwrap(),
         );
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury)));
         let rpc_service = JsonRpcService::new(
             &node_group_info,
             rpc_addr,
             StorageState::default(),
             JsonRpcConfig::default(),
-            bank_forks,
+            treasury_forks,
             &exit,
         );
         let thread = rpc_service.thread_hdl.thread();

@@ -1,6 +1,6 @@
 //! The `replay_stage` replays transactions broadcast by the leader.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::block_buffer_pool_processor;
@@ -79,7 +79,7 @@ impl ReplayStage {
         vote_account: &Pubkey,
         voting_keypair: Option<&Arc<T>>,
         block_buffer_pool: Arc<BlockBufferPool>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
         exit: &Arc<AtomicBool>,
         ledger_signal_receiver: Receiver<bool>,
@@ -95,11 +95,11 @@ impl ReplayStage {
         trace!("replay stage");
         let exit_ = exit.clone();
         let subscriptions = subscriptions.clone();
-        let bank_forks = bank_forks.clone();
+        let treasury_forks = treasury_forks.clone();
         let waterclock_recorder = waterclock_recorder.clone();
         let my_pubkey = *my_pubkey;
         let mut ticks_per_slot = 0;
-        let mut locktower = Locktower::new_from_forks(&bank_forks.read().unwrap(), &my_pubkey);
+        let mut locktower = Locktower::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
         // Start the replay stage loop
         let leader_schedule_cache = leader_schedule_cache.clone();
         let vote_account = *vote_account;
@@ -118,7 +118,7 @@ impl ReplayStage {
 
                     Self::generate_new_bank_forks(
                         &block_buffer_pool,
-                        &mut bank_forks.write().unwrap(),
+                        &mut treasury_forks.write().unwrap(),
                         &leader_schedule_cache,
                     );
 
@@ -126,7 +126,7 @@ impl ReplayStage {
 
                     Self::replay_active_banks(
                         &block_buffer_pool,
-                        &bank_forks,
+                        &treasury_forks,
                         &my_pubkey,
                         &mut ticks_per_slot,
                         &mut progress,
@@ -134,20 +134,20 @@ impl ReplayStage {
                     )?;
 
                     if ticks_per_slot == 0 {
-                        let frozen_banks = bank_forks.read().unwrap().frozen_banks();
+                        let frozen_banks = treasury_forks.read().unwrap().frozen_banks();
                         let treasury = frozen_banks.values().next().unwrap();
                         ticks_per_slot = treasury.ticks_per_slot();
                     }
 
                     let votable =
-                        Self::generate_votable_banks(&bank_forks, &locktower, &mut progress);
+                        Self::generate_votable_banks(&treasury_forks, &locktower, &mut progress);
 
                     if let Some((_, treasury)) = votable.last() {
-                        subscriptions.notify_subscribers(treasury.slot(), &bank_forks);
+                        subscriptions.notify_subscribers(treasury.slot(), &treasury_forks);
 
                         Self::handle_votable_bank(
                             &treasury,
-                            &bank_forks,
+                            &treasury_forks,
                             &mut locktower,
                             &mut progress,
                             &vote_account,
@@ -186,7 +186,7 @@ impl ReplayStage {
                         );
                         Self::start_leader(
                             &my_pubkey,
-                            &bank_forks,
+                            &treasury_forks,
                             &waterclock_recorder,
                             &node_group_info,
                             waterclock_slot,
@@ -215,7 +215,7 @@ impl ReplayStage {
     }
     pub fn start_leader(
         my_pubkey: &Pubkey,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         waterclock_slot: u64,
@@ -224,10 +224,10 @@ impl ReplayStage {
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         trace!("{} checking waterclock slot {}", my_pubkey, waterclock_slot);
-        if bank_forks.read().unwrap().get(waterclock_slot).is_none() {
+        if treasury_forks.read().unwrap().get(waterclock_slot).is_none() {
             let parent_slot = waterclock_recorder.lock().unwrap().start_slot();
             let parent = {
-                let r_bf = bank_forks.read().unwrap();
+                let r_bf = treasury_forks.read().unwrap();
                 r_bf.get(parent_slot)
                     .expect("start slot doesn't exist in treasury forks")
                     .clone()
@@ -248,10 +248,10 @@ impl ReplayStage {
                             ("count", waterclock_slot, i64),
                             ("grace", grace_ticks, i64));
                         let tpu_bank = Bank::new_from_parent(&parent, my_pubkey, waterclock_slot);
-                        bank_forks.write().unwrap().insert(tpu_bank);
-                        if let Some(tpu_bank) = bank_forks.read().unwrap().get(waterclock_slot).cloned() {
+                        treasury_forks.write().unwrap().insert(tpu_bank);
+                        if let Some(tpu_bank) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
                             assert_eq!(
-                                bank_forks.read().unwrap().working_bank().slot(),
+                                treasury_forks.read().unwrap().working_bank().slot(),
                                 tpu_bank.slot()
                             );
                             debug!(
@@ -305,7 +305,7 @@ impl ReplayStage {
     #[allow(clippy::too_many_arguments)]
     fn handle_votable_bank<T>(
         treasury: &Arc<Bank>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         locktower: &mut Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
         vote_account: &Pubkey,
@@ -320,7 +320,7 @@ impl ReplayStage {
     {
         if let Some(new_root) = locktower.record_vote(treasury.slot(), treasury.hash()) {
             // get the root treasury before squash
-            let root_bank = bank_forks
+            let root_bank = treasury_forks
                 .read()
                 .unwrap()
                 .get(new_root)
@@ -332,16 +332,16 @@ impl ReplayStage {
                 .map(|treasury| treasury.slot())
                 .collect::<Vec<_>>();
             rooted_slots.push(root_bank.slot());
-            let old_root = bank_forks.read().unwrap().root();
+            let old_root = treasury_forks.read().unwrap().root();
             block_buffer_pool
                 .set_genesis(new_root, old_root)
                 .expect("Ledger set root failed");
-            // Set root first in leader schedule_cache before bank_forks because bank_forks.root
+            // Set root first in leader schedule_cache before treasury_forks because treasury_forks.root
             // is consumed by repair_service to update gossip, so we don't want to get blobs for
             // repair on gossip before we update leader schedule, otherwise they may get dropped.
             leader_schedule_cache.set_genesis(new_root);
-            bank_forks.write().unwrap().set_genesis(new_root);
-            Self::handle_new_root(&bank_forks, progress);
+            treasury_forks.write().unwrap().set_genesis(new_root);
+            Self::handle_new_root(&treasury_forks, progress);
             root_slot_sender.send(rooted_slots)?;
         }
         locktower.update_epoch(&treasury);
@@ -392,17 +392,17 @@ impl ReplayStage {
 
     fn replay_active_banks(
         block_buffer_pool: &Arc<BlockBufferPool>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         my_pubkey: &Pubkey,
         ticks_per_slot: &mut u64,
         progress: &mut HashMap<u64, ForkProgress>,
         slot_full_sender: &Sender<(u64, Pubkey)>,
     ) -> Result<()> {
-        let active_banks = bank_forks.read().unwrap().active_banks();
+        let active_banks = treasury_forks.read().unwrap().active_banks();
         trace!("active banks {:?}", active_banks);
 
         for bank_slot in &active_banks {
-            let treasury = bank_forks.read().unwrap().get(*bank_slot).unwrap().clone();
+            let treasury = treasury_forks.read().unwrap().get(*bank_slot).unwrap().clone();
             *ticks_per_slot = treasury.ticks_per_slot();
             if treasury.collector_id() != *my_pubkey {
                 Self::replay_block_buffer_into_bank(&treasury, &block_buffer_pool, progress)?;
@@ -416,15 +416,15 @@ impl ReplayStage {
     }
 
     fn generate_votable_banks(
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         locktower: &Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Vec<(u128, Arc<Bank>)> {
         let locktower_start = Instant::now();
         // Locktower voting
-        let descendants = bank_forks.read().unwrap().descendants();
-        let ancestors = bank_forks.read().unwrap().ancestors();
-        let frozen_banks = bank_forks.read().unwrap().frozen_banks();
+        let descendants = treasury_forks.read().unwrap().descendants();
+        let ancestors = treasury_forks.read().unwrap().ancestors();
+        let frozen_banks = treasury_forks.read().unwrap().frozen_banks();
 
         trace!("frozen_banks {}", frozen_banks.len());
         let mut votable: Vec<(u128, Arc<Bank>)> = frozen_banks
@@ -462,7 +462,7 @@ impl ReplayStage {
             .filter(|(b, stake_lockouts)| {
                 let vote_threshold =
                     locktower.check_vote_stake_threshold(b.slot(), &stake_lockouts);
-                Self::confirm_forks(locktower, stake_lockouts, progress, bank_forks);
+                Self::confirm_forks(locktower, stake_lockouts, progress, treasury_forks);
                 debug!("treasury vote_threshold: {} {}", b.slot(), vote_threshold);
                 vote_threshold
             })
@@ -512,12 +512,12 @@ impl ReplayStage {
         locktower: &Locktower,
         stake_lockouts: &HashMap<u64, StakeLockout>,
         progress: &mut HashMap<u64, ForkProgress>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
     ) {
         progress.retain(|slot, prog| {
             let duration = timing::timestamp() - prog.started_ms;
             if locktower.is_slot_confirmed(*slot, stake_lockouts)
-                && bank_forks
+                && treasury_forks
                     .read()
                     .unwrap()
                     .get(*slot)
@@ -595,10 +595,10 @@ impl ReplayStage {
     }
 
     fn handle_new_root(
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         progress: &mut HashMap<u64, ForkProgress>,
     ) {
-        let r_bank_forks = bank_forks.read().unwrap();
+        let r_bank_forks = treasury_forks.read().unwrap();
         progress.retain(|k, _| r_bank_forks.get(*k).is_some());
     }
 
@@ -690,35 +690,35 @@ mod test {
             let genesis_block = create_genesis_block(10_000).genesis_block;
             let bank0 = Bank::new(&genesis_block);
             let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank0));
-            let mut bank_forks = BankForks::new(0, bank0);
-            bank_forks.working_bank().freeze();
+            let mut treasury_forks = BankForks::new(0, bank0);
+            treasury_forks.working_bank().freeze();
 
             // Insert blob for slot 1, generate new forks, check result
             let mut blob_slot_1 = Blob::default();
             blob_slot_1.set_slot(1);
             blob_slot_1.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_1]).unwrap();
-            assert!(bank_forks.get(1).is_none());
+            assert!(treasury_forks.get(1).is_none());
             ReplayStage::generate_new_bank_forks(
                 &block_buffer_pool,
-                &mut bank_forks,
+                &mut treasury_forks,
                 &leader_schedule_cache,
             );
-            assert!(bank_forks.get(1).is_some());
+            assert!(treasury_forks.get(1).is_some());
 
             // Insert blob for slot 3, generate new forks, check result
             let mut blob_slot_2 = Blob::default();
             blob_slot_2.set_slot(2);
             blob_slot_2.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_2]).unwrap();
-            assert!(bank_forks.get(2).is_none());
+            assert!(treasury_forks.get(2).is_none());
             ReplayStage::generate_new_bank_forks(
                 &block_buffer_pool,
-                &mut bank_forks,
+                &mut treasury_forks,
                 &leader_schedule_cache,
             );
-            assert!(bank_forks.get(1).is_some());
-            assert!(bank_forks.get(2).is_some());
+            assert!(treasury_forks.get(1).is_some());
+            assert!(treasury_forks.get(2).is_some());
         }
 
         let _ignored = remove_dir_all(&ledger_path);
@@ -728,10 +728,10 @@ mod test {
     fn test_handle_new_root() {
         let genesis_block = create_genesis_block(10_000).genesis_block;
         let bank0 = Bank::new(&genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank0)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, bank0)));
         let mut progress = HashMap::new();
         progress.insert(5, ForkProgress::new(Hash::default()));
-        ReplayStage::handle_new_root(&bank_forks, &mut progress);
+        ReplayStage::handle_new_root(&treasury_forks, &mut progress);
         assert!(progress.is_empty());
     }
 }

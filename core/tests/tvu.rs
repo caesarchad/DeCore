@@ -88,7 +88,7 @@ fn test_replay() {
     let tvu_addr = target1.info.tvu;
 
     let (
-        bank_forks,
+        treasury_forks,
         _bank_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,
@@ -96,7 +96,7 @@ fn test_replay() {
         leader_schedule_cache,
         _,
     ) = verifier::new_banks_from_block_buffer(&block_buffer_pool_path, None);
-    let working_bank = bank_forks.working_bank();
+    let working_bank = treasury_forks.working_bank();
     assert_eq!(
         working_bank.get_balance(&mint_keypair.pubkey()),
         mint_balance
@@ -104,7 +104,7 @@ fn test_replay() {
 
     let leader_schedule_cache = Arc::new(leader_schedule_cache);
     // start cluster_info1
-    let bank_forks = Arc::new(RwLock::new(bank_forks));
+    let treasury_forks = Arc::new(RwLock::new(treasury_forks));
     let mut cluster_info1 = NodeGroupInfo::new_with_invalid_keypair(target1.info.clone());
     cluster_info1.insert_info(leader.info.clone());
     let cref1 = Arc::new(RwLock::new(cluster_info1));
@@ -120,7 +120,7 @@ fn test_replay() {
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
-            &bank_forks,
+            &treasury_forks,
             &cref1,
             {
                 Sockets {
@@ -192,7 +192,7 @@ fn test_replay() {
             );
         }
 
-        let working_bank = bank_forks.read().unwrap().working_bank();
+        let working_bank = treasury_forks.read().unwrap().working_bank();
         let final_mint_balance = working_bank.get_balance(&mint_keypair.pubkey());
         assert_eq!(final_mint_balance, mint_ref_balance);
 

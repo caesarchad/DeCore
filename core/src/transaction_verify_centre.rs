@@ -12,7 +12,7 @@
 //! 4. StorageStage
 //! - Generating the keys used to encrypt the ledger and sample it for storage mining.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::fetch_spot_stage::BlobFetchStage;
 use crate::block_stream_service::BlockstreamService;
@@ -60,7 +60,7 @@ impl Tvu {
         vote_account: &Pubkey,
         voting_keypair: Option<&Arc<T>>,
         storage_keypair: &Arc<Keypair>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         sockets: Sockets,
         block_buffer_pool: Arc<BlockBufferPool>,
@@ -102,7 +102,7 @@ impl Tvu {
         //the packets coming out of blob_receiver need to be sent to the GPU and verified
         //then sent to the window, which does the erasure coding reconstruction
         let retransmit_stage = RetransmitStage::new(
-            bank_forks.clone(),
+            treasury_forks.clone(),
             leader_schedule_cache,
             block_buffer_pool.clone(),
             &node_group_info,
@@ -112,7 +112,7 @@ impl Tvu {
             &exit,
             genesis_blockhash,
             completed_slots_receiver,
-            *bank_forks.read().unwrap().working_bank().epoch_schedule(),
+            *treasury_forks.read().unwrap().working_bank().epoch_schedule(),
         );
 
         let (replay_stage, slot_full_receiver, root_slot_receiver) = ReplayStage::new(
@@ -120,7 +120,7 @@ impl Tvu {
             vote_account,
             voting_keypair,
             block_buffer_pool.clone(),
-            &bank_forks,
+            &treasury_forks,
             node_group_info.clone(),
             &exit,
             ledger_signal_receiver,
@@ -148,7 +148,7 @@ impl Tvu {
             &keypair,
             storage_keypair,
             &exit,
-            &bank_forks,
+            &treasury_forks,
             storage_rotate_count,
             &node_group_info,
         );
@@ -251,7 +251,7 @@ pub mod tests {
         let starting_balance = 10_000;
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(starting_balance);
 
-        let bank_forks = BankForks::new(0, Bank::new(&genesis_block));
+        let treasury_forks = BankForks::new(0, Bank::new(&genesis_block));
 
         //start cluster_info1
         let mut cluster_info1 = NodeGroupInfo::new_with_invalid_keypair(target1.info.clone());
@@ -263,7 +263,7 @@ pub mod tests {
             BlockBufferPool::open_by_message(&block_buffer_pool_path)
                 .expect("Expected to successfully open ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let treasury = bank_forks.working_bank();
+        let treasury = treasury_forks.working_bank();
         let (exit, waterclock_recorder, waterclock_service, _entry_receiver) =
             create_test_recorder(&treasury, &block_buffer_pool);
         let voting_keypair = Keypair::new();
@@ -273,7 +273,7 @@ pub mod tests {
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
-            &Arc::new(RwLock::new(bank_forks)),
+            &Arc::new(RwLock::new(treasury_forks)),
             &cref1,
             {
                 Sockets {

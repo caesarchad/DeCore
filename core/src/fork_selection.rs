@@ -1,4 +1,4 @@
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::staking_utils;
 use hashbrown::{HashMap, HashSet};
@@ -72,8 +72,8 @@ impl EpochStakes {
 }
 
 impl Locktower {
-    pub fn new_from_forks(bank_forks: &BankForks, my_pubkey: &Pubkey) -> Self {
-        let mut frozen_banks: Vec<_> = bank_forks.frozen_banks().values().cloned().collect();
+    pub fn new_from_forks(treasury_forks: &BankForks, my_pubkey: &Pubkey) -> Self {
+        let mut frozen_banks: Vec<_> = treasury_forks.frozen_banks().values().cloned().collect();
         frozen_banks.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
             if let Some(treasury) = frozen_banks.last() {
@@ -91,7 +91,7 @@ impl Locktower {
             recent_votes: VecDeque::default(),
         };
 
-        let treasury = locktower.find_heaviest_bank(bank_forks).unwrap();
+        let treasury = locktower.find_heaviest_bank(treasury_forks).unwrap();
         locktower.lockouts =
             Self::initialize_lockouts_from_bank(&treasury, locktower.epoch_stakes.epoch);
         locktower
@@ -383,9 +383,9 @@ impl Locktower {
         self.calculate_weight(&stake_lockouts)
     }
 
-    fn find_heaviest_bank(&self, bank_forks: &BankForks) -> Option<Arc<Bank>> {
-        let ancestors = bank_forks.ancestors();
-        let mut bank_weights: Vec<_> = bank_forks
+    fn find_heaviest_bank(&self, treasury_forks: &BankForks) -> Option<Arc<Bank>> {
+        let ancestors = treasury_forks.ancestors();
+        let mut bank_weights: Vec<_> = treasury_forks
             .frozen_banks()
             .values()
             .map(|b| {

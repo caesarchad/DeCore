@@ -2,7 +2,7 @@
 // for storage mining. miners submit storage proofs, validator then bundles them
 // to submit its proof for mining to be rewarded.
 
-// use crate::bank_forks::BankForks;
+// use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::BlockBufferPool;
 #[cfg(all(feature = "chacha", feature = "cuda"))]
@@ -138,7 +138,7 @@ impl StorageStage {
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         exit: &Arc<AtomicBool>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         storage_rotate_count: u64,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     ) -> Self {
@@ -197,14 +197,14 @@ impl StorageStage {
             let exit = exit.clone();
             let keypair = keypair.clone();
             let storage_keypair = storage_keypair.clone();
-            let bank_forks = bank_forks.clone();
+            let treasury_forks = treasury_forks.clone();
             Builder::new()
                 .name("morgan-storage-create-accounts".to_string())
                 .spawn(move || {
                     let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
                     {
-                        let working_bank = bank_forks.read().unwrap().working_bank();
+                        let working_bank = treasury_forks.read().unwrap().working_bank();
                         let storage_account = working_bank.get_account(&storage_keypair.pubkey());
                         if storage_account.is_none() {
                             // warn!("Storage account not found: {}", storage_keypair.pubkey());
@@ -222,7 +222,7 @@ impl StorageStage {
                         match instruction_receiver.recv_timeout(Duration::from_secs(1)) {
                             Ok(instruction) => {
                                 Self::send_transaction(
-                                    &bank_forks,
+                                    &treasury_forks,
                                     &node_group_info,
                                     instruction,
                                     &keypair,
@@ -261,14 +261,14 @@ impl StorageStage {
     }
 
     fn send_transaction(
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<BankForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         instruction: Instruction,
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         transactions_socket: &UdpSocket,
     ) -> io::Result<()> {
-        let working_bank = bank_forks.read().unwrap().working_bank();
+        let working_bank = treasury_forks.read().unwrap().working_bank();
         let blockhash = working_bank.confirmed_last_blockhash();
         let keypair_balance = working_bank.get_balance(&keypair.pubkey());
 
@@ -609,7 +609,7 @@ mod tests {
         let node_group_info = test_node_group_info(&keypair.pubkey());
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let treasury = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StorageStage::new(
@@ -619,7 +619,7 @@ mod tests {
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
@@ -648,7 +648,7 @@ mod tests {
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let slot = 1;
         let treasury = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         block_buffer_pool
             .update_entries(slot, 0, 0, ticks_per_slot, &entries)
             .unwrap();
@@ -664,7 +664,7 @@ mod tests {
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
@@ -743,7 +743,7 @@ mod tests {
             .update_entries(1, 0, 0, ticks_per_slot, &entries)
             .unwrap();
         let treasury = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
         let (slot_sender, slot_receiver) = channel();
@@ -755,7 +755,7 @@ mod tests {
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
