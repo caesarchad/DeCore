@@ -2,7 +2,7 @@
 
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::inc_new_counter_info;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::timing;
 use std::ops::Index;
 use std::sync::Arc;
@@ -23,9 +23,9 @@ impl Index<u64> for BankForks {
 }
 
 impl BankForks {
-    pub fn new(bank_slot: u64, bank: Bank) -> Self {
+    pub fn new(bank_slot: u64, treasury: Bank) -> Self {
         let mut banks = HashMap::new();
-        let working_bank = Arc::new(bank);
+        let working_bank = Arc::new(treasury);
         banks.insert(bank_slot, working_bank.clone());
         Self {
             banks,
@@ -34,29 +34,29 @@ impl BankForks {
         }
     }
 
-    /// Create a map of bank slot id to the set of ancestors for the bank slot.
+    /// Create a map of treasury slot id to the set of ancestors for the treasury slot.
     pub fn ancestors(&self) -> HashMap<u64, HashSet<u64>> {
         let mut ancestors = HashMap::new();
-        for bank in self.banks.values() {
-            let mut set: HashSet<u64> = bank.ancestors.keys().cloned().collect();
-            set.remove(&bank.slot());
-            ancestors.insert(bank.slot(), set);
+        for treasury in self.banks.values() {
+            let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
+            set.remove(&treasury.slot());
+            ancestors.insert(treasury.slot(), set);
         }
         ancestors
     }
 
-    /// Create a map of bank slot id to the set of all of its descendants
+    /// Create a map of treasury slot id to the set of all of its descendants
     pub fn descendants(&self) -> HashMap<u64, HashSet<u64>> {
         let mut descendants = HashMap::new();
-        for bank in self.banks.values() {
-            let _ = descendants.entry(bank.slot()).or_insert(HashSet::new());
-            let mut set: HashSet<u64> = bank.ancestors.keys().cloned().collect();
-            set.remove(&bank.slot());
+        for treasury in self.banks.values() {
+            let _ = descendants.entry(treasury.slot()).or_insert(HashSet::new());
+            let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
+            set.remove(&treasury.slot());
             for parent in set {
                 descendants
                     .entry(parent)
                     .or_insert(HashSet::new())
-                    .insert(bank.slot());
+                    .insert(treasury.slot());
             }
         }
         descendants
@@ -85,8 +85,8 @@ impl BankForks {
     pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
         let mut banks = HashMap::new();
         let working_bank = initial_banks[0].clone();
-        for bank in initial_banks {
-            banks.insert(bank.slot(), bank.clone());
+        for treasury in initial_banks {
+            banks.insert(treasury.slot(), treasury.clone());
         }
         Self {
             root,
@@ -95,12 +95,12 @@ impl BankForks {
         }
     }
 
-    pub fn insert(&mut self, bank: Bank) {
-        let bank = Arc::new(bank);
-        let prev = self.banks.insert(bank.slot(), bank.clone());
+    pub fn insert(&mut self, treasury: Bank) {
+        let treasury = Arc::new(treasury);
+        let prev = self.banks.insert(treasury.slot(), treasury.clone());
         assert!(prev.is_none());
 
-        self.working_bank = bank.clone();
+        self.working_bank = treasury.clone();
     }
 
     // TODO: really want to kill this...
@@ -114,22 +114,22 @@ impl BankForks {
         let root_bank = self
             .banks
             .get(&root)
-            .expect("root bank didn't exist in bank_forks");
+            .expect("root treasury didn't exist in bank_forks");
         let root_tx_count = root_bank
             .parents()
             .last()
-            .map(|bank| bank.transaction_count())
+            .map(|treasury| treasury.transaction_count())
             .unwrap_or(0);
         root_bank.squash();
         let new_tx_count = root_bank.transaction_count();
         self.prune_non_root(root);
 
         inc_new_counter_info!(
-            "bank-forks_set_root_ms",
+            "treasury-forks_set_root_ms",
             timing::duration_as_ms(&set_root_start.elapsed()) as usize
         );
         inc_new_counter_info!(
-            "bank-forks_set_root_tx_count",
+            "treasury-forks_set_root_tx_count",
             (new_tx_count - root_tx_count) as usize
         );
     }
@@ -213,8 +213,8 @@ mod tests {
     #[test]
     fn test_bank_forks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
+        let treasury = Bank::new(&genesis_block);
+        let mut bank_forks = BankForks::new(0, treasury);
         let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
         child_bank.register_tick(&Hash::default());
         bank_forks.insert(child_bank);
@@ -225,13 +225,13 @@ mod tests {
     #[test]
     fn test_bank_forks_descendants() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
+        let treasury = Bank::new(&genesis_block);
+        let mut bank_forks = BankForks::new(0, treasury);
         let bank0 = bank_forks[0].clone();
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
-        bank_forks.insert(bank);
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
-        bank_forks.insert(bank);
+        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
+        bank_forks.insert(treasury);
+        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
+        bank_forks.insert(treasury);
         let descendants = bank_forks.descendants();
         let children: Vec<u64> = descendants[&0].iter().cloned().collect();
         assert_eq!(children, vec![1, 2]);
@@ -242,13 +242,13 @@ mod tests {
     #[test]
     fn test_bank_forks_ancestors() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
+        let treasury = Bank::new(&genesis_block);
+        let mut bank_forks = BankForks::new(0, treasury);
         let bank0 = bank_forks[0].clone();
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
-        bank_forks.insert(bank);
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
-        bank_forks.insert(bank);
+        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
+        bank_forks.insert(treasury);
+        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
+        bank_forks.insert(treasury);
         let ancestors = bank_forks.ancestors();
         assert!(ancestors[&0].is_empty());
         let parents: Vec<u64> = ancestors[&1].iter().cloned().collect();
@@ -260,8 +260,8 @@ mod tests {
     #[test]
     fn test_bank_forks_frozen_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
+        let treasury = Bank::new(&genesis_block);
+        let mut bank_forks = BankForks::new(0, treasury);
         let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
         bank_forks.insert(child_bank);
         assert!(bank_forks.frozen_banks().get(&0).is_some());
@@ -271,8 +271,8 @@ mod tests {
     #[test]
     fn test_bank_forks_active_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
+        let treasury = Bank::new(&genesis_block);
+        let mut bank_forks = BankForks::new(0, treasury);
         let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
         bank_forks.insert(child_bank);
         assert_eq!(bank_forks.active_banks(), vec![1]);

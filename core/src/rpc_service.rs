@@ -168,7 +168,7 @@ mod tests {
     use super::*;
     use crate::connection_info::ContactInfo;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_interface::signature::KeypairUtil;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -180,7 +180,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let exit = Arc::new(AtomicBool::new(false));
-        let bank = Bank::new(&genesis_block);
+        let treasury = Bank::new(&genesis_block);
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             ContactInfo::default(),
         )));
@@ -188,7 +188,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             morgan_netutil::find_available_port_in_range((10000, 65535)).unwrap(),
         );
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(bank.slot(), bank)));
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury)));
         let rpc_service = JsonRpcService::new(
             &node_group_info,
             rpc_addr,

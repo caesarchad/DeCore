@@ -18,7 +18,7 @@ use morgan_client::rpc_client::RpcClient;
 use morgan_client::rpc_request::RpcRequest;
 use morgan_client::thin_client::ThinClient;
 use solana_ed25519_dalek as ed25519_dalek;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::client::{AsyncClient, SyncClient};
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{Hash, Hasher};
@@ -210,8 +210,8 @@ impl StorageMiner {
         // entries after being passed to window_service
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
-        let bank = Bank::new_with_paths(&genesis_block, None);
-        let genesis_blockhash = bank.last_blockhash();
+        let treasury = Bank::new_with_paths(&genesis_block, None);
+        let genesis_blockhash = treasury.last_blockhash();
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(ledger_path).expect("Expected to be able to open database ledger"),
         );

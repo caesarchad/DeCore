@@ -19,7 +19,7 @@ use crate::storage_stage::StorageState;
 use crate::transaction_process_centre::Tpu;
 use crate::transaction_verify_centre::{Sockets, Tvu};
 use morgan_metricbot::inc_new_counter_info;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -83,7 +83,7 @@ impl Validator {
         entrypoint_info_option: Option<&ContactInfo>,
         config: &ValidatorConfig,
     ) -> Self {
-        // info!("{}", Info(format!("creating bank...").to_string()));
+        // info!("{}", Info(format!("creating treasury...").to_string()));
         println!("{}",
             printLn(
                 format!("creating treasury...").to_string(),
@@ -94,8 +94,8 @@ impl Validator {
         assert_eq!(id, node.info.id);
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
-        let bank = Bank::new_with_paths(&genesis_block, None);
-        let genesis_blockhash = bank.last_blockhash();
+        let treasury = Bank::new_with_paths(&genesis_block, None);
+        let genesis_blockhash = treasury.last_blockhash();
 
         let (
             bank_forks,
@@ -110,19 +110,19 @@ impl Validator {
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
         let bank_info = &bank_forks_info[0];
-        let bank = bank_forks[bank_info.bank_slot].clone();
+        let treasury = bank_forks[bank_info.bank_slot].clone();
 
         // info!(
         //     "{}",
         //     Info(format!("starting Water Clock... {} {}",
-        //     bank.tick_height(),
-        //     bank.last_blockhash()).to_string())
+        //     treasury.tick_height(),
+        //     treasury.last_blockhash()).to_string())
         // );
         println!("{}",
             printLn(
                 format!("starting water clock... {} {}",
-                    bank.tick_height(),
-                    bank.last_blockhash()).to_string(),
+                    treasury.tick_height(),
+                    treasury.last_blockhash()).to_string(),
                 module_path!().to_string()
             )
         );
@@ -130,11 +130,11 @@ impl Validator {
 
         let waterclock_config = Arc::new(waterclock_config);
         let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new_with_clear_signal(
-            bank.tick_height(),
-            bank.last_blockhash(),
-            bank.slot(),
-            leader_schedule_cache.next_leader_slot(&id, bank.slot(), &bank, Some(&block_buffer_pool)),
-            bank.ticks_per_slot(),
+            treasury.tick_height(),
+            treasury.last_blockhash(),
+            treasury.slot(),
+            leader_schedule_cache.next_leader_slot(&id, treasury.slot(), &treasury, Some(&block_buffer_pool)),
+            treasury.ticks_per_slot(),
             &id,
             &block_buffer_pool,
             block_buffer_pool.new_blobs_signals.first().cloned(),
@@ -146,7 +146,7 @@ impl Validator {
         assert_eq!(
             block_buffer_pool.new_blobs_signals.len(),
             1,
-            "New blob signal for the TVU should be the same as the clear bank signal."
+            "New blob signal for the TVU should be the same as the clear treasury signal."
         );
 
         // info!("{}", Info(format!("node info: {:?}", node.info).to_string()));

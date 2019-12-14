@@ -107,7 +107,7 @@ mod tests {
     use crate::water_clock_recorder::WorkingBank;
     use crate::result::Result;
     use crate::test_tx::test_tx;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_interface::hash::hash;
     use morgan_interface::pubkey::Pubkey;
     use std::time::Duration;
@@ -115,8 +115,8 @@ mod tests {
     #[test]
     fn test_waterclock_service() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let prev_hash = bank.last_blockhash();
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let prev_hash = treasury.last_blockhash();
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool =
@@ -126,21 +126,21 @@ mod tests {
                 target_tick_duration: Duration::from_millis(42),
             });
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                bank.tick_height(),
+                treasury.tick_height(),
                 prev_hash,
-                bank.slot(),
+                treasury.slot(),
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &waterclock_config,
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
             let exit = Arc::new(AtomicBool::new(false));
             let working_bank = WorkingBank {
-                bank: bank.clone(),
-                min_tick_height: bank.tick_height(),
+                treasury: treasury.clone(),
+                min_tick_height: treasury.tick_height(),
                 max_tick_height: std::u64::MAX,
             };
 
@@ -158,7 +158,7 @@ mod tests {
                             let _ = waterclock_recorder
                                 .lock()
                                 .unwrap()
-                                .record(bank.slot(), h1, vec![tx]);
+                                .record(treasury.slot(), h1, vec![tx]);
 
                             if exit.load(Ordering::Relaxed) {
                                 break Ok(());

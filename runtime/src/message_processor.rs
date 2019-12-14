@@ -163,8 +163,8 @@ impl MessageProcessor {
 
     /// Execute an instruction
     /// This method calls the instruction's program entrypoint method and verifies that the result of
-    /// the call does not violate the bank's accounting rules.
-    /// The accounts are committed back to the bank only if this function returns Ok(_).
+    /// the call does not violate the treasury's accounting rules.
+    /// The accounts are committed back to the treasury only if this function returns Ok(_).
     fn execute_instruction(
         &self,
         message: &Message,
@@ -212,7 +212,7 @@ impl MessageProcessor {
 
     /// Process a message.
     /// This method calls each instruction in the message over the set of loaded Accounts
-    /// The accounts are committed back to the bank only if every instruction succeeds
+    /// The accounts are committed back to the treasury only if every instruction succeeds
     pub fn process_message(
         &self,
         message: &Message,

@@ -1,6 +1,6 @@
 #[cfg(any(feature = "bpf_c", feature = "bpf_rust"))]
 mod bpf {
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_runtime::bank_client::BankClient;
     use morgan_runtime::loader_utils::load_program;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -42,8 +42,8 @@ mod bpf {
             file.read_to_end(&mut elf).unwrap();
 
             let (genesis_block, alice_keypair) = create_genesis_block(50);
-            let bank = Bank::new(&genesis_block);
-            let bank_client = BankClient::new(bank);
+            let treasury = Bank::new(&genesis_block);
+            let bank_client = BankClient::new(treasury);
 
             // Call user program
             let program_id = load_program(&bank_client, &alice_keypair, &bpf_loader::id(), elf);
@@ -73,8 +73,8 @@ mod bpf {
                 file.read_to_end(&mut elf).unwrap();
 
                 let (genesis_block, alice_keypair) = create_genesis_block(50);
-                let bank = Bank::new(&genesis_block);
-                let bank_client = BankClient::new(bank);
+                let treasury = Bank::new(&genesis_block);
+                let bank_client = BankClient::new(treasury);
 
                 let loader_pubkey = load_program(
                     &bank_client,
@@ -119,8 +119,8 @@ mod bpf {
                 file.read_to_end(&mut elf).unwrap();
 
                 let (genesis_block, alice_keypair) = create_genesis_block(50);
-                let bank = Bank::new(&genesis_block);
-                let bank_client = BankClient::new(bank);
+                let treasury = Bank::new(&genesis_block);
+                let bank_client = BankClient::new(treasury);
 
                 let loader_pubkey = load_program(
                     &bank_client,

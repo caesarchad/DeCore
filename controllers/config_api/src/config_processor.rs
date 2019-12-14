@@ -46,7 +46,7 @@ mod tests {
     use crate::{config_instruction, id, ConfigState};
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_runtime::bank_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -75,16 +75,16 @@ mod tests {
 
     fn create_bank(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        (bank, mint_keypair)
+        let mut treasury = Bank::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        (treasury, mint_keypair)
     }
 
-    fn create_config_account(bank: Bank, mint_keypair: &Keypair) -> (BankClient, Keypair) {
+    fn create_config_account(treasury: Bank, mint_keypair: &Keypair) -> (BankClient, Keypair) {
         let config_keypair = Keypair::new();
         let config_pubkey = config_keypair.pubkey();
 
-        let bank_client = BankClient::new(bank);
+        let bank_client = BankClient::new(treasury);
         bank_client
             .send_instruction(
                 mint_keypair,
@@ -102,8 +102,8 @@ mod tests {
     #[test]
     fn test_process_create_ok() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_account_data = bank_client
             .get_account_data(&config_keypair.pubkey())
             .unwrap()
@@ -117,8 +117,8 @@ mod tests {
     #[test]
     fn test_process_store_ok() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
@@ -142,8 +142,8 @@ mod tests {
     #[test]
     fn test_process_store_fail_instruction_data_too_large() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
@@ -159,12 +159,12 @@ mod tests {
     #[test]
     fn test_process_store_fail_account0_not_signer() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_bank(10_000);
         let system_keypair = Keypair::new();
         let system_pubkey = system_keypair.pubkey();
 
-        bank.transfer(42, &mint_keypair, &system_pubkey).unwrap();
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        treasury.transfer(42, &mint_keypair, &system_pubkey).unwrap();
+        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let transfer_instruction =

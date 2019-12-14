@@ -290,7 +290,7 @@ mod tests {
     use jsonrpc_pubsub::{PubSubHandler, Session};
     use morgan_budget_api;
     use morgan_budget_api::budget_instruction;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_program;
@@ -329,9 +329,9 @@ mod tests {
         } = create_genesis_block(10_000);
         let bob = Keypair::new();
         let bob_pubkey = bob.pubkey();
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
 
@@ -365,8 +365,8 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let bob_pubkey = Pubkey::new_rand();
-        let bank = Bank::new(&genesis_block);
-        let arc_bank = Arc::new(bank);
+        let treasury = Bank::new(&genesis_block);
+        let arc_bank = Arc::new(treasury);
         let blockhash = arc_bank.last_blockhash();
 
         let session = create_session();
@@ -422,9 +422,9 @@ mod tests {
         let contract_state = Keypair::new();
         let budget_program_id = morgan_budget_api::id();
         let executable = false; // TODO
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
         let session = create_session();
@@ -553,9 +553,9 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();
@@ -582,9 +582,9 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();

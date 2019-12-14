@@ -587,7 +587,7 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
     use rayon::prelude::*;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_interface::hash::{Hash, Hasher};
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -608,8 +608,8 @@ mod tests {
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StorageStage::new(
@@ -647,8 +647,8 @@ mod tests {
         let entries = make_tiny_test_entries(64);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let slot = 1;
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         block_buffer_pool
             .update_entries(slot, 0, 0, ticks_per_slot, &entries)
             .unwrap();
@@ -742,8 +742,8 @@ mod tests {
         block_buffer_pool
             .update_entries(1, 0, 0, ticks_per_slot, &entries)
             .unwrap();
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
         let (slot_sender, slot_receiver) = channel();

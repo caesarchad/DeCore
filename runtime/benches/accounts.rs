@@ -2,21 +2,21 @@
 
 extern crate test;
 
-use morgan_runtime::bank::*;
+use morgan_runtime::treasury::*;
 use morgan_interface::account::Account;
 use morgan_interface::genesis_block::create_genesis_block;
 use morgan_interface::pubkey::Pubkey;
 use std::sync::Arc;
 use test::Bencher;
 
-fn deposit_many(bank: &Bank, pubkeys: &mut Vec<Pubkey>, num: usize) {
+fn deposit_many(treasury: &Bank, pubkeys: &mut Vec<Pubkey>, num: usize) {
     for t in 0..num {
         let pubkey = Pubkey::new_rand();
         let account = Account::new((t + 1) as u64, 0, 0, &Account::default().owner);
         pubkeys.push(pubkey.clone());
-        assert!(bank.get_account(&pubkey).is_none());
-        bank.deposit(&pubkey, (t + 1) as u64);
-        assert_eq!(bank.get_account(&pubkey).unwrap(), account);
+        assert!(treasury.get_account(&pubkey).is_none());
+        treasury.deposit(&pubkey, (t + 1) as u64);
+        assert_eq!(treasury.get_account(&pubkey).unwrap(), account);
     }
 }
 
@@ -42,8 +42,8 @@ fn test_accounts_squash(bencher: &mut Bencher) {
     deposit_many(&banks[0], &mut pubkeys, 250000);
     banks[0].freeze();
     // Measures the performance of the squash operation merging the accounts
-    // with the majority of the accounts present in the parent bank that is
-    // moved over to this bank.
+    // with the majority of the accounts present in the parent treasury that is
+    // moved over to this treasury.
     bencher.iter(|| {
         banks.push(Arc::new(Bank::new_from_parent(
             &banks[0],

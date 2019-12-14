@@ -7,7 +7,7 @@ use jsonrpc_core::futures::Future;
 use jsonrpc_pubsub::typed::Sink;
 use jsonrpc_pubsub::SubscriptionId;
 use serde::Serialize;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::account::Account;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
@@ -268,7 +268,7 @@ impl RpcSubscriptions {
     }
 
     /// Notify subscribers of changes to any accounts or new signatures since
-    /// the bank's last checkpoint.
+    /// the treasury's last checkpoint.
     pub fn notify_subscribers(&self, current_slot: u64, bank_forks: &Arc<RwLock<BankForks>>) {
         let pubkeys: Vec<_> = {
             let subs = self.account_subscriptions.read().unwrap();
@@ -313,9 +313,9 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
@@ -369,9 +369,9 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
@@ -423,9 +423,9 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&genesis_block);
+        let blockhash = treasury.last_blockhash();
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, blockhash);
         let signature = tx.signatures[0];

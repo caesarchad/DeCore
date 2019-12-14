@@ -166,7 +166,7 @@ pub fn process_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bank::Bank;
+    use crate::treasury::Bank;
     use crate::bank_client::BankClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
@@ -423,14 +423,14 @@ mod tests {
         let mallory_pubkey = mallory_keypair.pubkey();
 
         // Fund to account to bypass AccountNotFound error
-        let bank = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(bank);
+        let treasury = Bank::new(&genesis_block);
+        let bank_client = BankClient::new(treasury);
         bank_client
             .transfer(50, &alice_keypair, &mallory_pubkey)
             .unwrap();
 
         // Erroneously sign transaction with recipient account key
-        // No signature case is tested by bank `test_zero_signatures()`
+        // No signature case is tested by treasury `test_zero_signatures()`
         let account_metas = vec![
             AccountMeta::new(alice_pubkey, false),
             AccountMeta::new(mallory_pubkey, true),

@@ -53,8 +53,8 @@ impl Broadcast {
         genesis_blockhash: &Hash,
     ) -> Result<()> {
         let timer = Duration::new(1, 0);
-        let (mut bank, entries) = receiver.recv_timeout(timer)?;
-        let mut max_tick_height = bank.max_tick_height();
+        let (mut treasury, entries) = receiver.recv_timeout(timer)?;
+        let mut max_tick_height = treasury.max_tick_height();
 
         let run_start = Instant::now();
         let mut num_entries = entries.len();
@@ -65,13 +65,13 @@ impl Broadcast {
         assert!(last_tick <= max_tick_height);
         if last_tick != max_tick_height {
             while let Ok((same_bank, entries)) = receiver.try_recv() {
-                // If the bank changed, that implies the previous slot was interrupted and we do not have to
+                // If the treasury changed, that implies the previous slot was interrupted and we do not have to
                 // broadcast its entries.
-                if same_bank.slot() != bank.slot() {
+                if same_bank.slot() != treasury.slot() {
                     num_entries = 0;
                     ventries.clear();
-                    bank = same_bank.clone();
-                    max_tick_height = bank.max_tick_height();
+                    treasury = same_bank.clone();
+                    max_tick_height = treasury.max_tick_height();
                 }
                 num_entries += entries.len();
                 last_tick = entries.last().map(|v| v.1).unwrap_or(0);
@@ -83,11 +83,11 @@ impl Broadcast {
             }
         }
 
-        let bank_epoch = bank.get_stakers_epoch(bank.slot());
+        let bank_epoch = treasury.get_stakers_epoch(treasury.slot());
         let mut broadcast_table = node_group_info
             .read()
             .unwrap()
-            .sorted_tvu_peers(staking_utils::staked_nodes_at_epoch(&bank, bank_epoch).as_ref());
+            .sorted_tvu_peers(staking_utils::staked_nodes_at_epoch(&treasury, bank_epoch).as_ref());
 
         inc_new_counter_warn!("broadcast_service-num_peers", broadcast_table.len() + 1);
         // Layer 1, leader nodes are limited to the fanout size.
@@ -107,7 +107,7 @@ impl Broadcast {
             .collect();
 
         let blob_index = block_buffer_pool
-            .meta(bank.slot())
+            .meta(treasury.slot())
             .expect("Database error")
             .map(|meta| meta.consumed)
             .unwrap_or(0);
@@ -117,8 +117,8 @@ impl Broadcast {
             &self.id,
             genesis_blockhash,
             blob_index,
-            bank.slot(),
-            bank.parent().map_or(0, |parent| parent.slot()),
+            treasury.slot(),
+            treasury.parent().map_or(0, |parent| parent.slot()),
         );
 
         let contains_last_tick = last_tick == max_tick_height;
@@ -317,7 +317,7 @@ mod test {
     use crate::entry_info::create_ticks;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use std::sync::atomic::AtomicBool;
@@ -329,7 +329,7 @@ mod test {
     struct MockBroadcastStage {
         block_buffer_pool: Arc<BlockBufferPool>,
         broadcast_service: BroadcastStage,
-        bank: Arc<Bank>,
+        treasury: Arc<Bank>,
     }
 
     fn setup_dummy_broadcast_service(
@@ -355,7 +355,7 @@ mod test {
         let exit_sender = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Bank::new(&genesis_block));
 
         // Start up the broadcast stage
         let broadcast_service = BroadcastStage::new(
@@ -370,7 +370,7 @@ mod test {
         MockBroadcastStage {
             block_buffer_pool,
             broadcast_service,
-            bank,
+            treasury,
         }
     }
 
@@ -389,15 +389,15 @@ mod test {
                 &ledger_path,
                 entry_receiver,
             );
-            let bank = broadcast_service.bank.clone();
-            let start_tick_height = bank.tick_height();
-            let max_tick_height = bank.max_tick_height();
-            let ticks_per_slot = bank.ticks_per_slot();
+            let treasury = broadcast_service.treasury.clone();
+            let start_tick_height = treasury.tick_height();
+            let max_tick_height = treasury.max_tick_height();
+            let ticks_per_slot = treasury.ticks_per_slot();
 
             let ticks = create_ticks(max_tick_height - start_tick_height, Hash::default());
             for (i, tick) in ticks.into_iter().enumerate() {
                 entry_sender
-                    .send((bank.clone(), vec![(tick, i as u64 + 1)]))
+                    .send((treasury.clone(), vec![(tick, i as u64 + 1)]))
                     .expect("Expect successful send to broadcast service");
             }
 

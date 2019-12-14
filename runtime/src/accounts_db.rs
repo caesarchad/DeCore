@@ -427,7 +427,7 @@ impl AccountsDB {
 
 #[cfg(test)]
 mod tests {
-    // TODO: all the bank tests are bank specific, issue: 2194
+    // TODO: all the treasury tests are treasury specific, issue: 2194
     use super::*;
     use rand::{thread_rng, Rng};
     use morgan_interface::account::Account;
@@ -878,7 +878,7 @@ mod tests {
     #[test]
     fn test_lazy_gc_fork() {
         //This test is pedantic
-        //A fork is purged when a non root bank is cleaned up.  If a fork is behind root but it is
+        //A fork is purged when a non root treasury is cleaned up.  If a fork is behind root but it is
         //not root, it means we are retaining dead banks.
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);

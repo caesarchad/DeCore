@@ -143,7 +143,7 @@ impl ThinClient {
         self.rpc_client.wait_for_balance(pubkey, expected_balance)
     }
 
-    /// Check a signature in the bank. This method blocks
+    /// Check a signature in the treasury. This method blocks
     /// until the server sends a response.
     pub fn check_signature(&self, signature: &Signature) -> bool {
         self.rpc_client.check_signature(signature)

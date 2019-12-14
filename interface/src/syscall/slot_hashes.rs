@@ -1,4 +1,4 @@
-//! named accounts for synthesized data accounts for bank state, etc.
+//! named accounts for synthesized data accounts for treasury state, etc.
 //!
 //! this account carries the Bank's most recent blockhashes for some N parents
 //!

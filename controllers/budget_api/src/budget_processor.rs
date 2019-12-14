@@ -153,7 +153,7 @@ mod tests {
     use super::*;
     use crate::budget_instruction;
     use crate::id;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_runtime::bank_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -164,15 +164,15 @@ mod tests {
 
     fn create_bank(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        (bank, mint_keypair)
+        let mut treasury = Bank::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        (treasury, mint_keypair)
     }
 
     #[test]
     fn test_budget_payment() {
-        let (bank, alice_keypair) = create_bank(10_000);
-        let bank_client = BankClient::new(bank);
+        let (treasury, alice_keypair) = create_bank(10_000);
+        let bank_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let bob_pubkey = Pubkey::new_rand();
         let instructions = budget_instruction::payment(&alice_pubkey, &bob_pubkey, 100);
@@ -185,8 +185,8 @@ mod tests {
 
     #[test]
     fn test_unsigned_witness_key() {
-        let (bank, alice_keypair) = create_bank(10_000);
-        let bank_client = BankClient::new(bank);
+        let (treasury, alice_keypair) = create_bank(10_000);
+        let bank_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
 
         // Initialize BudgetState
@@ -233,8 +233,8 @@ mod tests {
 
     #[test]
     fn test_unsigned_timestamp() {
-        let (bank, alice_keypair) = create_bank(10_000);
-        let bank_client = BankClient::new(bank);
+        let (treasury, alice_keypair) = create_bank(10_000);
+        let bank_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
 
         // Initialize BudgetState
@@ -282,8 +282,8 @@ mod tests {
 
     #[test]
     fn test_pay_on_date() {
-        let (bank, alice_keypair) = create_bank(2);
-        let bank_client = BankClient::new(bank);
+        let (treasury, alice_keypair) = create_bank(2);
+        let bank_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
@@ -351,8 +351,8 @@ mod tests {
 
     #[test]
     fn test_cancel_payment() {
-        let (bank, alice_keypair) = create_bank(3);
-        let bank_client = BankClient::new(bank);
+        let (treasury, alice_keypair) = create_bank(3);
+        let bank_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();

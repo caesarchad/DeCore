@@ -7,7 +7,7 @@
 //! - Blobs are windowed until a contiguous chunk is available.  This stage also repairs and
 //! retransmits blobs that are in the queue.
 //! 3. ReplayStage
-//! - Transactions in blobs are processed and applied to the bank.
+//! - Transactions in blobs are processed and applied to the treasury.
 //! - TODO We need to verify the signatures in the blobs.
 //! 4. StorageStage
 //! - Generating the keys used to encrypt the ledger and sample it for storage mining.
@@ -50,7 +50,7 @@ pub struct Sockets {
 
 impl Tvu {
     /// This service receives messages from a leader in the network and processes the transactions
-    /// on the bank state.
+    /// on the treasury state.
     /// # Arguments
     /// * `node_group_info` - The node_group_info state.
     /// * `sockets` - fetch, repair, and retransmit sockets
@@ -238,7 +238,7 @@ pub mod tests {
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use std::sync::atomic::Ordering;
 
     #[test]
@@ -263,12 +263,12 @@ pub mod tests {
             BlockBufferPool::open_by_message(&block_buffer_pool_path)
                 .expect("Expected to successfully open ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let bank = bank_forks.working_bank();
+        let treasury = bank_forks.working_bank();
         let (exit, waterclock_recorder, waterclock_service, _entry_receiver) =
-            create_test_recorder(&bank, &block_buffer_pool);
+            create_test_recorder(&treasury, &block_buffer_pool);
         let voting_keypair = Keypair::new();
         let storage_keypair = Arc::new(Keypair::new());
-        let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank));
+        let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
         let tvu = Tvu::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),

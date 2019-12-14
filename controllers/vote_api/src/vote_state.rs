@@ -21,7 +21,7 @@ pub const INITIAL_LOCKOUT: usize = 2;
 pub struct Vote {
     /// A vote for height slot
     pub slot: u64,
-    // signature of the bank's state at given slot
+    // signature of the treasury's state at given slot
     pub hash: Hash,
 }
 
@@ -184,7 +184,7 @@ impl VoteState {
         let vote = Lockout::new(&vote);
 
         // TODO: Integrity checks
-        // Verify the vote's bank hash matches what is expected
+        // Verify the vote's treasury hash matches what is expected
 
         self.pop_expired_votes(vote.slot);
         // Once the stack is full, pop the oldest vote and distribute rewards

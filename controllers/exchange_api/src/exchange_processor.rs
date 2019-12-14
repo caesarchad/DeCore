@@ -675,7 +675,7 @@ pub fn process_instruction(
 mod test {
     use super::*;
     use crate::{exchange_instruction, id};
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_runtime::bank_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -762,14 +762,14 @@ mod test {
 
     fn create_bank(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        (bank, mint_keypair)
+        let mut treasury = Bank::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        (treasury, mint_keypair)
     }
 
-    fn create_client(bank: Bank, mint_keypair: Keypair) -> (BankClient, Keypair) {
+    fn create_client(treasury: Bank, mint_keypair: Keypair) -> (BankClient, Keypair) {
         let owner = Keypair::new();
-        let bank_client = BankClient::new(bank);
+        let bank_client = BankClient::new(treasury);
         bank_client
             .transfer(42, &mint_keypair, &owner.pubkey())
             .unwrap();
@@ -846,8 +846,8 @@ mod test {
     #[test]
     fn test_exchange_new_account() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
         let new_account_data = client.get_account_data(&new).unwrap().unwrap();
@@ -865,8 +865,8 @@ mod test {
     #[test]
     fn test_exchange_new_account_not_unallocated() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
@@ -878,8 +878,8 @@ mod test {
     #[test]
     fn test_exchange_new_transfer_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
 
@@ -909,8 +909,8 @@ mod test {
     #[test]
     fn test_exchange_new_trade_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let (trade, src) = trade(
             &client,
@@ -950,8 +950,8 @@ mod test {
     #[test]
     fn test_exchange_new_swap_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);
         let (to_trade, _) = trade(
@@ -1017,8 +1017,8 @@ mod test {
     #[test]
     fn test_exchange_trade_to_token_account() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_bank(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);
         let (to_trade, _) = trade(

@@ -57,7 +57,7 @@ impl ClusterInfoVoteListener {
                 return Ok(());
             }
             let (votes, new_ts) = node_group_info.read().unwrap().get_votes(last_ts);
-            if waterclock_recorder.lock().unwrap().bank().is_some() {
+            if waterclock_recorder.lock().unwrap().treasury().is_some() {
                 last_ts = new_ts;
                 inc_new_counter_debug!("node_group_info_vote_listener-recv_count", votes.len());
                 let msgs = packet::to_packets(&votes);

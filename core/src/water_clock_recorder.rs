@@ -1,5 +1,5 @@
 //! The `waterclock_recorder` module provides an object for synchronizing with Proof of History.
-//! It synchronizes Water Clock, bank's register_tick and the ledger
+//! It synchronizes Water Clock, treasury's register_tick and the ledger
 //!
 //! WaterClockRecorder will send ticks or entries to a WorkingBank, if the current range of ticks is
 //! within the specified WorkingBank range.
@@ -16,7 +16,7 @@ use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::leader_arrange_utils;
 use crate::water_clock::WaterClock;
 use crate::result::{Error, Result};
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::hash::Hash;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -40,7 +40,7 @@ pub type WorkingBankEntries = (Arc<Bank>, Vec<(Entry, u64)>);
 
 #[derive(Clone)]
 pub struct WorkingBank {
-    pub bank: Arc<Bank>,
+    pub treasury: Arc<Bank>,
     pub min_tick_height: u64,
     pub max_tick_height: u64,
 }
@@ -67,16 +67,16 @@ pub struct WaterClockRecorder {
 impl WaterClockRecorder {
     fn clear_bank(&mut self) {
         if let Some(working_bank) = self.working_bank.take() {
-            let bank = working_bank.bank;
+            let treasury = working_bank.treasury;
             let next_leader_slot = self.leader_schedule_cache.next_leader_slot(
                 &self.id,
-                bank.slot(),
-                &bank,
+                treasury.slot(),
+                &treasury,
                 Some(&self.block_buffer_pool),
             );
             let (start_leader_at_tick, last_leader_tick) = Self::compute_leader_slot_ticks(
                 &next_leader_slot,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 self.max_last_leader_grace_ticks,
             );
             self.start_leader_at_tick = start_leader_at_tick;
@@ -110,8 +110,8 @@ impl WaterClockRecorder {
         self.start_slot
     }
 
-    pub fn bank(&self) -> Option<Arc<Bank>> {
-        self.working_bank.clone().map(|w| w.bank)
+    pub fn treasury(&self) -> Option<Arc<Bank>> {
+        self.working_bank.clone().map(|w| w.treasury)
     }
 
     pub fn tick_height(&self) -> u64 {
@@ -167,7 +167,7 @@ impl WaterClockRecorder {
             .unwrap_or((None, None))
     }
 
-    // synchronize Water Clock with a bank
+    // synchronize Water Clock with a treasury
     pub fn reset(
         &mut self,
         tick_height: u64,
@@ -213,26 +213,26 @@ impl WaterClockRecorder {
     }
 
     pub fn set_working_bank(&mut self, working_bank: WorkingBank) {
-        trace!("new working bank");
+        trace!("new working treasury");
         self.working_bank = Some(working_bank);
     }
-    pub fn set_bank(&mut self, bank: &Arc<Bank>) {
-        let max_tick_height = (bank.slot() + 1) * bank.ticks_per_slot() - 1;
+    pub fn set_bank(&mut self, treasury: &Arc<Bank>) {
+        let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
         let working_bank = WorkingBank {
-            bank: bank.clone(),
-            min_tick_height: bank.tick_height(),
+            treasury: treasury.clone(),
+            min_tick_height: treasury.tick_height(),
             max_tick_height,
         };
-        self.ticks_per_slot = bank.ticks_per_slot();
+        self.ticks_per_slot = treasury.ticks_per_slot();
         self.set_working_bank(working_bank);
     }
 
-    // Flush cache will delay flushing the cache for a bank until it past the WorkingBank::min_tick_height
+    // Flush cache will delay flushing the cache for a treasury until it past the WorkingBank::min_tick_height
     // On a record flush will flush the cache at the WorkingBank::min_tick_height, since a record
     // occurs after the min_tick_height was generated
     fn flush_cache(&mut self, tick: bool) -> Result<()> {
-        // check_tick_height is called before flush cache, so it cannot overrun the bank
-        // so a bank that is so late that it's slot fully generated before it starts recording
+        // check_tick_height is called before flush cache, so it cannot overrun the treasury
+        // so a treasury that is so late that it's slot fully generated before it starts recording
         // will fail instead of broadcasting any ticks
         let working_bank = self
             .working_bank
@@ -257,34 +257,34 @@ impl WaterClockRecorder {
         let send_result = if entry_count > 0 {
             debug!(
                 "flush_cache: bank_slot: {} tick_height: {} max: {} sending: {}",
-                working_bank.bank.slot(),
-                working_bank.bank.tick_height(),
+                working_bank.treasury.slot(),
+                working_bank.treasury.tick_height(),
                 working_bank.max_tick_height,
                 entry_count,
             );
             let cache = &self.tick_cache[..entry_count];
             for t in cache {
-                working_bank.bank.register_tick(&t.0.hash);
+                working_bank.treasury.register_tick(&t.0.hash);
             }
             self.sender
-                .send((working_bank.bank.clone(), cache.to_vec()))
+                .send((working_bank.treasury.clone(), cache.to_vec()))
         } else {
             Ok(())
         };
         if self.tick_height >= working_bank.max_tick_height {
             // info!(
             //     "{}",
-            //     Info(format!("waterclock_record: max_tick_height reached, setting working bank {} to None",
-            //     working_bank.bank.slot()).to_string())
+            //     Info(format!("waterclock_record: max_tick_height reached, setting working treasury {} to None",
+            //     working_bank.treasury.slot()).to_string())
             // );
             let info:String = format!(
                 "water_clock_recorder: max timmer reached, setting current treasury {} to None",
-                working_bank.bank.slot()
+                working_bank.treasury.slot()
             ).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
 
-            self.start_slot = working_bank.max_tick_height / working_bank.bank.ticks_per_slot();
-            self.start_tick = (self.start_slot + 1) * working_bank.bank.ticks_per_slot();
+            self.start_slot = working_bank.max_tick_height / working_bank.treasury.ticks_per_slot();
+            self.start_tick = (self.start_slot + 1) * working_bank.treasury.ticks_per_slot();
             self.clear_bank();
         }
         if send_result.is_err() {
@@ -295,7 +295,7 @@ impl WaterClockRecorder {
                     module_path!().to_string()
                 )
             );
-            // revert the cache, but clear the working bank
+            // revert the cache, but clear the working treasury
             self.clear_bank();
         } else {
             // commit the flush
@@ -362,7 +362,7 @@ impl WaterClockRecorder {
                 .working_bank
                 .as_ref()
                 .ok_or(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))?;
-            if bank_slot != working_bank.bank.slot() {
+            if bank_slot != working_bank.treasury.slot() {
                 return Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached));
             }
 
@@ -380,7 +380,7 @@ impl WaterClockRecorder {
                     transactions,
                 };
                 self.sender
-                    .send((working_bank.bank.clone(), vec![(entry, self.tick_height)]))?;
+                    .send((working_bank.treasury.clone(), vec![(entry, self.tick_height)]))?;
                 return Ok(());
             }
             // record() might fail if the next Water Clock hash needs to be a tick.  But that's ok, tick()
@@ -437,7 +437,7 @@ impl WaterClockRecorder {
     }
 
     /// A recorder to synchronize Water Clock with the following data structures
-    /// * bank - the LastId's queue is updated on `tick` and `record` events
+    /// * treasury - the LastId's queue is updated on `tick` and `record` events
     /// * sender - the Entry channel that outputs to the ledger
     pub fn new(
         tick_height: u64,
@@ -562,22 +562,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank,
+                treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -596,22 +596,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -629,7 +629,7 @@ mod tests {
             assert_eq!(waterclock_recorder.tick_cache.len(), 0);
             let (bank_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
-            assert_eq!(bank_.slot(), bank.slot());
+            assert_eq!(bank_.slot(), treasury.slot());
             assert!(waterclock_recorder.working_bank.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -642,17 +642,17 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -664,7 +664,7 @@ mod tests {
             assert_eq!(waterclock_recorder.tick_height, 4);
 
             let working_bank = WorkingBank {
-                bank,
+                treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -686,22 +686,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -710,7 +710,7 @@ mod tests {
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
-                .record(bank.slot(), h1, vec![tx.clone()])
+                .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_err());
             assert!(entry_receiver.try_recv().is_err());
         }
@@ -724,22 +724,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
@@ -750,7 +750,7 @@ mod tests {
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert_matches!(
-                waterclock_recorder.record(bank.slot() + 1, h1, vec![tx.clone()]),
+                waterclock_recorder.record(treasury.slot() + 1, h1, vec![tx.clone()]),
                 Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))
             );
         }
@@ -764,22 +764,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
@@ -790,7 +790,7 @@ mod tests {
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
-                .record(bank.slot(), h1, vec![tx.clone()])
+                .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_ok());
             assert_eq!(waterclock_recorder.tick_cache.len(), 0);
 
@@ -811,22 +811,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
@@ -837,7 +837,7 @@ mod tests {
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
-                .record(bank.slot(), h1, vec![tx.clone()])
+                .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_err());
 
             let (_bank, e) = entry_receiver.recv().expect("recv 1");
@@ -855,22 +855,22 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let working_bank = WorkingBank {
-                bank,
+                treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -988,21 +988,21 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Bank::new(&genesis_block));
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 Hash::default(),
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
-            let ticks_per_slot = bank.ticks_per_slot();
+            let ticks_per_slot = treasury.ticks_per_slot();
             let working_bank = WorkingBank {
-                bank,
+                treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
@@ -1020,21 +1020,21 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Bank::new(&genesis_block));
             let (sender, receiver) = sync_channel(1);
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new_with_clear_signal(
                 0,
                 Hash::default(),
                 0,
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 Some(sender),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.set_bank(&bank);
+            waterclock_recorder.set_bank(&treasury);
             waterclock_recorder.clear_bank();
             assert!(receiver.try_recv().is_ok());
         }
@@ -1052,25 +1052,25 @@ mod tests {
                 mut genesis_block, ..
             } = create_genesis_block(2);
             genesis_block.ticks_per_slot = ticks_per_slot;
-            let bank = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Bank::new(&genesis_block));
 
-            let prev_hash = bank.last_blockhash();
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             let end_slot = 3;
             let max_tick_height = (end_slot + 1) * ticks_per_slot - 1;
             let working_bank = WorkingBank {
-                bank: bank.clone(),
+                treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height,
             };
@@ -1083,7 +1083,7 @@ mod tests {
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
-                .record(bank.slot(), h1, vec![tx.clone()])
+                .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_err());
             assert!(waterclock_recorder.working_bank.is_none());
             // Make sure the starting slot is updated
@@ -1099,17 +1099,17 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -1118,10 +1118,10 @@ mod tests {
 
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 0,
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             // Test that with no leader slot in reset(), we don't reach the leader tick
@@ -1129,24 +1129,24 @@ mod tests {
 
             // Provide a leader slot 1 slot down
             waterclock_recorder.reset(
-                bank.ticks_per_slot(),
-                bank.last_blockhash(),
+                treasury.ticks_per_slot(),
+                treasury.last_blockhash(),
                 0,
                 Some(2),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             let init_ticks = waterclock_recorder.tick_height();
 
             // Send one slot worth of ticks
-            for _ in 0..bank.ticks_per_slot() {
+            for _ in 0..treasury.ticks_per_slot() {
                 waterclock_recorder.tick();
             }
 
             // Tick should be recorded
             assert_eq!(
                 waterclock_recorder.tick_height(),
-                init_ticks + bank.ticks_per_slot()
+                init_ticks + treasury.ticks_per_slot()
             );
 
             // Test that we don't reach the leader tick because of grace ticks
@@ -1155,10 +1155,10 @@ mod tests {
             // reset waterclock now. it should discard the grace ticks wait
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 1,
                 Some(2),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
             // without sending more ticks, we should be leader now
             assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
@@ -1168,14 +1168,14 @@ mod tests {
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 2,
                 Some(3),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             // Send one slot worth of ticks
-            for _ in 0..bank.ticks_per_slot() {
+            for _ in 0..treasury.ticks_per_slot() {
                 waterclock_recorder.tick();
             }
 
@@ -1183,7 +1183,7 @@ mod tests {
             assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
 
             // Send 1 less tick than the grace ticks
-            for _ in 0..bank.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR - 1 {
+            for _ in 0..treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR - 1 {
                 waterclock_recorder.tick();
             }
             // We are still not the leader
@@ -1196,22 +1196,22 @@ mod tests {
             assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
             assert_eq!(
                 waterclock_recorder.reached_leader_tick().1,
-                bank.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR
+                treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR
             );
 
             // Let's test that correct grace ticks are reported
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 3,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             // Send remaining ticks for the slot (remember we sent extra ticks in the previous part of the test)
             for _ in
-                bank.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR..bank.ticks_per_slot()
+                treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR..treasury.ticks_per_slot()
             {
                 waterclock_recorder.tick();
             }
@@ -1223,10 +1223,10 @@ mod tests {
             assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 3,
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
             // without sending more ticks, we should be leader now
             assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
@@ -1237,14 +1237,14 @@ mod tests {
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 4,
                 Some(5),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             // Send remaining ticks for the slot (remember we sent extra ticks in the previous part of the test)
-            for _ in 0..4 * bank.ticks_per_slot() {
+            for _ in 0..4 * treasury.ticks_per_slot() {
                 waterclock_recorder.tick();
             }
 
@@ -1261,69 +1261,69 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let bank = Arc::new(Bank::new(&genesis_block));
-            let prev_hash = bank.last_blockhash();
+            let treasury = Arc::new(Bank::new(&genesis_block));
+            let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
                 0,
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
             // Test that with no leader slot, we don't reach the leader tick
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 false
             );
 
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 0,
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
             );
 
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 false
             );
 
             // We reset with leader slot after 3 slots
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                bank.last_blockhash(),
+                treasury.last_blockhash(),
                 0,
-                Some(bank.slot() + 3),
-                bank.ticks_per_slot(),
+                Some(treasury.slot() + 3),
+                treasury.ticks_per_slot(),
             );
 
             // Test that the node won't be leader in next 2 slots
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 false
             );
 
             // Test that the node will be leader in next 3 slots
             assert_eq!(
-                waterclock_recorder.would_be_leader(3 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(3 * treasury.ticks_per_slot()),
                 true
             );
 
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 false
             );
 
-            // If we set the working bank, the node should be leader within next 2 slots
-            waterclock_recorder.set_bank(&bank);
+            // If we set the working treasury, the node should be leader within next 2 slots
+            waterclock_recorder.set_bank(&treasury);
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * bank.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
                 true
             );
         }

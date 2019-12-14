@@ -15,8 +15,8 @@ pub const DEFAULT_SLOTS_PER_EPOCH: u64 = 4096;
 
 pub const NUM_CONSECUTIVE_LEADER_SLOTS: u64 = 8;
 
-/// The time window of recent block hash values that the bank will track the signatures
-/// of over. Once the bank discards a block hash, it will reject any transactions that use
+/// The time window of recent block hash values that the treasury will track the signatures
+/// of over. Once the treasury discards a block hash, it will reject any transactions that use
 /// that `recent_blockhash` in a transaction. Lowering this value reduces memory consumption,
 /// but requires clients to update its `recent_blockhash` more frequently. Raising the value
 /// lengthens the time a client must wait to be certain a missing transaction will

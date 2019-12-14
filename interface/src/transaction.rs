@@ -31,12 +31,12 @@ pub enum TransactionError {
     /// This account may not be used to pay transaction fees
     InvalidAccountForFee,
 
-    /// The bank has seen `Signature` before. This can occur under normal operation
+    /// The treasury has seen `Signature` before. This can occur under normal operation
     /// when a UDP packet is duplicated, as a user error from a client not updating
     /// its `recent_blockhash`, or as a double-spend attack.
     DuplicateSignature,
 
-    /// The bank has not seen the given `recent_blockhash` or the transaction is too old and
+    /// The treasury has not seen the given `recent_blockhash` or the transaction is too old and
     /// the `recent_blockhash` has been discarded.
     BlockhashNotFound,
 

@@ -10,7 +10,7 @@ use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::streamer::{BlobReceiver, BlobSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::duration_as_ms;
@@ -79,13 +79,13 @@ fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>)
 /// blob's slot
 pub fn should_retransmit_and_persist(
     blob: &Blob,
-    bank: Option<Arc<Bank>>,
+    treasury: Option<Arc<Bank>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     my_pubkey: &Pubkey,
 ) -> bool {
-    let slot_leader_pubkey = match bank {
+    let slot_leader_pubkey = match treasury {
         None => leader_schedule_cache.slot_leader_at(blob.slot(), None),
-        Some(bank) => leader_schedule_cache.slot_leader_at(blob.slot(), Some(&bank)),
+        Some(treasury) => leader_schedule_cache.slot_leader_at(blob.slot(), Some(&treasury)),
     };
 
     if blob.id() == *my_pubkey {
@@ -306,10 +306,10 @@ mod test {
     fn test_should_retransmit_and_persist() {
         let me_id = Pubkey::new_rand();
         let leader_pubkey = Pubkey::new_rand();
-        let bank = Arc::new(Bank::new(
+        let treasury = Arc::new(Bank::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank));
+        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
 
         let mut blob = Blob::default();
         blob.set_id(&leader_pubkey);
@@ -322,25 +322,25 @@ mod test {
 
         // with a Bank for slot 0, blob continues
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank.clone()), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury.clone()), &cache, &me_id),
             true
         );
 
         // set the blob to have come from the wrong leader
         blob.set_id(&Pubkey::new_rand());
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank.clone()), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury.clone()), &cache, &me_id),
             false
         );
 
         // with a Bank and no idea who leader is, blob gets thrown out
         blob.set_slot(MINIMUM_SLOT_LENGTH as u64 * 3);
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury), &cache, &me_id),
             false
         );
 
-        // if the blob came back from me, it doesn't continue, whether or not I have a bank
+        // if the blob came back from me, it doesn't continue, whether or not I have a treasury
         blob.set_id(&me_id);
         assert_eq!(
             should_retransmit_and_persist(&blob, None, &cache, &me_id),
@@ -368,8 +368,8 @@ mod test {
             .expect("Expected to be able to open database ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
 
-        let bank = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let repair_strategy = RepairStrategy::RepairAll {
             bank_forks: bank_forks.clone(),
             completed_slots_receiver,
@@ -455,8 +455,8 @@ mod test {
             .expect("Expected to be able to open database ledger");
 
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let bank = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let epoch_schedule = *bank_forks.read().unwrap().working_bank().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {
             bank_forks,

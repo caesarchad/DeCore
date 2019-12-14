@@ -1,4 +1,4 @@
-use crate::bank::Bank;
+use crate::treasury::Bank;
 use morgan_interface::client::{AsyncClient, Client, SyncClient};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
@@ -18,7 +18,7 @@ use std::thread::{sleep, Builder};
 use std::time::{Duration, Instant};
 
 pub struct BankClient {
-    bank: Arc<Bank>,
+    treasury: Arc<Bank>,
     transaction_sender: Mutex<Sender<Transaction>>,
 }
 
@@ -72,9 +72,9 @@ impl AsyncClient for BankClient {
 
 impl SyncClient for BankClient {
     fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
-        let blockhash = self.bank.last_blockhash();
+        let blockhash = self.treasury.last_blockhash();
         let transaction = Transaction::new(&keypairs, message, blockhash);
-        self.bank.process_transaction(&transaction)?;
+        self.treasury.process_transaction(&transaction)?;
         Ok(transaction.signatures.get(0).cloned().unwrap_or_default())
     }
 
@@ -92,28 +92,28 @@ impl SyncClient for BankClient {
     }
 
     fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>> {
-        Ok(self.bank.get_account(pubkey).map(|account| account.data))
+        Ok(self.treasury.get_account(pubkey).map(|account| account.data))
     }
 
     fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
-        Ok(self.bank.get_balance(pubkey))
+        Ok(self.treasury.get_balance(pubkey))
     }
 
     fn get_signature_status(
         &self,
         signature: &Signature,
     ) -> Result<Option<transaction::Result<()>>> {
-        Ok(self.bank.get_signature_status(signature))
+        Ok(self.treasury.get_signature_status(signature))
     }
 
     fn get_recent_blockhash(&self) -> Result<(Hash, FeeCalculator)> {
-        let last_blockhash = self.bank.last_blockhash();
-        let fee_calculator = self.bank.fee_calculator.clone();
+        let last_blockhash = self.treasury.last_blockhash();
+        let fee_calculator = self.treasury.fee_calculator.clone();
         Ok((last_blockhash, fee_calculator))
     }
 
     fn get_transaction_count(&self) -> Result<u64> {
-        Ok(self.bank.transaction_count())
+        Ok(self.treasury.transaction_count())
     }
 
     fn poll_for_signature_confirmation(
@@ -124,7 +124,7 @@ impl SyncClient for BankClient {
         let mut now = Instant::now();
         let mut confirmed_blocks = 0;
         loop {
-            let response = self.bank.get_signature_confirmation_status(signature);
+            let response = self.treasury.get_signature_confirmation_status(signature);
             if let Some((confirmations, res)) = response {
                 if res.is_ok() {
                     if confirmed_blocks != confirmations {
@@ -151,7 +151,7 @@ impl SyncClient for BankClient {
     fn poll_for_signature(&self, signature: &Signature) -> Result<()> {
         let now = Instant::now();
         loop {
-            let response = self.bank.get_signature_status(signature);
+            let response = self.treasury.get_signature_status(signature);
             if let Some(res) = response {
                 if res.is_ok() {
                     break;
@@ -183,33 +183,33 @@ impl SyncClient for BankClient {
 }
 
 impl BankClient {
-    fn run(bank: &Bank, transaction_receiver: Receiver<Transaction>) {
+    fn run(treasury: &Bank, transaction_receiver: Receiver<Transaction>) {
         while let Ok(tx) = transaction_receiver.recv() {
             let mut transactions = vec![tx];
             while let Ok(tx) = transaction_receiver.try_recv() {
                 transactions.push(tx);
             }
-            let _ = bank.process_transactions(&transactions);
+            let _ = treasury.process_transactions(&transactions);
         }
     }
 
-    pub fn new_shared(bank: &Arc<Bank>) -> Self {
+    pub fn new_shared(treasury: &Arc<Bank>) -> Self {
         let (transaction_sender, transaction_receiver) = channel();
         let transaction_sender = Mutex::new(transaction_sender);
-        let thread_bank = bank.clone();
-        let bank = bank.clone();
+        let thread_bank = treasury.clone();
+        let treasury = treasury.clone();
         Builder::new()
-            .name("morgan-bank-client".to_string())
+            .name("morgan-treasury-client".to_string())
             .spawn(move || Self::run(&thread_bank, transaction_receiver))
             .unwrap();
         Self {
-            bank,
+            treasury,
             transaction_sender,
         }
     }
 
-    pub fn new(bank: Bank) -> Self {
-        Self::new_shared(&Arc::new(bank))
+    pub fn new(treasury: Bank) -> Self {
+        Self::new_shared(&Arc::new(treasury))
     }
 }
 
@@ -226,8 +226,8 @@ mod tests {
         let jane_doe_keypair = Keypair::new();
         let jane_pubkey = jane_doe_keypair.pubkey();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
-        let bank = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(bank);
+        let treasury = Bank::new(&genesis_block);
+        let bank_client = BankClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
         let bob_pubkey = Pubkey::new_rand();

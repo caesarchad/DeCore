@@ -390,7 +390,7 @@ impl RpcClient {
         Ok(())
     }
 
-    /// Check a signature in the bank.
+    /// Check a signature in the treasury.
     pub fn check_signature(&self, signature: &Signature) -> bool {
         trace!("check_signature: {:?}", signature);
         let params = json!([format!("{}", signature)]);

@@ -104,7 +104,7 @@ mod tests {
     use assert_matches::assert_matches;
     use bincode::deserialize;
     use log::*;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Bank;
     use morgan_runtime::bank_client::BankClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
     use morgan_interface::client::SyncClient;
@@ -271,11 +271,11 @@ mod tests {
         let mining_pool_keypair = Keypair::new();
         let mining_pool_pubkey = mining_pool_keypair.pubkey();
 
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        let bank = Arc::new(bank);
+        let mut treasury = Bank::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        let treasury = Arc::new(treasury);
         let slot = 0;
-        let bank_client = BankClient::new_shared(&bank);
+        let bank_client = BankClient::new_shared(&treasury);
 
         init_storage_accounts(
             &bank_client,
@@ -291,10 +291,10 @@ mod tests {
         ));
         bank_client.send_message(&[&mint_keypair], message).unwrap();
 
-        // tick the bank up until it's moved into storage segment 2 because the next advertise is for segment 1
+        // tick the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
         for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+            treasury.register_tick(&treasury.last_blockhash());
         }
 
         // advertise for storage segment 1
@@ -344,7 +344,7 @@ mod tests {
 
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
         for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+            treasury.register_tick(&treasury.last_blockhash());
         }
 
         assert_matches!(
@@ -377,7 +377,7 @@ mod tests {
 
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
         for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+            treasury.register_tick(&treasury.last_blockhash());
         }
 
         assert_matches!(
@@ -401,9 +401,9 @@ mod tests {
             10 + (TOTAL_VALIDATOR_REWARDS * 10)
         );
 
-        // tick the bank into the next storage epoch so that rewards can be claimed
+        // tick the treasury into the next storage epoch so that rewards can be claimed
         for _ in 0..=TICKS_IN_SEGMENT {
-            bank.register_tick(&bank.last_blockhash());
+            treasury.register_tick(&treasury.last_blockhash());
         }
 
         assert_eq!(
@@ -558,14 +558,14 @@ mod tests {
         let validator_keypair = Keypair::new();
         let validator_pubkey = validator_keypair.pubkey();
 
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        // tick the bank up until it's moved into storage segment 2
+        let mut treasury = Bank::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        // tick the treasury up until it's moved into storage segment 2
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
         for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+            treasury.register_tick(&treasury.last_blockhash());
         }
-        let bank_client = BankClient::new(bank);
+        let bank_client = BankClient::new(treasury);
 
         let x = 42;
         let x2 = x * 2;

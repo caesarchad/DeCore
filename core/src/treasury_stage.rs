@@ -17,7 +17,7 @@ use bincode::deserialize;
 use itertools::Itertools;
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info, inc_new_counter_warn};
 use morgan_runtime::accounts_db::ErrorCounters;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -39,7 +39,7 @@ use morgan_helper::logHelper::*;
 type PacketsAndOffsets = (Packets, Vec<usize>);
 pub type UnprocessedPackets = Vec<PacketsAndOffsets>;
 
-// number of threads is 1 until mt bank is ready
+// number of threads is 1 until mt treasury is ready
 pub const NUM_THREADS: u32 = 10;
 
 /// Stores the stage's thread handle and output receiver.
@@ -55,7 +55,7 @@ pub enum BufferedPacketsDecision {
 }
 
 impl BankingStage {
-    /// Create the stage using `bank`. Exit when `verified_receiver` is dropped.
+    /// Create the stage using `treasury`. Exit when `verified_receiver` is dropped.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -85,7 +85,7 @@ impl BankingStage {
 
         // Single thread to generate entries from many banks.
         // This thread talks to waterclock_service and broadcasts the entries once they have been recorded.
-        // Once an entry has been recorded, its blockhash is registered with the bank.
+        // Once an entry has been recorded, its blockhash is registered with the treasury.
         let exit = Arc::new(AtomicBool::new(false));
 
         // Many banks that process transactions in parallel.
@@ -157,17 +157,17 @@ impl BankingStage {
 
         let proc_start = Instant::now();
         while let Some((msgs, unprocessed_indexes)) = buffered_packets_iter.next() {
-            let bank = waterclock_recorder.lock().unwrap().bank();
-            if bank.is_none() {
+            let treasury = waterclock_recorder.lock().unwrap().treasury();
+            if treasury.is_none() {
                 rebuffered_packets += unprocessed_indexes.len();
                 Self::push_unprocessed(&mut unprocessed_packets, msgs, unprocessed_indexes);
                 continue;
             }
-            let bank = bank.unwrap();
+            let treasury = treasury.unwrap();
 
             let (processed, verified_txs_len, new_unprocessed_indexes) =
                 Self::process_received_packets(
-                    &bank,
+                    &treasury,
                     &waterclock_recorder,
                     &msgs,
                     unprocessed_indexes.to_owned(),
@@ -184,7 +184,7 @@ impl BankingStage {
                 // Walk thru rest of the transactions and filter out the invalid (e.g. too old) ones
                 while let Some((msgs, unprocessed_indexes)) = buffered_packets_iter.next() {
                     let unprocessed_indexes = Self::filter_unprocessed_packets(
-                        &bank,
+                        &treasury,
                         &msgs,
                         &unprocessed_indexes,
                         my_pubkey,
@@ -226,7 +226,7 @@ impl BankingStage {
             // else process the packets
             |x| {
                 if bank_is_available {
-                    // If the bank is available, this node is the leader
+                    // If the treasury is available, this node is the leader
                     BufferedPacketsDecision::Consume
                 } else if would_be_leader {
                     // If the node will be the leader soon, hold the packets for now
@@ -257,7 +257,7 @@ impl BankingStage {
             (
                 Self::consume_or_forward_packets(
                     next_leader,
-                    waterclock.bank().is_some(),
+                    waterclock.treasury().is_some(),
                     waterclock.would_be_leader(DEFAULT_TICKS_PER_SLOT * 2),
                     &r_node_group_info.id(),
                 ),
@@ -372,7 +372,7 @@ impl BankingStage {
     }
 
     fn record_transactions<'a, 'b>(
-        bank: &'a Bank,
+        treasury: &'a Bank,
         txs: &'b [Transaction],
         results: &[transaction::Result<()>],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
@@ -390,7 +390,7 @@ impl BankingStage {
                 }
             })
             .collect();
-        let record_locks = bank.lock_record_accounts(recordable_txs);
+        let record_locks = treasury.lock_record_accounts(recordable_txs);
         debug!("processed: {} ", processed_transactions.len());
         // unlock all the accounts with errors which are filtered by the above `filter_map`
         if !processed_transactions.is_empty() {
@@ -402,13 +402,13 @@ impl BankingStage {
             // record and unlock will unlock all the successful transactions
             waterclock.lock()
                 .unwrap()
-                .record(bank.slot(), hash, processed_transactions)?;
+                .record(treasury.slot(), hash, processed_transactions)?;
         }
         Ok(record_locks)
     }
 
     fn process_and_record_transactions_locked(
-        bank: &Bank,
+        treasury: &Bank,
         txs: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         lock_results: &LockedAccountsResults<Transaction>,
@@ -419,22 +419,22 @@ impl BankingStage {
         // TODO: Banking stage threads should be prioritized to complete faster then this queue
         // expires.
         let (loaded_accounts, results) =
-            bank.load_and_execute_transactions(txs, lock_results, MAX_RECENT_BLOCKHASHES / 2);
+            treasury.load_and_execute_transactions(txs, lock_results, MAX_RECENT_BLOCKHASHES / 2);
         let load_execute_time = now.elapsed();
 
-        let freeze_lock = bank.freeze_lock();
+        let freeze_lock = treasury.freeze_lock();
 
         let mut recordable_txs = vec![];
         let (record_time, record_locks) = {
             let now = Instant::now();
             let record_locks =
-                Self::record_transactions(bank, txs, &results, waterclock, &mut recordable_txs)?;
+                Self::record_transactions(treasury, txs, &results, waterclock, &mut recordable_txs)?;
             (now.elapsed(), record_locks)
         };
 
         let commit_time = {
             let now = Instant::now();
-            bank.commit_transactions(txs, &loaded_accounts, &results);
+            treasury.commit_transactions(txs, &loaded_accounts, &results);
             now.elapsed()
         };
 
@@ -442,8 +442,8 @@ impl BankingStage {
         drop(freeze_lock);
 
         debug!(
-            "bank: {} load_execute: {}us record: {}us commit: {}us txs_len: {}",
-            bank.slot(),
+            "treasury: {} load_execute: {}us record: {}us commit: {}us txs_len: {}",
+            treasury.slot(),
             duration_as_us(&load_execute_time),
             duration_as_us(&record_time),
             duration_as_us(&commit_time),
@@ -454,7 +454,7 @@ impl BankingStage {
     }
 
     pub fn process_and_record_transactions(
-        bank: &Bank,
+        treasury: &Bank,
         txs: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         chunk_offset: usize,
@@ -462,7 +462,7 @@ impl BankingStage {
         let now = Instant::now();
         // Once accounts are locked, other threads cannot encode transactions that will modify the
         // same account state
-        let lock_results = bank.lock_accounts(txs);
+        let lock_results = treasury.lock_accounts(txs);
         let lock_time = now.elapsed();
 
         let unprocessed_txs: Vec<_> = lock_results
@@ -476,7 +476,7 @@ impl BankingStage {
             })
             .collect();
 
-        let results = Self::process_and_record_transactions_locked(bank, txs, waterclock, &lock_results);
+        let results = Self::process_and_record_transactions_locked(treasury, txs, waterclock, &lock_results);
 
         let now = Instant::now();
         // Once the accounts are new transactions can enter the pipeline to process them
@@ -484,8 +484,8 @@ impl BankingStage {
         let unlock_time = now.elapsed();
 
         debug!(
-            "bank: {} lock: {}us unlock: {}us txs_len: {}",
-            bank.slot(),
+            "treasury: {} lock: {}us unlock: {}us txs_len: {}",
+            treasury.slot(),
             duration_as_us(&lock_time),
             duration_as_us(&unlock_time),
             txs.len(),
@@ -494,12 +494,12 @@ impl BankingStage {
         (results, unprocessed_txs)
     }
 
-    /// Sends transactions to the bank.
+    /// Sends transactions to the treasury.
     ///
-    /// Returns the number of transactions successfully processed by the bank, which may be less
-    /// than the total number if max Water Clock height was reached and the bank halted
+    /// Returns the number of transactions successfully processed by the treasury, which may be less
+    /// than the total number if max Water Clock height was reached and the treasury halted
     fn process_transactions(
-        bank: &Bank,
+        treasury: &Bank,
         transactions: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Result<(usize, Vec<usize>)> {
@@ -514,7 +514,7 @@ impl BankingStage {
                 );
 
             let (result, unprocessed_txs_in_chunk) = Self::process_and_record_transactions(
-                bank,
+                treasury,
                 &transactions[chunk_start..chunk_end],
                 waterclock,
                 chunk_start,
@@ -525,12 +525,12 @@ impl BankingStage {
                 // info!(
                 //     "{}",
                 //     Info(format!("process transactions: max height reached slot: {} height: {}",
-                //     bank.slot(),
-                //     bank.tick_height()).to_string())
+                //     treasury.slot(),
+                //     treasury.tick_height()).to_string())
                 // );
                 let loginfo: String = format!("process transactions: max height reached slot: {} height: {}",
-                    bank.slot(),
-                    bank.tick_height()).to_string();
+                    treasury.slot(),
+                    treasury.tick_height()).to_string();
                 println!("{}",
                     printLn(
                         loginfo,
@@ -613,7 +613,7 @@ impl BankingStage {
 
     // This function  filters pending transactions that are still valid
     fn filter_pending_transactions(
-        bank: &Arc<Bank>,
+        treasury: &Arc<Bank>,
         transactions: &[Transaction],
         transaction_indexes: &[usize],
         pending_indexes: &[usize],
@@ -621,7 +621,7 @@ impl BankingStage {
         let filter = Self::prepare_filter_for_pending_transactions(transactions, pending_indexes);
 
         let mut error_counters = ErrorCounters::default();
-        let result = bank.check_transactions(
+        let result = treasury.check_transactions(
             transactions,
             &filter,
             (MAX_RECENT_BLOCKHASHES - MAX_TRANSACTION_FORWARDING_DELAY) / 2,
@@ -632,7 +632,7 @@ impl BankingStage {
     }
 
     fn process_received_packets(
-        bank: &Arc<Bank>,
+        treasury: &Arc<Bank>,
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         msgs: &Packets,
         transaction_indexes: Vec<usize>,
@@ -640,20 +640,20 @@ impl BankingStage {
         let (transactions, transaction_indexes) =
             Self::transactions_from_packets(msgs, &transaction_indexes);
         debug!(
-            "bank: {} filtered transactions {}",
-            bank.slot(),
+            "treasury: {} filtered transactions {}",
+            treasury.slot(),
             transactions.len()
         );
 
         let tx_len = transactions.len();
 
         let (processed, unprocessed_tx_indexes) =
-            Self::process_transactions(bank, &transactions, waterclock)?;
+            Self::process_transactions(treasury, &transactions, waterclock)?;
 
         let unprocessed_tx_count = unprocessed_tx_indexes.len();
 
         let filtered_unprocessed_tx_indexes = Self::filter_pending_transactions(
-            bank,
+            treasury,
             &transactions,
             &transaction_indexes,
             &unprocessed_tx_indexes,
@@ -667,7 +667,7 @@ impl BankingStage {
     }
 
     fn filter_unprocessed_packets(
-        bank: &Arc<Bank>,
+        treasury: &Arc<Bank>,
         msgs: &Packets,
         transaction_indexes: &[usize],
         my_pubkey: &Pubkey,
@@ -689,7 +689,7 @@ impl BankingStage {
 
         let unprocessed_tx_indexes = (0..transactions.len()).collect_vec();
         let filtered_unprocessed_tx_indexes = Self::filter_pending_transactions(
-            bank,
+            treasury,
             &transactions,
             &transaction_indexes,
             &unprocessed_tx_indexes,
@@ -741,15 +741,15 @@ impl BankingStage {
         let mut unprocessed_packets = vec![];
         while let Some((msgs, vers)) = mms_iter.next() {
             let packet_indexes = Self::generate_packet_indexes(vers);
-            let bank = waterclock.lock().unwrap().bank();
-            if bank.is_none() {
+            let treasury = waterclock.lock().unwrap().treasury();
+            if treasury.is_none() {
                 Self::push_unprocessed(&mut unprocessed_packets, msgs, packet_indexes);
                 continue;
             }
-            let bank = bank.unwrap();
+            let treasury = treasury.unwrap();
 
             let (processed, verified_txs_len, unprocessed_indexes) =
-                Self::process_received_packets(&bank, &waterclock, &msgs, packet_indexes)?;
+                Self::process_received_packets(&treasury, &waterclock, &msgs, packet_indexes)?;
 
             new_tx_count += processed;
 
@@ -763,7 +763,7 @@ impl BankingStage {
                 while let Some((msgs, vers)) = mms_iter.next() {
                     let packet_indexes = Self::generate_packet_indexes(vers);
                     let unprocessed_indexes = Self::filter_unprocessed_packets(
-                        &bank,
+                        &treasury,
                         &msgs,
                         &packet_indexes,
                         &my_pubkey,
@@ -821,7 +821,7 @@ impl Service for BankingStage {
 }
 
 pub fn create_test_recorder(
-    bank: &Arc<Bank>,
+    treasury: &Arc<Bank>,
     block_buffer_pool: &Arc<BlockBufferPool>,
 ) -> (
     Arc<AtomicBool>,
@@ -832,17 +832,17 @@ pub fn create_test_recorder(
     let exit = Arc::new(AtomicBool::new(false));
     let waterclock_config = Arc::new(WaterClockConfig::default());
     let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-        bank.tick_height(),
-        bank.last_blockhash(),
-        bank.slot(),
+        treasury.tick_height(),
+        treasury.last_blockhash(),
+        treasury.slot(),
         Some(4),
-        bank.ticks_per_slot(),
+        treasury.ticks_per_slot(),
         &Pubkey::default(),
         block_buffer_pool,
-        &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+        &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
         &waterclock_config,
     );
-    waterclock_recorder.set_bank(&bank);
+    waterclock_recorder.set_bank(&treasury);
 
     let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
     let waterclock_service = WaterClockService::new(waterclock_recorder.clone(), &waterclock_config, &exit);
@@ -871,7 +871,7 @@ mod tests {
     #[test]
     fn test_banking_stage_shutdown1() {
         let genesis_block = create_genesis_block(2).genesis_block;
-        let bank = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Bank::new(&genesis_block));
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -880,7 +880,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
             );
             let (exit, waterclock_recorder, waterclock_service, _entry_receiever) =
-                create_test_recorder(&bank, &block_buffer_pool);
+                create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
             let banking_stage = BankingStage::new(
@@ -905,8 +905,8 @@ mod tests {
             mut genesis_block, ..
         } = create_genesis_block(2);
         genesis_block.ticks_per_slot = 4;
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let start_hash = bank.last_blockhash();
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let start_hash = treasury.last_blockhash();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -915,7 +915,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
             );
             let (exit, waterclock_recorder, waterclock_service, entry_receiver) =
-                create_test_recorder(&bank, &block_buffer_pool);
+                create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
             let banking_stage = BankingStage::new(
@@ -924,7 +924,7 @@ mod tests {
                 verified_receiver,
                 vote_receiver,
             );
-            trace!("sending bank");
+            trace!("sending treasury");
             sleep(Duration::from_millis(600));
             drop(verified_sender);
             drop(vote_sender);
@@ -940,7 +940,7 @@ mod tests {
             trace!("done");
             assert_eq!(entries.len(), genesis_block.ticks_per_slot as usize - 1);
             assert!(entries.verify(&start_hash));
-            assert_eq!(entries[entries.len() - 1].hash, bank.last_blockhash());
+            assert_eq!(entries[entries.len() - 1].hash, treasury.last_blockhash());
             banking_stage.join().unwrap();
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -954,8 +954,8 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10);
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let start_hash = bank.last_blockhash();
+        let treasury = Arc::new(Bank::new(&genesis_block));
+        let start_hash = treasury.last_blockhash();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -964,7 +964,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
             );
             let (exit, waterclock_recorder, waterclock_service, entry_receiver) =
-                create_test_recorder(&bank, &block_buffer_pool);
+                create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
             let banking_stage = BankingStage::new(
@@ -982,7 +982,7 @@ mod tests {
                 2,
                 start_hash,
             );
-            bank.process_transaction(&fund_tx).unwrap();
+            treasury.process_transaction(&fund_tx).unwrap();
 
             // good tx
             let to = Pubkey::new_rand();
@@ -1019,8 +1019,8 @@ mod tests {
             drop(waterclock_recorder);
 
             let mut blockhash = start_hash;
-            let bank = Bank::new(&genesis_block);
-            bank.process_transaction(&fund_tx).unwrap();
+            let treasury = Bank::new(&genesis_block);
+            treasury.process_transaction(&fund_tx).unwrap();
             //receive entries + ticks
             for _ in 0..10 {
                 let ventries: Vec<Vec<Entry>> = entry_receiver
@@ -1030,7 +1030,7 @@ mod tests {
 
                 for entries in &ventries {
                     for entry in entries {
-                        bank.process_transactions(&entry.transactions)
+                        treasury.process_transactions(&entry.transactions)
                             .iter()
                             .for_each(|x| assert_eq!(*x, Ok(())));
                     }
@@ -1038,15 +1038,15 @@ mod tests {
                     blockhash = entries.last().unwrap().hash;
                 }
 
-                if bank.get_balance(&to) == 1 {
+                if treasury.get_balance(&to) == 1 {
                     break;
                 }
 
                 sleep(Duration::from_millis(200));
             }
 
-            assert_eq!(bank.get_balance(&to), 1);
-            assert_eq!(bank.get_balance(&to2), 0);
+            assert_eq!(treasury.get_balance(&to), 1);
+            assert_eq!(treasury.get_balance(&to2), 0);
 
             drop(entry_receiver);
             banking_stage.join().unwrap();
@@ -1102,13 +1102,13 @@ mod tests {
         {
             let entry_receiver = {
                 // start a banking_stage to eat verified receiver
-                let bank = Arc::new(Bank::new(&genesis_block));
+                let treasury = Arc::new(Bank::new(&genesis_block));
                 let block_buffer_pool = Arc::new(
                     BlockBufferPool::open_ledger_file(&ledger_path)
                         .expect("Expected to be able to open database ledger"),
                 );
                 let (exit, waterclock_recorder, waterclock_service, entry_receiver) =
-                    create_test_recorder(&bank, &block_buffer_pool);
+                    create_test_recorder(&treasury, &block_buffer_pool);
                 let node_group_info =
                     NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
                 let node_group_info = Arc::new(RwLock::new(node_group_info));
@@ -1121,7 +1121,7 @@ mod tests {
                 );
 
                 // wait for banking_stage to eat the packets
-                while bank.get_balance(&alice.pubkey()) != 1 {
+                while treasury.get_balance(&alice.pubkey()) != 1 {
                     sleep(Duration::from_millis(100));
                 }
                 exit.store(true, Ordering::Relaxed);
@@ -1131,16 +1131,16 @@ mod tests {
             drop(verified_sender);
             drop(vote_sender);
 
-            // consume the entire entry_receiver, feed it into a new bank
+            // consume the entire entry_receiver, feed it into a new treasury
             // check that the balance is what we expect.
             let entries: Vec<_> = entry_receiver
                 .iter()
                 .flat_map(|x| x.1.into_iter().map(|e| e.0))
                 .collect();
 
-            let bank = Bank::new(&genesis_block);
+            let treasury = Bank::new(&genesis_block);
             for entry in &entries {
-                bank.process_transactions(&entry.transactions)
+                treasury.process_transactions(&entry.transactions)
                     .iter()
                     .for_each(|x| assert_eq!(*x, Ok(())));
             }
@@ -1148,7 +1148,7 @@ mod tests {
             // Assert the user holds one dif, not two. If the stage only outputs one
             // entry, then the second transaction will be rejected, because it drives
             // the account balance below zero before the credit is added.
-            assert_eq!(bank.get_balance(&alice.pubkey()), 1);
+            assert_eq!(treasury.get_balance(&alice.pubkey()), 1);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1160,10 +1160,10 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let bank = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Bank::new(&genesis_block));
         let working_bank = WorkingBank {
-            bank: bank.clone(),
-            min_tick_height: bank.tick_height(),
+            treasury: treasury.clone(),
+            min_tick_height: treasury.tick_height(),
             max_tick_height: std::u64::MAX,
         };
         let ledger_path = get_tmp_ledger_path!();
@@ -1171,14 +1171,14 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                bank.tick_height(),
-                bank.last_blockhash(),
-                bank.slot(),
+                treasury.tick_height(),
+                treasury.last_blockhash(),
+                treasury.slot(),
                 None,
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
@@ -1195,7 +1195,7 @@ mod tests {
 
             let mut results = vec![Ok(()), Ok(())];
             BankingStage::record_transactions(
-                &bank,
+                &treasury,
                 &transactions,
                 &results,
                 &waterclock_recorder,
@@ -1211,7 +1211,7 @@ mod tests {
                 InstructionError::new_result_with_negative_difs(),
             ));
             BankingStage::record_transactions(
-                &bank,
+                &treasury,
                 &transactions,
                 &results,
                 &waterclock_recorder,
@@ -1224,7 +1224,7 @@ mod tests {
             // Other TransactionErrors should not be recorded
             results[0] = Err(TransactionError::AccountNotFound);
             BankingStage::record_transactions(
-                &bank,
+                &treasury,
                 &transactions,
                 &results,
                 &waterclock_recorder,
@@ -1467,7 +1467,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let bank = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Bank::new(&genesis_block));
         let pubkey = Pubkey::new_rand();
 
         let transactions = vec![system_transaction::transfer(
@@ -1478,30 +1478,30 @@ mod tests {
         )];
 
         let working_bank = WorkingBank {
-            bank: bank.clone(),
-            min_tick_height: bank.tick_height(),
-            max_tick_height: bank.tick_height() + 1,
+            treasury: treasury.clone(),
+            min_tick_height: treasury.tick_height(),
+            max_tick_height: treasury.tick_height() + 1,
         };
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                bank.tick_height(),
-                bank.last_blockhash(),
-                bank.slot(),
+                treasury.tick_height(),
+                treasury.last_blockhash(),
+                treasury.slot(),
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
             waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
 
-            BankingStage::process_and_record_transactions(&bank, &transactions, &waterclock_recorder, 0)
+            BankingStage::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
                 .0
                 .unwrap();
             waterclock_recorder.lock().unwrap().tick();
@@ -1513,7 +1513,7 @@ mod tests {
                     if !entry.is_tick() {
                         trace!("got entry");
                         assert_eq!(entry.transactions.len(), transactions.len());
-                        assert_eq!(bank.get_balance(&pubkey), 1);
+                        assert_eq!(treasury.get_balance(&pubkey), 1);
                         done = true;
                     }
                 }
@@ -1534,7 +1534,7 @@ mod tests {
 
             assert_matches!(
                 BankingStage::process_and_record_transactions(
-                    &bank,
+                    &treasury,
                     &transactions,
                     &waterclock_recorder,
                     0
@@ -1543,7 +1543,7 @@ mod tests {
                 Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))
             );
 
-            assert_eq!(bank.get_balance(&pubkey), 1);
+            assert_eq!(treasury.get_balance(&pubkey), 1);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1556,7 +1556,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let bank = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Bank::new(&genesis_block));
         let pubkey = Pubkey::new_rand();
         let pubkey1 = Pubkey::new_rand();
 
@@ -1566,23 +1566,23 @@ mod tests {
         ];
 
         let working_bank = WorkingBank {
-            bank: bank.clone(),
-            min_tick_height: bank.tick_height(),
-            max_tick_height: bank.tick_height() + 1,
+            treasury: treasury.clone(),
+            min_tick_height: treasury.tick_height(),
+            max_tick_height: treasury.tick_height() + 1,
         };
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
-                bank.tick_height(),
-                bank.last_blockhash(),
-                bank.slot(),
+                treasury.tick_height(),
+                treasury.last_blockhash(),
+                treasury.slot(),
                 Some(4),
-                bank.ticks_per_slot(),
+                treasury.ticks_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
@@ -1590,7 +1590,7 @@ mod tests {
             waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
 
             let (result, unprocessed) = BankingStage::process_and_record_transactions(
-                &bank,
+                &treasury,
                 &transactions,
                 &waterclock_recorder,
                 0,

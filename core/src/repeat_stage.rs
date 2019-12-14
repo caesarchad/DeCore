@@ -16,7 +16,7 @@ use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
 use hashbrown::HashMap;
 use morgan_metricbot::{datapoint_warn, inc_new_counter_error, inc_new_counter_info};
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::KeypairUtil;
@@ -122,7 +122,7 @@ impl ReplayStage {
                         &leader_schedule_cache,
                     );
 
-                    let mut is_tpu_bank_active = waterclock_recorder.lock().unwrap().bank().is_some();
+                    let mut is_tpu_bank_active = waterclock_recorder.lock().unwrap().treasury().is_some();
 
                     Self::replay_active_banks(
                         &block_buffer_pool,
@@ -135,18 +135,18 @@ impl ReplayStage {
 
                     if ticks_per_slot == 0 {
                         let frozen_banks = bank_forks.read().unwrap().frozen_banks();
-                        let bank = frozen_banks.values().next().unwrap();
-                        ticks_per_slot = bank.ticks_per_slot();
+                        let treasury = frozen_banks.values().next().unwrap();
+                        ticks_per_slot = treasury.ticks_per_slot();
                     }
 
                     let votable =
                         Self::generate_votable_banks(&bank_forks, &locktower, &mut progress);
 
-                    if let Some((_, bank)) = votable.last() {
-                        subscriptions.notify_subscribers(bank.slot(), &bank_forks);
+                    if let Some((_, treasury)) = votable.last() {
+                        subscriptions.notify_subscribers(treasury.slot(), &bank_forks);
 
                         Self::handle_votable_bank(
-                            &bank,
+                            &treasury,
                             &bank_forks,
                             &mut locktower,
                             &mut progress,
@@ -161,7 +161,7 @@ impl ReplayStage {
                         Self::reset_waterclock_recorder(
                             &my_pubkey,
                             &block_buffer_pool,
-                            &bank,
+                            &treasury,
                             &waterclock_recorder,
                             ticks_per_slot,
                             &leader_schedule_cache,
@@ -229,7 +229,7 @@ impl ReplayStage {
             let parent = {
                 let r_bf = bank_forks.read().unwrap();
                 r_bf.get(parent_slot)
-                    .expect("start slot doesn't exist in bank forks")
+                    .expect("start slot doesn't exist in treasury forks")
                     .clone()
             };
             assert!(parent.is_frozen());
@@ -255,7 +255,7 @@ impl ReplayStage {
                                 tpu_bank.slot()
                             );
                             debug!(
-                                "waterclock_recorder new working bank: me: {} next_slot: {} next_leader: {}",
+                                "waterclock_recorder new working treasury: me: {} next_slot: {} next_leader: {}",
                                 my_pubkey,
                                 tpu_bank.slot(),
                                 next_leader
@@ -278,13 +278,13 @@ impl ReplayStage {
         }
     }
     fn replay_block_buffer_into_bank(
-        bank: &Bank,
+        treasury: &Bank,
         block_buffer_pool: &BlockBufferPool,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Result<()> {
-        let (entries, num) = Self::load_block_buffer_entries(bank, block_buffer_pool, progress)?;
+        let (entries, num) = Self::load_block_buffer_entries(treasury, block_buffer_pool, progress)?;
         let len = entries.len();
-        let result = Self::replay_entries_into_bank(bank, entries, progress, num);
+        let result = Self::replay_entries_into_bank(treasury, entries, progress, num);
         if result.is_ok() {
             trace!("verified entries {}", len);
             inc_new_counter_info!("replicate-stage_process_entries", len);
@@ -304,7 +304,7 @@ impl ReplayStage {
 
     #[allow(clippy::too_many_arguments)]
     fn handle_votable_bank<T>(
-        bank: &Arc<Bank>,
+        treasury: &Arc<Bank>,
         bank_forks: &Arc<RwLock<BankForks>>,
         locktower: &mut Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
@@ -318,18 +318,18 @@ impl ReplayStage {
     where
         T: 'static + KeypairUtil + Send + Sync,
     {
-        if let Some(new_root) = locktower.record_vote(bank.slot(), bank.hash()) {
-            // get the root bank before squash
+        if let Some(new_root) = locktower.record_vote(treasury.slot(), treasury.hash()) {
+            // get the root treasury before squash
             let root_bank = bank_forks
                 .read()
                 .unwrap()
                 .get(new_root)
-                .expect("Root bank doesn't exist")
+                .expect("Root treasury doesn't exist")
                 .clone();
             let mut rooted_slots = root_bank
                 .parents()
                 .into_iter()
-                .map(|bank| bank.slot())
+                .map(|treasury| treasury.slot())
                 .collect::<Vec<_>>();
             rooted_slots.push(root_bank.slot());
             let old_root = bank_forks.read().unwrap().root();
@@ -344,7 +344,7 @@ impl ReplayStage {
             Self::handle_new_root(&bank_forks, progress);
             root_slot_sender.send(rooted_slots)?;
         }
-        locktower.update_epoch(&bank);
+        locktower.update_epoch(&treasury);
         if let Some(ref voting_keypair) = voting_keypair {
             let node_keypair = node_group_info.read().unwrap().keypair.clone();
 
@@ -357,7 +357,7 @@ impl ReplayStage {
             );
 
             let mut vote_tx = Transaction::new_unsigned_instructions(vec![vote_ix]);
-            let blockhash = bank.last_blockhash();
+            let blockhash = treasury.last_blockhash();
             vote_tx.partial_sign(&[node_keypair.as_ref()], blockhash);
             vote_tx.partial_sign(&[voting_keypair.as_ref()], blockhash);
             node_group_info.write().unwrap().push_vote(vote_tx);
@@ -368,24 +368,24 @@ impl ReplayStage {
     fn reset_waterclock_recorder(
         my_pubkey: &Pubkey,
         block_buffer_pool: &BlockBufferPool,
-        bank: &Arc<Bank>,
+        treasury: &Arc<Bank>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         ticks_per_slot: u64,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         let next_leader_slot =
-            leader_schedule_cache.next_leader_slot(&my_pubkey, bank.slot(), &bank, Some(block_buffer_pool));
+            leader_schedule_cache.next_leader_slot(&my_pubkey, treasury.slot(), &treasury, Some(block_buffer_pool));
         waterclock_recorder.lock().unwrap().reset(
-            bank.tick_height(),
-            bank.last_blockhash(),
-            bank.slot(),
+            treasury.tick_height(),
+            treasury.last_blockhash(),
+            treasury.slot(),
             next_leader_slot,
             ticks_per_slot,
         );
         debug!(
             "{:?} voted and reset waterclock at {}. next leader slot {:?}",
             my_pubkey,
-            bank.tick_height(),
+            treasury.tick_height(),
             next_leader_slot
         );
     }
@@ -402,14 +402,14 @@ impl ReplayStage {
         trace!("active banks {:?}", active_banks);
 
         for bank_slot in &active_banks {
-            let bank = bank_forks.read().unwrap().get(*bank_slot).unwrap().clone();
-            *ticks_per_slot = bank.ticks_per_slot();
-            if bank.collector_id() != *my_pubkey {
-                Self::replay_block_buffer_into_bank(&bank, &block_buffer_pool, progress)?;
+            let treasury = bank_forks.read().unwrap().get(*bank_slot).unwrap().clone();
+            *ticks_per_slot = treasury.ticks_per_slot();
+            if treasury.collector_id() != *my_pubkey {
+                Self::replay_block_buffer_into_bank(&treasury, &block_buffer_pool, progress)?;
             }
-            let max_tick_height = (*bank_slot + 1) * bank.ticks_per_slot() - 1;
-            if bank.tick_height() == max_tick_height {
-                Self::process_completed_bank(my_pubkey, bank, slot_full_sender);
+            let max_tick_height = (*bank_slot + 1) * treasury.ticks_per_slot() - 1;
+            if treasury.tick_height() == max_tick_height {
+                Self::process_completed_bank(my_pubkey, treasury, slot_full_sender);
             }
         }
         Ok(())
@@ -431,30 +431,30 @@ impl ReplayStage {
             .values()
             .filter(|b| {
                 let is_votable = b.is_votable();
-                trace!("bank is votable: {} {}", b.slot(), is_votable);
+                trace!("treasury is votable: {} {}", b.slot(), is_votable);
                 is_votable
             })
             .filter(|b| {
                 let is_recent_epoch = locktower.is_recent_epoch(b);
-                trace!("bank is is_recent_epoch: {} {}", b.slot(), is_recent_epoch);
+                trace!("treasury is is_recent_epoch: {} {}", b.slot(), is_recent_epoch);
                 is_recent_epoch
             })
             .filter(|b| {
                 let has_voted = locktower.has_voted(b.slot());
-                trace!("bank is has_voted: {} {}", b.slot(), has_voted);
+                trace!("treasury is has_voted: {} {}", b.slot(), has_voted);
                 !has_voted
             })
             .filter(|b| {
                 let is_locked_out = locktower.is_locked_out(b.slot(), &descendants);
-                trace!("bank is is_locked_out: {} {}", b.slot(), is_locked_out);
+                trace!("treasury is is_locked_out: {} {}", b.slot(), is_locked_out);
                 !is_locked_out
             })
-            .map(|bank| {
+            .map(|treasury| {
                 (
-                    bank,
+                    treasury,
                     locktower.collect_vote_lockouts(
-                        bank.slot(),
-                        bank.vote_accounts().into_iter(),
+                        treasury.slot(),
+                        treasury.vote_accounts().into_iter(),
                         &ancestors,
                     ),
                 )
@@ -463,7 +463,7 @@ impl ReplayStage {
                 let vote_threshold =
                     locktower.check_vote_stake_threshold(b.slot(), &stake_lockouts);
                 Self::confirm_forks(locktower, stake_lockouts, progress, bank_forks);
-                debug!("bank vote_threshold: {} {}", b.slot(), vote_threshold);
+                debug!("treasury vote_threshold: {} {}", b.slot(), vote_threshold);
                 vote_threshold
             })
             .map(|(b, stake_lockouts)| (locktower.calculate_weight(&stake_lockouts), b.clone()))
@@ -546,27 +546,27 @@ impl ReplayStage {
     }
 
     fn load_block_buffer_entries(
-        bank: &Bank,
+        treasury: &Bank,
         block_buffer_pool: &BlockBufferPool,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Result<(Vec<Entry>, usize)> {
-        let bank_slot = bank.slot();
+        let bank_slot = treasury.slot();
         let bank_progress = &mut progress
             .entry(bank_slot)
-            .or_insert(ForkProgress::new(bank.last_blockhash()));
+            .or_insert(ForkProgress::new(treasury.last_blockhash()));
         block_buffer_pool.fetch_slot_entries_by_blob_len(bank_slot, bank_progress.num_blobs as u64, None)
     }
 
     fn replay_entries_into_bank(
-        bank: &Bank,
+        treasury: &Bank,
         entries: Vec<Entry>,
         progress: &mut HashMap<u64, ForkProgress>,
         num: usize,
     ) -> Result<()> {
         let bank_progress = &mut progress
-            .entry(bank.slot())
-            .or_insert(ForkProgress::new(bank.last_blockhash()));
-        let result = Self::verify_and_process_entries(&bank, &entries, &bank_progress.last_entry);
+            .entry(treasury.slot())
+            .or_insert(ForkProgress::new(treasury.last_blockhash()));
+        let result = Self::verify_and_process_entries(&treasury, &entries, &bank_progress.last_entry);
         bank_progress.num_blobs += num;
         if let Some(last_entry) = entries.last() {
             bank_progress.last_entry = last_entry.hash;
@@ -575,7 +575,7 @@ impl ReplayStage {
     }
 
     pub fn verify_and_process_entries(
-        bank: &Bank,
+        treasury: &Bank,
         entries: &[Entry],
         last_entry: &Hash,
     ) -> Result<()> {
@@ -583,13 +583,13 @@ impl ReplayStage {
             trace!(
                 "entry verification failed {} {} {} {}",
                 entries.len(),
-                bank.tick_height(),
+                treasury.tick_height(),
                 last_entry,
-                bank.last_blockhash()
+                treasury.last_blockhash()
             );
             return Err(Error::BlobError(BlobError::VerificationFailed));
         }
-        block_buffer_pool_processor::process_entries(bank, entries)?;
+        block_buffer_pool_processor::process_entries(treasury, entries)?;
 
         Ok(())
     }
@@ -604,18 +604,18 @@ impl ReplayStage {
 
     fn process_completed_bank(
         my_pubkey: &Pubkey,
-        bank: Arc<Bank>,
+        treasury: Arc<Bank>,
         slot_full_sender: &Sender<(u64, Pubkey)>,
     ) {
-        bank.freeze();
-        // info!("{}", Info(format!("bank frozen {}", bank.slot()).to_string()));
+        treasury.freeze();
+        // info!("{}", Info(format!("treasury frozen {}", treasury.slot()).to_string()));
         let info:String = format!(
             "treasury locked {}",
-            bank.slot()
+            treasury.slot()
         ).to_string();
         println!("{}", printLn(info, module_path!().to_string()));
 
-        if let Err(e) = slot_full_sender.send((bank.slot(), bank.collector_id())) {
+        if let Err(e) = slot_full_sender.send((treasury.slot(), treasury.collector_id())) {
             trace!("{} slot_full alert failed: {:?}", my_pubkey, e);
         }
     }
@@ -637,7 +637,7 @@ impl ReplayStage {
         for (parent_id, children) in next_slots {
             let parent_bank = frozen_banks
                 .get(&parent_id)
-                .expect("missing parent in bank forks")
+                .expect("missing parent in treasury forks")
                 .clone();
             for child_id in children {
                 if forks.get(child_id).is_some() {

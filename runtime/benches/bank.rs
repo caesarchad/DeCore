@@ -3,7 +3,7 @@
 extern crate test;
 
 use log::*;
-use morgan_runtime::bank::*;
+use morgan_runtime::treasury::*;
 use morgan_runtime::bank_client::BankClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::account::KeyedAccount;
@@ -80,17 +80,17 @@ pub fn create_native_loader_transactions(
         .collect()
 }
 
-fn sync_bencher(bank: &Arc<Bank>, _bank_client: &BankClient, transactions: &Vec<Transaction>) {
-    let results = bank.process_transactions(&transactions);
+fn sync_bencher(treasury: &Arc<Bank>, _bank_client: &BankClient, transactions: &Vec<Transaction>) {
+    let results = treasury.process_transactions(&transactions);
     assert!(results.iter().all(Result::is_ok));
 }
 
-fn async_bencher(bank: &Arc<Bank>, bank_client: &BankClient, transactions: &Vec<Transaction>) {
+fn async_bencher(treasury: &Arc<Bank>, bank_client: &BankClient, transactions: &Vec<Transaction>) {
     for transaction in transactions.clone() {
         bank_client.async_send_transaction(transaction).unwrap();
     }
     for _ in 0..1_000_000_000_u64 {
-        if bank
+        if treasury
             .get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
             .is_some()
         {
@@ -98,7 +98,7 @@ fn async_bencher(bank: &Arc<Bank>, bank_client: &BankClient, transactions: &Vec<
         }
         sleep(Duration::from_nanos(1));
     }
-    if !bank
+    if !treasury
         .get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
         .unwrap()
         .is_ok()
@@ -106,14 +106,14 @@ fn async_bencher(bank: &Arc<Bank>, bank_client: &BankClient, transactions: &Vec<
         // error!(
         //     "{}",
         //     Error(format!("transaction failed: {:?}",
-        //     bank.get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
+        //     treasury.get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
         //         .unwrap()).to_string())
         // );
         println!(
             "{}",
             Error(
                 format!("transaction failed: {:?}",
-                    bank.get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
+                    treasury.get_signature_status(&transactions.last().unwrap().signatures.get(0).unwrap())
                     .unwrap()).to_string(),
                 module_path!().to_string()
             )
@@ -130,20 +130,20 @@ fn do_bench_transactions(
     morgan_logger::setup();
     let ns_per_s = 1_000_000_000;
     let (genesis_block, mint_keypair) = create_genesis_block(100_000_000);
-    let mut bank = Bank::new(&genesis_block);
-    bank.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
-    let bank = Arc::new(bank);
-    let bank_client = BankClient::new_shared(&bank);
+    let mut treasury = Bank::new(&genesis_block);
+    treasury.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
+    let treasury = Arc::new(treasury);
+    let bank_client = BankClient::new_shared(&treasury);
     let transactions = create_transactions(&bank_client, &mint_keypair);
 
     // Do once to fund accounts, load modules, etc...
-    let results = bank.process_transactions(&transactions);
+    let results = treasury.process_transactions(&transactions);
     assert!(results.iter().all(Result::is_ok));
 
     bencher.iter(|| {
         // Since bencher runs this multiple times, we need to clear the signatures.
-        bank.clear_signatures();
-        bench_work(&bank, &bank_client, &transactions);
+        treasury.clear_signatures();
+        bench_work(&treasury, &bank_client, &transactions);
     });
 
     let summary = bencher.bench(|_bencher| {}).unwrap();

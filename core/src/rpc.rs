@@ -10,7 +10,7 @@ use bincode::{deserialize, serialize};
 use jsonrpc_core::{Error, Metadata, Result};
 use jsonrpc_derive::rpc;
 use morgan_tokenbot::drone::{request_airdrop_transaction, request_reputation_airdrop_transaction};
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Bank;
 use morgan_interface::account::Account;
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::pubkey::Pubkey;
@@ -48,7 +48,7 @@ pub struct JsonRpcRequestProcessor {
 }
 
 impl JsonRpcRequestProcessor {
-    fn bank(&self) -> Arc<Bank> {
+    fn treasury(&self) -> Arc<Bank> {
         self.bank_forks.read().unwrap().working_bank()
     }
 
@@ -67,23 +67,23 @@ impl JsonRpcRequestProcessor {
     }
 
     pub fn get_account_info(&self, pubkey: &Pubkey) -> Result<Account> {
-        self.bank()
+        self.treasury()
             .get_account(&pubkey)
             .ok_or_else(Error::invalid_request)
     }
 
     pub fn get_balance(&self, pubkey: &Pubkey) -> u64 {
-        self.bank().get_balance(&pubkey)
+        self.treasury().get_balance(&pubkey)
     }
 
     pub fn get_reputation(&self, pubkey: &Pubkey) -> u64 {
-        self.bank().get_reputation(&pubkey)
+        self.treasury().get_reputation(&pubkey)
     }
 
     fn get_recent_blockhash(&self) -> (String, FeeCalculator) {
         (
-            self.bank().confirmed_last_blockhash().to_string(),
-            self.bank().fee_calculator.clone(),
+            self.treasury().confirmed_last_blockhash().to_string(),
+            self.treasury().fee_calculator.clone(),
         )
     }
 
@@ -101,17 +101,17 @@ impl JsonRpcRequestProcessor {
         &self,
         signature: Signature,
     ) -> Option<(usize, transaction::Result<()>)> {
-        self.bank().get_signature_confirmation_status(&signature)
+        self.treasury().get_signature_confirmation_status(&signature)
     }
 
     fn get_transaction_count(&self) -> Result<u64> {
-        Ok(self.bank().transaction_count() as u64)
+        Ok(self.treasury().transaction_count() as u64)
     }
 
     fn get_epoch_vote_accounts(&self) -> Result<Vec<(Pubkey, u64, VoteState)>> {
-        let bank = self.bank();
-        Ok(bank
-            .epoch_vote_accounts(bank.get_stakers_epoch(bank.slot()))
+        let treasury = self.treasury();
+        Ok(treasury
+            .epoch_vote_accounts(treasury.get_stakers_epoch(treasury.slot()))
             .ok_or_else(Error::invalid_request)?
             .iter()
             .map(|(k, (s, a))| (*k, *s, VoteState::from(a).unwrap_or_default()))
@@ -382,7 +382,7 @@ impl RpcSol for RpcSolImpl {
             .request_processor
             .read()
             .unwrap()
-            .bank()
+            .treasury()
             .confirmed_last_blockhash();
         let transaction = request_airdrop_transaction(&drone_addr, &pubkey, difs, blockhash)
             .map_err(|err| {
@@ -471,7 +471,7 @@ impl RpcSol for RpcSolImpl {
             .request_processor
             .read()
             .unwrap()
-            .bank()
+            .treasury()
             .confirmed_last_blockhash();
         let transaction = request_reputation_airdrop_transaction(&drone_addr, &pubkey, reputations, blockhash)
             .map_err(|err| {
@@ -655,15 +655,15 @@ mod tests {
         pubkey: &Pubkey,
     ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, Pubkey) {
         let (bank_forks, alice) = new_bank_forks();
-        let bank = bank_forks.read().unwrap().working_bank();
+        let treasury = bank_forks.read().unwrap().working_bank();
         let exit = Arc::new(AtomicBool::new(false));
 
-        let blockhash = bank.confirmed_last_blockhash();
+        let blockhash = treasury.confirmed_last_blockhash();
         let tx = system_transaction::transfer(&alice, pubkey, 20, blockhash);
-        bank.process_transaction(&tx).expect("process transaction");
+        treasury.process_transaction(&tx).expect("process transaction");
 
         let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, blockhash);
-        let _ = bank.process_transaction(&tx);
+        let _ = treasury.process_transaction(&tx);
 
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
             StorageState::default(),
@@ -693,7 +693,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
         let (bank_forks, alice) = new_bank_forks();
-        let bank = bank_forks.read().unwrap().working_bank();
+        let treasury = bank_forks.read().unwrap().working_bank();
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
             JsonRpcConfig::default(),
@@ -701,9 +701,9 @@ mod tests {
             &exit,
         );
         thread::spawn(move || {
-            let blockhash = bank.confirmed_last_blockhash();
+            let blockhash = treasury.confirmed_last_blockhash();
             let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
-            bank.process_transaction(&tx).expect("process transaction");
+            treasury.process_transaction(&tx).expect("process transaction");
         })
         .join()
         .unwrap();
@@ -1022,9 +1022,9 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
+        let treasury = Bank::new(&genesis_block);
         (
-            Arc::new(RwLock::new(BankForks::new(bank.slot(), bank))),
+            Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury))),
             mint_keypair,
         )
     }
