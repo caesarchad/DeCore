@@ -760,7 +760,7 @@ mod test {
         try_calc(1000,   50,  100,   50,  101,  0,45,  5,   49, Tokens::new(   1, 0, 0, 0)).unwrap();
     }
 
-    fn create_bank(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Bank::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
@@ -846,7 +846,7 @@ mod test {
     #[test]
     fn test_exchange_new_account() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
@@ -865,7 +865,7 @@ mod test {
     #[test]
     fn test_exchange_new_account_not_unallocated() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
@@ -878,7 +878,7 @@ mod test {
     #[test]
     fn test_exchange_new_transfer_request() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
@@ -909,7 +909,7 @@ mod test {
     #[test]
     fn test_exchange_new_trade_request() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let (trade, src) = trade(
@@ -950,7 +950,7 @@ mod test {
     #[test]
     fn test_exchange_new_swap_request() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);
@@ -1017,7 +1017,7 @@ mod test {
     #[test]
     fn test_exchange_trade_to_token_account() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);

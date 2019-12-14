@@ -73,7 +73,7 @@ mod tests {
         }
     }
 
-    fn create_bank(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Bank::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_process_create_ok() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_account_data = treasury_client
             .get_account_data(&config_keypair.pubkey())
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn test_process_store_ok() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_process_store_fail_instruction_data_too_large() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_process_store_fail_account0_not_signer() {
         morgan_logger::setup();
-        let (treasury, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let system_keypair = Keypair::new();
         let system_pubkey = system_keypair.pubkey();
 

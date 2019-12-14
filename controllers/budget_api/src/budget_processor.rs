@@ -162,7 +162,7 @@ mod tests {
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::TransactionError;
 
-    fn create_bank(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Bank, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Bank::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_budget_payment() {
-        let (treasury, alice_keypair) = create_bank(10_000);
+        let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let bob_pubkey = Pubkey::new_rand();
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_unsigned_witness_key() {
-        let (treasury, alice_keypair) = create_bank(10_000);
+        let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
 
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_unsigned_timestamp() {
-        let (treasury, alice_keypair) = create_bank(10_000);
+        let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
 
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_pay_on_date() {
-        let (treasury, alice_keypair) = create_bank(2);
+        let (treasury, alice_keypair) = create_treasury(2);
         let treasury_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let budget_pubkey = Pubkey::new_rand();
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_cancel_payment() {
-        let (treasury, alice_keypair) = create_bank(3);
+        let (treasury, alice_keypair) = create_treasury(3);
         let treasury_client = BankClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let budget_pubkey = Pubkey::new_rand();
