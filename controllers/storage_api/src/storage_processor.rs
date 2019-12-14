@@ -105,7 +105,7 @@ mod tests {
     use bincode::deserialize;
     use log::*;
     use morgan_runtime::treasury::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -275,10 +275,10 @@ mod tests {
         treasury.add_instruction_processor(id(), process_instruction);
         let treasury = Arc::new(treasury);
         let slot = 0;
-        let bank_client = BankClient::new_shared(&treasury);
+        let treasury_client = BankClient::new_shared(&treasury);
 
         init_storage_accounts(
-            &bank_client,
+            &treasury_client,
             &mint_keypair,
             &[&validator_storage_id],
             &[&miner_1_storage_id, &miner_2_storage_id],
@@ -289,7 +289,7 @@ mod tests {
             &mining_pool_pubkey,
             100,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         // tick the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
@@ -307,7 +307,7 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -321,7 +321,7 @@ mod tests {
                     &mint_keypair,
                     &miner_1_storage_keypair,
                     slot,
-                    &bank_client,
+                    &treasury_client,
                 ));
             checked_proofs
                 .entry(miner_2_storage_id)
@@ -330,7 +330,7 @@ mod tests {
                     &mint_keypair,
                     &miner_2_storage_keypair,
                     slot,
-                    &bank_client,
+                    &treasury_client,
                 ));
         }
         let message = Message::new_with_payer(
@@ -348,7 +348,7 @@ mod tests {
         }
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -362,7 +362,7 @@ mod tests {
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -381,11 +381,11 @@ mod tests {
         }
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
-        assert_eq!(bank_client.get_balance(&validator_storage_id).unwrap(), 10);
+        assert_eq!(treasury_client.get_balance(&validator_storage_id).unwrap(), 10);
 
         let message = Message::new_with_payer(
             vec![storage_instruction::claim_reward(
@@ -395,9 +395,9 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
         assert_eq!(
-            bank_client.get_balance(&validator_storage_id).unwrap(),
+            treasury_client.get_balance(&validator_storage_id).unwrap(),
             10 + (TOTAL_VALIDATOR_REWARDS * 10)
         );
 
@@ -407,7 +407,7 @@ mod tests {
         }
 
         assert_eq!(
-            bank_client.get_balance(&miner_1_storage_id).unwrap(),
+            treasury_client.get_balance(&miner_1_storage_id).unwrap(),
             10
         );
 
@@ -419,7 +419,7 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
 
         let message = Message::new_with_payer(
             vec![storage_instruction::claim_reward(
@@ -429,11 +429,11 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
 
         // TODO enable when rewards are working
         assert_eq!(
-            bank_client.get_balance(&miner_1_storage_id).unwrap(),
+            treasury_client.get_balance(&miner_1_storage_id).unwrap(),
             10 + (TOTAL_STORAGE_MINER_REWARDS * 5)
         );
     }
@@ -508,7 +508,7 @@ mod tests {
         mint_keypair: &Keypair,
         storage_keypair: &Keypair,
         slot: u64,
-        bank_client: &BankClient,
+        treasury_client: &BankClient,
     ) -> CheckedProof {
         let sha_state = Hash::new(Pubkey::new_rand().as_ref());
         let message = Message::new_with_payer(
@@ -522,7 +522,7 @@ mod tests {
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &storage_keypair], message),
             Ok(_)
         );
         CheckedProof {
@@ -565,13 +565,13 @@ mod tests {
         for _ in 0..next_storage_segment_tick_height {
             treasury.register_tick(&treasury.last_blockhash());
         }
-        let bank_client = BankClient::new(treasury);
+        let treasury_client = BankClient::new(treasury);
 
         let x = 42;
         let x2 = x * 2;
         let storage_blockhash = hash(&[x2]);
 
-        bank_client
+        treasury_client
             .transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
@@ -580,14 +580,14 @@ mod tests {
             &miner_pubkey,
             1,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         let message = Message::new(storage_instruction::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         let message = Message::new_with_payer(
             vec![storage_instruction::advertise_recent_blockhash(
@@ -599,7 +599,7 @@ mod tests {
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_keypair], message),
             Ok(_)
         );
 
@@ -614,16 +614,16 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &miner_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &miner_keypair], message),
             Ok(_)
         );
 
         assert_eq!(
-            get_storage_slot(&bank_client, &validator_pubkey),
+            get_storage_slot(&treasury_client, &validator_pubkey),
             SLOTS_PER_SEGMENT
         );
         assert_eq!(
-            get_storage_blockhash(&bank_client, &validator_pubkey),
+            get_storage_blockhash(&treasury_client, &validator_pubkey),
             storage_blockhash
         );
     }

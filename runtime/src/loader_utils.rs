@@ -1,4 +1,4 @@
-use crate::bank_client::BankClient;
+use crate::treasury_client::BankClient;
 use serde::Serialize;
 use morgan_interface::client::SyncClient;
 use morgan_interface::instruction::{AccountMeta, Instruction};
@@ -9,7 +9,7 @@ use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::system_instruction;
 
 pub fn load_program(
-    bank_client: &BankClient,
+    treasury_client: &BankClient,
     from_keypair: &Keypair,
     loader_pubkey: &Pubkey,
     program: Vec<u8>,
@@ -24,7 +24,7 @@ pub fn load_program(
         program.len() as u64,
         loader_pubkey,
     );
-    bank_client
+    treasury_client
         .send_instruction(&from_keypair, instruction)
         .unwrap();
 
@@ -34,7 +34,7 @@ pub fn load_program(
         let instruction =
             loader_instruction::write(&program_pubkey, loader_pubkey, offset, chunk.to_vec());
         let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
-        bank_client
+        treasury_client
             .send_message(&[from_keypair, &program_keypair], message)
             .unwrap();
         offset += chunk_size as u32;
@@ -42,7 +42,7 @@ pub fn load_program(
 
     let instruction = loader_instruction::finalize(&program_pubkey, loader_pubkey);
     let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
-    bank_client
+    treasury_client
         .send_message(&[from_keypair, &program_keypair], message)
         .unwrap();
 

@@ -4,7 +4,7 @@ extern crate test;
 
 use log::*;
 use morgan_runtime::treasury::*;
-use morgan_runtime::bank_client::BankClient;
+use morgan_runtime::treasury_client::BankClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::client::AsyncClient;
@@ -36,7 +36,7 @@ fn process_instruction(
 }
 
 pub fn create_builtin_transactions(
-    bank_client: &BankClient,
+    treasury_client: &BankClient,
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
     let program_id = Pubkey::new(&BUILTIN_PROGRAM_ID);
@@ -46,35 +46,35 @@ pub fn create_builtin_transactions(
         .map(|_| {
             // Seed the signer account
             let rando0 = Keypair::new();
-            bank_client
+            treasury_client
                 .transfer(10_000, &mint_keypair, &rando0.pubkey())
                 .expect(&format!("{}:{}", line!(), file!()));
 
             let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
-            let (blockhash, _fee_calculator) = bank_client.get_recent_blockhash().unwrap();
+            let (blockhash, _fee_calculator) = treasury_client.get_recent_blockhash().unwrap();
             Transaction::new_signed_instructions(&[&rando0], vec![instruction], blockhash)
         })
         .collect()
 }
 
 pub fn create_native_loader_transactions(
-    bank_client: &BankClient,
+    treasury_client: &BankClient,
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
     let program = "morgan_noop_program".as_bytes().to_vec();
-    let program_id = load_program(&bank_client, &mint_keypair, &native_loader::id(), program);
+    let program_id = load_program(&treasury_client, &mint_keypair, &native_loader::id(), program);
 
     (0..4096)
         .into_iter()
         .map(|_| {
             // Seed the signer account©41
             let rando0 = Keypair::new();
-            bank_client
+            treasury_client
                 .transfer(10_000, &mint_keypair, &rando0.pubkey())
                 .expect(&format!("{}:{}", line!(), file!()));
 
             let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
-            let (blockhash, _fee_calculator) = bank_client.get_recent_blockhash().unwrap();
+            let (blockhash, _fee_calculator) = treasury_client.get_recent_blockhash().unwrap();
             Transaction::new_signed_instructions(&[&rando0], vec![instruction], blockhash)
         })
         .collect()
@@ -85,9 +85,9 @@ fn sync_bencher(treasury: &Arc<Bank>, _bank_client: &BankClient, transactions: &
     assert!(results.iter().all(Result::is_ok));
 }
 
-fn async_bencher(treasury: &Arc<Bank>, bank_client: &BankClient, transactions: &Vec<Transaction>) {
+fn async_bencher(treasury: &Arc<Bank>, treasury_client: &BankClient, transactions: &Vec<Transaction>) {
     for transaction in transactions.clone() {
-        bank_client.async_send_transaction(transaction).unwrap();
+        treasury_client.async_send_transaction(transaction).unwrap();
     }
     for _ in 0..1_000_000_000_u64 {
         if treasury
@@ -133,8 +133,8 @@ fn do_bench_transactions(
     let mut treasury = Bank::new(&genesis_block);
     treasury.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
     let treasury = Arc::new(treasury);
-    let bank_client = BankClient::new_shared(&treasury);
-    let transactions = create_transactions(&bank_client, &mint_keypair);
+    let treasury_client = BankClient::new_shared(&treasury);
+    let transactions = create_transactions(&treasury_client, &mint_keypair);
 
     // Do once to fund accounts, load modules, etc...
     let results = treasury.process_transactions(&transactions);
@@ -143,7 +143,7 @@ fn do_bench_transactions(
     bencher.iter(|| {
         // Since bencher runs this multiple times, we need to clear the signatures.
         treasury.clear_signatures();
-        bench_work(&treasury, &bank_client, &transactions);
+        bench_work(&treasury, &treasury_client, &transactions);
     });
 
     let summary = bencher.bench(|_bencher| {}).unwrap();

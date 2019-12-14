@@ -227,7 +227,7 @@ mod tests {
         let jane_pubkey = jane_doe_keypair.pubkey();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
         let treasury = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(treasury);
+        let treasury_client = BankClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
         let bob_pubkey = Pubkey::new_rand();
@@ -237,7 +237,7 @@ mod tests {
             .push(AccountMeta::new(jane_pubkey, true));
 
         let message = Message::new(vec![transfer_instruction]);
-        bank_client.send_message(&doe_keypairs, message).unwrap();
-        assert_eq!(bank_client.get_balance(&bob_pubkey).unwrap(), 42);
+        treasury_client.send_message(&doe_keypairs, message).unwrap();
+        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }
 }

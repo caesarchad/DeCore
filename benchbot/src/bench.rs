@@ -663,7 +663,7 @@ mod tests {
     use morgan_client::thin_client::create_client;
     use morgan_tokenbot::drone::run_local_drone;
     use morgan_runtime::treasury::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use std::sync::mpsc::channel;

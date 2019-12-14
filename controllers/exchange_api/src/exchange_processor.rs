@@ -676,7 +676,7 @@ mod test {
     use super::*;
     use crate::{exchange_instruction, id};
     use morgan_runtime::treasury::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -769,12 +769,12 @@ mod test {
 
     fn create_client(treasury: Bank, mint_keypair: Keypair) -> (BankClient, Keypair) {
         let owner = Keypair::new();
-        let bank_client = BankClient::new(treasury);
-        bank_client
+        let treasury_client = BankClient::new(treasury);
+        treasury_client
             .transfer(42, &mint_keypair, &owner.pubkey())
             .unwrap();
 
-        (bank_client, owner)
+        (treasury_client, owner)
     }
 
     fn create_account(client: &BankClient, owner: &Keypair) -> Pubkey {

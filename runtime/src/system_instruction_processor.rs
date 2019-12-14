@@ -167,7 +167,7 @@ pub fn process_instruction(
 mod tests {
     use super::*;
     use crate::treasury::Bank;
-    use crate::bank_client::BankClient;
+    use crate::treasury_client::BankClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
     use morgan_interface::client::SyncClient;
@@ -424,8 +424,8 @@ mod tests {
 
         // Fund to account to bypass AccountNotFound error
         let treasury = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(treasury);
-        bank_client
+        let treasury_client = BankClient::new(treasury);
+        treasury_client
             .transfer(50, &alice_keypair, &mallory_pubkey)
             .unwrap();
 
@@ -441,13 +441,13 @@ mod tests {
             account_metas,
         );
         assert_eq!(
-            bank_client
+            treasury_client
                 .send_instruction(&mallory_keypair, malicious_instruction)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
         );
-        assert_eq!(bank_client.get_balance(&alice_pubkey).unwrap(), 50);
-        assert_eq!(bank_client.get_balance(&mallory_pubkey).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&mallory_pubkey).unwrap(), 50);
     }
 }

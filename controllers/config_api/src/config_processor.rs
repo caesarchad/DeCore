@@ -47,7 +47,7 @@ mod tests {
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
     use morgan_runtime::treasury::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::message::Message;
@@ -84,8 +84,8 @@ mod tests {
         let config_keypair = Keypair::new();
         let config_pubkey = config_keypair.pubkey();
 
-        let bank_client = BankClient::new(treasury);
-        bank_client
+        let treasury_client = BankClient::new(treasury);
+        treasury_client
             .send_instruction(
                 mint_keypair,
                 config_instruction::create_account::<MyConfig>(
@@ -96,15 +96,15 @@ mod tests {
             )
             .expect("new_account");
 
-        (bank_client, config_keypair)
+        (treasury_client, config_keypair)
     }
 
     #[test]
     fn test_process_create_ok() {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
-        let config_account_data = bank_client
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
+        let config_account_data = treasury_client
             .get_account_data(&config_keypair.pubkey())
             .unwrap()
             .unwrap();
@@ -118,18 +118,18 @@ mod tests {
     fn test_process_store_ok() {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
 
         let instruction = config_instruction::store(&config_pubkey, &my_config);
         let message = Message::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
-        bank_client
+        treasury_client
             .send_message(&[&mint_keypair, &config_keypair], message)
             .unwrap();
 
-        let config_account_data = bank_client
+        let config_account_data = treasury_client
             .get_account_data(&config_pubkey)
             .unwrap()
             .unwrap();
@@ -143,7 +143,7 @@ mod tests {
     fn test_process_store_fail_instruction_data_too_large() {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
@@ -151,7 +151,7 @@ mod tests {
         let mut instruction = config_instruction::store(&config_pubkey, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let message = Message::new(vec![instruction]);
-        bank_client
+        treasury_client
             .send_message(&[&config_keypair], message)
             .unwrap_err();
     }
@@ -164,7 +164,7 @@ mod tests {
         let system_pubkey = system_keypair.pubkey();
 
         treasury.transfer(42, &mint_keypair, &system_pubkey).unwrap();
-        let (bank_client, config_keypair) = create_config_account(treasury, &mint_keypair);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let transfer_instruction =
@@ -174,7 +174,7 @@ mod tests {
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
         let message = Message::new(vec![transfer_instruction, store_instruction]);
-        bank_client
+        treasury_client
             .send_message(&[&system_keypair], message)
             .unwrap_err();
     }
