@@ -11,7 +11,7 @@ use std::{borrow::Cow, convert, ffi::OsStr, path::Path, str};
 
 pub struct BankForks {
     banks: HashMap<u64, Arc<Bank>>,
-    working_bank: Arc<Bank>,
+    working_treasury: Arc<Bank>,
     root: u64,
 }
 
@@ -25,11 +25,11 @@ impl Index<u64> for BankForks {
 impl BankForks {
     pub fn new(bank_slot: u64, treasury: Bank) -> Self {
         let mut banks = HashMap::new();
-        let working_bank = Arc::new(treasury);
-        banks.insert(bank_slot, working_bank.clone());
+        let working_treasury = Arc::new(treasury);
+        banks.insert(bank_slot, working_treasury.clone());
         Self {
             banks,
-            working_bank,
+            working_treasury,
             root: 0,
         }
     }
@@ -84,14 +84,14 @@ impl BankForks {
 
     pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
         let mut banks = HashMap::new();
-        let working_bank = initial_banks[0].clone();
+        let working_treasury = initial_banks[0].clone();
         for treasury in initial_banks {
             banks.insert(treasury.slot(), treasury.clone());
         }
         Self {
             root,
             banks,
-            working_bank,
+            working_treasury,
         }
     }
 
@@ -100,12 +100,12 @@ impl BankForks {
         let prev = self.banks.insert(treasury.slot(), treasury.clone());
         assert!(prev.is_none());
 
-        self.working_bank = treasury.clone();
+        self.working_treasury = treasury.clone();
     }
 
     // TODO: really want to kill this...
-    pub fn working_bank(&self) -> Arc<Bank> {
-        self.working_bank.clone()
+    pub fn working_treasury(&self) -> Arc<Bank> {
+        self.working_treasury.clone()
     }
 
     pub fn set_genesis(&mut self, root: u64) {
@@ -219,7 +219,7 @@ mod tests {
         child_bank.register_tick(&Hash::default());
         treasury_forks.insert(child_bank);
         assert_eq!(treasury_forks[1u64].tick_height(), 1);
-        assert_eq!(treasury_forks.working_bank().tick_height(), 1);
+        assert_eq!(treasury_forks.working_treasury().tick_height(), 1);
     }
 
     #[test]

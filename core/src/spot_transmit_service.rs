@@ -219,7 +219,7 @@ impl WindowService {
                             blob,
                             treasury_forks
                                 .as_ref()
-                                .map(|treasury_forks| treasury_forks.read().unwrap().working_bank()),
+                                .map(|treasury_forks| treasury_forks.read().unwrap().working_treasury()),
                         )
                     }) {
                         match e {
@@ -376,7 +376,7 @@ mod test {
             epoch_schedule: treasury_forks
                 .read()
                 .unwrap()
-                .working_bank()
+                .working_treasury()
                 .epoch_schedule()
                 .clone(),
         };
@@ -457,7 +457,7 @@ mod test {
         let block_buffer_pool = Arc::new(block_buffer_pool);
         let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
-        let epoch_schedule = *treasury_forks.read().unwrap().working_bank().epoch_schedule();
+        let epoch_schedule = *treasury_forks.read().unwrap().working_treasury().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {
             treasury_forks,
             completed_slots_receiver,

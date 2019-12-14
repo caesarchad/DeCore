@@ -49,7 +49,7 @@ pub struct JsonRpcRequestProcessor {
 
 impl JsonRpcRequestProcessor {
     fn treasury(&self) -> Arc<Bank> {
-        self.treasury_forks.read().unwrap().working_bank()
+        self.treasury_forks.read().unwrap().working_treasury()
     }
 
     pub fn new(
@@ -655,7 +655,7 @@ mod tests {
         pubkey: &Pubkey,
     ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, Pubkey) {
         let (treasury_forks, alice) = new_bank_forks();
-        let treasury = treasury_forks.read().unwrap().working_bank();
+        let treasury = treasury_forks.read().unwrap().working_treasury();
         let exit = Arc::new(AtomicBool::new(false));
 
         let blockhash = treasury.confirmed_last_blockhash();
@@ -693,7 +693,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
         let (treasury_forks, alice) = new_bank_forks();
-        let treasury = treasury_forks.read().unwrap().working_bank();
+        let treasury = treasury_forks.read().unwrap().working_treasury();
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
             JsonRpcConfig::default(),

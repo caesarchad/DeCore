@@ -112,7 +112,7 @@ impl Tvu {
             &exit,
             genesis_blockhash,
             completed_slots_receiver,
-            *treasury_forks.read().unwrap().working_bank().epoch_schedule(),
+            *treasury_forks.read().unwrap().working_treasury().epoch_schedule(),
         );
 
         let (replay_stage, slot_full_receiver, root_slot_receiver) = ReplayStage::new(
@@ -263,7 +263,7 @@ pub mod tests {
             BlockBufferPool::open_by_message(&block_buffer_pool_path)
                 .expect("Expected to successfully open ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let treasury = treasury_forks.working_bank();
+        let treasury = treasury_forks.working_treasury();
         let (exit, waterclock_recorder, waterclock_service, _entry_receiver) =
             create_test_recorder(&treasury, &block_buffer_pool);
         let voting_keypair = Keypair::new();

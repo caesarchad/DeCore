@@ -251,7 +251,7 @@ impl ReplayStage {
                         treasury_forks.write().unwrap().insert(tpu_bank);
                         if let Some(tpu_bank) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
                             assert_eq!(
-                                treasury_forks.read().unwrap().working_bank().slot(),
+                                treasury_forks.read().unwrap().working_treasury().slot(),
                                 tpu_bank.slot()
                             );
                             debug!(
@@ -691,7 +691,7 @@ mod test {
             let bank0 = Bank::new(&genesis_block);
             let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank0));
             let mut treasury_forks = BankForks::new(0, bank0);
-            treasury_forks.working_bank().freeze();
+            treasury_forks.working_treasury().freeze();
 
             // Insert blob for slot 1, generate new forks, check result
             let mut blob_slot_1 = Blob::default();

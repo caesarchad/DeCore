@@ -204,8 +204,8 @@ impl StorageStage {
                     let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
                     {
-                        let working_bank = treasury_forks.read().unwrap().working_bank();
-                        let storage_account = working_bank.get_account(&storage_keypair.pubkey());
+                        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+                        let storage_account = working_treasury.get_account(&storage_keypair.pubkey());
                         if storage_account.is_none() {
                             // warn!("Storage account not found: {}", storage_keypair.pubkey());
                             println!(
@@ -268,9 +268,9 @@ impl StorageStage {
         storage_keypair: &Arc<Keypair>,
         transactions_socket: &UdpSocket,
     ) -> io::Result<()> {
-        let working_bank = treasury_forks.read().unwrap().working_bank();
-        let blockhash = working_bank.confirmed_last_blockhash();
-        let keypair_balance = working_bank.get_balance(&keypair.pubkey());
+        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+        let blockhash = working_treasury.confirmed_last_blockhash();
+        let keypair_balance = working_treasury.get_balance(&keypair.pubkey());
 
         if keypair_balance == 0 {
             // warn!("keypair account balance empty: {}", keypair.pubkey(),);
@@ -288,7 +288,7 @@ impl StorageStage {
                 keypair_balance
             );
         }
-        if working_bank
+        if working_treasury
             .get_account(&storage_keypair.pubkey())
             .is_none()
         {

@@ -138,7 +138,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
             let exit = Arc::new(AtomicBool::new(false));
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: treasury.tick_height(),
                 max_tick_height: std::u64::MAX,
@@ -169,7 +169,7 @@ mod tests {
             };
 
             let waterclock_service = WaterClockService::new(waterclock_recorder.clone(), &waterclock_config, &exit);
-            waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
+            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
 
             // get some events
             let mut hashes = 0;

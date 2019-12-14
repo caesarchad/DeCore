@@ -1055,7 +1055,7 @@ impl NodeGroupInfo {
                     let start = timestamp();
                     let stakes: HashMap<_, _> = match treasury_forks {
                         Some(ref treasury_forks) => {
-                            staking_utils::staked_nodes(&treasury_forks.read().unwrap().working_bank())
+                            staking_utils::staked_nodes(&treasury_forks.read().unwrap().working_treasury())
                         }
                         None => HashMap::new(),
                     };

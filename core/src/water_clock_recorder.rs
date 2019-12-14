@@ -52,7 +52,7 @@ pub struct WaterClockRecorder {
     start_slot: u64,
     start_tick: u64,
     tick_cache: Vec<(Entry, u64)>,
-    working_bank: Option<WorkingBank>,
+    working_treasury: Option<WorkingBank>,
     sender: Sender<WorkingBankEntries>,
     start_leader_at_tick: Option<u64>,
     last_leader_tick: Option<u64>,
@@ -66,8 +66,8 @@ pub struct WaterClockRecorder {
 
 impl WaterClockRecorder {
     fn clear_bank(&mut self) {
-        if let Some(working_bank) = self.working_bank.take() {
-            let treasury = working_bank.treasury;
+        if let Some(working_treasury) = self.working_treasury.take() {
+            let treasury = working_treasury.treasury;
             let next_leader_slot = self.leader_schedule_cache.next_leader_slot(
                 &self.id,
                 treasury.slot(),
@@ -97,7 +97,7 @@ impl WaterClockRecorder {
                     >= leader_pubkeyeal_start_tick.saturating_sub(within_next_n_ticks)
         });
 
-        self.working_bank.is_some() || close_to_leader_tick
+        self.working_treasury.is_some() || close_to_leader_tick
     }
 
     pub fn next_slot_leader(&self) -> Option<Pubkey> {
@@ -111,7 +111,7 @@ impl WaterClockRecorder {
     }
 
     pub fn treasury(&self) -> Option<Arc<Bank>> {
-        self.working_bank.clone().map(|w| w.treasury)
+        self.working_treasury.clone().map(|w| w.treasury)
     }
 
     pub fn tick_height(&self) -> u64 {
@@ -212,19 +212,19 @@ impl WaterClockRecorder {
         self.ticks_per_slot = ticks_per_slot;
     }
 
-    pub fn set_working_bank(&mut self, working_bank: WorkingBank) {
+    pub fn set_working_bank(&mut self, working_treasury: WorkingBank) {
         trace!("new working treasury");
-        self.working_bank = Some(working_bank);
+        self.working_treasury = Some(working_treasury);
     }
     pub fn set_bank(&mut self, treasury: &Arc<Bank>) {
         let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
-        let working_bank = WorkingBank {
+        let working_treasury = WorkingBank {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height,
         };
         self.ticks_per_slot = treasury.ticks_per_slot();
-        self.set_working_bank(working_bank);
+        self.set_working_bank(working_treasury);
     }
 
     // Flush cache will delay flushing the cache for a treasury until it past the WorkingBank::min_tick_height
@@ -234,16 +234,16 @@ impl WaterClockRecorder {
         // check_tick_height is called before flush cache, so it cannot overrun the treasury
         // so a treasury that is so late that it's slot fully generated before it starts recording
         // will fail instead of broadcasting any ticks
-        let working_bank = self
-            .working_bank
+        let working_treasury = self
+            .working_treasury
             .as_ref()
             .ok_or(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))?;
-        if self.tick_height < working_bank.min_tick_height {
+        if self.tick_height < working_treasury.min_tick_height {
             return Err(Error::WaterClockRecorderErr(
                 WaterClockRecorderErr::MinHeightNotReached,
             ));
         }
-        if tick && self.tick_height == working_bank.min_tick_height {
+        if tick && self.tick_height == working_treasury.min_tick_height {
             return Err(Error::WaterClockRecorderErr(
                 WaterClockRecorderErr::MinHeightNotReached,
             ));
@@ -252,39 +252,39 @@ impl WaterClockRecorder {
         let entry_count = self
             .tick_cache
             .iter()
-            .take_while(|x| x.1 <= working_bank.max_tick_height)
+            .take_while(|x| x.1 <= working_treasury.max_tick_height)
             .count();
         let send_result = if entry_count > 0 {
             debug!(
                 "flush_cache: bank_slot: {} tick_height: {} max: {} sending: {}",
-                working_bank.treasury.slot(),
-                working_bank.treasury.tick_height(),
-                working_bank.max_tick_height,
+                working_treasury.treasury.slot(),
+                working_treasury.treasury.tick_height(),
+                working_treasury.max_tick_height,
                 entry_count,
             );
             let cache = &self.tick_cache[..entry_count];
             for t in cache {
-                working_bank.treasury.register_tick(&t.0.hash);
+                working_treasury.treasury.register_tick(&t.0.hash);
             }
             self.sender
-                .send((working_bank.treasury.clone(), cache.to_vec()))
+                .send((working_treasury.treasury.clone(), cache.to_vec()))
         } else {
             Ok(())
         };
-        if self.tick_height >= working_bank.max_tick_height {
+        if self.tick_height >= working_treasury.max_tick_height {
             // info!(
             //     "{}",
             //     Info(format!("waterclock_record: max_tick_height reached, setting working treasury {} to None",
-            //     working_bank.treasury.slot()).to_string())
+            //     working_treasury.treasury.slot()).to_string())
             // );
             let info:String = format!(
                 "water_clock_recorder: max timmer reached, setting current treasury {} to None",
-                working_bank.treasury.slot()
+                working_treasury.treasury.slot()
             ).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
 
-            self.start_slot = working_bank.max_tick_height / working_bank.treasury.ticks_per_slot();
-            self.start_tick = (self.start_slot + 1) * working_bank.treasury.ticks_per_slot();
+            self.start_slot = working_treasury.max_tick_height / working_treasury.treasury.ticks_per_slot();
+            self.start_tick = (self.start_slot + 1) * working_treasury.treasury.ticks_per_slot();
             self.clear_bank();
         }
         if send_result.is_err() {
@@ -358,11 +358,11 @@ impl WaterClockRecorder {
         loop {
             self.flush_cache(false)?;
 
-            let working_bank = self
-                .working_bank
+            let working_treasury = self
+                .working_treasury
                 .as_ref()
                 .ok_or(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))?;
-            if bank_slot != working_bank.treasury.slot() {
+            if bank_slot != working_treasury.treasury.slot() {
                 return Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached));
             }
 
@@ -380,7 +380,7 @@ impl WaterClockRecorder {
                     transactions,
                 };
                 self.sender
-                    .send((working_bank.treasury.clone(), vec![(entry, self.tick_height)]))?;
+                    .send((working_treasury.treasury.clone(), vec![(entry, self.tick_height)]))?;
                 return Ok(());
             }
             // record() might fail if the next Water Clock hash needs to be a tick.  But that's ok, tick()
@@ -418,7 +418,7 @@ impl WaterClockRecorder {
                 waterclock,
                 tick_height,
                 tick_cache: vec![],
-                working_bank: None,
+                working_treasury: None,
                 sender,
                 clear_bank_signal,
                 start_slot,
@@ -576,15 +576,15 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
-            assert!(waterclock_recorder.working_bank.is_some());
+            waterclock_recorder.set_working_bank(working_treasury);
+            assert!(waterclock_recorder.working_treasury.is_some());
             waterclock_recorder.clear_bank();
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -610,12 +610,12 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             //tick height equal to min_tick_height
@@ -630,7 +630,7 @@ mod tests {
             let (bank_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
             assert_eq!(bank_.slot(), treasury.slot());
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -663,16 +663,16 @@ mod tests {
             assert_eq!(waterclock_recorder.tick_cache.last().unwrap().1, 4);
             assert_eq!(waterclock_recorder.tick_height, 4);
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
 
             assert_eq!(waterclock_recorder.tick_height, 5);
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
             let (_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
         }
@@ -700,12 +700,12 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             let tx = test_tx();
             let h1 = hash(b"hello world!");
@@ -738,12 +738,12 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_cache.len(), 1);
             assert_eq!(waterclock_recorder.tick_height, 1);
@@ -778,12 +778,12 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_cache.len(), 1);
             assert_eq!(waterclock_recorder.tick_height, 1);
@@ -825,12 +825,12 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_height, 2);
@@ -869,18 +869,18 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_height, 2);
             drop(entry_receiver);
             waterclock_recorder.tick();
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
             assert_eq!(waterclock_recorder.tick_cache.len(), 3);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -1001,14 +1001,14 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
             let ticks_per_slot = treasury.ticks_per_slot();
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), ticks_per_slot);
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1069,13 +1069,13 @@ mod tests {
 
             let end_slot = 3;
             let max_tick_height = (end_slot + 1) * ticks_per_slot - 1;
-            let working_bank = WorkingBank {
+            let working_treasury = WorkingBank {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height,
             };
 
-            waterclock_recorder.set_working_bank(working_bank);
+            waterclock_recorder.set_working_bank(working_treasury);
             for _ in 0..max_tick_height {
                 waterclock_recorder.tick();
             }
@@ -1085,7 +1085,7 @@ mod tests {
             assert!(waterclock_recorder
                 .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_err());
-            assert!(waterclock_recorder.working_bank.is_none());
+            assert!(waterclock_recorder.working_treasury.is_none());
             // Make sure the starting slot is updated
             assert_eq!(waterclock_recorder.start_slot(), end_slot);
         }

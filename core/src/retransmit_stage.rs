@@ -37,7 +37,7 @@ fn retransmit(
 
     datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
 
-    let r_bank = treasury_forks.read().unwrap().working_bank();
+    let r_bank = treasury_forks.read().unwrap().working_treasury();
     let bank_epoch = r_bank.get_stakers_epoch(r_bank.slot());
     let (neighbors, children) = compute_retransmit_peers(
         staking_utils::staked_nodes_at_epoch(&r_bank, bank_epoch).as_ref(),
@@ -210,8 +210,8 @@ impl RetransmitStage {
             exit,
             repair_strategy,
             genesis_blockhash,
-            move |id, blob, working_bank| {
-                should_retransmit_and_persist(blob, working_bank, &leader_schedule_cache, id)
+            move |id, blob, working_treasury| {
+                should_retransmit_and_persist(blob, working_treasury, &leader_schedule_cache, id)
             },
         );
 

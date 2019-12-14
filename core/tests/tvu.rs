@@ -96,9 +96,9 @@ fn test_replay() {
         leader_schedule_cache,
         _,
     ) = verifier::new_banks_from_block_buffer(&block_buffer_pool_path, None);
-    let working_bank = treasury_forks.working_bank();
+    let working_treasury = treasury_forks.working_treasury();
     assert_eq!(
-        working_bank.get_balance(&mint_keypair.pubkey()),
+        working_treasury.get_balance(&mint_keypair.pubkey()),
         mint_balance
     );
 
@@ -115,7 +115,7 @@ fn test_replay() {
     let block_buffer_pool = Arc::new(block_buffer_pool);
     {
         let (waterclock_service_exit, waterclock_recorder, waterclock_service, _entry_receiver) =
-            create_test_recorder(&working_bank, &block_buffer_pool);
+            create_test_recorder(&working_treasury, &block_buffer_pool);
         let tvu = Tvu::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
@@ -192,11 +192,11 @@ fn test_replay() {
             );
         }
 
-        let working_bank = treasury_forks.read().unwrap().working_bank();
-        let final_mint_balance = working_bank.get_balance(&mint_keypair.pubkey());
+        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+        let final_mint_balance = working_treasury.get_balance(&mint_keypair.pubkey());
         assert_eq!(final_mint_balance, mint_ref_balance);
 
-        let bob_balance = working_bank.get_balance(&bob_keypair.pubkey());
+        let bob_balance = working_treasury.get_balance(&bob_keypair.pubkey());
         assert_eq!(bob_balance, mint_balance - mint_ref_balance);
 
         exit.store(true, Ordering::Relaxed);

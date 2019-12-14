@@ -1161,7 +1161,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Bank::new(&genesis_block));
-        let working_bank = WorkingBank {
+        let working_treasury = WorkingBank {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: std::u64::MAX,
@@ -1183,7 +1183,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
+            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
             let pubkey = Pubkey::new_rand();
             let keypair2 = Keypair::new();
             let pubkey2 = Pubkey::new_rand();
@@ -1477,7 +1477,7 @@ mod tests {
             genesis_block.hash(),
         )];
 
-        let working_bank = WorkingBank {
+        let working_treasury = WorkingBank {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,
@@ -1499,7 +1499,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
+            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
 
             BankingStage::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
                 .0
@@ -1565,7 +1565,7 @@ mod tests {
             system_transaction::transfer(&mint_keypair, &pubkey1, 1, genesis_block.hash()),
         ];
 
-        let working_bank = WorkingBank {
+        let working_treasury = WorkingBank {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,
@@ -1587,7 +1587,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_bank);
+            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
 
             let (result, unprocessed) = BankingStage::process_and_record_transactions(
                 &treasury,
