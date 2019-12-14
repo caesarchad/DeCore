@@ -21,7 +21,7 @@ use std::thread;
 pub struct Tpu {
     fetch_stage: FetchStage,
     sigverify_stage: SigVerifyStage,
-    banking_stage: BankingStage,
+    treasury_phase: BankingStage,
     cluster_info_vote_listener: ClusterInfoVoteListener,
     broadcast_stage: BroadcastStage,
 }
@@ -65,7 +65,7 @@ impl Tpu {
             &waterclock_recorder,
         );
 
-        let banking_stage = BankingStage::new(
+        let treasury_phase = BankingStage::new(
             &node_group_info,
             waterclock_recorder,
             verified_receiver,
@@ -84,7 +84,7 @@ impl Tpu {
         Self {
             fetch_stage,
             sigverify_stage,
-            banking_stage,
+            treasury_phase,
             cluster_info_vote_listener,
             broadcast_stage,
         }
@@ -99,7 +99,7 @@ impl Service for Tpu {
         results.push(self.fetch_stage.join());
         results.push(self.sigverify_stage.join());
         results.push(self.cluster_info_vote_listener.join());
-        results.push(self.banking_stage.join());
+        results.push(self.treasury_phase.join());
         let broadcast_result = self.broadcast_stage.join();
         for result in results {
             result?;

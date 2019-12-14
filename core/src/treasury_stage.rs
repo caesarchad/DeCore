@@ -1,4 +1,4 @@
-//! The `banking_stage` processes Transaction messages. It is intended to be used
+//! The `treasury_phase` processes Transaction messages. It is intended to be used
 //! to contruct a software pipeline. The stage uses all available CPU cores and
 //! can do its processing in parallel with signature verification on the GPU.
 use crate::block_buffer_pool::BlockBufferPool;
@@ -134,7 +134,7 @@ impl BankingStage {
         unprocessed_packets: &[PacketsAndOffsets],
     ) -> std::io::Result<()> {
         let packets = Self::filter_valid_packets_for_forwarding(unprocessed_packets);
-        inc_new_counter_info!("banking_stage-forwarded_packets", packets.len());
+        inc_new_counter_info!("treasury_phase-forwarded_packets", packets.len());
         let blobs = packet::packets_to_blobs(&packets);
 
         for blob in blobs {
@@ -207,9 +207,9 @@ impl BankingStage {
             (new_tx_count as f32) / (total_time_s)
         );
 
-        inc_new_counter_info!("banking_stage-rebuffered_packets", rebuffered_packets);
-        inc_new_counter_info!("banking_stage-consumed_buffered_packets", new_tx_count);
-        inc_new_counter_debug!("banking_stage-process_transactions", new_tx_count);
+        inc_new_counter_info!("treasury_phase-rebuffered_packets", rebuffered_packets);
+        inc_new_counter_info!("treasury_phase-consumed_buffered_packets", new_tx_count);
+        inc_new_counter_debug!("treasury_phase-process_transactions", new_tx_count);
 
         Ok(unprocessed_packets)
     }
@@ -348,7 +348,7 @@ impl BankingStage {
                         .iter()
                         .map(|(_, unprocessed)| unprocessed.len())
                         .sum();
-                    inc_new_counter_info!("banking_stage-buffered_packets", num);
+                    inc_new_counter_info!("treasury_phase-buffered_packets", num);
                     buffered_packets.append(&mut unprocessed_packets);
                 }
                 Err(err) => {
@@ -395,7 +395,7 @@ impl BankingStage {
         // unlock all the accounts with errors which are filtered by the above `filter_map`
         if !processed_transactions.is_empty() {
             inc_new_counter_warn!(
-                "banking_stage-record_transactions",
+                "treasury_phase-record_transactions",
                 processed_transactions.len()
             );
             let hash = hash_transactions(&processed_transactions);
@@ -659,7 +659,7 @@ impl BankingStage {
             &unprocessed_tx_indexes,
         );
         inc_new_counter_info!(
-            "banking_stage-dropped_tx_before_forwarding",
+            "treasury_phase-dropped_tx_before_forwarding",
             unprocessed_tx_count.saturating_sub(filtered_unprocessed_tx_indexes.len())
         );
 
@@ -696,7 +696,7 @@ impl BankingStage {
         );
 
         inc_new_counter_info!(
-            "banking_stage-dropped_tx_before_forwarding",
+            "treasury_phase-dropped_tx_before_forwarding",
             tx_count.saturating_sub(filtered_unprocessed_tx_indexes.len())
         );
 
@@ -733,7 +733,7 @@ impl BankingStage {
             count,
             id,
         );
-        inc_new_counter_debug!("banking_stage-transactions_received", count);
+        inc_new_counter_debug!("treasury_phase-transactions_received", count);
         let proc_start = Instant::now();
         let mut new_tx_count = 0;
 
@@ -775,7 +775,7 @@ impl BankingStage {
         }
 
         inc_new_counter_debug!(
-            "banking_stage-time_ms",
+            "treasury_phase-time_ms",
             timing::duration_as_ms(&proc_start.elapsed()) as usize
         );
         let total_time_s = timing::duration_as_s(&proc_start.elapsed());
@@ -790,8 +790,8 @@ impl BankingStage {
             count,
             id,
         );
-        inc_new_counter_debug!("banking_stage-process_packets", count);
-        inc_new_counter_debug!("banking_stage-process_transactions", new_tx_count);
+        inc_new_counter_debug!("treasury_phase-process_packets", count);
+        inc_new_counter_debug!("treasury_phase-process_transactions", new_tx_count);
 
         *recv_start = Instant::now();
 
@@ -883,7 +883,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let banking_stage = BankingStage::new(
+            let treasury_phase = BankingStage::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -892,7 +892,7 @@ mod tests {
             drop(verified_sender);
             drop(vote_sender);
             exit.store(true, Ordering::Relaxed);
-            banking_stage.join().unwrap();
+            treasury_phase.join().unwrap();
             waterclock_service.join().unwrap();
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -918,7 +918,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let banking_stage = BankingStage::new(
+            let treasury_phase = BankingStage::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -941,7 +941,7 @@ mod tests {
             assert_eq!(entries.len(), genesis_block.ticks_per_slot as usize - 1);
             assert!(entries.verify(&start_hash));
             assert_eq!(entries[entries.len() - 1].hash, treasury.last_blockhash());
-            banking_stage.join().unwrap();
+            treasury_phase.join().unwrap();
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -967,7 +967,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let banking_stage = BankingStage::new(
+            let treasury_phase = BankingStage::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -1049,7 +1049,7 @@ mod tests {
             assert_eq!(treasury.get_balance(&to2), 0);
 
             drop(entry_receiver);
-            banking_stage.join().unwrap();
+            treasury_phase.join().unwrap();
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1101,7 +1101,7 @@ mod tests {
         let ledger_path = get_tmp_ledger_path!();
         {
             let entry_receiver = {
-                // start a banking_stage to eat verified receiver
+                // start a treasury_phase to eat verified receiver
                 let treasury = Arc::new(Bank::new(&genesis_block));
                 let block_buffer_pool = Arc::new(
                     BlockBufferPool::open_ledger_file(&ledger_path)
@@ -1120,7 +1120,7 @@ mod tests {
                     2,
                 );
 
-                // wait for banking_stage to eat the packets
+                // wait for treasury_phase to eat the packets
                 while treasury.get_balance(&alice.pubkey()) != 1 {
                     sleep(Duration::from_millis(100));
                 }
