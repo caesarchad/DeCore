@@ -159,7 +159,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
             create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _banking_stage = BankingStage::new(
+        let _treasury_phase = BankingStage::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,
@@ -285,7 +285,7 @@ fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
             create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _banking_stage = BankingStage::new(
+        let _treasury_phase = BankingStage::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,

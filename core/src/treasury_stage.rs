@@ -1112,7 +1112,7 @@ mod tests {
                 let node_group_info =
                     NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
                 let node_group_info = Arc::new(RwLock::new(node_group_info));
-                let _banking_stage = BankingStage::new_num_threads(
+                let _treasury_phase = BankingStage::new_num_threads(
                     &node_group_info,
                     &waterclock_recorder,
                     verified_receiver,
