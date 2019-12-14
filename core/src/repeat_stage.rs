@@ -401,13 +401,13 @@ impl ReplayStage {
         let active_banks = treasury_forks.read().unwrap().active_banks();
         trace!("active banks {:?}", active_banks);
 
-        for bank_slot in &active_banks {
-            let treasury = treasury_forks.read().unwrap().get(*bank_slot).unwrap().clone();
+        for treasury_slot in &active_banks {
+            let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();
             *ticks_per_slot = treasury.ticks_per_slot();
             if treasury.collector_id() != *my_pubkey {
                 Self::replay_block_buffer_into_bank(&treasury, &block_buffer_pool, progress)?;
             }
-            let max_tick_height = (*bank_slot + 1) * treasury.ticks_per_slot() - 1;
+            let max_tick_height = (*treasury_slot + 1) * treasury.ticks_per_slot() - 1;
             if treasury.tick_height() == max_tick_height {
                 Self::process_completed_bank(my_pubkey, treasury, slot_full_sender);
             }
@@ -550,11 +550,11 @@ impl ReplayStage {
         block_buffer_pool: &BlockBufferPool,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Result<(Vec<Entry>, usize)> {
-        let bank_slot = treasury.slot();
+        let treasury_slot = treasury.slot();
         let bank_progress = &mut progress
-            .entry(bank_slot)
+            .entry(treasury_slot)
             .or_insert(ForkProgress::new(treasury.last_blockhash()));
-        block_buffer_pool.fetch_slot_entries_by_blob_len(bank_slot, bank_progress.num_blobs as u64, None)
+        block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, bank_progress.num_blobs as u64, None)
     }
 
     fn replay_entries_into_bank(

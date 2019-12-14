@@ -110,7 +110,7 @@ impl Validator {
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
         let bank_info = &treasury_forks_info[0];
-        let treasury = treasury_forks[bank_info.bank_slot].clone();
+        let treasury = treasury_forks[bank_info.treasury_slot].clone();
 
         // info!(
         //     "{}",

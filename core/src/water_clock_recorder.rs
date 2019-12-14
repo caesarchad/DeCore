@@ -256,7 +256,7 @@ impl WaterClockRecorder {
             .count();
         let send_result = if entry_count > 0 {
             debug!(
-                "flush_cache: bank_slot: {} tick_height: {} max: {} sending: {}",
+                "flush_cache: treasury_slot: {} tick_height: {} max: {} sending: {}",
                 working_treasury.treasury.slot(),
                 working_treasury.treasury.tick_height(),
                 working_treasury.max_tick_height,
@@ -348,7 +348,7 @@ impl WaterClockRecorder {
 
     pub fn record(
         &mut self,
-        bank_slot: u64,
+        treasury_slot: u64,
         mixin: Hash,
         transactions: Vec<Transaction>,
     ) -> Result<()> {
@@ -362,7 +362,7 @@ impl WaterClockRecorder {
                 .working_treasury
                 .as_ref()
                 .ok_or(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))?;
-            if bank_slot != working_treasury.treasury.slot() {
+            if treasury_slot != working_treasury.treasury.slot() {
                 return Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached));
             }
 

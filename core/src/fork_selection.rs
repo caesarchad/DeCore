@@ -107,7 +107,7 @@ impl Locktower {
     }
     pub fn collect_vote_lockouts<F>(
         &self,
-        bank_slot: u64,
+        treasury_slot: u64,
         vote_accounts: F,
         ancestors: &HashMap<u64, HashSet<u64>>,
     ) -> HashMap<u64, StakeLockout>
@@ -155,7 +155,7 @@ impl Locktower {
             }
             let start_root = vote_state.root_slot;
 
-            vote_state.process_slot_vote_unchecked(bank_slot);
+            vote_state.process_slot_vote_unchecked(treasury_slot);
 
             for vote in &vote_state.votes {
                 Self::update_ancestor_lockouts(&mut stake_lockouts, &vote, ancestors);
@@ -178,18 +178,18 @@ impl Locktower {
                 Self::update_ancestor_lockouts(&mut stake_lockouts, &vote, ancestors);
             }
 
-            // The last vote in the vote stack is a simulated vote on bank_slot, which
+            // The last vote in the vote stack is a simulated vote on treasury_slot, which
             // we added to the vote stack earlier in this function by calling process_vote().
             // We don't want to update the ancestors stakes of this vote b/c it does not
             // represent an actual vote by the validator.
 
             // Note: It should not be possible for any vote state in this treasury to have
-            // a vote for a slot >= bank_slot, so we are guaranteed that the last vote in
+            // a vote for a slot >= treasury_slot, so we are guaranteed that the last vote in
             // this vote stack is the simulated vote, so this fetch should be sufficient
             // to find the last unsimulated vote.
             assert_eq!(
                 vote_state.nth_recent_vote(0).map(|l| l.slot),
-                Some(bank_slot)
+                Some(treasury_slot)
             );
             if let Some(vote) = vote_state.nth_recent_vote(1) {
                 // Update all the parents of this last vote with the stake of this vote account

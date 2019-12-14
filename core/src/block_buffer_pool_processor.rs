@@ -129,7 +129,7 @@ pub fn process_entries(treasury: &Bank, entries: &[Entry]) -> Result<()> {
 
 #[derive(Debug, PartialEq)]
 pub struct BankForksInfo {
-    pub bank_slot: u64,
+    pub treasury_slot: u64,
     pub entry_height: u64,
 }
 
@@ -291,7 +291,7 @@ pub fn process_block_buffer_pool(
         if meta.next_slots.is_empty() {
             // Reached the end of this fork.  Record the final entry height and last entry.hash
             let bfi = BankForksInfo {
-                bank_slot: slot,
+                treasury_slot: slot,
                 entry_height,
             };
             fork_info.push((treasury, bfi));
@@ -336,7 +336,7 @@ pub fn process_block_buffer_pool(
                 ));
             } else {
                 let bfi = BankForksInfo {
-                    bank_slot: slot,
+                    treasury_slot: slot,
                     entry_height,
                 };
                 fork_info.push((treasury.clone(), bfi));
@@ -487,7 +487,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: 0, // slot 1 isn't "full", we stop at slot zero
+                treasury_slot: 0, // slot 1 isn't "full", we stop at slot zero
                 entry_height: ticks_per_slot,
             }
         );
@@ -560,7 +560,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: 4, // Fork 2's head is slot 4
+                treasury_slot: 4, // Fork 2's head is slot 4
                 entry_height: ticks_per_slot * 3,
             }
         );
@@ -573,8 +573,8 @@ pub mod tests {
 
         // Ensure treasury_forks holds the right banks
         for info in treasury_forks_info {
-            assert_eq!(treasury_forks[info.bank_slot].slot(), info.bank_slot);
-            assert!(treasury_forks[info.bank_slot].is_frozen());
+            assert_eq!(treasury_forks[info.treasury_slot].slot(), info.treasury_slot);
+            assert!(treasury_forks[info.treasury_slot].is_frozen());
         }
 
         assert_eq!(treasury_forks.root(), 4);
@@ -647,7 +647,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: 3, // Fork 1's head is slot 3
+                treasury_slot: 3, // Fork 1's head is slot 3
                 entry_height: ticks_per_slot * 4,
             }
         );
@@ -662,7 +662,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[1],
             BankForksInfo {
-                bank_slot: 4, // Fork 2's head is slot 4
+                treasury_slot: 4, // Fork 2's head is slot 4
                 entry_height: ticks_per_slot * 3,
             }
         );
@@ -679,8 +679,8 @@ pub mod tests {
 
         // Ensure treasury_forks holds the right banks
         for info in treasury_forks_info {
-            assert_eq!(treasury_forks[info.bank_slot].slot(), info.bank_slot);
-            assert!(treasury_forks[info.bank_slot].is_frozen());
+            assert_eq!(treasury_forks[info.treasury_slot].slot(), info.treasury_slot);
+            assert!(treasury_forks[info.treasury_slot].is_frozen());
         }
     }
 
@@ -727,7 +727,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: last_slot + 1, // Head is last_slot + 1
+                treasury_slot: last_slot + 1, // Head is last_slot + 1
                 entry_height: ticks_per_slot * (last_slot + 2),
             }
         );
@@ -864,7 +864,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: 1,
+                treasury_slot: 1,
                 entry_height,
             }
         );
@@ -894,7 +894,7 @@ pub mod tests {
         assert_eq!(
             treasury_forks_info[0],
             BankForksInfo {
-                bank_slot: 0,
+                treasury_slot: 0,
                 entry_height: 1,
             }
         );

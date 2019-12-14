@@ -17,16 +17,16 @@ pub struct BankForks {
 
 impl Index<u64> for BankForks {
     type Output = Arc<Bank>;
-    fn index(&self, bank_slot: u64) -> &Arc<Bank> {
-        &self.banks[&bank_slot]
+    fn index(&self, treasury_slot: u64) -> &Arc<Bank> {
+        &self.banks[&treasury_slot]
     }
 }
 
 impl BankForks {
-    pub fn new(bank_slot: u64, treasury: Bank) -> Self {
+    pub fn new(treasury_slot: u64, treasury: Bank) -> Self {
         let mut banks = HashMap::new();
         let working_treasury = Arc::new(treasury);
-        banks.insert(bank_slot, working_treasury.clone());
+        banks.insert(treasury_slot, working_treasury.clone());
         Self {
             banks,
             working_treasury,
@@ -78,8 +78,8 @@ impl BankForks {
             .collect()
     }
 
-    pub fn get(&self, bank_slot: u64) -> Option<&Arc<Bank>> {
-        self.banks.get(&bank_slot)
+    pub fn get(&self, treasury_slot: u64) -> Option<&Arc<Bank>> {
+        self.banks.get(&treasury_slot)
     }
 
     pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
