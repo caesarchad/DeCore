@@ -607,8 +607,8 @@ mod tests {
         treasury_forks.write().unwrap().insert(treasury1);
         rpc.subscriptions.notify_subscribers(1, &treasury_forks);
         let treasury1 = treasury_forks.read().unwrap()[1].clone();
-        let bank2 = Bank::new_from_parent(&treasury1, &Pubkey::default(), 2);
-        treasury_forks.write().unwrap().insert(bank2);
+        let treasury2 = Bank::new_from_parent(&treasury1, &Pubkey::default(), 2);
+        treasury_forks.write().unwrap().insert(treasury2);
         rpc.subscriptions.notify_subscribers(2, &treasury_forks);
         let string = receiver.poll();
         let expected = json!({

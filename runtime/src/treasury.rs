@@ -1545,8 +1545,8 @@ mod tests {
         assert_eq!(treasury0.hash_internal_state(), treasury1.hash_internal_state());
 
         // Checkpointing should not change its state
-        let bank2 = new_from_parent(&Arc::new(treasury1));
-        assert_eq!(treasury0.hash_internal_state(), bank2.hash_internal_state());
+        let treasury2 = new_from_parent(&Arc::new(treasury1));
+        assert_eq!(treasury0.hash_internal_state(), treasury2.hash_internal_state());
     }
 
     #[test]
@@ -1851,7 +1851,7 @@ mod tests {
         // Bank 1
         let treasury1 = Arc::new(new_from_parent(&treasury0));
         // Bank 2
-        let bank2 = new_from_parent(&treasury0);
+        let treasury2 = new_from_parent(&treasury0);
 
         // transfer a token
         assert_eq!(
@@ -1865,13 +1865,13 @@ mod tests {
         );
 
         assert_eq!(treasury0.transaction_count(), 0);
-        assert_eq!(bank2.transaction_count(), 0);
+        assert_eq!(treasury2.transaction_count(), 0);
         assert_eq!(treasury1.transaction_count(), 1);
 
         treasury1.squash();
 
         assert_eq!(treasury0.transaction_count(), 0);
-        assert_eq!(bank2.transaction_count(), 0);
+        assert_eq!(treasury2.transaction_count(), 0);
         assert_eq!(treasury1.transaction_count(), 1);
 
         let bank6 = new_from_parent(&treasury1);

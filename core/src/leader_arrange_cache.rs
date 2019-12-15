@@ -442,16 +442,16 @@ mod tests {
         assert_eq!(treasury.get_epoch_and_slot_index(96).0, 2);
         assert!(cache.slot_leader_at(96, Some(&treasury)).is_none());
 
-        let bank2 = Bank::new_from_parent(&treasury, &Pubkey::new_rand(), 95);
-        assert!(bank2.epoch_vote_accounts(2).is_some());
+        let treasury2 = Bank::new_from_parent(&treasury, &Pubkey::new_rand(), 95);
+        assert!(treasury2.epoch_vote_accounts(2).is_some());
 
         // Set root for a slot in epoch 1, so that epoch 2 is now confirmed
         cache.set_genesis(95);
         assert_eq!(*cache.max_epoch.read().unwrap(), 2);
-        assert!(cache.slot_leader_at(96, Some(&bank2)).is_some());
-        assert_eq!(bank2.get_epoch_and_slot_index(223).0, 2);
-        assert!(cache.slot_leader_at(223, Some(&bank2)).is_some());
-        assert_eq!(bank2.get_epoch_and_slot_index(224).0, 3);
-        assert!(cache.slot_leader_at(224, Some(&bank2)).is_none());
+        assert!(cache.slot_leader_at(96, Some(&treasury2)).is_some());
+        assert_eq!(treasury2.get_epoch_and_slot_index(223).0, 2);
+        assert!(cache.slot_leader_at(223, Some(&treasury2)).is_some());
+        assert_eq!(treasury2.get_epoch_and_slot_index(224).0, 3);
+        assert!(cache.slot_leader_at(224, Some(&treasury2)).is_none());
     }
 }
