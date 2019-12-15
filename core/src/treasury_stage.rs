@@ -1319,7 +1319,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_prepare_filter_for_pending_transaction() {
+    fn test_treasury_prepare_filter_for_pending_transaction() {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
