@@ -77,7 +77,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
     hashmap_key: &K,
     current_slot: u64,
     treasury_forks: &Arc<RwLock<BankForks>>,
-    bank_method: F,
+    treasury_method: F,
     notify: N,
 ) where
     K: Eq + Hash + Clone + Copy,
@@ -115,7 +115,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
                     .get(desired_slot[0])
                     .unwrap()
                     .clone();
-                let result = bank_method(&desired_bank, hashmap_key);
+                let result = treasury_method(&desired_bank, hashmap_key);
                 notify(result, &sink, root);
             }
         }
