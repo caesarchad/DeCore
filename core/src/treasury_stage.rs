@@ -1238,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_filter_transaction_indexes() {
+    fn test_treasury_filter_transaction_indexes() {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
