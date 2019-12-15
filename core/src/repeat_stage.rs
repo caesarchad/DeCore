@@ -635,7 +635,7 @@ impl ReplayStage {
         // Filter out what we've already seen
         trace!("generate new forks {:?}", next_slots);
         for (parent_id, children) in next_slots {
-            let parent_bank = frozen_treasuries
+            let parent_treasury = frozen_treasuries
                 .get(&parent_id)
                 .expect("missing parent in treasury forks")
                 .clone();
@@ -645,7 +645,7 @@ impl ReplayStage {
                     continue;
                 }
                 let leader = leader_schedule_cache
-                    .slot_leader_at(child_id, Some(&parent_bank))
+                    .slot_leader_at(child_id, Some(&parent_treasury))
                     .unwrap();
                 // info!("{}", Info(format!("new fork:{} parent:{}", child_id, parent_id).to_string()));
                 println!("{}",
@@ -654,7 +654,7 @@ impl ReplayStage {
                         module_path!().to_string()
                     )
                 );
-                forks.insert(Bank::new_from_parent(&parent_bank, &leader, child_id));
+                forks.insert(Bank::new_from_parent(&parent_treasury, &leader, child_id));
             }
         }
     }
