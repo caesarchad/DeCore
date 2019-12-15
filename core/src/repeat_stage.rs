@@ -598,8 +598,8 @@ impl ReplayStage {
         treasury_forks: &Arc<RwLock<BankForks>>,
         progress: &mut HashMap<u64, ForkProgress>,
     ) {
-        let r_bank_forks = treasury_forks.read().unwrap();
-        progress.retain(|k, _| r_bank_forks.get(*k).is_some());
+        let r_treasury_forks = treasury_forks.read().unwrap();
+        progress.retain(|k, _| r_treasury_forks.get(*k).is_some());
     }
 
     fn process_completed_bank(
