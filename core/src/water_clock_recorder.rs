@@ -65,7 +65,7 @@ pub struct WaterClockRecorder {
 }
 
 impl WaterClockRecorder {
-    fn clear_bank(&mut self) {
+    fn clear_treasury(&mut self) {
         if let Some(working_treasury) = self.working_treasury.take() {
             let treasury = working_treasury.treasury;
             let next_leader_slot = self.leader_schedule_cache.next_leader_slot(
@@ -176,7 +176,7 @@ impl WaterClockRecorder {
         my_next_leader_slot: Option<u64>,
         ticks_per_slot: u64,
     ) {
-        self.clear_bank();
+        self.clear_treasury();
         let mut cache = vec![];
         {
             let mut waterclock = self.waterclock.lock().unwrap();
@@ -285,7 +285,7 @@ impl WaterClockRecorder {
 
             self.start_slot = working_treasury.max_tick_height / working_treasury.treasury.ticks_per_slot();
             self.start_tick = (self.start_slot + 1) * working_treasury.treasury.ticks_per_slot();
-            self.clear_bank();
+            self.clear_treasury();
         }
         if send_result.is_err() {
             // info!("{}", Info(format!("WorkingBank::sender disconnected {:?}", send_result).to_string()));
@@ -296,7 +296,7 @@ impl WaterClockRecorder {
                 )
             );
             // revert the cache, but clear the working treasury
-            self.clear_bank();
+            self.clear_treasury();
         } else {
             // commit the flush
             let _ = self.tick_cache.drain(..entry_count);
@@ -583,7 +583,7 @@ mod tests {
             };
             waterclock_recorder.set_working_treasury(working_treasury);
             assert!(waterclock_recorder.working_treasury.is_some());
-            waterclock_recorder.clear_bank();
+            waterclock_recorder.clear_treasury();
             assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -982,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reset_clear_bank() {
+    fn test_reset_clear_treasury() {
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool =
@@ -1035,7 +1035,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder.set_treasury(&treasury);
-            waterclock_recorder.clear_bank();
+            waterclock_recorder.clear_treasury();
             assert!(receiver.try_recv().is_ok());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
