@@ -140,7 +140,7 @@ impl ReplayStage {
                     }
 
                     let votable =
-                        Self::generate_votable_banks(&treasury_forks, &locktower, &mut progress);
+                        Self::generate_votable_treasuries(&treasury_forks, &locktower, &mut progress);
 
                     if let Some((_, treasury)) = votable.last() {
                         subscriptions.notify_subscribers(treasury.slot(), &treasury_forks);
@@ -415,7 +415,7 @@ impl ReplayStage {
         Ok(())
     }
 
-    fn generate_votable_banks(
+    fn generate_votable_treasuries(
         treasury_forks: &Arc<RwLock<BankForks>>,
         locktower: &Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
