@@ -12,8 +12,8 @@
 //! * layer 2 - Everyone else, if layer 1 is `2^10`, layer 2 should be able to fit `2^20` number of nodes.
 //!
 //! Treasury needs to provide an interface for us to query the stake weight
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::connection_info::ContactInfo;
 use crate::gossip::CrdsGossip;
@@ -1042,7 +1042,7 @@ impl NodeGroupInfo {
     /// randomly pick a node and ask them for updates asynchronously
     pub fn gossip(
         obj: Arc<RwLock<Self>>,
-        treasury_forks: Option<Arc<RwLock<BankForks>>>,
+        treasury_forks: Option<Arc<RwLock<TreasuryForks>>>,
         blob_sender: BlobSender,
         exit: &Arc<AtomicBool>,
     ) -> JoinHandle<()> {

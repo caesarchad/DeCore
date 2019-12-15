@@ -1,8 +1,8 @@
 //! The `repair_service` module implements the tools necessary to generate a thread which
 //! regularly finds missing blobs in the ledger and sends repair requests for those blobs
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver, MetaInfoCol};
 use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info_fixer_listener::NodeGroupInfoFixListener;
@@ -30,7 +30,7 @@ pub const MAX_ORPHANS: usize = 5;
 pub enum RepairStrategy {
     RepairRange(RepairSlotRange),
     RepairAll {
-        treasury_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         completed_slots_receiver: CompletedSlotsReceiver,
         epoch_schedule: EpochSchedule,
     },

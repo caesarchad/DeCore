@@ -1,7 +1,7 @@
 //! The `retransmit_stage` retransmits blobs between validators
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
 use crate::leader_arrange_cache::LeaderScheduleCache;
@@ -23,7 +23,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::Duration;
 
 fn retransmit(
-    treasury_forks: &Arc<RwLock<BankForks>>,
+    treasury_forks: &Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     r: &BlobReceiver,
@@ -67,7 +67,7 @@ fn retransmit(
 /// * `r` - Receive channel for blobs to be retransmitted to all the layer 1 nodes.
 fn retransmitter(
     sock: Arc<UdpSocket>,
-    treasury_forks: Arc<RwLock<BankForks>>,
+    treasury_forks: Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: Arc<RwLock<NodeGroupInfo>>,
     r: BlobReceiver,
@@ -173,7 +173,7 @@ impl RetransmitStage {
     #[allow(clippy::new_ret_no_self)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        treasury_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,

@@ -1,7 +1,7 @@
 //! The `rpc` module implements the Morgan RPC interface.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::connection_info::ContactInfo;
 use crate::packet::PACKET_DATA_SIZE;
@@ -41,7 +41,7 @@ impl Default for JsonRpcConfig {
 
 #[derive(Clone)]
 pub struct JsonRpcRequestProcessor {
-    treasury_forks: Arc<RwLock<BankForks>>,
+    treasury_forks: Arc<RwLock<TreasuryForks>>,
     storage_state: StorageState,
     config: JsonRpcConfig,
     fullnode_exit: Arc<AtomicBool>,
@@ -55,7 +55,7 @@ impl JsonRpcRequestProcessor {
     pub fn new(
         storage_state: StorageState,
         config: JsonRpcConfig,
-        treasury_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         fullnode_exit: &Arc<AtomicBool>,
     ) -> Self {
         JsonRpcRequestProcessor {
@@ -1016,7 +1016,7 @@ mod tests {
         );
     }
 
-    fn new_treasury_forks() -> (Arc<RwLock<BankForks>>, Keypair) {
+    fn new_treasury_forks() -> (Arc<RwLock<TreasuryForks>>, Keypair) {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -1024,7 +1024,7 @@ mod tests {
         } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         (
-            Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury))),
+            Arc::new(RwLock::new(TreasuryForks::new(treasury.slot(), treasury))),
             mint_keypair,
         )
     }

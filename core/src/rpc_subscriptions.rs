@@ -1,7 +1,7 @@
 //! The `pubsub` module implements a threaded subscription service on client RPC request
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use core::hash::Hash;
 use jsonrpc_core::futures::Future;
 use jsonrpc_pubsub::typed::Sink;
@@ -76,7 +76,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
     subscriptions: &HashMap<K, HashMap<SubscriptionId, (Sink<S>, Confirmations)>>,
     hashmap_key: &K,
     current_slot: u64,
-    treasury_forks: &Arc<RwLock<BankForks>>,
+    treasury_forks: &Arc<RwLock<TreasuryForks>>,
     treasury_method: F,
     notify: N,
 ) where
@@ -171,7 +171,7 @@ impl RpcSubscriptions {
         &self,
         pubkey: &Pubkey,
         current_slot: u64,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let subscriptions = self.account_subscriptions.read().unwrap();
         check_confirmations_and_notify(
@@ -188,7 +188,7 @@ impl RpcSubscriptions {
         &self,
         program_id: &Pubkey,
         current_slot: u64,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let subscriptions = self.program_subscriptions.write().unwrap();
         check_confirmations_and_notify(
@@ -205,7 +205,7 @@ impl RpcSubscriptions {
         &self,
         signature: &Signature,
         current_slot: u64,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let mut subscriptions = self.signature_subscriptions.write().unwrap();
         check_confirmations_and_notify(
@@ -269,7 +269,7 @@ impl RpcSubscriptions {
 
     /// Notify subscribers of changes to any accounts or new signatures since
     /// the treasury's last checkpoint.
-    pub fn notify_subscribers(&self, current_slot: u64, treasury_forks: &Arc<RwLock<BankForks>>) {
+    pub fn notify_subscribers(&self, current_slot: u64, treasury_forks: &Arc<RwLock<TreasuryForks>>) {
         let pubkeys: Vec<_> = {
             let subs = self.account_subscriptions.read().unwrap();
             subs.keys().cloned().collect()
@@ -315,7 +315,7 @@ pub mod tests {
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
@@ -371,7 +371,7 @@ pub mod tests {
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
@@ -425,7 +425,7 @@ pub mod tests {
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, blockhash);
         let signature = tx.signatures[0];

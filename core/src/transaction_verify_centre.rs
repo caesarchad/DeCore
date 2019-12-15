@@ -12,8 +12,8 @@
 //! 4. StorageStage
 //! - Generating the keys used to encrypt the ledger and sample it for storage mining.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::fetch_spot_stage::BlobFetchStage;
 use crate::block_stream_service::BlockstreamService;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
@@ -60,7 +60,7 @@ impl Tvu {
         vote_account: &Pubkey,
         voting_keypair: Option<&Arc<T>>,
         storage_keypair: &Arc<Keypair>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         sockets: Sockets,
         block_buffer_pool: Arc<BlockBufferPool>,
@@ -251,7 +251,7 @@ pub mod tests {
         let starting_balance = 10_000;
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(starting_balance);
 
-        let treasury_forks = BankForks::new(0, Treasury::new(&genesis_block));
+        let treasury_forks = TreasuryForks::new(0, Treasury::new(&genesis_block));
 
         //start cluster_info1
         let mut cluster_info1 = NodeGroupInfo::new_with_invalid_keypair(target1.info.clone());

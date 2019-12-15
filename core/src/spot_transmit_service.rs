@@ -261,8 +261,8 @@ impl Service for WindowService {
 #[cfg(test)]
 mod test {
     use super::*;
-    // use crate::treasury_forks::BankForks;
-    use crate::treasury_forks::BankForks;
+    // use crate::treasury_forks::TreasuryForks;
+    use crate::treasury_forks::TreasuryForks;
     use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::entry_info::{make_consecutive_blobs, make_tiny_test_entries, EntrySlice};
@@ -369,7 +369,7 @@ mod test {
         let block_buffer_pool = Arc::new(block_buffer_pool);
 
         let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let repair_strategy = RepairStrategy::RepairAll {
             treasury_forks: treasury_forks.clone(),
             completed_slots_receiver,
@@ -456,7 +456,7 @@ mod test {
 
         let block_buffer_pool = Arc::new(block_buffer_pool);
         let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let epoch_schedule = *treasury_forks.read().unwrap().working_treasury().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {
             treasury_forks,

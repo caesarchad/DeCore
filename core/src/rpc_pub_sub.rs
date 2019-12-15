@@ -282,8 +282,8 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use crate::treasury_forks::BankForks;
-    use crate::treasury_forks::BankForks;
+    // use crate::treasury_forks::TreasuryForks;
+    use crate::treasury_forks::TreasuryForks;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use jsonrpc_core::futures::sync::mpsc;
     use jsonrpc_core::Response;
@@ -302,7 +302,7 @@ mod tests {
     use tokio::prelude::{Async, Stream};
 
     fn process_transaction_and_notify(
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         tx: &Transaction,
         subscriptions: &RpcSubscriptions,
     ) -> transaction::Result<()> {
@@ -331,7 +331,7 @@ mod tests {
         let bob_pubkey = bob.pubkey();
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
 
@@ -424,7 +424,7 @@ mod tests {
         let executable = false; // TODO
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
         let session = create_session();
@@ -555,7 +555,7 @@ mod tests {
         } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();
@@ -584,7 +584,7 @@ mod tests {
         } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();

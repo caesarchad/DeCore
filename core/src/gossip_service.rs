@@ -1,7 +1,7 @@
 //! The `gossip_service` module implements the network control plane.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info::FULLNODE_PORT_RANGE;
@@ -35,7 +35,7 @@ impl GossipService {
     pub fn new(
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         block_buffer_pool: Option<Arc<BlockBufferPool>>,
-        treasury_forks: Option<Arc<RwLock<BankForks>>>,
+        treasury_forks: Option<Arc<RwLock<TreasuryForks>>>,
         gossip_socket: UdpSocket,
         exit: &Arc<AtomicBool>,
     ) -> Self {

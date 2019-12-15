@@ -1,5 +1,5 @@
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::staking_utils;
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::datapoint_info;
@@ -72,7 +72,7 @@ impl EpochStakes {
 }
 
 impl Locktower {
-    pub fn new_from_forks(treasury_forks: &BankForks, my_pubkey: &Pubkey) -> Self {
+    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_pubkey: &Pubkey) -> Self {
         let mut frozen_treasuries: Vec<_> = treasury_forks.frozen_treasuries().values().cloned().collect();
         frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
@@ -383,7 +383,7 @@ impl Locktower {
         self.calculate_weight(&stake_lockouts)
     }
 
-    fn find_heaviest_treasury(&self, treasury_forks: &BankForks) -> Option<Arc<Treasury>> {
+    fn find_heaviest_treasury(&self, treasury_forks: &TreasuryForks) -> Option<Arc<Treasury>> {
         let ancestors = treasury_forks.ancestors();
         let mut bank_weights: Vec<_> = treasury_forks
             .frozen_treasuries()

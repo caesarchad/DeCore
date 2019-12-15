@@ -1,7 +1,7 @@
 //! The `rpc_service` module implements the Morgan JSON RPC service.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::rpc::*;
 use crate::service::Service;
@@ -28,7 +28,7 @@ impl JsonRpcService {
         rpc_addr: SocketAddr,
         storage_state: StorageState,
         config: JsonRpcConfig,
-        treasury_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         exit: &Arc<AtomicBool>,
     ) -> Self {
         // info!("{}", Info(format!("rpc bound to {:?}", rpc_addr).to_string()));
@@ -188,7 +188,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             morgan_netutil::find_available_port_in_range((10000, 65535)).unwrap(),
         );
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(treasury.slot(), treasury)));
         let rpc_service = JsonRpcService::new(
             &node_group_info,
             rpc_addr,

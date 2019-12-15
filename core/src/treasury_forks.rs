@@ -1,4 +1,4 @@
-//! The `treasury_forks` module implments BankForks a DAG of checkpointed Banks
+//! The `treasury_forks` module implments TreasuryForks a DAG of checkpointed Banks
 
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::inc_new_counter_info;
@@ -9,20 +9,20 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::{borrow::Cow, convert, ffi::OsStr, path::Path, str};
 
-pub struct BankForks {
+pub struct TreasuryForks {
     treasuries: HashMap<u64, Arc<Treasury>>,
     working_treasury: Arc<Treasury>,
     root: u64,
 }
 
-impl Index<u64> for BankForks {
+impl Index<u64> for TreasuryForks {
     type Output = Arc<Treasury>;
     fn index(&self, treasury_slot: u64) -> &Arc<Treasury> {
         &self.treasuries[&treasury_slot]
     }
 }
 
-impl BankForks {
+impl TreasuryForks {
     pub fn new(treasury_slot: u64, treasury: Treasury) -> Self {
         let mut treasuries = HashMap::new();
         let working_treasury = Arc::new(treasury);
@@ -214,7 +214,7 @@ mod tests {
     fn test_treasury_forks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let mut treasury_forks = BankForks::new(0, treasury);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
         let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
         child_treasury.register_tick(&Hash::default());
         treasury_forks.insert(child_treasury);
@@ -226,7 +226,7 @@ mod tests {
     fn test_treasury_forks_descendants() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let mut treasury_forks = BankForks::new(0, treasury);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
         let treasury0 = treasury_forks[0].clone();
         let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.insert(treasury);
@@ -243,7 +243,7 @@ mod tests {
     fn test_treasury_forks_ancestors() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let mut treasury_forks = BankForks::new(0, treasury);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
         let treasury0 = treasury_forks[0].clone();
         let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.insert(treasury);
@@ -261,7 +261,7 @@ mod tests {
     fn test_treasury_forks_frozen_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let mut treasury_forks = BankForks::new(0, treasury);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
         let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
         treasury_forks.insert(child_treasury);
         assert!(treasury_forks.frozen_treasuries().get(&0).is_some());
@@ -272,7 +272,7 @@ mod tests {
     fn test_treasury_forks_active_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let mut treasury_forks = BankForks::new(0, treasury);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
         let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
         treasury_forks.insert(child_treasury);
         assert_eq!(treasury_forks.active_treasuries(), vec![1]);

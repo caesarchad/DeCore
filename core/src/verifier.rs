@@ -1,9 +1,9 @@
 //! The `fullnode` module hosts all the fullnode microservices.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
-use crate::block_buffer_pool_processor::{self, BankForksInfo};
+use crate::block_buffer_pool_processor::{self, TreasuryForksInfo};
 use crate::node_group_info::{NodeGroupInfo, Node};
 use crate::connection_info::ContactInfo;
 use crate::gossip_service::{find_node_group_host, GossipService};
@@ -333,8 +333,8 @@ pub fn new_treasuries_from_block_buffer(
     block_buffer_pool_path: &str,
     account_paths: Option<String>,
 ) -> (
-    BankForks,
-    Vec<BankForksInfo>,
+    TreasuryForks,
+    Vec<TreasuryForksInfo>,
     BlockBufferPool,
     Receiver<bool>,
     CompletedSlotsReceiver,

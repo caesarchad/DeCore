@@ -2,8 +2,8 @@
 // for storage mining. miners submit storage proofs, validator then bundles them
 // to submit its proof for mining to be rewarded.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 #[cfg(all(feature = "chacha", feature = "cuda"))]
 use crate::chacha_cuda::chacha_cbc_encrypt_file_many_keys;
@@ -138,7 +138,7 @@ impl StorageStage {
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         exit: &Arc<AtomicBool>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         storage_rotate_count: u64,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     ) -> Self {
@@ -261,7 +261,7 @@ impl StorageStage {
     }
 
     fn send_transaction(
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         instruction: Instruction,
         keypair: &Arc<Keypair>,
@@ -609,7 +609,7 @@ mod tests {
         let node_group_info = test_node_group_info(&keypair.pubkey());
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_banks(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StorageStage::new(
@@ -648,7 +648,7 @@ mod tests {
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let slot = 1;
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_banks(&[treasury], 0)));
         block_buffer_pool
             .update_entries(slot, 0, 0, ticks_per_slot, &entries)
             .unwrap();
@@ -743,7 +743,7 @@ mod tests {
             .update_entries(1, 0, 0, ticks_per_slot, &entries)
             .unwrap();
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[treasury], 0)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_banks(&[treasury], 0)));
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
         let (slot_sender, slot_receiver) = channel();

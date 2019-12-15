@@ -1,5 +1,5 @@
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::{Entry, EntrySlice};
 use crate::leader_arrange_cache::LeaderScheduleCache;
@@ -128,7 +128,7 @@ pub fn process_entries(treasury: &Treasury, entries: &[Entry]) -> Result<()> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct BankForksInfo {
+pub struct TreasuryForksInfo {
     pub treasury_slot: u64,
     pub entry_height: u64,
 }
@@ -142,7 +142,7 @@ pub fn process_block_buffer_pool(
     genesis_block: &GenesisBlock,
     block_buffer_pool: &BlockBufferPool,
     account_paths: Option<String>,
-) -> result::Result<(BankForks, Vec<BankForksInfo>, LeaderScheduleCache), BlocktreeProcessorError> {
+) -> result::Result<(TreasuryForks, Vec<TreasuryForksInfo>, LeaderScheduleCache), BlocktreeProcessorError> {
     let now = Instant::now();
     // info!("{}", Info(format!("processing ledger...").to_string()));
     let loginfo: String = format!("processing ledger...").to_string();
@@ -290,7 +290,7 @@ pub fn process_block_buffer_pool(
 
         if meta.next_slots.is_empty() {
             // Reached the end of this fork.  Record the final entry height and last entry.hash
-            let bfi = BankForksInfo {
+            let bfi = TreasuryForksInfo {
                 treasury_slot: slot,
                 entry_height,
             };
@@ -335,7 +335,7 @@ pub fn process_block_buffer_pool(
                     last_entry_hash,
                 ));
             } else {
-                let bfi = BankForksInfo {
+                let bfi = TreasuryForksInfo {
                     treasury_slot: slot,
                     entry_height,
                 };
@@ -349,7 +349,7 @@ pub fn process_block_buffer_pool(
     }
 
     let (treasuries, treasury_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
-    let treasury_forks = BankForks::new_from_banks(&treasuries, root);
+    let treasury_forks = TreasuryForks::new_from_banks(&treasuries, root);
     // info!(
     //     "{}",
     //     Info(format!("processing ledger...complete in {}ms, forks={}...",
@@ -486,7 +486,7 @@ pub mod tests {
         assert_eq!(treasury_forks_info.len(), 1);
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 0, // slot 1 isn't "full", we stop at slot zero
                 entry_height: ticks_per_slot,
             }
@@ -559,7 +559,7 @@ pub mod tests {
 
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 4, // Fork 2's head is slot 4
                 entry_height: ticks_per_slot * 3,
             }
@@ -646,7 +646,7 @@ pub mod tests {
         assert_eq!(treasury_forks_info.len(), 2); // There are two forks
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 3, // Fork 1's head is slot 3
                 entry_height: ticks_per_slot * 4,
             }
@@ -661,7 +661,7 @@ pub mod tests {
         );
         assert_eq!(
             treasury_forks_info[1],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 4, // Fork 2's head is slot 4
                 entry_height: ticks_per_slot * 3,
             }
@@ -726,7 +726,7 @@ pub mod tests {
         assert_eq!(treasury_forks_info.len(), 1); // There is one fork
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: last_slot + 1, // Head is last_slot + 1
                 entry_height: ticks_per_slot * (last_slot + 2),
             }
@@ -863,7 +863,7 @@ pub mod tests {
         assert_eq!(treasury_forks.root(), 0);
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 1,
                 entry_height,
             }
@@ -893,7 +893,7 @@ pub mod tests {
         assert_eq!(treasury_forks_info.len(), 1);
         assert_eq!(
             treasury_forks_info[0],
-            BankForksInfo {
+            TreasuryForksInfo {
                 treasury_slot: 0,
                 entry_height: 1,
             }

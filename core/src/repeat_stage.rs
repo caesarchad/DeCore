@@ -1,7 +1,7 @@
 //! The `replay_stage` replays transactions broadcast by the leader.
 
-// use crate::treasury_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::block_buffer_pool_processor;
 use crate::node_group_info::NodeGroupInfo;
@@ -79,7 +79,7 @@ impl ReplayStage {
         vote_account: &Pubkey,
         voting_keypair: Option<&Arc<T>>,
         block_buffer_pool: Arc<BlockBufferPool>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
         exit: &Arc<AtomicBool>,
         ledger_signal_receiver: Receiver<bool>,
@@ -215,7 +215,7 @@ impl ReplayStage {
     }
     pub fn start_leader(
         my_pubkey: &Pubkey,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         waterclock_slot: u64,
@@ -305,7 +305,7 @@ impl ReplayStage {
     #[allow(clippy::too_many_arguments)]
     fn handle_votable_treasury<T>(
         treasury: &Arc<Treasury>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         locktower: &mut Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
         vote_account: &Pubkey,
@@ -392,7 +392,7 @@ impl ReplayStage {
 
     fn replay_active_treasuries(
         block_buffer_pool: &Arc<BlockBufferPool>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         my_pubkey: &Pubkey,
         ticks_per_slot: &mut u64,
         progress: &mut HashMap<u64, ForkProgress>,
@@ -416,7 +416,7 @@ impl ReplayStage {
     }
 
     fn generate_votable_treasuries(
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         locktower: &Locktower,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Vec<(u128, Arc<Treasury>)> {
@@ -512,7 +512,7 @@ impl ReplayStage {
         locktower: &Locktower,
         stake_lockouts: &HashMap<u64, StakeLockout>,
         progress: &mut HashMap<u64, ForkProgress>,
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         progress.retain(|slot, prog| {
             let duration = timing::timestamp() - prog.started_ms;
@@ -595,7 +595,7 @@ impl ReplayStage {
     }
 
     fn handle_new_root(
-        treasury_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         progress: &mut HashMap<u64, ForkProgress>,
     ) {
         let r_treasury_forks = treasury_forks.read().unwrap();
@@ -622,7 +622,7 @@ impl ReplayStage {
 
     fn generate_new_treasury_forks(
         block_buffer_pool: &BlockBufferPool,
-        forks: &mut BankForks,
+        forks: &mut TreasuryForks,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         // Find the next slot that chains to the old slot
@@ -690,7 +690,7 @@ mod test {
             let genesis_block = create_genesis_block(10_000).genesis_block;
             let treasury0 = Treasury::new(&genesis_block);
             let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury0));
-            let mut treasury_forks = BankForks::new(0, treasury0);
+            let mut treasury_forks = TreasuryForks::new(0, treasury0);
             treasury_forks.working_treasury().freeze();
 
             // Insert blob for slot 1, generate new forks, check result
@@ -728,7 +728,7 @@ mod test {
     fn test_handle_new_root() {
         let genesis_block = create_genesis_block(10_000).genesis_block;
         let treasury0 = Treasury::new(&genesis_block);
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury0)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury0)));
         let mut progress = HashMap::new();
         progress.insert(5, ForkProgress::new(Hash::default()));
         ReplayStage::handle_new_root(&treasury_forks, &mut progress);
