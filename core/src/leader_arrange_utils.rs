@@ -105,7 +105,7 @@ mod tests {
     };
 
     #[test]
-    fn test_leader_schedule_via_bank() {
+    fn test_leader_schedule_via_treasury() {
         let pubkey = Pubkey::new_rand();
         let genesis_block =
             create_genesis_block_with_leader(0, &pubkey, BOOTSTRAP_LEADER_DIFS).genesis_block;
