@@ -247,20 +247,20 @@ impl ReplayStage {
                             "replay_stage-new_leader",
                             ("count", waterclock_slot, i64),
                             ("grace", grace_ticks, i64));
-                        let tpu_bank = Bank::new_from_parent(&parent, my_pubkey, waterclock_slot);
-                        treasury_forks.write().unwrap().insert(tpu_bank);
-                        if let Some(tpu_bank) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
+                        let tpu_treasury = Bank::new_from_parent(&parent, my_pubkey, waterclock_slot);
+                        treasury_forks.write().unwrap().insert(tpu_treasury);
+                        if let Some(tpu_treasury) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
                             assert_eq!(
                                 treasury_forks.read().unwrap().working_treasury().slot(),
-                                tpu_bank.slot()
+                                tpu_treasury.slot()
                             );
                             debug!(
                                 "waterclock_recorder new working treasury: me: {} next_slot: {} next_leader: {}",
                                 my_pubkey,
-                                tpu_bank.slot(),
+                                tpu_treasury.slot(),
                                 next_leader
                             );
-                            waterclock_recorder.lock().unwrap().set_treasury(&tpu_bank);
+                            waterclock_recorder.lock().unwrap().set_treasury(&tpu_treasury);
                         }
                     }
                 })
