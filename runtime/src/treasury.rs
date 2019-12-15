@@ -1895,7 +1895,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_vote_accounts() {
+    fn test_treasury_vote_accounts() {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
