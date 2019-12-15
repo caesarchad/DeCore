@@ -1044,7 +1044,7 @@ mod tests {
     use morgan_vote_api::vote_state::VoteState;
 
     #[test]
-    fn test_bank_new() {
+    fn test_treasury_new() {
         let dummy_leader_pubkey = Pubkey::new_rand();
         let dummy_leader_difs = BOOTSTRAP_LEADER_DIFS;
         let mint_difs = 10_000;
