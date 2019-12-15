@@ -1531,7 +1531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_hash_internal_state() {
+    fn test_treasury_hash_internal_state() {
         let (genesis_block, mint_keypair) = create_genesis_block(2_000);
         let treasury0 = Bank::new(&genesis_block);
         let treasury1 = Bank::new(&genesis_block);
@@ -1557,7 +1557,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_hash_internal_state_squash() {
+    fn test_treasury_hash_internal_state_squash() {
         let collector_id = Pubkey::default();
         let treasury0 = Arc::new(Bank::new(&create_genesis_block(10).0));
         let hash0 = treasury0.hash_internal_state();
