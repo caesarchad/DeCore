@@ -17,18 +17,18 @@ use std::sync::Mutex;
 use std::thread::{sleep, Builder};
 use std::time::{Duration, Instant};
 
-pub struct BankClient {
+pub struct TreasuryClient {
     treasury: Arc<Treasury>,
     transaction_sender: Mutex<Sender<Transaction>>,
 }
 
-impl Client for BankClient {
+impl Client for TreasuryClient {
     fn transactions_addr(&self) -> String {
-        "Local BankClient".to_string()
+        "Local TreasuryClient".to_string()
     }
 }
 
-impl AsyncClient for BankClient {
+impl AsyncClient for TreasuryClient {
     fn async_send_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
         let signature = transaction.signatures.get(0).cloned().unwrap_or_default();
         let transaction_sender = self.transaction_sender.lock().unwrap();
@@ -70,7 +70,7 @@ impl AsyncClient for BankClient {
     }
 }
 
-impl SyncClient for BankClient {
+impl SyncClient for TreasuryClient {
     fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
         let blockhash = self.treasury.last_blockhash();
         let transaction = Transaction::new(&keypairs, message, blockhash);
@@ -182,7 +182,7 @@ impl SyncClient for BankClient {
     }
 }
 
-impl BankClient {
+impl TreasuryClient {
     fn run(treasury: &Treasury, transaction_receiver: Receiver<Transaction>) {
         while let Ok(tx) = transaction_receiver.recv() {
             let mut transactions = vec![tx];
@@ -227,7 +227,7 @@ mod tests {
         let jane_pubkey = jane_doe_keypair.pubkey();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
         let treasury = Treasury::new(&genesis_block);
-        let treasury_client = BankClient::new(treasury);
+        let treasury_client = TreasuryClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
         let bob_pubkey = Pubkey::new_rand();

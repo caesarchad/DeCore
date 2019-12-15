@@ -4,7 +4,7 @@ extern crate test;
 
 use log::*;
 use morgan_runtime::treasury::*;
-use morgan_runtime::treasury_client::BankClient;
+use morgan_runtime::treasury_client::TreasuryClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::client::AsyncClient;
@@ -36,7 +36,7 @@ fn process_instruction(
 }
 
 pub fn create_builtin_transactions(
-    treasury_client: &BankClient,
+    treasury_client: &TreasuryClient,
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
     let program_id = Pubkey::new(&BUILTIN_PROGRAM_ID);
@@ -58,7 +58,7 @@ pub fn create_builtin_transactions(
 }
 
 pub fn create_native_loader_transactions(
-    treasury_client: &BankClient,
+    treasury_client: &TreasuryClient,
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
     let program = "morgan_noop_program".as_bytes().to_vec();
@@ -80,12 +80,12 @@ pub fn create_native_loader_transactions(
         .collect()
 }
 
-fn sync_bencher(treasury: &Arc<Treasury>, _bank_client: &BankClient, transactions: &Vec<Transaction>) {
+fn sync_bencher(treasury: &Arc<Treasury>, _bank_client: &TreasuryClient, transactions: &Vec<Transaction>) {
     let results = treasury.process_transactions(&transactions);
     assert!(results.iter().all(Result::is_ok));
 }
 
-fn async_bencher(treasury: &Arc<Treasury>, treasury_client: &BankClient, transactions: &Vec<Transaction>) {
+fn async_bencher(treasury: &Arc<Treasury>, treasury_client: &TreasuryClient, transactions: &Vec<Transaction>) {
     for transaction in transactions.clone() {
         treasury_client.async_send_transaction(transaction).unwrap();
     }
@@ -124,8 +124,8 @@ fn async_bencher(treasury: &Arc<Treasury>, treasury_client: &BankClient, transac
 
 fn do_bench_transactions(
     bencher: &mut Bencher,
-    bench_work: &Fn(&Arc<Treasury>, &BankClient, &Vec<Transaction>),
-    create_transactions: &Fn(&BankClient, &Keypair) -> Vec<Transaction>,
+    bench_work: &Fn(&Arc<Treasury>, &TreasuryClient, &Vec<Transaction>),
+    create_transactions: &Fn(&TreasuryClient, &Keypair) -> Vec<Transaction>,
 ) {
     morgan_logger::setup();
     let ns_per_s = 1_000_000_000;
@@ -133,7 +133,7 @@ fn do_bench_transactions(
     let mut treasury = Treasury::new(&genesis_block);
     treasury.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
     let treasury = Arc::new(treasury);
-    let treasury_client = BankClient::new_shared(&treasury);
+    let treasury_client = TreasuryClient::new_shared(&treasury);
     let transactions = create_transactions(&treasury_client, &mint_keypair);
 
     // Do once to fund accounts, load modules, etc...

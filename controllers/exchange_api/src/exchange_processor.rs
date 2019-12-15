@@ -676,7 +676,7 @@ mod test {
     use super::*;
     use crate::{exchange_instruction, id};
     use morgan_runtime::treasury::Treasury;
-    use morgan_runtime::treasury_client::BankClient;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -767,9 +767,9 @@ mod test {
         (treasury, mint_keypair)
     }
 
-    fn create_client(treasury: Treasury, mint_keypair: Keypair) -> (BankClient, Keypair) {
+    fn create_client(treasury: Treasury, mint_keypair: Keypair) -> (TreasuryClient, Keypair) {
         let owner = Keypair::new();
-        let treasury_client = BankClient::new(treasury);
+        let treasury_client = TreasuryClient::new(treasury);
         treasury_client
             .transfer(42, &mint_keypair, &owner.pubkey())
             .unwrap();
@@ -777,7 +777,7 @@ mod test {
         (treasury_client, owner)
     }
 
-    fn create_account(client: &BankClient, owner: &Keypair) -> Pubkey {
+    fn create_account(client: &TreasuryClient, owner: &Keypair) -> Pubkey {
         let new = Pubkey::new_rand();
         let instruction = system_instruction::create_account(
             &owner.pubkey(),
@@ -792,7 +792,7 @@ mod test {
         new
     }
 
-    fn create_token_account(client: &BankClient, owner: &Keypair) -> Pubkey {
+    fn create_token_account(client: &TreasuryClient, owner: &Keypair) -> Pubkey {
         let new = create_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
         client
@@ -801,7 +801,7 @@ mod test {
         new
     }
 
-    fn transfer(client: &BankClient, owner: &Keypair, to: &Pubkey, token: Token, tokens: u64) {
+    fn transfer(client: &TreasuryClient, owner: &Keypair, to: &Pubkey, token: Token, tokens: u64) {
         let instruction = exchange_instruction::transfer_request(
             &owner.pubkey(),
             to,
@@ -815,7 +815,7 @@ mod test {
     }
 
     fn trade(
-        client: &BankClient,
+        client: &TreasuryClient,
         owner: &Keypair,
         direction: Direction,
         pair: TokenPair,

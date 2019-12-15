@@ -47,7 +47,7 @@ mod tests {
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
     use morgan_runtime::treasury::Treasury;
-    use morgan_runtime::treasury_client::BankClient;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::message::Message;
@@ -80,11 +80,11 @@ mod tests {
         (treasury, mint_keypair)
     }
 
-    fn create_config_account(treasury: Treasury, mint_keypair: &Keypair) -> (BankClient, Keypair) {
+    fn create_config_account(treasury: Treasury, mint_keypair: &Keypair) -> (TreasuryClient, Keypair) {
         let config_keypair = Keypair::new();
         let config_pubkey = config_keypair.pubkey();
 
-        let treasury_client = BankClient::new(treasury);
+        let treasury_client = TreasuryClient::new(treasury);
         treasury_client
             .send_instruction(
                 mint_keypair,

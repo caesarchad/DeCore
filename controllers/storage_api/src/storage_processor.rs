@@ -105,7 +105,7 @@ mod tests {
     use bincode::deserialize;
     use log::*;
     use morgan_runtime::treasury::Treasury;
-    use morgan_runtime::treasury_client::BankClient;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -275,7 +275,7 @@ mod tests {
         treasury.add_instruction_processor(id(), process_instruction);
         let treasury = Arc::new(treasury);
         let slot = 0;
-        let treasury_client = BankClient::new_shared(&treasury);
+        let treasury_client = TreasuryClient::new_shared(&treasury);
 
         init_storage_accounts(
             &treasury_client,
@@ -439,7 +439,7 @@ mod tests {
     }
 
     fn init_storage_accounts(
-        client: &BankClient,
+        client: &TreasuryClient,
         mint: &Keypair,
         validator_accounts_to_create: &[&Pubkey],
         storage_miner_accounts_to_create: &[&Pubkey],
@@ -508,7 +508,7 @@ mod tests {
         mint_keypair: &Keypair,
         storage_keypair: &Keypair,
         slot: u64,
-        treasury_client: &BankClient,
+        treasury_client: &TreasuryClient,
     ) -> CheckedProof {
         let sha_state = Hash::new(Pubkey::new_rand().as_ref());
         let message = Message::new_with_payer(
@@ -565,7 +565,7 @@ mod tests {
         for _ in 0..next_storage_segment_tick_height {
             treasury.register_tick(&treasury.last_blockhash());
         }
-        let treasury_client = BankClient::new(treasury);
+        let treasury_client = TreasuryClient::new(treasury);
 
         let x = 42;
         let x2 = x * 2;

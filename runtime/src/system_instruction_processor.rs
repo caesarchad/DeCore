@@ -167,7 +167,7 @@ pub fn process_instruction(
 mod tests {
     use super::*;
     use crate::treasury::Treasury;
-    use crate::treasury_client::BankClient;
+    use crate::treasury_client::TreasuryClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
     use morgan_interface::client::SyncClient;
@@ -424,7 +424,7 @@ mod tests {
 
         // Fund to account to bypass AccountNotFound error
         let treasury = Treasury::new(&genesis_block);
-        let treasury_client = BankClient::new(treasury);
+        let treasury_client = TreasuryClient::new(treasury);
         treasury_client
             .transfer(50, &alice_keypair, &mallory_pubkey)
             .unwrap();

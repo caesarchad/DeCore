@@ -1,4 +1,4 @@
-use crate::treasury_client::BankClient;
+use crate::treasury_client::TreasuryClient;
 use serde::Serialize;
 use morgan_interface::client::SyncClient;
 use morgan_interface::instruction::{AccountMeta, Instruction};
@@ -9,7 +9,7 @@ use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::system_instruction;
 
 pub fn load_program(
-    treasury_client: &BankClient,
+    treasury_client: &TreasuryClient,
     from_keypair: &Keypair,
     loader_pubkey: &Pubkey,
     program: Vec<u8>,

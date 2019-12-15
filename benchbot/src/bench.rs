@@ -663,7 +663,7 @@ mod tests {
     use morgan_client::thin_client::create_client;
     use morgan_tokenbot::drone::run_local_drone;
     use morgan_runtime::treasury::Treasury;
-    use morgan_runtime::treasury_client::BankClient;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use std::sync::mpsc::channel;
@@ -728,7 +728,7 @@ mod tests {
     fn test_bench_tps_treasury_client() {
         let (genesis_block, id) = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let clients = vec![BankClient::new(treasury)];
+        let clients = vec![TreasuryClient::new(treasury)];
 
         let mut config = Config::default();
         config.id = id;
@@ -745,7 +745,7 @@ mod tests {
     fn test_bench_tps_fund_keys() {
         let (genesis_block, id) = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let client = BankClient::new(treasury);
+        let client = TreasuryClient::new(treasury);
         let tx_count = 10;
         let difs = 20;
 

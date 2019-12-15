@@ -1,5 +1,5 @@
 use morgan_runtime::treasury::Treasury;
-use morgan_runtime::treasury_client::BankClient;
+use morgan_runtime::treasury_client::TreasuryClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::client::SyncClient;
 use morgan_interface::genesis_block::create_genesis_block;
@@ -12,7 +12,7 @@ fn test_program_native_noop() {
 
     let (genesis_block, alice_keypair) = create_genesis_block(50);
     let treasury = Treasury::new(&genesis_block);
-    let treasury_client = BankClient::new(treasury);
+    let treasury_client = TreasuryClient::new(treasury);
 
     let program = "morgan_noop_controller".as_bytes().to_vec();
     let program_id = load_program(&treasury_client, &alice_keypair, &native_loader::id(), program);
