@@ -1488,7 +1488,7 @@ mod tests {
 
     /// Verify that the parent's vector is computed correctly
     #[test]
-    fn test_bank_parents() {
+    fn test_treasury_parents() {
         let (genesis_block, _) = create_genesis_block(1);
         let parent = Arc::new(Bank::new(&genesis_block));
 
