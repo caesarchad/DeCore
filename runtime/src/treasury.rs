@@ -1844,7 +1844,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_inherit_tx_count() {
+    fn test_treasury_inherit_tx_count() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
         let treasury0 = Arc::new(Bank::new(&genesis_block));
 
