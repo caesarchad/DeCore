@@ -1656,7 +1656,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_epoch_vote_accounts() {
+    fn test_treasury_epoch_vote_accounts() {
         let leader_pubkey = Pubkey::new_rand();
         let leader_difs = 3;
         let mut genesis_block =
