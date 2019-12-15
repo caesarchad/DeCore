@@ -377,7 +377,7 @@ impl Locktower {
         }
     }
 
-    fn bank_weight(&self, treasury: &Bank, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
+    fn treasury_weight(&self, treasury: &Bank, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
         let stake_lockouts =
             self.collect_vote_lockouts(treasury.slot(), treasury.vote_accounts().into_iter(), ancestors);
         self.calculate_weight(&stake_lockouts)
@@ -390,7 +390,7 @@ impl Locktower {
             .values()
             .map(|b| {
                 (
-                    self.bank_weight(b, &ancestors),
+                    self.treasury_weight(b, &ancestors),
                     b.parents().len(),
                     b.clone(),
                 )
