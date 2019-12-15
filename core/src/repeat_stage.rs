@@ -277,7 +277,7 @@ impl ReplayStage {
                 });
         }
     }
-    fn replay_block_buffer_into_bank(
+    fn replay_block_buffer_into_treasury(
         treasury: &Bank,
         block_buffer_pool: &BlockBufferPool,
         progress: &mut HashMap<u64, ForkProgress>,
@@ -405,7 +405,7 @@ impl ReplayStage {
             let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();
             *ticks_per_slot = treasury.ticks_per_slot();
             if treasury.collector_id() != *my_pubkey {
-                Self::replay_block_buffer_into_bank(&treasury, &block_buffer_pool, progress)?;
+                Self::replay_block_buffer_into_treasury(&treasury, &block_buffer_pool, progress)?;
             }
             let max_tick_height = (*treasury_slot + 1) * treasury.ticks_per_slot() - 1;
             if treasury.tick_height() == max_tick_height {
