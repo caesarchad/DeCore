@@ -122,7 +122,7 @@ impl ReplayStage {
                         &leader_schedule_cache,
                     );
 
-                    let mut is_tpu_bank_active = waterclock_recorder.lock().unwrap().treasury().is_some();
+                    let mut is_tpu_treasury_active = waterclock_recorder.lock().unwrap().treasury().is_some();
 
                     Self::replay_active_banks(
                         &block_buffer_pool,
@@ -167,17 +167,17 @@ impl ReplayStage {
                             &leader_schedule_cache,
                         );
 
-                        is_tpu_bank_active = false;
+                        is_tpu_treasury_active = false;
                     }
 
-                    let (reached_leader_tick, grace_ticks) = if !is_tpu_bank_active {
+                    let (reached_leader_tick, grace_ticks) = if !is_tpu_treasury_active {
                         let waterclock = waterclock_recorder.lock().unwrap();
                         waterclock.reached_leader_tick()
                     } else {
                         (false, 0)
                     };
 
-                    if !is_tpu_bank_active {
+                    if !is_tpu_treasury_active {
                         assert!(ticks_per_slot > 0);
                         let waterclock_tick_height = waterclock_recorder.lock().unwrap().tick_height();
                         let waterclock_slot = leader_arrange_utils::tick_height_to_slot(
