@@ -109,13 +109,13 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
                 .collect();
             let root = if root.len() == 1 { root[0] } else { 0 };
             if desired_slot.len() == 1 {
-                let desired_bank = treasury_forks
+                let desired_treasury = treasury_forks
                     .read()
                     .unwrap()
                     .get(desired_slot[0])
                     .unwrap()
                     .clone();
-                let result = treasury_method(&desired_bank, hashmap_key);
+                let result = treasury_method(&desired_treasury, hashmap_key);
                 notify(result, &sink, root);
             }
         }
