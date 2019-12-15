@@ -1460,7 +1460,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_process_and_record_transactions() {
+    fn test_treasury_process_and_record_transactions() {
         morgan_logger::setup();
         let GenesisBlockInfo {
             genesis_block,
@@ -1549,7 +1549,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_process_and_record_transactions_account_in_use() {
+    fn test_treasury_process_and_record_transactions_account_in_use() {
         morgan_logger::setup();
         let GenesisBlockInfo {
             genesis_block,
