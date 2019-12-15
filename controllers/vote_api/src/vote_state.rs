@@ -317,7 +317,7 @@ pub fn process_votes(
     vote_account.set_state(&vote_state)
 }
 
-// utility function, used by Bank, tests
+// utility function, used by Treasury, tests
 pub fn create_account(
     vote_pubkey: &Pubkey,
     node_pubkey: &Pubkey,

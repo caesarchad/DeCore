@@ -385,7 +385,7 @@ impl Locktower {
 
     fn find_heaviest_treasury(&self, treasury_forks: &TreasuryForks) -> Option<Arc<Treasury>> {
         let ancestors = treasury_forks.ancestors();
-        let mut bank_weights: Vec<_> = treasury_forks
+        let mut treasury_weights: Vec<_> = treasury_forks
             .frozen_treasuries()
             .values()
             .map(|b| {
@@ -396,8 +396,8 @@ impl Locktower {
                 )
             })
             .collect();
-        bank_weights.sort_by_key(|b| (b.0, b.1));
-        bank_weights.pop().map(|b| b.2)
+        treasury_weights.sort_by_key(|b| (b.0, b.1));
+        treasury_weights.pop().map(|b| b.2)
     }
 
     fn initialize_lockouts_from_treasury(treasury: &Treasury, current_epoch: u64) -> VoteState {

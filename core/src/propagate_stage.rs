@@ -64,13 +64,13 @@ impl Broadcast {
 
         assert!(last_tick <= max_tick_height);
         if last_tick != max_tick_height {
-            while let Ok((same_bank, entries)) = receiver.try_recv() {
+            while let Ok((same_treasury, entries)) = receiver.try_recv() {
                 // If the treasury changed, that implies the previous slot was interrupted and we do not have to
                 // broadcast its entries.
-                if same_bank.slot() != treasury.slot() {
+                if same_treasury.slot() != treasury.slot() {
                     num_entries = 0;
                     ventries.clear();
-                    treasury = same_bank.clone();
+                    treasury = same_treasury.clone();
                     max_tick_height = treasury.max_tick_height();
                 }
                 num_entries += entries.len();

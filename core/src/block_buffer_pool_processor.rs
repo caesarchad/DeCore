@@ -349,7 +349,7 @@ pub fn process_block_buffer_pool(
     }
 
     let (treasuries, treasury_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
-    let treasury_forks = TreasuryForks::new_from_banks(&treasuries, root);
+    let treasury_forks = TreasuryForks::new_from_treasuries(&treasuries, root);
     // info!(
     //     "{}",
     //     Info(format!("processing ledger...complete in {}ms, forks={}...",
@@ -480,7 +480,7 @@ pub mod tests {
         // slot 2, points at slot 1
         fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, blockhash);
 
-        let (mut _bank_forks, treasury_forks_info, _) =
+        let (mut _treasury_forks, treasury_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1);

@@ -112,7 +112,7 @@ fn main() {
             stdout().write_all(b"\n]}\n").expect("close array");
         }
         ("verify", _) => match process_block_buffer_pool(&genesis_block, &block_buffer_pool, None) {
-            Ok((_bank_forks, treasury_forks_info, _)) => {
+            Ok((_treasury_forks, treasury_forks_info, _)) => {
                 println!("{:?}", treasury_forks_info);
             }
             Err(err) => {

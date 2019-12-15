@@ -1,4 +1,4 @@
-//! The `treasury_forks` module implments TreasuryForks a DAG of checkpointed Banks
+//! The `treasury_forks` module implments TreasuryForks a DAG of checkpointed Treasuries
 
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::inc_new_counter_info;
@@ -82,7 +82,7 @@ impl TreasuryForks {
         self.treasuries.get(&treasury_slot)
     }
 
-    pub fn new_from_banks(initial_treasuries: &[Arc<Treasury>], root: u64) -> Self {
+    pub fn new_from_treasuries(initial_treasuries: &[Arc<Treasury>], root: u64) -> Self {
         let mut treasuries = HashMap::new();
         let working_treasury = initial_treasuries[0].clone();
         for treasury in initial_treasuries {
@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_treasury_forks_frozen_banks() {
+    fn test_treasury_forks_frozen_treasuries() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_treasury_forks_active_banks() {
+    fn test_treasury_forks_active_treasuries() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);

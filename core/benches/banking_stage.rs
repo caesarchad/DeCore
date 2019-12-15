@@ -85,7 +85,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
+fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
     morgan_logger::setup();
     let num_threads = TreasuryStage::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races

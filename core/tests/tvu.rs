@@ -89,7 +89,7 @@ fn test_replay() {
 
     let (
         treasury_forks,
-        _bank_forks_info,
+        _treasury_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,
         completed_slots_receiver,

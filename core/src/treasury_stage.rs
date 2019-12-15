@@ -68,7 +68,7 @@ impl TreasuryStage {
             waterclock_recorder,
             verified_receiver,
             verified_vote_receiver,
-            2, // 1 for voting, 1 for banking.
+            2, // 1 for voting, 1 for treasury.
                // More than 2 threads is slower in testnet testing.
         )
     }
@@ -103,7 +103,7 @@ impl TreasuryStage {
                 let exit = exit.clone();
                 let mut recv_start = Instant::now();
                 Builder::new()
-                    .name("morgan-banking-stage-tx".to_string())
+                    .name("morgan-treasury-stage-tx".to_string())
                     .spawn(move || {
                         Self::process_loop(
                             &verified_receiver,
@@ -352,7 +352,7 @@ impl TreasuryStage {
                     buffered_packets.append(&mut unprocessed_packets);
                 }
                 Err(err) => {
-                    debug!("morgan-banking-stage-tx: exit due to {:?}", err);
+                    debug!("morgan-treasury-stage-tx: exit due to {:?}", err);
                     break;
                 }
             }
@@ -416,7 +416,7 @@ impl TreasuryStage {
         let now = Instant::now();
         // Use a shorter maximum age when adding transactions into the pipeline.  This will reduce
         // the likelihood of any single thread getting starved and processing old ids.
-        // TODO: Banking stage threads should be prioritized to complete faster then this queue
+        // TODO: Treasury stage threads should be prioritized to complete faster then this queue
         // expires.
         let (loaded_accounts, results) =
             treasury.load_and_execute_transactions(txs, lock_results, MAX_RECENT_BLOCKHASHES / 2);
@@ -813,8 +813,8 @@ impl Service for TreasuryStage {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
-        for bank_thread_hdl in self.treasury_thread_hdls {
-            bank_thread_hdl.join()?;
+        for treasury_thread_hdl in self.treasury_thread_hdls {
+            treasury_thread_hdl.join()?;
         }
         Ok(())
     }
@@ -869,7 +869,7 @@ mod tests {
     use std::thread::sleep;
 
     #[test]
-    fn test_banking_stage_shutdown1() {
+    fn test_treasury_phase_shutdown1() {
         let genesis_block = create_genesis_block(2).genesis_block;
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let (verified_sender, verified_receiver) = channel();
@@ -899,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn test_banking_stage_tick() {
+    fn test_treasury_phase_tick() {
         morgan_logger::setup();
         let GenesisBlockInfo {
             mut genesis_block, ..
@@ -947,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn test_banking_stage_entries_only() {
+    fn test_treasury_phase_entries_only() {
         morgan_logger::setup();
         let GenesisBlockInfo {
             genesis_block,
@@ -1055,7 +1055,7 @@ mod tests {
     }
 
     #[test]
-    fn test_banking_stage_entryfication() {
+    fn test_treasury_phase_entryfication() {
         morgan_logger::setup();
         // In this attack we'll demonstrate that a verifier can interpret the ledger
         // differently if either the server doesn't signal the ledger to add an
@@ -1154,7 +1154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_record_transactions() {
+    fn test_treasury_record_transactions() {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,

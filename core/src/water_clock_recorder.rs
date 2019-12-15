@@ -840,7 +840,7 @@ mod tests {
                 .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_err());
 
-            let (_bank, e) = entry_receiver.recv().expect("recv 1");
+            let (_treasury, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 2);
             assert!(e[0].0.is_tick());
             assert!(e[1].0.is_tick());

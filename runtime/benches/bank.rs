@@ -80,7 +80,7 @@ pub fn create_native_loader_transactions(
         .collect()
 }
 
-fn sync_bencher(treasury: &Arc<Treasury>, _bank_client: &TreasuryClient, transactions: &Vec<Transaction>) {
+fn sync_bencher(treasury: &Arc<Treasury>, _treasury_client: &TreasuryClient, transactions: &Vec<Transaction>) {
     let results = treasury.process_transactions(&transactions);
     assert!(results.iter().all(Result::is_ok));
 }
@@ -178,7 +178,7 @@ fn bench_treasury_sync_process_builtin_transactions(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn bench_bank_sync_process_native_loader_transactions(bencher: &mut Bencher) {
+fn bench_treasury_sync_process_native_loader_transactions(bencher: &mut Bencher) {
     do_bench_transactions(bencher, &sync_bencher, &create_native_loader_transactions);
 }
 

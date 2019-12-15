@@ -472,7 +472,7 @@ impl ReplayStage {
         votable.sort_by_key(|b| b.0);
         let ms = timing::duration_as_ms(&locktower_start.elapsed());
 
-        trace!("votable_banks {}", votable.len());
+        trace!("votable_treasuries {}", votable.len());
         if !votable.is_empty() {
             let weights: Vec<u128> = votable.iter().map(|x| x.0).collect();
             // info!(

@@ -1226,7 +1226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_deposit() {
+    fn test_treasury_deposit() {
         let (genesis_block, _mint_keypair) = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
 
@@ -1241,7 +1241,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_withdraw() {
+    fn test_treasury_withdraw() {
         let (genesis_block, _mint_keypair) = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
 
@@ -1267,7 +1267,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_tx_fee() {
+    fn test_treasury_tx_fee() {
         let leader = Pubkey::new_rand();
         let GenesisBlockInfo {
             genesis_block,
@@ -1438,7 +1438,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_invalid_account_index() {
+    fn test_treasury_invalid_account_index() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let keypair = Keypair::new();
         let treasury = Treasury::new(&genesis_block);
@@ -1462,7 +1462,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_pay_to_self() {
+    fn test_treasury_pay_to_self() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let key1 = Keypair::new();
         let treasury = Treasury::new(&genesis_block);
@@ -1874,12 +1874,12 @@ mod tests {
         assert_eq!(treasury2.transaction_count(), 0);
         assert_eq!(treasury1.transaction_count(), 1);
 
-        let bank6 = new_from_parent(&treasury1);
+        let treasury6 = new_from_parent(&treasury1);
         assert_eq!(treasury1.transaction_count(), 1);
-        assert_eq!(bank6.transaction_count(), 1);
+        assert_eq!(treasury6.transaction_count(), 1);
 
-        bank6.squash();
-        assert_eq!(bank6.transaction_count(), 1);
+        treasury6.squash();
+        assert_eq!(treasury6.transaction_count(), 1);
     }
 
     #[test]

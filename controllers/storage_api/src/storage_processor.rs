@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_storage() {
+    fn test_treasury_storage() {
         let (genesis_block, mint_keypair) = create_genesis_block(1000);
         let mint_pubkey = mint_keypair.pubkey();
         let miner_keypair = Keypair::new();

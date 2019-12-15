@@ -64,7 +64,7 @@ pub enum StorageContract {
     MiningPool,
 }
 
-// utility function, used by Bank, tests, genesis
+// utility function, used by Treasury, tests, genesis
 pub fn create_validator_storage_account(difs: u64) -> Account {
     let mut storage_account = Account::new(difs, 0, STORAGE_ACCOUNT_SPACE as usize, &crate::id());
 

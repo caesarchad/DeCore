@@ -181,7 +181,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
     }
 }
 
-// utility function, used by Bank, tests, genesis
+// utility function, used by Treasury, tests, genesis
 pub fn create_delegate_stake_account(
     voter_pubkey: &Pubkey,
     vote_state: &VoteState,
