@@ -216,7 +216,7 @@ impl BankingStage {
 
     fn consume_or_forward_packets(
         leader_pubkey: Option<Pubkey>,
-        bank_is_available: bool,
+        treasury_is_available: bool,
         would_be_leader: bool,
         my_pubkey: &Pubkey,
     ) -> BufferedPacketsDecision {
@@ -225,7 +225,7 @@ impl BankingStage {
             BufferedPacketsDecision::Hold,
             // else process the packets
             |x| {
-                if bank_is_available {
+                if treasury_is_available {
                     // If the treasury is available, this node is the leader
                     BufferedPacketsDecision::Consume
                 } else if would_be_leader {
