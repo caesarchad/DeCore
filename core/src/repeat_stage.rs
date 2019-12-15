@@ -627,10 +627,10 @@ impl ReplayStage {
     ) {
         // Find the next slot that chains to the old slot
         let frozen_treasuries = forks.frozen_treasuries();
-        let frozen_bank_slots: Vec<u64> = frozen_treasuries.keys().cloned().collect();
-        trace!("frozen_treasuries {:?}", frozen_bank_slots);
+        let frozen_treasury_slots: Vec<u64> = frozen_treasuries.keys().cloned().collect();
+        trace!("frozen_treasuries {:?}", frozen_treasury_slots);
         let next_slots = block_buffer_pool
-            .fetch_slot_from(&frozen_bank_slots)
+            .fetch_slot_from(&frozen_treasury_slots)
             .expect("Db error");
         // Filter out what we've already seen
         trace!("generate new forks {:?}", next_slots);
