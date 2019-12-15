@@ -83,11 +83,11 @@ impl Broadcast {
             }
         }
 
-        let bank_epoch = treasury.get_stakers_epoch(treasury.slot());
+        let treasury_epoch = treasury.get_stakers_epoch(treasury.slot());
         let mut broadcast_table = node_group_info
             .read()
             .unwrap()
-            .sorted_tvu_peers(staking_utils::staked_nodes_at_epoch(&treasury, bank_epoch).as_ref());
+            .sorted_tvu_peers(staking_utils::staked_nodes_at_epoch(&treasury, treasury_epoch).as_ref());
 
         inc_new_counter_warn!("broadcast_service-num_peers", broadcast_table.len() + 1);
         // Layer 1, leader nodes are limited to the fanout size.

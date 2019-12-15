@@ -101,11 +101,11 @@ impl LeaderScheduleCache {
     fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Bank) -> Option<Pubkey> {
         let cache_result = self.slot_leader_at_no_compute(slot);
         // Forbid asking for slots in an unconfirmed epoch
-        let bank_epoch = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
-        if bank_epoch > *self.max_epoch.read().unwrap() {
+        let treasury_epoch = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
+        if treasury_epoch > *self.max_epoch.read().unwrap() {
             debug!(
                 "Requested leader in slot: {} of unconfirmed epoch: {}",
-                slot, bank_epoch
+                slot, treasury_epoch
             );
             return None;
         }

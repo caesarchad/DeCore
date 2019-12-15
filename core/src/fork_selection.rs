@@ -64,10 +64,10 @@ impl EpochStakes {
         Self::new(epoch, stakes, &accounts[0].0)
     }
     pub fn new_from_bank(treasury: &Bank, my_pubkey: &Pubkey) -> Self {
-        let bank_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
-        let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, bank_epoch)
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_epoch)
             .expect("voting require a treasury with stakes");
-        Self::new(bank_epoch, stakes, my_pubkey)
+        Self::new(treasury_epoch, stakes, my_pubkey)
     }
 }
 
@@ -209,8 +209,8 @@ impl Locktower {
     }
 
     pub fn is_recent_epoch(&self, treasury: &Bank) -> bool {
-        let bank_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
-        bank_epoch >= self.epoch_stakes.epoch
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        treasury_epoch >= self.epoch_stakes.epoch
     }
 
     pub fn update_epoch(&mut self, treasury: &Bank) {
@@ -219,8 +219,8 @@ impl Locktower {
             treasury.slot(),
             self.epoch_stakes.epoch
         );
-        let bank_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
-        if bank_epoch != self.epoch_stakes.epoch {
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        if treasury_epoch != self.epoch_stakes.epoch {
             assert!(
                 self.is_recent_epoch(treasury),
                 "epoch_stakes cannot move backwards"

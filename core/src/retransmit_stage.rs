@@ -38,9 +38,9 @@ fn retransmit(
     datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
 
     let r_bank = treasury_forks.read().unwrap().working_treasury();
-    let bank_epoch = r_bank.get_stakers_epoch(r_bank.slot());
+    let treasury_epoch = r_bank.get_stakers_epoch(r_bank.slot());
     let (neighbors, children) = compute_retransmit_peers(
-        staking_utils::staked_nodes_at_epoch(&r_bank, bank_epoch).as_ref(),
+        staking_utils::staked_nodes_at_epoch(&r_bank, treasury_epoch).as_ref(),
         node_group_info,
         DATA_PLANE_FANOUT,
     );
