@@ -116,7 +116,7 @@ impl ReplayStage {
                         break;
                     }
 
-                    Self::generate_new_bank_forks(
+                    Self::generate_new_treasury_forks(
                         &block_buffer_pool,
                         &mut treasury_forks.write().unwrap(),
                         &leader_schedule_cache,
@@ -620,7 +620,7 @@ impl ReplayStage {
         }
     }
 
-    fn generate_new_bank_forks(
+    fn generate_new_treasury_forks(
         block_buffer_pool: &BlockBufferPool,
         forks: &mut BankForks,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
@@ -699,7 +699,7 @@ mod test {
             blob_slot_1.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_1]).unwrap();
             assert!(treasury_forks.get(1).is_none());
-            ReplayStage::generate_new_bank_forks(
+            ReplayStage::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
@@ -712,7 +712,7 @@ mod test {
             blob_slot_2.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_2]).unwrap();
             assert!(treasury_forks.get(2).is_none());
-            ReplayStage::generate_new_bank_forks(
+            ReplayStage::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
