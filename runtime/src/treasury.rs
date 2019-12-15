@@ -1498,7 +1498,7 @@ mod tests {
 
     /// Verifies that last ids and status cache are correctly referenced from parent
     #[test]
-    fn test_bank_parent_duplicate_signature() {
+    fn test_treasury_parent_duplicate_signature() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
         let parent = Arc::new(Bank::new(&genesis_block));
