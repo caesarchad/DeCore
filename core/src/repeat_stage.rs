@@ -551,10 +551,10 @@ impl ReplayStage {
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Result<(Vec<Entry>, usize)> {
         let treasury_slot = treasury.slot();
-        let bank_progress = &mut progress
+        let treasury_progress = &mut progress
             .entry(treasury_slot)
             .or_insert(ForkProgress::new(treasury.last_blockhash()));
-        block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, bank_progress.num_blobs as u64, None)
+        block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, treasury_progress.num_blobs as u64, None)
     }
 
     fn replay_entries_into_treasury(
@@ -563,13 +563,13 @@ impl ReplayStage {
         progress: &mut HashMap<u64, ForkProgress>,
         num: usize,
     ) -> Result<()> {
-        let bank_progress = &mut progress
+        let treasury_progress = &mut progress
             .entry(treasury.slot())
             .or_insert(ForkProgress::new(treasury.last_blockhash()));
-        let result = Self::verify_and_process_entries(&treasury, &entries, &bank_progress.last_entry);
-        bank_progress.num_blobs += num;
+        let result = Self::verify_and_process_entries(&treasury, &entries, &treasury_progress.last_entry);
+        treasury_progress.num_blobs += num;
         if let Some(last_entry) = entries.last() {
-            bank_progress.last_entry = last_entry.hash;
+            treasury_progress.last_entry = last_entry.hash;
         }
         result
     }
