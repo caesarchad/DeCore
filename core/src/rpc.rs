@@ -654,7 +654,7 @@ mod tests {
     fn start_rpc_handler_with_tx(
         pubkey: &Pubkey,
     ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, Pubkey) {
-        let (treasury_forks, alice) = new_bank_forks();
+        let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
         let exit = Arc::new(AtomicBool::new(false));
 
@@ -692,7 +692,7 @@ mod tests {
     fn test_rpc_request_processor_new() {
         let bob_pubkey = Pubkey::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
-        let (treasury_forks, alice) = new_bank_forks();
+        let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
@@ -958,7 +958,7 @@ mod tests {
                 let request_processor = JsonRpcRequestProcessor::new(
                     StorageState::default(),
                     JsonRpcConfig::default(),
-                    new_bank_forks().0,
+                    new_treasury_forks().0,
                     &exit,
                 );
                 Arc::new(RwLock::new(request_processor))
@@ -1016,7 +1016,7 @@ mod tests {
         );
     }
 
-    fn new_bank_forks() -> (Arc<RwLock<BankForks>>, Keypair) {
+    fn new_treasury_forks() -> (Arc<RwLock<BankForks>>, Keypair) {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -1035,7 +1035,7 @@ mod tests {
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
             JsonRpcConfig::default(),
-            new_bank_forks().0,
+            new_treasury_forks().0,
             &exit,
         );
         assert_eq!(request_processor.fullnode_exit(), Ok(false));
@@ -1050,7 +1050,7 @@ mod tests {
         let request_processor = JsonRpcRequestProcessor::new(
             StorageState::default(),
             config,
-            new_bank_forks().0,
+            new_treasury_forks().0,
             &exit,
         );
         assert_eq!(request_processor.fullnode_exit(), Ok(true));
