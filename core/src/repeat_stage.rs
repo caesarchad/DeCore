@@ -398,10 +398,10 @@ impl ReplayStage {
         progress: &mut HashMap<u64, ForkProgress>,
         slot_full_sender: &Sender<(u64, Pubkey)>,
     ) -> Result<()> {
-        let active_banks = treasury_forks.read().unwrap().active_banks();
-        trace!("active treasuries {:?}", active_banks);
+        let active_treasuries = treasury_forks.read().unwrap().active_treasuries();
+        trace!("active treasuries {:?}", active_treasuries);
 
-        for treasury_slot in &active_banks {
+        for treasury_slot in &active_treasuries {
             let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();
             *ticks_per_slot = treasury.ticks_per_slot();
             if treasury.collector_id() != *my_pubkey {

@@ -70,7 +70,7 @@ impl BankForks {
             .collect()
     }
 
-    pub fn active_banks(&self) -> Vec<u64> {
+    pub fn active_treasuries(&self) -> Vec<u64> {
         self.treasuries
             .iter()
             .filter(|(_, v)| !v.is_frozen())
@@ -275,7 +275,7 @@ mod tests {
         let mut treasury_forks = BankForks::new(0, treasury);
         let child_treasury = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
         treasury_forks.insert(child_treasury);
-        assert_eq!(treasury_forks.active_banks(), vec![1]);
+        assert_eq!(treasury_forks.active_treasuries(), vec![1]);
     }
 
 }
