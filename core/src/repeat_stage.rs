@@ -688,9 +688,9 @@ mod test {
             );
 
             let genesis_block = create_genesis_block(10_000).genesis_block;
-            let bank0 = Bank::new(&genesis_block);
-            let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&bank0));
-            let mut treasury_forks = BankForks::new(0, bank0);
+            let treasury0 = Bank::new(&genesis_block);
+            let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury0));
+            let mut treasury_forks = BankForks::new(0, treasury0);
             treasury_forks.working_treasury().freeze();
 
             // Insert blob for slot 1, generate new forks, check result
@@ -727,8 +727,8 @@ mod test {
     #[test]
     fn test_handle_new_root() {
         let genesis_block = create_genesis_block(10_000).genesis_block;
-        let bank0 = Bank::new(&genesis_block);
-        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, bank0)));
+        let treasury0 = Bank::new(&genesis_block);
+        let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury0)));
         let mut progress = HashMap::new();
         progress.insert(5, ForkProgress::new(Hash::default()));
         ReplayStage::handle_new_root(&treasury_forks, &mut progress);

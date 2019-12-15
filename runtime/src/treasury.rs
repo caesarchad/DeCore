@@ -1533,38 +1533,38 @@ mod tests {
     #[test]
     fn test_bank_hash_internal_state() {
         let (genesis_block, mint_keypair) = create_genesis_block(2_000);
-        let bank0 = Bank::new(&genesis_block);
+        let treasury0 = Bank::new(&genesis_block);
         let bank1 = Bank::new(&genesis_block);
-        let initial_state = bank0.hash_internal_state();
+        let initial_state = treasury0.hash_internal_state();
         assert_eq!(bank1.hash_internal_state(), initial_state);
 
         let pubkey = Pubkey::new_rand();
-        bank0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
-        assert_ne!(bank0.hash_internal_state(), initial_state);
+        treasury0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        assert_ne!(treasury0.hash_internal_state(), initial_state);
         bank1.transfer(1_000, &mint_keypair, &pubkey).unwrap();
-        assert_eq!(bank0.hash_internal_state(), bank1.hash_internal_state());
+        assert_eq!(treasury0.hash_internal_state(), bank1.hash_internal_state());
 
         // Checkpointing should not change its state
         let bank2 = new_from_parent(&Arc::new(bank1));
-        assert_eq!(bank0.hash_internal_state(), bank2.hash_internal_state());
+        assert_eq!(treasury0.hash_internal_state(), bank2.hash_internal_state());
     }
 
     #[test]
     fn test_hash_internal_state_genesis() {
-        let bank0 = Bank::new(&create_genesis_block(10).0);
+        let treasury0 = Bank::new(&create_genesis_block(10).0);
         let bank1 = Bank::new(&create_genesis_block(20).0);
-        assert_ne!(bank0.hash_internal_state(), bank1.hash_internal_state());
+        assert_ne!(treasury0.hash_internal_state(), bank1.hash_internal_state());
     }
 
     #[test]
     fn test_bank_hash_internal_state_squash() {
         let collector_id = Pubkey::default();
-        let bank0 = Arc::new(Bank::new(&create_genesis_block(10).0));
-        let hash0 = bank0.hash_internal_state();
+        let treasury0 = Arc::new(Bank::new(&create_genesis_block(10).0));
+        let hash0 = treasury0.hash_internal_state();
         // save hash0 because new_from_parent
         // updates syscall entries
 
-        let bank1 = Bank::new_from_parent(&bank0, &collector_id, 1);
+        let bank1 = Bank::new_from_parent(&treasury0, &collector_id, 1);
 
         // no delta in bank1, hashes match
         assert_eq!(hash0, bank1.hash_internal_state());
@@ -1846,12 +1846,12 @@ mod tests {
     #[test]
     fn test_bank_inherit_tx_count() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let bank0 = Arc::new(Bank::new(&genesis_block));
+        let treasury0 = Arc::new(Bank::new(&genesis_block));
 
         // Bank 1
-        let bank1 = Arc::new(new_from_parent(&bank0));
+        let bank1 = Arc::new(new_from_parent(&treasury0));
         // Bank 2
-        let bank2 = new_from_parent(&bank0);
+        let bank2 = new_from_parent(&treasury0);
 
         // transfer a token
         assert_eq!(
@@ -1864,13 +1864,13 @@ mod tests {
             Ok(())
         );
 
-        assert_eq!(bank0.transaction_count(), 0);
+        assert_eq!(treasury0.transaction_count(), 0);
         assert_eq!(bank2.transaction_count(), 0);
         assert_eq!(bank1.transaction_count(), 1);
 
         bank1.squash();
 
-        assert_eq!(bank0.transaction_count(), 0);
+        assert_eq!(treasury0.transaction_count(), 0);
         assert_eq!(bank2.transaction_count(), 0);
         assert_eq!(bank1.transaction_count(), 1);
 
@@ -1886,10 +1886,10 @@ mod tests {
     fn test_bank_inherit_fee_calculator() {
         let (mut genesis_block, _mint_keypair) = create_genesis_block(500);
         genesis_block.fee_calculator.difs_per_signature = 123;
-        let bank0 = Arc::new(Bank::new(&genesis_block));
-        let bank1 = Arc::new(new_from_parent(&bank0));
+        let treasury0 = Arc::new(Bank::new(&genesis_block));
+        let bank1 = Arc::new(new_from_parent(&treasury0));
         assert_eq!(
-            bank0.fee_calculator.difs_per_signature,
+            treasury0.fee_calculator.difs_per_signature,
             bank1.fee_calculator.difs_per_signature
         );
     }

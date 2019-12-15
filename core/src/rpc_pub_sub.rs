@@ -602,8 +602,8 @@ mod tests {
             .unwrap();
         rpc.subscriptions.notify_subscribers(0, &treasury_forks);
 
-        let bank0 = treasury_forks.read().unwrap()[0].clone();
-        let bank1 = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
+        let treasury0 = treasury_forks.read().unwrap()[0].clone();
+        let bank1 = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.write().unwrap().insert(bank1);
         rpc.subscriptions.notify_subscribers(1, &treasury_forks);
         let bank1 = treasury_forks.read().unwrap()[1].clone();

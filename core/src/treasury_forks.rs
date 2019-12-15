@@ -227,10 +227,10 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
-        let bank0 = treasury_forks[0].clone();
-        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
+        let treasury0 = treasury_forks[0].clone();
+        let treasury = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.insert(treasury);
-        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
+        let treasury = Bank::new_from_parent(&treasury0, &Pubkey::default(), 2);
         treasury_forks.insert(treasury);
         let descendants = treasury_forks.descendants();
         let children: Vec<u64> = descendants[&0].iter().cloned().collect();
@@ -244,10 +244,10 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
-        let bank0 = treasury_forks[0].clone();
-        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
+        let treasury0 = treasury_forks[0].clone();
+        let treasury = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.insert(treasury);
-        let treasury = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
+        let treasury = Bank::new_from_parent(&treasury0, &Pubkey::default(), 2);
         treasury_forks.insert(treasury);
         let ancestors = treasury_forks.ancestors();
         assert!(ancestors[&0].is_empty());

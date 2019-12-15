@@ -23,10 +23,10 @@ fn deposit_many(treasury: &Bank, pubkeys: &mut Vec<Pubkey>, num: usize) {
 #[bench]
 fn test_accounts_create(bencher: &mut Bencher) {
     let (genesis_block, _) = create_genesis_block(10_000);
-    let bank0 = Bank::new_with_paths(&genesis_block, Some("bench_a0".to_string()));
+    let treasury0 = Bank::new_with_paths(&genesis_block, Some("bench_a0".to_string()));
     bencher.iter(|| {
         let mut pubkeys: Vec<Pubkey> = vec![];
-        deposit_many(&bank0, &mut pubkeys, 1000);
+        deposit_many(&treasury0, &mut pubkeys, 1000);
     });
 }
 
