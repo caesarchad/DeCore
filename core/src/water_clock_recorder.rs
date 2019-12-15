@@ -572,7 +572,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -606,7 +606,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -652,7 +652,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -696,7 +696,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -734,7 +734,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -774,7 +774,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -821,7 +821,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -865,7 +865,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -997,7 +997,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let ticks_per_slot = treasury.ticks_per_slot();
@@ -1063,7 +1063,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -1109,7 +1109,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -1271,7 +1271,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 

@@ -839,7 +839,7 @@ pub fn create_test_recorder(
         treasury.ticks_per_slot(),
         &Pubkey::default(),
         block_buffer_pool,
-        &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+        &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
         &waterclock_config,
     );
     waterclock_recorder.set_treasury(&treasury);
@@ -1178,7 +1178,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
@@ -1494,7 +1494,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
@@ -1582,7 +1582,7 @@ mod tests {
                 treasury.ticks_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&treasury)),
+                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));

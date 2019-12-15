@@ -268,7 +268,7 @@ pub mod tests {
             create_test_recorder(&treasury, &block_buffer_pool);
         let voting_keypair = Keypair::new();
         let storage_keypair = Arc::new(Keypair::new());
-        let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
+        let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
         let tvu = Tvu::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),

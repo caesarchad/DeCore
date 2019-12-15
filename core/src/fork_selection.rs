@@ -63,7 +63,7 @@ impl EpochStakes {
         let stakes = accounts.iter().map(|(k, (v, _))| (*k, *v)).collect();
         Self::new(epoch, stakes, &accounts[0].0)
     }
-    pub fn new_from_bank(treasury: &Bank, my_pubkey: &Pubkey) -> Self {
+    pub fn new_from_treasury(treasury: &Bank, my_pubkey: &Pubkey) -> Self {
         let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
         let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_epoch)
             .expect("voting require a treasury with stakes");
@@ -77,7 +77,7 @@ impl Locktower {
         frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
             if let Some(treasury) = frozen_treasuries.last() {
-                EpochStakes::new_from_bank(treasury, my_pubkey)
+                EpochStakes::new_from_treasury(treasury, my_pubkey)
             } else {
                 return Self::default();
             }
@@ -241,7 +241,7 @@ impl Locktower {
                 )
             );
             self.epoch_stakes =
-                EpochStakes::new_from_bank(treasury, &self.epoch_stakes.delegate_pubkey);
+                EpochStakes::new_from_treasury(treasury, &self.epoch_stakes.delegate_pubkey);
             datapoint_info!(
                 "locktower-epoch",
                 ("epoch", self.epoch_stakes.epoch, i64),

@@ -309,7 +309,7 @@ mod test {
         let treasury = Arc::new(Bank::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
+        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         let mut blob = Blob::default();
         blob.set_id(&leader_pubkey);

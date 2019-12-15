@@ -689,7 +689,7 @@ mod test {
 
             let genesis_block = create_genesis_block(10_000).genesis_block;
             let bank0 = Bank::new(&genesis_block);
-            let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank0));
+            let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&bank0));
             let mut treasury_forks = BankForks::new(0, bank0);
             treasury_forks.working_treasury().freeze();
 

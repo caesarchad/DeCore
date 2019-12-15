@@ -20,7 +20,7 @@ pub struct LeaderScheduleCache {
 }
 
 impl LeaderScheduleCache {
-    pub fn new_from_bank(treasury: &Bank) -> Self {
+    pub fn new_from_treasury(treasury: &Bank) -> Self {
         Self::new(*treasury.epoch_schedule(), treasury.slot())
     }
 
@@ -183,7 +183,7 @@ mod tests {
     fn test_slot_leader_at() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Bank::new(&genesis_block);
-        let cache = LeaderScheduleCache::new_from_bank(&treasury);
+        let cache = LeaderScheduleCache::new_from_treasury(&treasury);
 
         // Nothing in the cache, should return None
         assert!(cache.slot_leader_at(treasury.slot(), None).is_none());
@@ -271,7 +271,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Bank::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
+        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         assert_eq!(
             cache.slot_leader_at(treasury.slot(), Some(&treasury)).unwrap(),
@@ -312,7 +312,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Bank::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
+        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool = Arc::new(
@@ -382,7 +382,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Bank::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&treasury));
+        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         // Create new vote account
         let node_pubkey = Pubkey::new_rand();
@@ -428,7 +428,7 @@ mod tests {
     fn test_schedule_for_unconfirmed_epoch() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Bank::new(&genesis_block));
-        let cache = LeaderScheduleCache::new_from_bank(&treasury);
+        let cache = LeaderScheduleCache::new_from_treasury(&treasury);
 
         assert_eq!(*cache.max_epoch.read().unwrap(), 1);
 
