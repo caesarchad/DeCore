@@ -1642,7 +1642,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_get_account_in_parent_after_squash() {
+    fn test_treasury_get_account_in_parent_after_squash() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
         let parent = Arc::new(Bank::new(&genesis_block));
 
