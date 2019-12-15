@@ -1580,7 +1580,7 @@ mod tests {
 
     /// Verifies that last ids and accounts are correctly referenced from parent
     #[test]
-    fn test_bank_squash() {
+    fn test_treasury_squash() {
         morgan_logger::setup();
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
