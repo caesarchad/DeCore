@@ -188,6 +188,6 @@ fn bench_treasury_async_process_builtin_transactions(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn bench_bank_async_process_native_loader_transactions(bencher: &mut Bencher) {
+fn bench_treasury_async_process_native_loader_transactions(bencher: &mut Bencher) {
     do_bench_transactions(bencher, &async_bencher, &create_native_loader_transactions);
 }
