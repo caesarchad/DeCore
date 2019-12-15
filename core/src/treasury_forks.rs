@@ -211,7 +211,7 @@ mod tests {
     use morgan_interface::pubkey::Pubkey;
 
     #[test]
-    fn test_bank_forks() {
+    fn test_treasury_forks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
@@ -223,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_descendants() {
+    fn test_treasury_forks_descendants() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_ancestors() {
+    fn test_treasury_forks_ancestors() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_frozen_banks() {
+    fn test_treasury_forks_frozen_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_active_banks() {
+    fn test_treasury_forks_active_banks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
