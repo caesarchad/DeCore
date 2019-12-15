@@ -93,7 +93,7 @@ impl Locktower {
 
         let treasury = locktower.find_heaviest_treasury(treasury_forks).unwrap();
         locktower.lockouts =
-            Self::initialize_lockouts_from_bank(&treasury, locktower.epoch_stakes.epoch);
+            Self::initialize_lockouts_from_treasury(&treasury, locktower.epoch_stakes.epoch);
         locktower
     }
     pub fn new(epoch_stakes: EpochStakes, threshold_depth: usize, threshold_size: f64) -> Self {
@@ -400,7 +400,7 @@ impl Locktower {
         bank_weights.pop().map(|b| b.2)
     }
 
-    fn initialize_lockouts_from_bank(treasury: &Bank, current_epoch: u64) -> VoteState {
+    fn initialize_lockouts_from_treasury(treasury: &Bank, current_epoch: u64) -> VoteState {
         let mut lockouts = VoteState::default();
         if let Some(iter) = treasury.epoch_vote_accounts(current_epoch) {
             for (delegate_pubkey, (_, account)) in iter {
