@@ -77,7 +77,7 @@ pub struct Bank {
     slot: u64,
 
     /// Bank height in term of treasuries
-    bank_height: u64,
+    treasury_height: u64,
 
     /// The pubkey to send transactions fees to.
     collector_id: Pubkey,
@@ -138,7 +138,7 @@ impl Bank {
         let mut treasury = Self::default();
         treasury.blockhash_queue = RwLock::new(parent.blockhash_queue.read().unwrap().clone());
         treasury.status_cache = parent.status_cache.clone();
-        treasury.bank_height = parent.bank_height + 1;
+        treasury.treasury_height = parent.treasury_height + 1;
         treasury.fee_calculator = parent.fee_calculator.clone();
 
         treasury.transaction_count
@@ -156,7 +156,7 @@ impl Bank {
         datapoint_info!(
             "treasury-new_from_parent-heights",
             ("slot_height", slot, i64),
-            ("bank_height", treasury.bank_height, i64)
+            ("treasury_height", treasury.treasury_height, i64)
         );
 
         treasury.parent = RwLock::new(Some(parent.clone()));
