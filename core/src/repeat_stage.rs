@@ -145,7 +145,7 @@ impl ReplayStage {
                     if let Some((_, treasury)) = votable.last() {
                         subscriptions.notify_subscribers(treasury.slot(), &treasury_forks);
 
-                        Self::handle_votable_bank(
+                        Self::handle_votable_treasury(
                             &treasury,
                             &treasury_forks,
                             &mut locktower,
@@ -303,7 +303,7 @@ impl ReplayStage {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn handle_votable_bank<T>(
+    fn handle_votable_treasury<T>(
         treasury: &Arc<Bank>,
         treasury_forks: &Arc<RwLock<BankForks>>,
         locktower: &mut Locktower,
