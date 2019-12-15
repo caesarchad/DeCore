@@ -82,10 +82,10 @@ impl BankForks {
         self.treasuries.get(&treasury_slot)
     }
 
-    pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
+    pub fn new_from_banks(initial_treasuries: &[Arc<Bank>], root: u64) -> Self {
         let mut treasuries = HashMap::new();
-        let working_treasury = initial_banks[0].clone();
-        for treasury in initial_banks {
+        let working_treasury = initial_treasuries[0].clone();
+        for treasury in initial_treasuries {
             treasuries.insert(treasury.slot(), treasury.clone());
         }
         Self {
