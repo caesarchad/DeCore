@@ -173,7 +173,7 @@ fn do_bench_transactions(
 }
 
 #[bench]
-fn bench_bank_sync_process_builtin_transactions(bencher: &mut Bencher) {
+fn bench_treasury_sync_process_builtin_transactions(bencher: &mut Bencher) {
     do_bench_transactions(bencher, &sync_bencher, &create_builtin_transactions);
 }
 
