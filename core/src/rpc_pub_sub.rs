@@ -366,8 +366,8 @@ mod tests {
         } = create_genesis_block(10_000);
         let bob_pubkey = Pubkey::new_rand();
         let treasury = Bank::new(&genesis_block);
-        let arc_bank = Arc::new(treasury);
-        let blockhash = arc_bank.last_blockhash();
+        let arc_treasury = Arc::new(treasury);
+        let blockhash = arc_treasury.last_blockhash();
 
         let session = create_session();
 
