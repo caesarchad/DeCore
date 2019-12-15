@@ -1883,7 +1883,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_inherit_fee_calculator() {
+    fn test_treasury_inherit_fee_calculator() {
         let (mut genesis_block, _mint_keypair) = create_genesis_block(500);
         genesis_block.fee_calculator.difs_per_signature = 123;
         let treasury0 = Arc::new(Bank::new(&genesis_block));
