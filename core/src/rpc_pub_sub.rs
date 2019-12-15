@@ -603,11 +603,11 @@ mod tests {
         rpc.subscriptions.notify_subscribers(0, &treasury_forks);
 
         let treasury0 = treasury_forks.read().unwrap()[0].clone();
-        let bank1 = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
-        treasury_forks.write().unwrap().insert(bank1);
+        let treasury1 = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        treasury_forks.write().unwrap().insert(treasury1);
         rpc.subscriptions.notify_subscribers(1, &treasury_forks);
-        let bank1 = treasury_forks.read().unwrap()[1].clone();
-        let bank2 = Bank::new_from_parent(&bank1, &Pubkey::default(), 2);
+        let treasury1 = treasury_forks.read().unwrap()[1].clone();
+        let bank2 = Bank::new_from_parent(&treasury1, &Pubkey::default(), 2);
         treasury_forks.write().unwrap().insert(bank2);
         rpc.subscriptions.notify_subscribers(2, &treasury_forks);
         let string = receiver.poll();

@@ -1534,26 +1534,26 @@ mod tests {
     fn test_bank_hash_internal_state() {
         let (genesis_block, mint_keypair) = create_genesis_block(2_000);
         let treasury0 = Bank::new(&genesis_block);
-        let bank1 = Bank::new(&genesis_block);
+        let treasury1 = Bank::new(&genesis_block);
         let initial_state = treasury0.hash_internal_state();
-        assert_eq!(bank1.hash_internal_state(), initial_state);
+        assert_eq!(treasury1.hash_internal_state(), initial_state);
 
         let pubkey = Pubkey::new_rand();
         treasury0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_ne!(treasury0.hash_internal_state(), initial_state);
-        bank1.transfer(1_000, &mint_keypair, &pubkey).unwrap();
-        assert_eq!(treasury0.hash_internal_state(), bank1.hash_internal_state());
+        treasury1.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        assert_eq!(treasury0.hash_internal_state(), treasury1.hash_internal_state());
 
         // Checkpointing should not change its state
-        let bank2 = new_from_parent(&Arc::new(bank1));
+        let bank2 = new_from_parent(&Arc::new(treasury1));
         assert_eq!(treasury0.hash_internal_state(), bank2.hash_internal_state());
     }
 
     #[test]
     fn test_hash_internal_state_genesis() {
         let treasury0 = Bank::new(&create_genesis_block(10).0);
-        let bank1 = Bank::new(&create_genesis_block(20).0);
-        assert_ne!(treasury0.hash_internal_state(), bank1.hash_internal_state());
+        let treasury1 = Bank::new(&create_genesis_block(20).0);
+        assert_ne!(treasury0.hash_internal_state(), treasury1.hash_internal_state());
     }
 
     #[test]
@@ -1564,18 +1564,18 @@ mod tests {
         // save hash0 because new_from_parent
         // updates syscall entries
 
-        let bank1 = Bank::new_from_parent(&treasury0, &collector_id, 1);
+        let treasury1 = Bank::new_from_parent(&treasury0, &collector_id, 1);
 
-        // no delta in bank1, hashes match
-        assert_eq!(hash0, bank1.hash_internal_state());
+        // no delta in treasury1, hashes match
+        assert_eq!(hash0, treasury1.hash_internal_state());
 
         // remove parent
-        bank1.squash();
-        assert!(bank1.parents().is_empty());
+        treasury1.squash();
+        assert!(treasury1.parents().is_empty());
 
         // hash should still match,
         //  can't use hash_internal_state() after a freeze()...
-        assert_eq!(hash0, bank1.hash());
+        assert_eq!(hash0, treasury1.hash());
     }
 
     /// Verifies that last ids and accounts are correctly referenced from parent
@@ -1849,13 +1849,13 @@ mod tests {
         let treasury0 = Arc::new(Bank::new(&genesis_block));
 
         // Bank 1
-        let bank1 = Arc::new(new_from_parent(&treasury0));
+        let treasury1 = Arc::new(new_from_parent(&treasury0));
         // Bank 2
         let bank2 = new_from_parent(&treasury0);
 
         // transfer a token
         assert_eq!(
-            bank1.process_transaction(&system_transaction::transfer(
+            treasury1.process_transaction(&system_transaction::transfer(
                 &mint_keypair,
                 &Keypair::new().pubkey(),
                 1,
@@ -1866,16 +1866,16 @@ mod tests {
 
         assert_eq!(treasury0.transaction_count(), 0);
         assert_eq!(bank2.transaction_count(), 0);
-        assert_eq!(bank1.transaction_count(), 1);
+        assert_eq!(treasury1.transaction_count(), 1);
 
-        bank1.squash();
+        treasury1.squash();
 
         assert_eq!(treasury0.transaction_count(), 0);
         assert_eq!(bank2.transaction_count(), 0);
-        assert_eq!(bank1.transaction_count(), 1);
+        assert_eq!(treasury1.transaction_count(), 1);
 
-        let bank6 = new_from_parent(&bank1);
-        assert_eq!(bank1.transaction_count(), 1);
+        let bank6 = new_from_parent(&treasury1);
+        assert_eq!(treasury1.transaction_count(), 1);
         assert_eq!(bank6.transaction_count(), 1);
 
         bank6.squash();
@@ -1887,10 +1887,10 @@ mod tests {
         let (mut genesis_block, _mint_keypair) = create_genesis_block(500);
         genesis_block.fee_calculator.difs_per_signature = 123;
         let treasury0 = Arc::new(Bank::new(&genesis_block));
-        let bank1 = Arc::new(new_from_parent(&treasury0));
+        let treasury1 = Arc::new(new_from_parent(&treasury0));
         assert_eq!(
             treasury0.fee_calculator.difs_per_signature,
-            bank1.fee_calculator.difs_per_signature
+            treasury1.fee_calculator.difs_per_signature
         );
     }
 
