@@ -111,17 +111,17 @@ impl BankForks {
     pub fn set_genesis(&mut self, root: u64) {
         self.root = root;
         let set_root_start = Instant::now();
-        let root_bank = self
+        let root_treasury = self
             .treasuries
             .get(&root)
             .expect("root treasury didn't exist in treasury_forks");
-        let root_tx_count = root_bank
+        let root_tx_count = root_treasury
             .parents()
             .last()
             .map(|treasury| treasury.transaction_count())
             .unwrap_or(0);
-        root_bank.squash();
-        let new_tx_count = root_bank.transaction_count();
+        root_treasury.squash();
+        let new_tx_count = root_treasury.transaction_count();
         self.prune_non_root(root);
 
         inc_new_counter_info!(

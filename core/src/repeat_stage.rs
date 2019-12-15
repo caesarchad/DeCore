@@ -320,18 +320,18 @@ impl ReplayStage {
     {
         if let Some(new_root) = locktower.record_vote(treasury.slot(), treasury.hash()) {
             // get the root treasury before squash
-            let root_bank = treasury_forks
+            let root_treasury = treasury_forks
                 .read()
                 .unwrap()
                 .get(new_root)
                 .expect("Root treasury doesn't exist")
                 .clone();
-            let mut rooted_slots = root_bank
+            let mut rooted_slots = root_treasury
                 .parents()
                 .into_iter()
                 .map(|treasury| treasury.slot())
                 .collect::<Vec<_>>();
-            rooted_slots.push(root_bank.slot());
+            rooted_slots.push(root_treasury.slot());
             let old_root = treasury_forks.read().unwrap().root();
             block_buffer_pool
                 .set_genesis(new_root, old_root)
