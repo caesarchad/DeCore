@@ -627,9 +627,9 @@ mod tests {
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_height, 3);
             assert_eq!(waterclock_recorder.tick_cache.len(), 0);
-            let (bank_, e) = entry_receiver.recv().expect("recv 1");
+            let (treasury_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
-            assert_eq!(bank_.slot(), treasury.slot());
+            assert_eq!(treasury_.slot(), treasury.slot());
             assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
