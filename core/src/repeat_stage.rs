@@ -284,7 +284,7 @@ impl ReplayStage {
     ) -> Result<()> {
         let (entries, num) = Self::load_block_buffer_entries(treasury, block_buffer_pool, progress)?;
         let len = entries.len();
-        let result = Self::replay_entries_into_bank(treasury, entries, progress, num);
+        let result = Self::replay_entries_into_treasury(treasury, entries, progress, num);
         if result.is_ok() {
             trace!("verified entries {}", len);
             inc_new_counter_info!("replicate-stage_process_entries", len);
@@ -557,7 +557,7 @@ impl ReplayStage {
         block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, bank_progress.num_blobs as u64, None)
     }
 
-    fn replay_entries_into_bank(
+    fn replay_entries_into_treasury(
         treasury: &Bank,
         entries: Vec<Entry>,
         progress: &mut HashMap<u64, ForkProgress>,
