@@ -104,7 +104,7 @@ mod tests {
     use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::leader_arrange_cache::LeaderScheduleCache;
-    use crate::water_clock_recorder::WorkingBank;
+    use crate::water_clock_recorder::WorkingTreasury;
     use crate::result::Result;
     use crate::test_tx::test_tx;
     use morgan_runtime::treasury::Treasury;
@@ -138,7 +138,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
             let exit = Arc::new(AtomicBool::new(false));
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: treasury.tick_height(),
                 max_tick_height: std::u64::MAX,

@@ -8,7 +8,7 @@ use crate::entry_info::{hash_transactions, Entry};
 use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::packet;
 use crate::packet::{Packet, Packets};
-use crate::water_clock_recorder::{WaterClockRecorder, WaterClockRecorderErr, WorkingBankEntries};
+use crate::water_clock_recorder::{WaterClockRecorder, WaterClockRecorderErr, WorkingTreasuryEntries};
 use crate::water_clock_service::WaterClockService;
 use crate::result::{Error, Result};
 use crate::service::Service;
@@ -827,7 +827,7 @@ pub fn create_test_recorder(
     Arc<AtomicBool>,
     Arc<Mutex<WaterClockRecorder>>,
     WaterClockService,
-    Receiver<WorkingBankEntries>,
+    Receiver<WorkingTreasuryEntries>,
 ) {
     let exit = Arc::new(AtomicBool::new(false));
     let waterclock_config = Arc::new(WaterClockConfig::default());
@@ -858,7 +858,7 @@ mod tests {
     use crate::entry_info::EntrySlice;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::packet::to_packets;
-    use crate::water_clock_recorder::WorkingBank;
+    use crate::water_clock_recorder::WorkingTreasury;
     use crate::{get_tmp_ledger_path, tmp_ledger_name};
     use itertools::Itertools;
     use morgan_interface::instruction::InstructionError;
@@ -1161,7 +1161,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let working_treasury = WorkingBank {
+        let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: std::u64::MAX,
@@ -1477,7 +1477,7 @@ mod tests {
             genesis_block.hash(),
         )];
 
-        let working_treasury = WorkingBank {
+        let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,
@@ -1565,7 +1565,7 @@ mod tests {
             system_transaction::transfer(&mint_keypair, &pubkey1, 1, genesis_block.hash()),
         ];
 
-        let working_treasury = WorkingBank {
+        let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,

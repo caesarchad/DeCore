@@ -7,7 +7,7 @@ use crate::propagate_stage::BroadcastStage;
 use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info_voter_listener::ClusterInfoVoteListener;
 use crate::fetch_stage::FetchStage;
-use crate::water_clock_recorder::{WaterClockRecorder, WorkingBankEntries};
+use crate::water_clock_recorder::{WaterClockRecorder, WorkingTreasuryEntries};
 use crate::service::Service;
 use crate::signature_verify_stage::SigVerifyStage;
 use morgan_interface::hash::Hash;
@@ -32,7 +32,7 @@ impl Tpu {
         id: &Pubkey,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
-        entry_receiver: Receiver<WorkingBankEntries>,
+        entry_receiver: Receiver<WorkingTreasuryEntries>,
         transactions_sockets: Vec<UdpSocket>,
         tpu_via_blobs_sockets: Vec<UdpSocket>,
         broadcast_socket: UdpSocket,

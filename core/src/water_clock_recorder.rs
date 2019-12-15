@@ -1,14 +1,14 @@
 //! The `waterclock_recorder` module provides an object for synchronizing with Proof of History.
 //! It synchronizes Water Clock, treasury's register_tick and the ledger
 //!
-//! WaterClockRecorder will send ticks or entries to a WorkingBank, if the current range of ticks is
-//! within the specified WorkingBank range.
+//! WaterClockRecorder will send ticks or entries to a WorkingTreasury, if the current range of ticks is
+//! within the specified WorkingTreasury range.
 //!
 //! For Ticks:
-//! * tick must be > WorkingBank::min_tick_height && tick must be <= WorkingBank::max_tick_height
+//! * tick must be > WorkingTreasury::min_tick_height && tick must be <= WorkingTreasury::max_tick_height
 //!
 //! For Entries:
-//! * recorded entry must be >= WorkingBank::min_tick_height && entry must be < WorkingBank::max_tick_height
+//! * recorded entry must be >= WorkingTreasury::min_tick_height && entry must be < WorkingTreasury::max_tick_height
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::Entry;
@@ -36,10 +36,10 @@ pub enum WaterClockRecorderErr {
     MinHeightNotReached,
 }
 
-pub type WorkingBankEntries = (Arc<Treasury>, Vec<(Entry, u64)>);
+pub type WorkingTreasuryEntries = (Arc<Treasury>, Vec<(Entry, u64)>);
 
 #[derive(Clone)]
-pub struct WorkingBank {
+pub struct WorkingTreasury {
     pub treasury: Arc<Treasury>,
     pub min_tick_height: u64,
     pub max_tick_height: u64,
@@ -52,8 +52,8 @@ pub struct WaterClockRecorder {
     start_slot: u64,
     start_tick: u64,
     tick_cache: Vec<(Entry, u64)>,
-    working_treasury: Option<WorkingBank>,
-    sender: Sender<WorkingBankEntries>,
+    working_treasury: Option<WorkingTreasury>,
+    sender: Sender<WorkingTreasuryEntries>,
     start_leader_at_tick: Option<u64>,
     last_leader_tick: Option<u64>,
     max_last_leader_grace_ticks: u64,
@@ -212,13 +212,13 @@ impl WaterClockRecorder {
         self.ticks_per_slot = ticks_per_slot;
     }
 
-    pub fn set_working_treasury(&mut self, working_treasury: WorkingBank) {
+    pub fn set_working_treasury(&mut self, working_treasury: WorkingTreasury) {
         trace!("new working treasury");
         self.working_treasury = Some(working_treasury);
     }
     pub fn set_treasury(&mut self, treasury: &Arc<Treasury>) {
         let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
-        let working_treasury = WorkingBank {
+        let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
             max_tick_height,
@@ -227,8 +227,8 @@ impl WaterClockRecorder {
         self.set_working_treasury(working_treasury);
     }
 
-    // Flush cache will delay flushing the cache for a treasury until it past the WorkingBank::min_tick_height
-    // On a record flush will flush the cache at the WorkingBank::min_tick_height, since a record
+    // Flush cache will delay flushing the cache for a treasury until it past the WorkingTreasury::min_tick_height
+    // On a record flush will flush the cache at the WorkingTreasury::min_tick_height, since a record
     // occurs after the min_tick_height was generated
     fn flush_cache(&mut self, tick: bool) -> Result<()> {
         // check_tick_height is called before flush cache, so it cannot overrun the treasury
@@ -288,10 +288,10 @@ impl WaterClockRecorder {
             self.clear_treasury();
         }
         if send_result.is_err() {
-            // info!("{}", Info(format!("WorkingBank::sender disconnected {:?}", send_result).to_string()));
+            // info!("{}", Info(format!("WorkingTreasury::sender disconnected {:?}", send_result).to_string()));
             println!("{}",
                 printLn(
-                    format!("WorkingBank::sender disconnected {:?}", send_result).to_string(),
+                    format!("WorkingTreasury::sender disconnected {:?}", send_result).to_string(),
                     module_path!().to_string()
                 )
             );
@@ -401,7 +401,7 @@ impl WaterClockRecorder {
         clear_treasury_signal: Option<SyncSender<bool>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         waterclock_config: &Arc<WaterClockConfig>,
-    ) -> (Self, Receiver<WorkingBankEntries>) {
+    ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         let waterclock = Arc::new(Mutex::new(WaterClock::new(
             last_entry_hash,
             waterclock_config.hashes_per_tick,
@@ -449,7 +449,7 @@ impl WaterClockRecorder {
         block_buffer_pool: &Arc<BlockBufferPool>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         waterclock_config: &Arc<WaterClockConfig>,
-    ) -> (Self, Receiver<WorkingBankEntries>) {
+    ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         Self::new_with_clear_signal(
             tick_height,
             last_entry_hash,
@@ -576,7 +576,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -610,7 +610,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -663,7 +663,7 @@ mod tests {
             assert_eq!(waterclock_recorder.tick_cache.last().unwrap().1, 4);
             assert_eq!(waterclock_recorder.tick_height, 4);
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -700,7 +700,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -738,7 +738,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
@@ -778,7 +778,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
@@ -825,7 +825,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height: 2,
@@ -869,7 +869,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -1001,7 +1001,7 @@ mod tests {
                 &Arc::new(WaterClockConfig::default()),
             );
             let ticks_per_slot = treasury.ticks_per_slot();
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury,
                 min_tick_height: 2,
                 max_tick_height: 3,
@@ -1069,7 +1069,7 @@ mod tests {
 
             let end_slot = 3;
             let max_tick_height = (end_slot + 1) * ticks_per_slot - 1;
-            let working_treasury = WorkingBank {
+            let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
                 min_tick_height: 1,
                 max_tick_height,

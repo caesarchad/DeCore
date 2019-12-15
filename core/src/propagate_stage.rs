@@ -5,7 +5,7 @@ use crate::node_group_info::{NodeGroupInfo, NodeGroupInfoError, DATA_PLANE_FANOU
 use crate::entry_info::EntrySlice;
 use crate::expunge::CodingGenerator;
 use crate::packet::index_blobs_with_genesis;
-use crate::water_clock_recorder::WorkingBankEntries;
+use crate::water_clock_recorder::WorkingTreasuryEntries;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::staking_utils;
@@ -47,7 +47,7 @@ impl Broadcast {
     fn run(
         &mut self,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-        receiver: &Receiver<WorkingBankEntries>,
+        receiver: &Receiver<WorkingTreasuryEntries>,
         sock: &UdpSocket,
         block_buffer_pool: &Arc<BlockBufferPool>,
         genesis_blockhash: &Hash,
@@ -217,7 +217,7 @@ impl BroadcastStage {
     fn run(
         sock: &UdpSocket,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-        receiver: &Receiver<WorkingBankEntries>,
+        receiver: &Receiver<WorkingTreasuryEntries>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         genesis_blockhash: &Hash,
     ) -> BroadcastStageReturnType {
@@ -275,7 +275,7 @@ impl BroadcastStage {
     pub fn new(
         sock: UdpSocket,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
-        receiver: Receiver<WorkingBankEntries>,
+        receiver: Receiver<WorkingTreasuryEntries>,
         exit_sender: &Arc<AtomicBool>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         genesis_blockhash: &Hash,
@@ -335,7 +335,7 @@ mod test {
     fn setup_dummy_broadcast_service(
         leader_pubkey: &Pubkey,
         ledger_path: &str,
-        entry_receiver: Receiver<WorkingBankEntries>,
+        entry_receiver: Receiver<WorkingTreasuryEntries>,
     ) -> MockBroadcastStage {
         // Make the database ledger
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(ledger_path).unwrap());

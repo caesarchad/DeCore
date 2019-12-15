@@ -13,7 +13,7 @@ use morgan::node_group_info::NodeGroupInfo;
 use morgan::node_group_info::Node;
 use morgan::genesis_utils::{create_genesis_block, GenesisBlockInfo};
 use morgan::packet::to_packets_chunked;
-use morgan::water_clock_recorder::WorkingBankEntries;
+use morgan::water_clock_recorder::WorkingTreasuryEntries;
 use morgan::service::Service;
 use morgan::test_tx::test_tx;
 use morgan_runtime::treasury::Treasury;
@@ -31,7 +31,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use test::Bencher;
 
-fn check_txs(receiver: &Arc<Receiver<WorkingBankEntries>>, ref_tx_count: usize) {
+fn check_txs(receiver: &Arc<Receiver<WorkingTreasuryEntries>>, ref_tx_count: usize) {
     let mut total = 0;
     loop {
         let entries = receiver.recv_timeout(Duration::new(1, 0));
