@@ -35,7 +35,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::time::Instant;
 use morgan_helper::logHelper::*;
 
-type BankStatusCache = StatusCache<Result<()>>;
+type TreasuryStatusCache = StatusCache<Result<()>>;
 
 /// Manager for the state of all accounts and programs after processing its entries.
 #[derive(Default)]
@@ -44,7 +44,7 @@ pub struct Treasury {
     accounts: Arc<Accounts>,
 
     /// A cache of signature statuses
-    status_cache: Arc<RwLock<BankStatusCache>>,
+    status_cache: Arc<RwLock<TreasuryStatusCache>>,
 
     /// FIFO queue of `recent_blockhash` items
     blockhash_queue: RwLock<BlockhashQueue>,

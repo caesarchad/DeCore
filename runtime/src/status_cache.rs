@@ -109,13 +109,13 @@ mod tests {
     use super::*;
     use morgan_interface::hash::hash;
 
-    type BankStatusCache = StatusCache<()>;
+    type TreasuryStatusCache = StatusCache<()>;
 
     #[test]
     fn test_empty_has_no_sigs() {
         let sig = Signature::default();
         let blockhash = hash(Hash::default().as_ref());
-        let status_cache = BankStatusCache::default();
+        let status_cache = TreasuryStatusCache::default();
         assert_eq!(
             status_cache.get_signature_status(&sig, &blockhash, &HashMap::new()),
             None
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_find_sig_with_ancestor_fork() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = vec![(0, 1)].into_iter().collect();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_find_sig_without_ancestor_fork() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = HashMap::new();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn test_find_sig_with_root_ancestor_fork() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = HashMap::new();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn test_find_sig_with_root_ancestor_fork_max_len() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = vec![(2, 2)].into_iter().collect();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_insert_picks_latest_blockhash_fork() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = vec![(0, 0)].into_iter().collect();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn test_root_expires() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = HashMap::new();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_clear_signatures_sigs_are_gone() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = HashMap::new();
         status_cache.insert(&blockhash, &sig, 0, ());
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn test_clear_signatures_insert_works() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         let ancestors = HashMap::new();
         status_cache.add_root(0);
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_signatures_slice() {
         let sig = Signature::default();
-        let mut status_cache = BankStatusCache::default();
+        let mut status_cache = TreasuryStatusCache::default();
         let blockhash = hash(Hash::default().as_ref());
         status_cache.clear_signatures();
         status_cache.insert(&blockhash, &sig, 0, ());
