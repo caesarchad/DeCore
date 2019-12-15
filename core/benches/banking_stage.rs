@@ -7,7 +7,7 @@ extern crate morgan;
 use log::*;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-use morgan::treasury_stage::{create_test_recorder, BankingStage};
+use morgan::treasury_stage::{create_test_recorder, TreasuryStage};
 use morgan::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
 use morgan::node_group_info::NodeGroupInfo;
 use morgan::node_group_info::Node;
@@ -75,7 +75,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
         // If the packet buffers are copied, performance will be poor.
         bencher.iter(move || {
             let _ignored =
-                BankingStage::consume_buffered_packets(&my_pubkey, &waterclock_recorder, &mut packets);
+                TreasuryStage::consume_buffered_packets(&my_pubkey, &waterclock_recorder, &mut packets);
         });
 
         exit.store(true, Ordering::Relaxed);
@@ -87,7 +87,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
 #[bench]
 fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
     morgan_logger::setup();
-    let num_threads = BankingStage::num_threads() as usize;
+    let num_threads = TreasuryStage::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races
     let txes = 192 * num_threads * 2;
     let mint_total = 1_000_000_000_000;
@@ -159,7 +159,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
             create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _treasury_phase = BankingStage::new(
+        let _treasury_phase = TreasuryStage::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,
@@ -202,7 +202,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
 #[ignore]
 fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let progs = 4;
-    let num_threads = BankingStage::num_threads() as usize;
+    let num_threads = TreasuryStage::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races
     let txes = 96 * 100 * num_threads * 2;
     let mint_total = 1_000_000_000_000;
@@ -285,7 +285,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
             create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _treasury_phase = BankingStage::new(
+        let _treasury_phase = TreasuryStage::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,
