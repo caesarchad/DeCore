@@ -91,7 +91,7 @@ impl Locktower {
             recent_votes: VecDeque::default(),
         };
 
-        let treasury = locktower.find_heaviest_bank(treasury_forks).unwrap();
+        let treasury = locktower.find_heaviest_treasury(treasury_forks).unwrap();
         locktower.lockouts =
             Self::initialize_lockouts_from_bank(&treasury, locktower.epoch_stakes.epoch);
         locktower
@@ -383,7 +383,7 @@ impl Locktower {
         self.calculate_weight(&stake_lockouts)
     }
 
-    fn find_heaviest_bank(&self, treasury_forks: &BankForks) -> Option<Arc<Bank>> {
+    fn find_heaviest_treasury(&self, treasury_forks: &BankForks) -> Option<Arc<Bank>> {
         let ancestors = treasury_forks.ancestors();
         let mut bank_weights: Vec<_> = treasury_forks
             .frozen_treasuries()
