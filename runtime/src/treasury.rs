@@ -1741,7 +1741,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_get_slots_in_epoch() {
+    fn test_treasury_get_slots_in_epoch() {
         let (genesis_block, _) = create_genesis_block(500);
 
         let treasury = Bank::new(&genesis_block);
