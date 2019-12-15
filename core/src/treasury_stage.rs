@@ -1362,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_filter_valid_transaction_indexes() {
+    fn test_treasury_filter_valid_transaction_indexes() {
         assert_eq!(
             BankingStage::filter_valid_transaction_indexes(
                 &vec![
