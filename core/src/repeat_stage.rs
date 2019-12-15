@@ -124,7 +124,7 @@ impl ReplayStage {
 
                     let mut is_tpu_treasury_active = waterclock_recorder.lock().unwrap().treasury().is_some();
 
-                    Self::replay_active_banks(
+                    Self::replay_active_treasuries(
                         &block_buffer_pool,
                         &treasury_forks,
                         &my_pubkey,
@@ -390,7 +390,7 @@ impl ReplayStage {
         );
     }
 
-    fn replay_active_banks(
+    fn replay_active_treasuries(
         block_buffer_pool: &Arc<BlockBufferPool>,
         treasury_forks: &Arc<RwLock<BankForks>>,
         my_pubkey: &Pubkey,
