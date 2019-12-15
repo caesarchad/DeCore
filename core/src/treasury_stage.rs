@@ -44,7 +44,7 @@ pub const NUM_THREADS: u32 = 10;
 
 /// Stores the stage's thread handle and output receiver.
 pub struct BankingStage {
-    bank_thread_hdls: Vec<JoinHandle<()>>,
+    treasury_thread_hdls: Vec<JoinHandle<()>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -89,7 +89,7 @@ impl BankingStage {
         let exit = Arc::new(AtomicBool::new(false));
 
         // Many treasuries that process transactions in parallel.
-        let bank_thread_hdls: Vec<JoinHandle<()>> = (0..num_threads)
+        let treasury_thread_hdls: Vec<JoinHandle<()>> = (0..num_threads)
             .map(|i| {
                 let (verified_receiver, enable_forwarding) = if i < num_threads - 1 {
                     (verified_receiver.clone(), true)
@@ -118,7 +118,7 @@ impl BankingStage {
                     .unwrap()
             })
             .collect();
-        Self { bank_thread_hdls }
+        Self { treasury_thread_hdls }
     }
 
     fn filter_valid_packets_for_forwarding(all_packets: &[PacketsAndOffsets]) -> Vec<&Packet> {
@@ -813,7 +813,7 @@ impl Service for BankingStage {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
-        for bank_thread_hdl in self.bank_thread_hdls {
+        for bank_thread_hdl in self.treasury_thread_hdls {
             bank_thread_hdl.join()?;
         }
         Ok(())
