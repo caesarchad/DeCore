@@ -212,7 +212,7 @@ impl WaterClockRecorder {
         self.ticks_per_slot = ticks_per_slot;
     }
 
-    pub fn set_working_bank(&mut self, working_treasury: WorkingBank) {
+    pub fn set_working_treasury(&mut self, working_treasury: WorkingBank) {
         trace!("new working treasury");
         self.working_treasury = Some(working_treasury);
     }
@@ -224,7 +224,7 @@ impl WaterClockRecorder {
             max_tick_height,
         };
         self.ticks_per_slot = treasury.ticks_per_slot();
-        self.set_working_bank(working_treasury);
+        self.set_working_treasury(working_treasury);
     }
 
     // Flush cache will delay flushing the cache for a treasury until it past the WorkingBank::min_tick_height
@@ -581,7 +581,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             assert!(waterclock_recorder.working_treasury.is_some());
             waterclock_recorder.clear_bank();
             assert!(waterclock_recorder.working_treasury.is_none());
@@ -615,7 +615,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             //tick height equal to min_tick_height
@@ -668,7 +668,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
 
             assert_eq!(waterclock_recorder.tick_height, 5);
@@ -705,7 +705,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             let tx = test_tx();
             let h1 = hash(b"hello world!");
@@ -743,7 +743,7 @@ mod tests {
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_cache.len(), 1);
             assert_eq!(waterclock_recorder.tick_height, 1);
@@ -783,7 +783,7 @@ mod tests {
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_cache.len(), 1);
             assert_eq!(waterclock_recorder.tick_height, 1);
@@ -830,7 +830,7 @@ mod tests {
                 min_tick_height: 1,
                 max_tick_height: 2,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_height, 2);
@@ -874,7 +874,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.tick();
             waterclock_recorder.tick();
             assert_eq!(waterclock_recorder.tick_height, 2);
@@ -1006,7 +1006,7 @@ mod tests {
                 min_tick_height: 2,
                 max_tick_height: 3,
             };
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), ticks_per_slot);
             assert!(waterclock_recorder.working_treasury.is_none());
         }
@@ -1075,7 +1075,7 @@ mod tests {
                 max_tick_height,
             };
 
-            waterclock_recorder.set_working_bank(working_treasury);
+            waterclock_recorder.set_working_treasury(working_treasury);
             for _ in 0..max_tick_height {
                 waterclock_recorder.tick();
             }

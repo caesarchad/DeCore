@@ -169,7 +169,7 @@ mod tests {
             };
 
             let waterclock_service = WaterClockService::new(waterclock_recorder.clone(), &waterclock_config, &exit);
-            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
+            waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
 
             // get some events
             let mut hashes = 0;

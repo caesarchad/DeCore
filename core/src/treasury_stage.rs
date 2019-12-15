@@ -1183,7 +1183,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
+            waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
             let pubkey = Pubkey::new_rand();
             let keypair2 = Keypair::new();
             let pubkey2 = Pubkey::new_rand();
@@ -1499,7 +1499,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
+            waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
 
             BankingStage::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
                 .0
@@ -1587,7 +1587,7 @@ mod tests {
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
-            waterclock_recorder.lock().unwrap().set_working_bank(working_treasury);
+            waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
 
             let (result, unprocessed) = BankingStage::process_and_record_transactions(
                 &treasury,
