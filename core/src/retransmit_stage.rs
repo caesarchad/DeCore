@@ -37,16 +37,16 @@ fn retransmit(
 
     datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
 
-    let r_bank = treasury_forks.read().unwrap().working_treasury();
-    let treasury_epoch = r_bank.get_stakers_epoch(r_bank.slot());
+    let r_treasury = treasury_forks.read().unwrap().working_treasury();
+    let treasury_epoch = r_treasury.get_stakers_epoch(r_treasury.slot());
     let (neighbors, children) = compute_retransmit_peers(
-        staking_utils::staked_nodes_at_epoch(&r_bank, treasury_epoch).as_ref(),
+        staking_utils::staked_nodes_at_epoch(&r_treasury, treasury_epoch).as_ref(),
         node_group_info,
         DATA_PLANE_FANOUT,
     );
     for blob in &blobs {
         let leader = leader_schedule_cache
-            .slot_leader_at(blob.read().unwrap().slot(), Some(r_bank.as_ref()));
+            .slot_leader_at(blob.read().unwrap().slot(), Some(r_treasury.as_ref()));
         if blob.read().unwrap().meta.forward {
             NodeGroupInfo::retransmit_to(&node_group_info, &neighbors, blob, leader, sock, true)?;
             NodeGroupInfo::retransmit_to(&node_group_info, &children, blob, leader, sock, false)?;
