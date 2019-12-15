@@ -9,7 +9,7 @@ use morgan_interface::pubkey::Pubkey;
 use std::sync::Arc;
 use test::Bencher;
 
-fn deposit_many(treasury: &Bank, pubkeys: &mut Vec<Pubkey>, num: usize) {
+fn deposit_many(treasury: &Treasury, pubkeys: &mut Vec<Pubkey>, num: usize) {
     for t in 0..num {
         let pubkey = Pubkey::new_rand();
         let account = Account::new((t + 1) as u64, 0, 0, &Account::default().owner);
@@ -23,7 +23,7 @@ fn deposit_many(treasury: &Bank, pubkeys: &mut Vec<Pubkey>, num: usize) {
 #[bench]
 fn test_accounts_create(bencher: &mut Bencher) {
     let (genesis_block, _) = create_genesis_block(10_000);
-    let treasury0 = Bank::new_with_paths(&genesis_block, Some("bench_a0".to_string()));
+    let treasury0 = Treasury::new_with_paths(&genesis_block, Some("bench_a0".to_string()));
     bencher.iter(|| {
         let mut pubkeys: Vec<Pubkey> = vec![];
         deposit_many(&treasury0, &mut pubkeys, 1000);
@@ -33,8 +33,8 @@ fn test_accounts_create(bencher: &mut Bencher) {
 #[bench]
 fn test_accounts_squash(bencher: &mut Bencher) {
     let (genesis_block, _) = create_genesis_block(100_000);
-    let mut treasuries: Vec<Arc<Bank>> = Vec::with_capacity(10);
-    treasuries.push(Arc::new(Bank::new_with_paths(
+    let mut treasuries: Vec<Arc<Treasury>> = Vec::with_capacity(10);
+    treasuries.push(Arc::new(Treasury::new_with_paths(
         &genesis_block,
         Some("bench_a1".to_string()),
     )));
@@ -45,7 +45,7 @@ fn test_accounts_squash(bencher: &mut Bencher) {
     // with the majority of the accounts present in the parent treasury that is
     // moved over to this treasury.
     bencher.iter(|| {
-        treasuries.push(Arc::new(Bank::new_from_parent(
+        treasuries.push(Arc::new(Treasury::new_from_parent(
             &treasuries[0],
             &Pubkey::default(),
             1u64,

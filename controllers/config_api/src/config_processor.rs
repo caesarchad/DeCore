@@ -46,7 +46,7 @@ mod tests {
     use crate::{config_instruction, id, ConfigState};
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -73,14 +73,14 @@ mod tests {
         }
     }
 
-    fn create_treasury(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
         (treasury, mint_keypair)
     }
 
-    fn create_config_account(treasury: Bank, mint_keypair: &Keypair) -> (BankClient, Keypair) {
+    fn create_config_account(treasury: Treasury, mint_keypair: &Keypair) -> (BankClient, Keypair) {
         let config_keypair = Keypair::new();
         let config_pubkey = config_keypair.pubkey();
 

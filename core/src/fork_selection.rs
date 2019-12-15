@@ -3,7 +3,7 @@ use crate::treasury_forks::BankForks;
 use crate::staking_utils;
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::datapoint_info;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
@@ -63,7 +63,7 @@ impl EpochStakes {
         let stakes = accounts.iter().map(|(k, (v, _))| (*k, *v)).collect();
         Self::new(epoch, stakes, &accounts[0].0)
     }
-    pub fn new_from_treasury(treasury: &Bank, my_pubkey: &Pubkey) -> Self {
+    pub fn new_from_treasury(treasury: &Treasury, my_pubkey: &Pubkey) -> Self {
         let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
         let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_epoch)
             .expect("voting require a treasury with stakes");
@@ -208,12 +208,12 @@ impl Locktower {
             .unwrap_or(false)
     }
 
-    pub fn is_recent_epoch(&self, treasury: &Bank) -> bool {
+    pub fn is_recent_epoch(&self, treasury: &Treasury) -> bool {
         let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
         treasury_epoch >= self.epoch_stakes.epoch
     }
 
-    pub fn update_epoch(&mut self, treasury: &Bank) {
+    pub fn update_epoch(&mut self, treasury: &Treasury) {
         trace!(
             "updating treasury epoch slot: {} epoch: {}",
             treasury.slot(),
@@ -377,13 +377,13 @@ impl Locktower {
         }
     }
 
-    fn treasury_weight(&self, treasury: &Bank, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
+    fn treasury_weight(&self, treasury: &Treasury, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
         let stake_lockouts =
             self.collect_vote_lockouts(treasury.slot(), treasury.vote_accounts().into_iter(), ancestors);
         self.calculate_weight(&stake_lockouts)
     }
 
-    fn find_heaviest_treasury(&self, treasury_forks: &BankForks) -> Option<Arc<Bank>> {
+    fn find_heaviest_treasury(&self, treasury_forks: &BankForks) -> Option<Arc<Treasury>> {
         let ancestors = treasury_forks.ancestors();
         let mut bank_weights: Vec<_> = treasury_forks
             .frozen_treasuries()
@@ -400,7 +400,7 @@ impl Locktower {
         bank_weights.pop().map(|b| b.2)
     }
 
-    fn initialize_lockouts_from_treasury(treasury: &Bank, current_epoch: u64) -> VoteState {
+    fn initialize_lockouts_from_treasury(treasury: &Treasury, current_epoch: u64) -> VoteState {
         let mut lockouts = VoteState::default();
         if let Some(iter) = treasury.epoch_vote_accounts(current_epoch) {
             for (delegate_pubkey, (_, account)) in iter {

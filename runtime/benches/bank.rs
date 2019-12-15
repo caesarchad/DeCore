@@ -80,12 +80,12 @@ pub fn create_native_loader_transactions(
         .collect()
 }
 
-fn sync_bencher(treasury: &Arc<Bank>, _bank_client: &BankClient, transactions: &Vec<Transaction>) {
+fn sync_bencher(treasury: &Arc<Treasury>, _bank_client: &BankClient, transactions: &Vec<Transaction>) {
     let results = treasury.process_transactions(&transactions);
     assert!(results.iter().all(Result::is_ok));
 }
 
-fn async_bencher(treasury: &Arc<Bank>, treasury_client: &BankClient, transactions: &Vec<Transaction>) {
+fn async_bencher(treasury: &Arc<Treasury>, treasury_client: &BankClient, transactions: &Vec<Transaction>) {
     for transaction in transactions.clone() {
         treasury_client.async_send_transaction(transaction).unwrap();
     }
@@ -124,13 +124,13 @@ fn async_bencher(treasury: &Arc<Bank>, treasury_client: &BankClient, transaction
 
 fn do_bench_transactions(
     bencher: &mut Bencher,
-    bench_work: &Fn(&Arc<Bank>, &BankClient, &Vec<Transaction>),
+    bench_work: &Fn(&Arc<Treasury>, &BankClient, &Vec<Transaction>),
     create_transactions: &Fn(&BankClient, &Keypair) -> Vec<Transaction>,
 ) {
     morgan_logger::setup();
     let ns_per_s = 1_000_000_000;
     let (genesis_block, mint_keypair) = create_genesis_block(100_000_000);
-    let mut treasury = Bank::new(&genesis_block);
+    let mut treasury = Treasury::new(&genesis_block);
     treasury.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
     let treasury = Arc::new(treasury);
     let treasury_client = BankClient::new_shared(&treasury);

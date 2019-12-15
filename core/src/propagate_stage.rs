@@ -317,7 +317,7 @@ mod test {
     use crate::entry_info::create_ticks;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use std::sync::atomic::AtomicBool;
@@ -329,7 +329,7 @@ mod test {
     struct MockBroadcastStage {
         block_buffer_pool: Arc<BlockBufferPool>,
         broadcast_service: BroadcastStage,
-        treasury: Arc<Bank>,
+        treasury: Arc<Treasury>,
     }
 
     fn setup_dummy_broadcast_service(
@@ -355,7 +355,7 @@ mod test {
         let exit_sender = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
 
         // Start up the broadcast stage
         let broadcast_service = BroadcastStage::new(

@@ -107,7 +107,7 @@ mod tests {
     use crate::water_clock_recorder::WorkingBank;
     use crate::result::Result;
     use crate::test_tx::test_tx;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::hash::hash;
     use morgan_interface::pubkey::Pubkey;
     use std::time::Duration;
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_waterclock_service() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let prev_hash = treasury.last_blockhash();
         let ledger_path = get_tmp_ledger_path!();
         {

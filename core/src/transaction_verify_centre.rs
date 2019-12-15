@@ -238,7 +238,7 @@ pub mod tests {
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use std::sync::atomic::Ordering;
 
     #[test]
@@ -251,7 +251,7 @@ pub mod tests {
         let starting_balance = 10_000;
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(starting_balance);
 
-        let treasury_forks = BankForks::new(0, Bank::new(&genesis_block));
+        let treasury_forks = BankForks::new(0, Treasury::new(&genesis_block));
 
         //start cluster_info1
         let mut cluster_info1 = NodeGroupInfo::new_with_invalid_keypair(target1.info.clone());

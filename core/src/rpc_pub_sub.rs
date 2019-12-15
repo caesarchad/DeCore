@@ -290,7 +290,7 @@ mod tests {
     use jsonrpc_pubsub::{PubSubHandler, Session};
     use morgan_budget_api;
     use morgan_budget_api::budget_instruction;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_program;
@@ -329,7 +329,7 @@ mod tests {
         } = create_genesis_block(10_000);
         let bob = Keypair::new();
         let bob_pubkey = bob.pubkey();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
 
@@ -365,7 +365,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let bob_pubkey = Pubkey::new_rand();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let arc_treasury = Arc::new(treasury);
         let blockhash = arc_treasury.last_blockhash();
 
@@ -422,7 +422,7 @@ mod tests {
         let contract_state = Keypair::new();
         let budget_program_id = morgan_budget_api::id();
         let executable = false; // TODO
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
 
@@ -553,7 +553,7 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let bob = Keypair::new();
@@ -582,7 +582,7 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let bob = Keypair::new();
@@ -603,11 +603,11 @@ mod tests {
         rpc.subscriptions.notify_subscribers(0, &treasury_forks);
 
         let treasury0 = treasury_forks.read().unwrap()[0].clone();
-        let treasury1 = Bank::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        let treasury1 = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
         treasury_forks.write().unwrap().insert(treasury1);
         rpc.subscriptions.notify_subscribers(1, &treasury_forks);
         let treasury1 = treasury_forks.read().unwrap()[1].clone();
-        let treasury2 = Bank::new_from_parent(&treasury1, &Pubkey::default(), 2);
+        let treasury2 = Treasury::new_from_parent(&treasury1, &Pubkey::default(), 2);
         treasury_forks.write().unwrap().insert(treasury2);
         rpc.subscriptions.notify_subscribers(2, &treasury_forks);
         let string = receiver.poll();

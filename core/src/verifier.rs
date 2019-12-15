@@ -19,7 +19,7 @@ use crate::storage_stage::StorageState;
 use crate::transaction_process_centre::Tpu;
 use crate::transaction_verify_centre::{Sockets, Tvu};
 use morgan_metricbot::inc_new_counter_info;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -94,7 +94,7 @@ impl Validator {
         assert_eq!(id, node.info.id);
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
-        let treasury = Bank::new_with_paths(&genesis_block, None);
+        let treasury = Treasury::new_with_paths(&genesis_block, None);
         let genesis_blockhash = treasury.last_blockhash();
 
         let (

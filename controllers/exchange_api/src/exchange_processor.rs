@@ -675,7 +675,7 @@ pub fn process_instruction(
 mod test {
     use super::*;
     use crate::{exchange_instruction, id};
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -760,14 +760,14 @@ mod test {
         try_calc(1000,   50,  100,   50,  101,  0,45,  5,   49, Tokens::new(   1, 0, 0, 0)).unwrap();
     }
 
-    fn create_treasury(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
         (treasury, mint_keypair)
     }
 
-    fn create_client(treasury: Bank, mint_keypair: Keypair) -> (BankClient, Keypair) {
+    fn create_client(treasury: Treasury, mint_keypair: Keypair) -> (BankClient, Keypair) {
         let owner = Keypair::new();
         let treasury_client = BankClient::new(treasury);
         treasury_client

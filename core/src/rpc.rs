@@ -10,7 +10,7 @@ use bincode::{deserialize, serialize};
 use jsonrpc_core::{Error, Metadata, Result};
 use jsonrpc_derive::rpc;
 use morgan_tokenbot::drone::{request_airdrop_transaction, request_reputation_airdrop_transaction};
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::pubkey::Pubkey;
@@ -48,7 +48,7 @@ pub struct JsonRpcRequestProcessor {
 }
 
 impl JsonRpcRequestProcessor {
-    fn treasury(&self) -> Arc<Bank> {
+    fn treasury(&self) -> Arc<Treasury> {
         self.treasury_forks.read().unwrap().working_treasury()
     }
 
@@ -1022,7 +1022,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         (
             Arc::new(RwLock::new(BankForks::new(treasury.slot(), treasury))),
             mint_keypair,

@@ -166,7 +166,7 @@ pub fn process_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::treasury::Bank;
+    use crate::treasury::Treasury;
     use crate::treasury_client::BankClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
@@ -423,7 +423,7 @@ mod tests {
         let mallory_pubkey = mallory_keypair.pubkey();
 
         // Fund to account to bypass AccountNotFound error
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let treasury_client = BankClient::new(treasury);
         treasury_client
             .transfer(50, &alice_keypair, &mallory_pubkey)

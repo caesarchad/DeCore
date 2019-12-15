@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::pubkey::Pubkey;
 use morgan_vote_api::vote_state::VoteState;
@@ -10,7 +10,7 @@ use std::{collections::VecDeque, sync::Mutex, time::SystemTime};
 
 /// Looks through vote accounts, and finds the latest slot that has achieved
 /// supermajority lockout
-pub fn get_supermajority_slot(treasury: &Bank, epoch_height: u64) -> Option<u64> {
+pub fn get_supermajority_slot(treasury: &Treasury, epoch_height: u64) -> Option<u64> {
     // Find the amount of stake needed for supermajority
     let stakes_and_lockouts = epoch_stakes_and_lockouts(treasury, epoch_height);
     let total_stake: u64 = stakes_and_lockouts.iter().map(|s| s.0).sum();
@@ -20,7 +20,7 @@ pub fn get_supermajority_slot(treasury: &Bank, epoch_height: u64) -> Option<u64>
     find_supermajority_slot(supermajority_stake, stakes_and_lockouts.iter())
 }
 
-pub fn vote_account_stakes(treasury: &Bank) -> HashMap<Pubkey, u64> {
+pub fn vote_account_stakes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
     treasury.vote_accounts()
         .into_iter()
         .map(|(id, (stake, _))| (id, stake))
@@ -28,14 +28,14 @@ pub fn vote_account_stakes(treasury: &Bank) -> HashMap<Pubkey, u64> {
 }
 
 /// Collect the staked nodes, as named by staked vote accounts from the given treasury
-pub fn staked_nodes(treasury: &Bank) -> HashMap<Pubkey, u64> {
+pub fn staked_nodes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
     to_staked_nodes(to_vote_states(treasury.vote_accounts().into_iter()))
 }
 
 /// At the specified epoch, collect the node account balance and vote states for nodes that
 /// have non-zero balance in their corresponding staking accounts
 pub fn vote_account_stakes_at_epoch(
-    treasury: &Bank,
+    treasury: &Treasury,
     epoch_height: u64,
 ) -> Option<HashMap<Pubkey, u64>> {
     treasury.epoch_vote_accounts(epoch_height).map(|accounts| {
@@ -48,7 +48,7 @@ pub fn vote_account_stakes_at_epoch(
 
 /// At the specified epoch, collect the delegate account balance and vote states for delegates
 /// that have non-zero balance in any of their managed staking accounts
-pub fn staked_nodes_at_epoch(treasury: &Bank, epoch_height: u64) -> Option<HashMap<Pubkey, u64>> {
+pub fn staked_nodes_at_epoch(treasury: &Treasury, epoch_height: u64) -> Option<HashMap<Pubkey, u64>> {
     treasury.epoch_vote_accounts(epoch_height)
         .map(|vote_accounts| to_staked_nodes(to_vote_states(vote_accounts.into_iter())))
 }
@@ -141,10 +141,10 @@ fn to_staked_nodes(
     map
 }
 
-fn epoch_stakes_and_lockouts(treasury: &Bank, epoch_height: u64) -> Vec<(u64, Option<u64>)> {
+fn epoch_stakes_and_lockouts(treasury: &Treasury, epoch_height: u64) -> Vec<(u64, Option<u64>)> {
     let node_staked_accounts = treasury
         .epoch_vote_accounts(epoch_height)
-        .expect("Bank state for epoch is missing")
+        .expect("Treasury state for epoch is missing")
         .into_iter();
 
     to_vote_states(node_staked_accounts)
@@ -193,8 +193,8 @@ pub(crate) mod tests {
     use std::iter::FromIterator;
     use std::sync::Arc;
 
-    fn new_from_parent(parent: &Arc<Bank>, slot: u64) -> Bank {
-        Bank::new_from_parent(parent, &Pubkey::default(), slot)
+    fn new_from_parent(parent: &Arc<Treasury>, slot: u64) -> Treasury {
+        Treasury::new_from_parent(parent, &Pubkey::default(), slot)
     }
 
     #[test]
@@ -205,7 +205,7 @@ pub(crate) mod tests {
             ..
         } = create_genesis_block_with_leader(1, &Pubkey::new_rand(), BOOTSTRAP_LEADER_DIFS);
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         // Epoch doesn't exist
         let mut expected = HashMap::new();
@@ -223,14 +223,14 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn setup_vote_and_stake_accounts(
-        treasury: &Bank,
+        treasury: &Treasury,
         from_account: &Keypair,
         vote_pubkey: &Pubkey,
         node_pubkey: &Pubkey,
         amount: u64,
     ) {
         fn process_instructions<T: KeypairUtil>(
-            treasury: &Bank,
+            treasury: &Treasury,
             keypairs: &[&T],
             ixs: Vec<Instruction>,
         ) {
@@ -289,7 +289,7 @@ pub(crate) mod tests {
             ..
         } = create_genesis_block(10_000);
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let vote_pubkey = Pubkey::new_rand();
 
         // Give the validator some stake but don't setup a staking account

@@ -104,7 +104,7 @@ mod tests {
     use assert_matches::assert_matches;
     use bincode::deserialize;
     use log::*;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
     use morgan_interface::client::SyncClient;
@@ -271,7 +271,7 @@ mod tests {
         let mining_pool_keypair = Keypair::new();
         let mining_pool_pubkey = mining_pool_keypair.pubkey();
 
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
         let treasury = Arc::new(treasury);
         let slot = 0;
@@ -558,7 +558,7 @@ mod tests {
         let validator_keypair = Keypair::new();
         let validator_pubkey = validator_keypair.pubkey();
 
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
         // tick the treasury up until it's moved into storage segment 2
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;

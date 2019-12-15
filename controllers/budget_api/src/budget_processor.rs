@@ -153,7 +153,7 @@ mod tests {
     use super::*;
     use crate::budget_instruction;
     use crate::id;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::BankClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -162,9 +162,9 @@ mod tests {
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::TransactionError;
 
-    fn create_treasury(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
         (treasury, mint_keypair)
     }

@@ -1,4 +1,4 @@
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_runtime::treasury_client::BankClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::client::SyncClient;
@@ -11,7 +11,7 @@ use morgan_interface::transaction::TransactionError;
 #[test]
 fn test_program_native_failure() {
     let (genesis_block, alice_keypair) = create_genesis_block(50);
-    let treasury = Bank::new(&genesis_block);
+    let treasury = Treasury::new(&genesis_block);
     let treasury_client = BankClient::new(treasury);
 
     let program = "morgan_failure_program".as_bytes().to_vec();

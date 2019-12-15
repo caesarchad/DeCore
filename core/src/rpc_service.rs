@@ -168,7 +168,7 @@ mod tests {
     use super::*;
     use crate::connection_info::ContactInfo;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::signature::KeypairUtil;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -180,7 +180,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let exit = Arc::new(AtomicBool::new(false));
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             ContactInfo::default(),
         )));

@@ -16,7 +16,7 @@ use morgan::packet::to_packets_chunked;
 use morgan::water_clock_recorder::WorkingBankEntries;
 use morgan::service::Service;
 use morgan::test_tx::test_tx;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
@@ -52,7 +52,7 @@ fn check_txs(receiver: &Arc<Receiver<WorkingBankEntries>>, ref_tx_count: usize) 
 #[bench]
 fn bench_consume_buffered(bencher: &mut Bencher) {
     let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(100_000);
-    let treasury = Arc::new(Bank::new(&genesis_block));
+    let treasury = Arc::new(Treasury::new(&genesis_block));
     let ledger_path = get_tmp_ledger_path!();
     let my_pubkey = Pubkey::new_rand();
     {
@@ -103,7 +103,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
 
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
-    let treasury = Arc::new(Bank::new(&genesis_block));
+    let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
     let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     trace!("txs: {}", txes);
@@ -214,7 +214,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
 
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
-    let treasury = Arc::new(Bank::new(&genesis_block));
+    let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
     let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     let transactions: Vec<_> = (0..txes)

@@ -11,7 +11,7 @@
 //! * layer 1 - As many nodes as we can fit
 //! * layer 2 - Everyone else, if layer 1 is `2^10`, layer 2 should be able to fit `2^20` number of nodes.
 //!
-//! Bank needs to provide an interface for us to query the stake weight
+//! Treasury needs to provide an interface for us to query the stake weight
 // use crate::treasury_forks::BankForks;
 use crate::treasury_forks::BankForks;
 use crate::block_buffer_pool::BlockBufferPool;
@@ -1561,7 +1561,7 @@ impl NodeGroupInfo {
 /// 1.2 - If no, then figure out what layer the node is in and who the neighbors are and only broadcast to them
 ///      1 - also check if there are nodes in the next layer and repeat the layer 1 to layer 2 logic
 
-/// Returns Neighbor Nodes and Children Nodes `(neighbors, children)` for a given node based on its stake (Bank Balance)
+/// Returns Neighbor Nodes and Children Nodes `(neighbors, children)` for a given node based on its stake (Treasury Balance)
 pub fn compute_retransmit_peers<S: std::hash::BuildHasher>(
     stakes: Option<&HashMap<Pubkey, u64, S>>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,

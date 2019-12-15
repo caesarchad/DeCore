@@ -5,7 +5,7 @@ use crate::entry_info::{Entry, EntrySlice};
 use crate::leader_arrange_cache::LeaderScheduleCache;
 use rayon::prelude::*;
 use morgan_metricbot::{datapoint, datapoint_error, inc_new_counter_debug};
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::timing::duration_as_ms;
@@ -27,7 +27,7 @@ fn first_err(results: &[Result<()>]) -> Result<()> {
 }
 
 fn par_execute_entries(
-    treasury: &Bank,
+    treasury: &Treasury,
     entries: &[(&Entry, LockedAccountsResults<Transaction>)],
 ) -> Result<()> {
     inc_new_counter_debug!("treasury-par_execute_entries-count", entries.len());
@@ -45,7 +45,7 @@ fn par_execute_entries(
                     if first_err.is_none() {
                         first_err = Some(r.clone());
                     }
-                    if !Bank::can_commit(&r) {
+                    if !Treasury::can_commit(&r) {
                         // warn!("Unexpected validator error: {:?}, tx: {:?}", e, tx);
                         println!(
                             "{}",
@@ -73,7 +73,7 @@ fn par_execute_entries(
 /// 2. Process the locked group in parallel
 /// 3. Register the `Tick` if it's available
 /// 4. Update the leader scheduler, goto 1
-pub fn process_entries(treasury: &Bank, entries: &[Entry]) -> Result<()> {
+pub fn process_entries(treasury: &Treasury, entries: &[Entry]) -> Result<()> {
     // accumulator for entries that can be processed in parallel
     let mut mt_group = vec![];
     for entry in entries {
@@ -155,7 +155,7 @@ pub fn process_block_buffer_pool(
     // Setup treasury for slot 0
     let mut pending_slots = {
         let slot = 0;
-        let treasury = Arc::new(Bank::new_with_paths(&genesis_block, account_paths));
+        let treasury = Arc::new(Treasury::new_with_paths(&genesis_block, account_paths));
         let entry_height = 0;
         let last_entry_hash = treasury.last_blockhash();
 
@@ -318,7 +318,7 @@ pub fn process_block_buffer_pool(
             // only process full slots in block_buffer_processor, replay_stage
             // handles any partials
             if next_meta.is_full() {
-                let next_treasury = Arc::new(Bank::new_from_parent(
+                let next_treasury = Arc::new(Treasury::new_from_parent(
                     &treasury,
                     &leader_schedule_cache
                         .slot_leader_at(next_slot, Some(&treasury))
@@ -783,7 +783,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(2);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
         let slot_entries = create_ticks(genesis_block.ticks_per_slot - 1, genesis_block.hash());
         let tx = system_transaction::create_user_account(
@@ -905,7 +905,7 @@ pub mod tests {
     #[test]
     fn test_process_entries_tick() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         // ensure treasury can process a tick
         assert_eq!(treasury.tick_height(), 0);
@@ -921,7 +921,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
 
@@ -955,7 +955,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let keypair3 = Keypair::new();
@@ -1012,7 +1012,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let keypair3 = Keypair::new();
@@ -1096,7 +1096,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let keypair3 = Keypair::new();
@@ -1190,7 +1190,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let keypair3 = Keypair::new();
@@ -1241,7 +1241,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let keypair3 = Keypair::new();
@@ -1309,7 +1309,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(11_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let pubkey = Pubkey::new_rand();
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
@@ -1351,7 +1351,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(11_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let success_tx = system_transaction::create_user_account(
@@ -1396,7 +1396,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(1_000_000_000);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
 
         const NUM_TRANSFERS: usize = 100;
         let keypairs: Vec<_> = (0..NUM_TRANSFERS * 2).map(|_| Keypair::new()).collect();
@@ -1469,7 +1469,7 @@ pub mod tests {
             .expect("process ticks failed");
 
             i += 1;
-            treasury = Bank::new_from_parent(&Arc::new(treasury), &Pubkey::default(), i as u64);
+            treasury = Treasury::new_from_parent(&Arc::new(treasury), &Pubkey::default(), i as u64);
             treasury.squash();
         }
     }
@@ -1478,7 +1478,7 @@ pub mod tests {
         genesis_block: &GenesisBlock,
         account_paths: Option<String>,
     ) -> EpochSchedule {
-        let treasury = Bank::new_with_paths(&genesis_block, account_paths);
+        let treasury = Treasury::new_with_paths(&genesis_block, account_paths);
         treasury.epoch_schedule().clone()
     }
 }

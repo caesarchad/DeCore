@@ -7,7 +7,7 @@ use jsonrpc_core::futures::Future;
 use jsonrpc_pubsub::typed::Sink;
 use jsonrpc_pubsub::SubscriptionId;
 use serde::Serialize;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
@@ -82,7 +82,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
 ) where
     K: Eq + Hash + Clone + Copy,
     S: Clone + Serialize,
-    F: Fn(&Bank, &K) -> X,
+    F: Fn(&Treasury, &K) -> X,
     N: Fn(X, &Sink<S>, u64),
     X: Clone + Serialize,
 {
@@ -179,7 +179,7 @@ impl RpcSubscriptions {
             pubkey,
             current_slot,
             treasury_forks,
-            Bank::get_account_modified_since_parent,
+            Treasury::get_account_modified_since_parent,
             notify_account,
         );
     }
@@ -196,7 +196,7 @@ impl RpcSubscriptions {
             program_id,
             current_slot,
             treasury_forks,
-            Bank::get_program_accounts_modified_since_parent,
+            Treasury::get_program_accounts_modified_since_parent,
             notify_program,
         );
     }
@@ -213,7 +213,7 @@ impl RpcSubscriptions {
             signature,
             current_slot,
             treasury_forks,
-            Bank::get_signature_status,
+            Treasury::get_signature_status,
             notify_signature,
         );
         subscriptions.remove(&signature);
@@ -313,7 +313,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();
@@ -369,7 +369,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();
@@ -423,7 +423,7 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let blockhash = treasury.last_blockhash();
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let alice = Keypair::new();

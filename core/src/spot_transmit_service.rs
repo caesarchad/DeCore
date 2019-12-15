@@ -10,7 +10,7 @@ use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::streamer::{BlobReceiver, BlobSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::duration_as_ms;
@@ -79,7 +79,7 @@ fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>)
 /// blob's slot
 pub fn should_retransmit_and_persist(
     blob: &Blob,
-    treasury: Option<Arc<Bank>>,
+    treasury: Option<Arc<Treasury>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     my_pubkey: &Pubkey,
 ) -> bool {
@@ -181,7 +181,7 @@ impl WindowService {
     ) -> WindowService
     where
         F: 'static
-            + Fn(&Pubkey, &Blob, Option<Arc<Bank>>) -> bool
+            + Fn(&Pubkey, &Blob, Option<Arc<Treasury>>) -> bool
             + std::marker::Send
             + std::marker::Sync,
     {
@@ -306,7 +306,7 @@ mod test {
     fn test_should_retransmit_and_persist() {
         let me_id = Pubkey::new_rand();
         let leader_pubkey = Pubkey::new_rand();
-        let treasury = Arc::new(Bank::new(
+        let treasury = Arc::new(Treasury::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
         let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
@@ -314,13 +314,13 @@ mod test {
         let mut blob = Blob::default();
         blob.set_id(&leader_pubkey);
 
-        // without a Bank and blobs not from me, blob gets thrown out
+        // without a Treasury and blobs not from me, blob gets thrown out
         assert_eq!(
             should_retransmit_and_persist(&blob, None, &cache, &me_id),
             false
         );
 
-        // with a Bank for slot 0, blob continues
+        // with a Treasury for slot 0, blob continues
         assert_eq!(
             should_retransmit_and_persist(&blob, Some(treasury.clone()), &cache, &me_id),
             true
@@ -333,7 +333,7 @@ mod test {
             false
         );
 
-        // with a Bank and no idea who leader is, blob gets thrown out
+        // with a Treasury and no idea who leader is, blob gets thrown out
         blob.set_slot(MINIMUM_SLOT_LENGTH as u64 * 3);
         assert_eq!(
             should_retransmit_and_persist(&blob, Some(treasury), &cache, &me_id),
@@ -368,7 +368,7 @@ mod test {
             .expect("Expected to be able to open database ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
 
-        let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let repair_strategy = RepairStrategy::RepairAll {
             treasury_forks: treasury_forks.clone(),
@@ -455,7 +455,7 @@ mod test {
             .expect("Expected to be able to open database ledger");
 
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let treasury = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
         let treasury_forks = Arc::new(RwLock::new(BankForks::new(0, treasury)));
         let epoch_schedule = *treasury_forks.read().unwrap().working_treasury().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {

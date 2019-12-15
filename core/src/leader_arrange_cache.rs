@@ -1,7 +1,7 @@
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::leader_arrange::LeaderSchedule;
 use crate::leader_arrange_utils;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_runtime::epoch_schedule::EpochSchedule;
 use morgan_interface::pubkey::Pubkey;
 use std::collections::hash_map::Entry;
@@ -20,7 +20,7 @@ pub struct LeaderScheduleCache {
 }
 
 impl LeaderScheduleCache {
-    pub fn new_from_treasury(treasury: &Bank) -> Self {
+    pub fn new_from_treasury(treasury: &Treasury) -> Self {
         Self::new(*treasury.epoch_schedule(), treasury.slot())
     }
 
@@ -39,7 +39,7 @@ impl LeaderScheduleCache {
         *self.max_epoch.write().unwrap() = self.epoch_schedule.get_stakers_epoch(root);
     }
 
-    pub fn slot_leader_at(&self, slot: u64, treasury: Option<&Bank>) -> Option<Pubkey> {
+    pub fn slot_leader_at(&self, slot: u64, treasury: Option<&Treasury>) -> Option<Pubkey> {
         if let Some(treasury) = treasury {
             self.slot_leader_at_else_compute(slot, treasury)
         } else {
@@ -52,7 +52,7 @@ impl LeaderScheduleCache {
         &self,
         pubkey: &Pubkey,
         mut current_slot: u64,
-        treasury: &Bank,
+        treasury: &Treasury,
         block_buffer_pool: Option<&BlockBufferPool>,
     ) -> Option<u64> {
         let (mut epoch, mut start_index) = treasury.get_epoch_and_slot_index(current_slot + 1);
@@ -98,7 +98,7 @@ impl LeaderScheduleCache {
             .map(|schedule| schedule[slot_index])
     }
 
-    fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Bank) -> Option<Pubkey> {
+    fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Treasury) -> Option<Pubkey> {
         let cache_result = self.slot_leader_at_no_compute(slot);
         // Forbid asking for slots in an unconfirmed epoch
         let treasury_epoch = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
@@ -124,7 +124,7 @@ impl LeaderScheduleCache {
     fn get_epoch_schedule_else_compute(
         &self,
         epoch: u64,
-        treasury: &Bank,
+        treasury: &Treasury,
     ) -> Option<Arc<LeaderSchedule>> {
         let epoch_schedule = self.cached_schedules.read().unwrap().0.get(&epoch).cloned();
 
@@ -137,7 +137,7 @@ impl LeaderScheduleCache {
         }
     }
 
-    fn compute_epoch_schedule(&self, epoch: u64, treasury: &Bank) -> Option<Arc<LeaderSchedule>> {
+    fn compute_epoch_schedule(&self, epoch: u64, treasury: &Treasury) -> Option<Arc<LeaderSchedule>> {
         let leader_schedule = leader_arrange_utils::leader_schedule(epoch, treasury);
         leader_schedule.map(|leader_schedule| {
             let leader_schedule = Arc::new(leader_schedule);
@@ -171,7 +171,7 @@ mod tests {
         create_genesis_block_with_leader, GenesisBlockInfo, BOOTSTRAP_LEADER_DIFS,
     };
     use crate::staking_utils::tests::setup_vote_and_stake_accounts;
-    use morgan_runtime::treasury::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_runtime::epoch_schedule::{EpochSchedule, MINIMUM_SLOT_LENGTH};
     use std::sync::mpsc::channel;
     use std::sync::Arc;
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn test_slot_leader_at() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let cache = LeaderScheduleCache::new_from_treasury(&treasury);
 
         // Nothing in the cache, should return None
@@ -224,7 +224,7 @@ mod tests {
         let slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
         let epoch_schedule = EpochSchedule::new(slots_per_epoch, slots_per_epoch / 2, true);
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let cache = Arc::new(LeaderScheduleCache::new(epoch_schedule, treasury.slot()));
 
         let num_threads = 10;
@@ -270,7 +270,7 @@ mod tests {
         .genesis_block;
         genesis_block.epoch_warmup = false;
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         assert_eq!(
@@ -311,7 +311,7 @@ mod tests {
         .genesis_block;
         genesis_block.epoch_warmup = false;
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
         let ledger_path = get_tmp_ledger_path!();
         {
@@ -381,7 +381,7 @@ mod tests {
         } = create_genesis_block(10_000);
         genesis_block.epoch_warmup = false;
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         // Create new vote account
@@ -403,7 +403,7 @@ mod tests {
             target_slot += 1;
         }
 
-        let treasury = Bank::new_from_parent(&Arc::new(treasury), &Pubkey::default(), target_slot);
+        let treasury = Treasury::new_from_parent(&Arc::new(treasury), &Pubkey::default(), target_slot);
         let mut expected_slot = 0;
         let epoch = treasury.get_stakers_epoch(target_slot);
         for i in 0..epoch {
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn test_schedule_for_unconfirmed_epoch() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let cache = LeaderScheduleCache::new_from_treasury(&treasury);
 
         assert_eq!(*cache.max_epoch.read().unwrap(), 1);
@@ -442,7 +442,7 @@ mod tests {
         assert_eq!(treasury.get_epoch_and_slot_index(96).0, 2);
         assert!(cache.slot_leader_at(96, Some(&treasury)).is_none());
 
-        let treasury2 = Bank::new_from_parent(&treasury, &Pubkey::new_rand(), 95);
+        let treasury2 = Treasury::new_from_parent(&treasury, &Pubkey::new_rand(), 95);
         assert!(treasury2.epoch_vote_accounts(2).is_some());
 
         // Set root for a slot in epoch 1, so that epoch 2 is now confirmed

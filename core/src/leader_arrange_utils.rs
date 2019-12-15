@@ -1,6 +1,6 @@
 use crate::leader_arrange::LeaderSchedule;
 use crate::staking_utils;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::NUM_CONSECUTIVE_LEADER_SLOTS;
 use proptest::{
@@ -9,7 +9,7 @@ use proptest::{
 };
 
 /// Return the leader schedule for the given epoch.
-pub fn leader_schedule(epoch_height: u64, treasury: &Bank) -> Option<LeaderSchedule> {
+pub fn leader_schedule(epoch_height: u64, treasury: &Treasury) -> Option<LeaderSchedule> {
     staking_utils::staked_nodes_at_epoch(treasury, epoch_height).map(|stakes| {
         let mut seed = [0u8; 32];
         seed[0..8].copy_from_slice(&epoch_height.to_le_bytes());
@@ -25,7 +25,7 @@ pub fn leader_schedule(epoch_height: u64, treasury: &Bank) -> Option<LeaderSched
 }
 
 /// Return the leader for the given slot.
-pub fn slot_leader_at(slot: u64, treasury: &Bank) -> Option<Pubkey> {
+pub fn slot_leader_at(slot: u64, treasury: &Treasury) -> Option<Pubkey> {
     let (epoch, slot_index) = treasury.get_epoch_and_slot_index(slot);
 
     leader_schedule(epoch, treasury).map(|leader_schedule| leader_schedule[slot_index])
@@ -33,7 +33,7 @@ pub fn slot_leader_at(slot: u64, treasury: &Bank) -> Option<Pubkey> {
 
 // Returns the number of ticks remaining from the specified tick_height to the end of the
 // slot implied by the tick_height
-pub fn num_ticks_left_in_slot(treasury: &Bank, tick_height: u64) -> u64 {
+pub fn num_ticks_left_in_slot(treasury: &Treasury, tick_height: u64) -> u64 {
     treasury.ticks_per_slot() - tick_height % treasury.ticks_per_slot() - 1
 }
 
@@ -109,7 +109,7 @@ mod tests {
         let pubkey = Pubkey::new_rand();
         let genesis_block =
             create_genesis_block_with_leader(0, &pubkey, BOOTSTRAP_LEADER_DIFS).genesis_block;
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         let pubkeys_and_stakes: Vec<_> = staking_utils::staked_nodes(&treasury).into_iter().collect();
         let seed = [0u8; 32];
@@ -134,7 +134,7 @@ mod tests {
             BOOTSTRAP_LEADER_DIFS,
         )
         .genesis_block;
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         assert_eq!(slot_leader_at(treasury.slot(), &treasury).unwrap(), pubkey);
     }
 

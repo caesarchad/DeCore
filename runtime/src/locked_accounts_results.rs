@@ -1,12 +1,12 @@
 use crate::accounts::AccountLockType;
-use crate::treasury::Bank;
+use crate::treasury::Treasury;
 use morgan_interface::transaction::{Result, Transaction};
 use std::borrow::Borrow;
 
 // Represents the results of trying to lock a set of accounts
 pub struct LockedAccountsResults<'a, 'b, I: Borrow<Transaction>> {
     locked_accounts_results: Vec<Result<()>>,
-    treasury: &'a Bank,
+    treasury: &'a Treasury,
     transactions: &'b [I],
     lock_type: AccountLockType,
     pub(crate) needs_unlock: bool,
@@ -15,7 +15,7 @@ pub struct LockedAccountsResults<'a, 'b, I: Borrow<Transaction>> {
 impl<'a, 'b, I: Borrow<Transaction>> LockedAccountsResults<'a, 'b, I> {
     pub fn new(
         locked_accounts_results: Vec<Result<()>>,
-        treasury: &'a Bank,
+        treasury: &'a Treasury,
         transactions: &'b [I],
         lock_type: AccountLockType,
     ) -> Self {
@@ -106,14 +106,14 @@ mod tests {
         assert!(lock_results2.locked_accounts_results().is_empty());
     }
 
-    fn setup() -> (Bank, Vec<Transaction>) {
+    fn setup() -> (Treasury, Vec<Transaction>) {
         let dummy_leader_pubkey = Pubkey::new_rand();
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
             ..
         } = create_genesis_block_with_leader(500, &dummy_leader_pubkey, 100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         let pubkey = Pubkey::new_rand();
         let keypair2 = Keypair::new();

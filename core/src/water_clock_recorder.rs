@@ -16,7 +16,7 @@ use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::leader_arrange_utils;
 use crate::water_clock::WaterClock;
 use crate::result::{Error, Result};
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -36,11 +36,11 @@ pub enum WaterClockRecorderErr {
     MinHeightNotReached,
 }
 
-pub type WorkingBankEntries = (Arc<Bank>, Vec<(Entry, u64)>);
+pub type WorkingBankEntries = (Arc<Treasury>, Vec<(Entry, u64)>);
 
 #[derive(Clone)]
 pub struct WorkingBank {
-    pub treasury: Arc<Bank>,
+    pub treasury: Arc<Treasury>,
     pub min_tick_height: u64,
     pub max_tick_height: u64,
 }
@@ -110,7 +110,7 @@ impl WaterClockRecorder {
         self.start_slot
     }
 
-    pub fn treasury(&self) -> Option<Arc<Bank>> {
+    pub fn treasury(&self) -> Option<Arc<Treasury>> {
         self.working_treasury.clone().map(|w| w.treasury)
     }
 
@@ -216,7 +216,7 @@ impl WaterClockRecorder {
         trace!("new working treasury");
         self.working_treasury = Some(working_treasury);
     }
-    pub fn set_treasury(&mut self, treasury: &Arc<Bank>) {
+    pub fn set_treasury(&mut self, treasury: &Arc<Treasury>) {
         let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
         let working_treasury = WorkingBank {
             treasury: treasury.clone(),
@@ -562,7 +562,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -596,7 +596,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -642,7 +642,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -686,7 +686,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -724,7 +724,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -764,7 +764,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -811,7 +811,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -855,7 +855,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -988,7 +988,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 Hash::default(),
@@ -1020,7 +1020,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let (sender, receiver) = sync_channel(1);
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new_with_clear_signal(
                 0,
@@ -1052,7 +1052,7 @@ mod tests {
                 mut genesis_block, ..
             } = create_genesis_block(2);
             genesis_block.ticks_per_slot = ticks_per_slot;
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
 
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
@@ -1099,7 +1099,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
@@ -1261,7 +1261,7 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
-            let treasury = Arc::new(Bank::new(&genesis_block));
+            let treasury = Arc::new(Treasury::new(&genesis_block));
             let prev_hash = treasury.last_blockhash();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,

@@ -1,4 +1,4 @@
-use crate::treasury::Bank;
+use crate::treasury::Treasury;
 use morgan_interface::client::{AsyncClient, Client, SyncClient};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
@@ -18,7 +18,7 @@ use std::thread::{sleep, Builder};
 use std::time::{Duration, Instant};
 
 pub struct BankClient {
-    treasury: Arc<Bank>,
+    treasury: Arc<Treasury>,
     transaction_sender: Mutex<Sender<Transaction>>,
 }
 
@@ -183,7 +183,7 @@ impl SyncClient for BankClient {
 }
 
 impl BankClient {
-    fn run(treasury: &Bank, transaction_receiver: Receiver<Transaction>) {
+    fn run(treasury: &Treasury, transaction_receiver: Receiver<Transaction>) {
         while let Ok(tx) = transaction_receiver.recv() {
             let mut transactions = vec![tx];
             while let Ok(tx) = transaction_receiver.try_recv() {
@@ -193,7 +193,7 @@ impl BankClient {
         }
     }
 
-    pub fn new_shared(treasury: &Arc<Bank>) -> Self {
+    pub fn new_shared(treasury: &Arc<Treasury>) -> Self {
         let (transaction_sender, transaction_receiver) = channel();
         let transaction_sender = Mutex::new(transaction_sender);
         let thread_treasury = treasury.clone();
@@ -208,7 +208,7 @@ impl BankClient {
         }
     }
 
-    pub fn new(treasury: Bank) -> Self {
+    pub fn new(treasury: Treasury) -> Self {
         Self::new_shared(&Arc::new(treasury))
     }
 }
@@ -226,7 +226,7 @@ mod tests {
         let jane_doe_keypair = Keypair::new();
         let jane_pubkey = jane_doe_keypair.pubkey();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let treasury_client = BankClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.

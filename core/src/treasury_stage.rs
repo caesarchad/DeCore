@@ -17,7 +17,7 @@ use bincode::deserialize;
 use itertools::Itertools;
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info, inc_new_counter_warn};
 use morgan_runtime::accounts_db::ErrorCounters;
-use morgan_runtime::treasury::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -372,7 +372,7 @@ impl BankingStage {
     }
 
     fn record_transactions<'a, 'b>(
-        treasury: &'a Bank,
+        treasury: &'a Treasury,
         txs: &'b [Transaction],
         results: &[transaction::Result<()>],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
@@ -382,7 +382,7 @@ impl BankingStage {
             .iter()
             .zip(txs.iter())
             .filter_map(|(r, x)| {
-                if Bank::can_commit(r) {
+                if Treasury::can_commit(r) {
                     recordable_txs.push(x);
                     Some(x.clone())
                 } else {
@@ -408,7 +408,7 @@ impl BankingStage {
     }
 
     fn process_and_record_transactions_locked(
-        treasury: &Bank,
+        treasury: &Treasury,
         txs: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         lock_results: &LockedAccountsResults<Transaction>,
@@ -454,7 +454,7 @@ impl BankingStage {
     }
 
     pub fn process_and_record_transactions(
-        treasury: &Bank,
+        treasury: &Treasury,
         txs: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         chunk_offset: usize,
@@ -499,7 +499,7 @@ impl BankingStage {
     /// Returns the number of transactions successfully processed by the treasury, which may be less
     /// than the total number if max Water Clock height was reached and the treasury halted
     fn process_transactions(
-        treasury: &Bank,
+        treasury: &Treasury,
         transactions: &[Transaction],
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Result<(usize, Vec<usize>)> {
@@ -613,7 +613,7 @@ impl BankingStage {
 
     // This function  filters pending transactions that are still valid
     fn filter_pending_transactions(
-        treasury: &Arc<Bank>,
+        treasury: &Arc<Treasury>,
         transactions: &[Transaction],
         transaction_indexes: &[usize],
         pending_indexes: &[usize],
@@ -632,7 +632,7 @@ impl BankingStage {
     }
 
     fn process_received_packets(
-        treasury: &Arc<Bank>,
+        treasury: &Arc<Treasury>,
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
         msgs: &Packets,
         transaction_indexes: Vec<usize>,
@@ -667,7 +667,7 @@ impl BankingStage {
     }
 
     fn filter_unprocessed_packets(
-        treasury: &Arc<Bank>,
+        treasury: &Arc<Treasury>,
         msgs: &Packets,
         transaction_indexes: &[usize],
         my_pubkey: &Pubkey,
@@ -821,7 +821,7 @@ impl Service for BankingStage {
 }
 
 pub fn create_test_recorder(
-    treasury: &Arc<Bank>,
+    treasury: &Arc<Treasury>,
     block_buffer_pool: &Arc<BlockBufferPool>,
 ) -> (
     Arc<AtomicBool>,
@@ -871,7 +871,7 @@ mod tests {
     #[test]
     fn test_banking_stage_shutdown1() {
         let genesis_block = create_genesis_block(2).genesis_block;
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -905,7 +905,7 @@ mod tests {
             mut genesis_block, ..
         } = create_genesis_block(2);
         genesis_block.ticks_per_slot = 4;
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let start_hash = treasury.last_blockhash();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
@@ -954,7 +954,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let start_hash = treasury.last_blockhash();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
@@ -1019,7 +1019,7 @@ mod tests {
             drop(waterclock_recorder);
 
             let mut blockhash = start_hash;
-            let treasury = Bank::new(&genesis_block);
+            let treasury = Treasury::new(&genesis_block);
             treasury.process_transaction(&fund_tx).unwrap();
             //receive entries + ticks
             for _ in 0..10 {
@@ -1102,7 +1102,7 @@ mod tests {
         {
             let entry_receiver = {
                 // start a treasury_phase to eat verified receiver
-                let treasury = Arc::new(Bank::new(&genesis_block));
+                let treasury = Arc::new(Treasury::new(&genesis_block));
                 let block_buffer_pool = Arc::new(
                     BlockBufferPool::open_ledger_file(&ledger_path)
                         .expect("Expected to be able to open database ledger"),
@@ -1138,7 +1138,7 @@ mod tests {
                 .flat_map(|x| x.1.into_iter().map(|e| e.0))
                 .collect();
 
-            let treasury = Bank::new(&genesis_block);
+            let treasury = Treasury::new(&genesis_block);
             for entry in &entries {
                 treasury.process_transactions(&entry.transactions)
                     .iter()
@@ -1160,7 +1160,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let working_treasury = WorkingBank {
             treasury: treasury.clone(),
             min_tick_height: treasury.tick_height(),
@@ -1467,7 +1467,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let pubkey = Pubkey::new_rand();
 
         let transactions = vec![system_transaction::transfer(
@@ -1556,7 +1556,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let pubkey = Pubkey::new_rand();
         let pubkey1 = Pubkey::new_rand();
 

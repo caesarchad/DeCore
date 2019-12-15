@@ -39,7 +39,7 @@ type BankStatusCache = StatusCache<Result<()>>;
 
 /// Manager for the state of all accounts and programs after processing its entries.
 #[derive(Default)]
-pub struct Bank {
+pub struct Treasury {
     /// where all the Accounts are stored
     accounts: Arc<Accounts>,
 
@@ -50,33 +50,33 @@ pub struct Bank {
     blockhash_queue: RwLock<BlockhashQueue>,
 
     /// Previous checkpoint of this treasury
-    parent: RwLock<Option<Arc<Bank>>>,
+    parent: RwLock<Option<Arc<Treasury>>>,
 
     /// The set of parents including this treasury
     pub ancestors: HashMap<u64, usize>,
 
-    /// Hash of this Bank's state. Only meaningful after freezing.
+    /// Hash of this Treasury's state. Only meaningful after freezing.
     hash: RwLock<Hash>,
 
-    /// Hash of this Bank's parent's state
+    /// Hash of this Treasury's parent's state
     parent_hash: Hash,
 
     /// The number of transactions processed without error
     transaction_count: AtomicUsize, // TODO: Use AtomicU64 if/when available
 
-    /// Bank tick height
+    /// Treasury tick height
     tick_height: AtomicUsize, // TODO: Use AtomicU64 if/when available
 
-    // Bank max_tick_height
+    // Treasury max_tick_height
     max_tick_height: u64,
 
     /// The number of ticks in each slot.
     ticks_per_slot: u64,
 
-    /// Bank fork (i.e. slot, i.e. block)
+    /// Treasury fork (i.e. slot, i.e. block)
     slot: u64,
 
-    /// Bank height in term of treasuries
+    /// Treasury height in term of treasuries
     treasury_height: u64,
 
     /// The pubkey to send transactions fees to.
@@ -109,7 +109,7 @@ impl Default for BlockhashQueue {
     }
 }
 
-impl Bank {
+impl Treasury {
     pub fn new(genesis_block: &GenesisBlock) -> Self {
         Self::new_with_paths(&genesis_block, None)
     }
@@ -131,7 +131,7 @@ impl Bank {
     }
 
     /// Create a new treasury that points to an immutable checkpoint of another treasury.
-    pub fn new_from_parent(parent: &Arc<Bank>, collector_id: &Pubkey, slot: u64) -> Self {
+    pub fn new_from_parent(parent: &Arc<Treasury>, collector_id: &Pubkey, slot: u64) -> Self {
         parent.freeze();
         assert_ne!(slot, parent.slot());
 
@@ -238,8 +238,8 @@ impl Bank {
         &self.epoch_schedule
     }
 
-    /// squash the parent's state up into this Bank,
-    ///   this Bank becomes a root
+    /// squash the parent's state up into this Treasury,
+    ///   this Treasury becomes a root
     pub fn squash(&self) {
         self.freeze();
 
@@ -267,7 +267,7 @@ impl Bank {
     }
 
     /// Return the more recent checkpoint of this treasury instance.
-    pub fn parent(&self) -> Option<Arc<Bank>> {
+    pub fn parent(&self) -> Option<Arc<Treasury>> {
         self.parent.read().unwrap().clone()
     }
 
@@ -423,7 +423,7 @@ impl Bank {
         }
     }
 
-    /// Process a Transaction. This is used for unit tests and simply calls the vector Bank::process_transactions method.
+    /// Process a Transaction. This is used for unit tests and simply calls the vector Treasury::process_transactions method.
     pub fn process_transaction(&self, tx: &Transaction) -> Result<()> {
         let txs = vec![tx.clone()];
         self.process_transactions(&txs)[0].clone()?;
@@ -829,7 +829,7 @@ impl Bank {
     }
 
     /// Compute all the parents of the treasury in order
-    pub fn parents(&self) -> Vec<Arc<Bank>> {
+    pub fn parents(&self) -> Vec<Arc<Treasury>> {
         let mut parents = vec![];
         let mut treasury = self.parent();
         while let Some(parent) = treasury {
@@ -1020,7 +1020,7 @@ impl Bank {
     }
 }
 
-impl Drop for Bank {
+impl Drop for Treasury {
     fn drop(&mut self) {
         // For root forks this is a noop
         self.accounts.purge_fork(self.slot());
@@ -1058,7 +1058,7 @@ mod tests {
             &dummy_leader_pubkey,
             dummy_leader_difs,
         );
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), mint_difs);
         assert_eq!(
             treasury.get_balance(&voting_keypair.pubkey()),
@@ -1070,7 +1070,7 @@ mod tests {
     fn test_two_payments_to_one_party() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
         let pubkey = Pubkey::new_rand();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_blockhash(), genesis_block.hash());
 
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
@@ -1086,7 +1086,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let key1 = Pubkey::new_rand();
         let key2 = Pubkey::new_rand();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_blockhash(), genesis_block.hash());
 
         let t1 = system_transaction::transfer(&mint_keypair, &key1, 1, genesis_block.hash());
@@ -1109,7 +1109,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let key1 = Pubkey::new_rand();
         let key2 = Pubkey::new_rand();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let instructions =
             system_instruction::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
         let tx = Transaction::new_signed_instructions(
@@ -1134,7 +1134,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Pubkey::new_rand();
         let key2 = Pubkey::new_rand();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let instructions =
             system_instruction::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
         let tx = Transaction::new_signed_instructions(
@@ -1152,7 +1152,7 @@ mod tests {
     #[test]
     fn test_detect_failed_duplicate_transactions() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.fee_calculator.difs_per_signature = 1;
 
         let dest = Keypair::new();
@@ -1185,7 +1185,7 @@ mod tests {
     #[test]
     fn test_account_not_found() {
         let (genesis_block, mint_keypair) = create_genesis_block(0);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
         assert_eq!(
             treasury.transfer(1, &keypair, &mint_keypair.pubkey()),
@@ -1197,7 +1197,7 @@ mod tests {
     #[test]
     fn test_insufficient_funds() {
         let (genesis_block, mint_keypair) = create_genesis_block(11_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let pubkey = Pubkey::new_rand();
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
@@ -1219,7 +1219,7 @@ mod tests {
     #[test]
     fn test_transfer_to_newb() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let pubkey = Pubkey::new_rand();
         treasury.transfer(500, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.get_balance(&pubkey), 500);
@@ -1228,7 +1228,7 @@ mod tests {
     #[test]
     fn test_bank_deposit() {
         let (genesis_block, _mint_keypair) = create_genesis_block(100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         // Test new account
         let key = Keypair::new();
@@ -1243,7 +1243,7 @@ mod tests {
     #[test]
     fn test_bank_withdraw() {
         let (genesis_block, _mint_keypair) = create_genesis_block(100);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         // Test no account
         let key = Keypair::new();
@@ -1274,7 +1274,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block_with_leader(100, &leader, 3);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.fee_calculator.difs_per_signature = 3;
 
         let key1 = Keypair::new();
@@ -1318,7 +1318,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block_with_leader(100, &leader, 3);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
 
         let key = Keypair::new();
         let tx1 =
@@ -1345,7 +1345,7 @@ mod tests {
     #[test]
     fn test_debits_before_credits() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
         let tx0 = system_transaction::create_user_account(
             &mint_keypair,
@@ -1370,7 +1370,7 @@ mod tests {
     #[test]
     fn test_need_credit_only_accounts() {
         let (genesis_block, mint_keypair) = create_genesis_block(10);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let payer0 = Keypair::new();
         let payer1 = Keypair::new();
         let recipient = Pubkey::new_rand();
@@ -1400,7 +1400,7 @@ mod tests {
     #[test]
     fn test_interleaving_locks() {
         let (genesis_block, mint_keypair) = create_genesis_block(3);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let alice = Keypair::new();
         let bob = Keypair::new();
 
@@ -1441,7 +1441,7 @@ mod tests {
     fn test_bank_invalid_account_index() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let keypair = Keypair::new();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         let tx =
             system_transaction::transfer(&mint_keypair, &keypair.pubkey(), 1, genesis_block.hash());
@@ -1465,7 +1465,7 @@ mod tests {
     fn test_bank_pay_to_self() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
         let key1 = Keypair::new();
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         treasury.transfer(1, &mint_keypair, &key1.pubkey()).unwrap();
         assert_eq!(treasury.get_balance(&key1.pubkey()), 1);
@@ -1482,15 +1482,15 @@ mod tests {
             .unwrap_err();
     }
 
-    fn new_from_parent(parent: &Arc<Bank>) -> Bank {
-        Bank::new_from_parent(parent, &Pubkey::default(), parent.slot() + 1)
+    fn new_from_parent(parent: &Arc<Treasury>) -> Treasury {
+        Treasury::new_from_parent(parent, &Pubkey::default(), parent.slot() + 1)
     }
 
     /// Verify that the parent's vector is computed correctly
     #[test]
     fn test_treasury_parents() {
         let (genesis_block, _) = create_genesis_block(1);
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let treasury = new_from_parent(&parent);
         assert!(Arc::ptr_eq(&treasury.parents()[0], &parent));
@@ -1501,7 +1501,7 @@ mod tests {
     fn test_treasury_parent_duplicate_signature() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
             system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
@@ -1519,7 +1519,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
         let key2 = Keypair::new();
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
             system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
@@ -1533,8 +1533,8 @@ mod tests {
     #[test]
     fn test_treasury_hash_internal_state() {
         let (genesis_block, mint_keypair) = create_genesis_block(2_000);
-        let treasury0 = Bank::new(&genesis_block);
-        let treasury1 = Bank::new(&genesis_block);
+        let treasury0 = Treasury::new(&genesis_block);
+        let treasury1 = Treasury::new(&genesis_block);
         let initial_state = treasury0.hash_internal_state();
         assert_eq!(treasury1.hash_internal_state(), initial_state);
 
@@ -1551,20 +1551,20 @@ mod tests {
 
     #[test]
     fn test_hash_internal_state_genesis() {
-        let treasury0 = Bank::new(&create_genesis_block(10).0);
-        let treasury1 = Bank::new(&create_genesis_block(20).0);
+        let treasury0 = Treasury::new(&create_genesis_block(10).0);
+        let treasury1 = Treasury::new(&create_genesis_block(20).0);
         assert_ne!(treasury0.hash_internal_state(), treasury1.hash_internal_state());
     }
 
     #[test]
     fn test_treasury_hash_internal_state_squash() {
         let collector_id = Pubkey::default();
-        let treasury0 = Arc::new(Bank::new(&create_genesis_block(10).0));
+        let treasury0 = Arc::new(Treasury::new(&create_genesis_block(10).0));
         let hash0 = treasury0.hash_internal_state();
         // save hash0 because new_from_parent
         // updates syscall entries
 
-        let treasury1 = Bank::new_from_parent(&treasury0, &collector_id, 1);
+        let treasury1 = Treasury::new_from_parent(&treasury0, &collector_id, 1);
 
         // no delta in treasury1, hashes match
         assert_eq!(hash0, treasury1.hash_internal_state());
@@ -1585,7 +1585,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
         let key2 = Keypair::new();
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx_transfer_mint_to_1 =
             system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
@@ -1644,7 +1644,7 @@ mod tests {
     #[test]
     fn test_treasury_get_account_in_parent_after_squash() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let key1 = Keypair::new();
 
@@ -1670,7 +1670,7 @@ mod tests {
         genesis_block.stakers_slot_offset = STAKERS_SLOT_OFFSET;
         genesis_block.epoch_warmup = false; // allows me to do the normal division stuff below
 
-        let parent = Arc::new(Bank::new(&genesis_block));
+        let parent = Arc::new(Treasury::new(&genesis_block));
 
         let vote_accounts0: Option<HashMap<_, _>> = parent.epoch_vote_accounts(0).map(|accounts| {
             accounts
@@ -1701,7 +1701,7 @@ mod tests {
         }
 
         // child crosses epoch boundary and is the first slot in the epoch
-        let child = Bank::new_from_parent(
+        let child = Treasury::new_from_parent(
             &parent,
             &leader_pubkey,
             SLOTS_PER_EPOCH - (STAKERS_SLOT_OFFSET % SLOTS_PER_EPOCH),
@@ -1710,7 +1710,7 @@ mod tests {
         assert!(child.epoch_vote_accounts(i).is_some());
 
         // child crosses epoch boundary but isn't the first slot in the epoch
-        let child = Bank::new_from_parent(
+        let child = Treasury::new_from_parent(
             &parent,
             &leader_pubkey,
             SLOTS_PER_EPOCH - (STAKERS_SLOT_OFFSET % SLOTS_PER_EPOCH) + 1,
@@ -1722,7 +1722,7 @@ mod tests {
     fn test_zero_signatures() {
         morgan_logger::setup();
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let mut treasury = Bank::new(&genesis_block);
+        let mut treasury = Treasury::new(&genesis_block);
         treasury.fee_calculator.difs_per_signature = 2;
         let key = Keypair::new();
 
@@ -1744,7 +1744,7 @@ mod tests {
     fn test_treasury_get_slots_in_epoch() {
         let (genesis_block, _) = create_genesis_block(500);
 
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
         assert_eq!(treasury.get_slots_in_epoch(0), MINIMUM_SLOT_LENGTH as u64);
         assert_eq!(treasury.get_slots_in_epoch(2), (MINIMUM_SLOT_LENGTH * 4) as u64);
@@ -1814,7 +1814,7 @@ mod tests {
     #[test]
     fn test_is_delta_true() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let key1 = Keypair::new();
         let tx_transfer_mint_to_1 =
             system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
@@ -1825,7 +1825,7 @@ mod tests {
     #[test]
     fn test_is_votable() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         let key1 = Keypair::new();
         assert_eq!(treasury.is_votable(), false);
 
@@ -1846,11 +1846,11 @@ mod tests {
     #[test]
     fn test_treasury_inherit_tx_count() {
         let (genesis_block, mint_keypair) = create_genesis_block(500);
-        let treasury0 = Arc::new(Bank::new(&genesis_block));
+        let treasury0 = Arc::new(Treasury::new(&genesis_block));
 
-        // Bank 1
+        // Treasury 1
         let treasury1 = Arc::new(new_from_parent(&treasury0));
-        // Bank 2
+        // Treasury 2
         let treasury2 = new_from_parent(&treasury0);
 
         // transfer a token
@@ -1886,7 +1886,7 @@ mod tests {
     fn test_treasury_inherit_fee_calculator() {
         let (mut genesis_block, _mint_keypair) = create_genesis_block(500);
         genesis_block.fee_calculator.difs_per_signature = 123;
-        let treasury0 = Arc::new(Bank::new(&genesis_block));
+        let treasury0 = Arc::new(Treasury::new(&genesis_block));
         let treasury1 = Arc::new(new_from_parent(&treasury0));
         assert_eq!(
             treasury0.fee_calculator.difs_per_signature,
@@ -1901,7 +1901,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block_with_leader(500, &Pubkey::new_rand(), 1);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
 
         let vote_accounts = treasury.vote_accounts();
         assert_eq!(vote_accounts.len(), 1); // bootstrap leader has
@@ -1940,7 +1940,7 @@ mod tests {
     #[test]
     fn test_treasury_0_votable() {
         let (genesis_block, _) = create_genesis_block(500);
-        let treasury = Arc::new(Bank::new(&genesis_block));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
         //set tick height to max
         let max_tick_height = ((treasury.slot + 1) * treasury.ticks_per_slot - 1) as usize;
         treasury.tick_height.store(max_tick_height, Ordering::Relaxed);
@@ -1950,7 +1950,7 @@ mod tests {
     #[test]
     fn test_is_delta_with_no_committables() {
         let (genesis_block, mint_keypair) = create_genesis_block(8000);
-        let treasury = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         treasury.is_delta.store(false, Ordering::Relaxed);
 
         let keypair1 = Keypair::new();
