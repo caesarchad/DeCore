@@ -48,7 +48,7 @@ pub struct WorkingBank {
 pub struct WaterClockRecorder {
     pub waterclock: Arc<Mutex<WaterClock>>,
     tick_height: u64,
-    clear_bank_signal: Option<SyncSender<bool>>,
+    clear_treasury_signal: Option<SyncSender<bool>>,
     start_slot: u64,
     start_tick: u64,
     tick_cache: Vec<(Entry, u64)>,
@@ -82,7 +82,7 @@ impl WaterClockRecorder {
             self.start_leader_at_tick = start_leader_at_tick;
             self.last_leader_tick = last_leader_tick;
         }
-        if let Some(ref signal) = self.clear_bank_signal {
+        if let Some(ref signal) = self.clear_treasury_signal {
             let _ = signal.try_send(true);
         }
     }
@@ -398,7 +398,7 @@ impl WaterClockRecorder {
         ticks_per_slot: u64,
         id: &Pubkey,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        clear_bank_signal: Option<SyncSender<bool>>,
+        clear_treasury_signal: Option<SyncSender<bool>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         waterclock_config: &Arc<WaterClockConfig>,
     ) -> (Self, Receiver<WorkingBankEntries>) {
@@ -420,7 +420,7 @@ impl WaterClockRecorder {
                 tick_cache: vec![],
                 working_treasury: None,
                 sender,
-                clear_bank_signal,
+                clear_treasury_signal,
                 start_slot,
                 start_tick: tick_height + 1,
                 start_leader_at_tick,
