@@ -105,7 +105,7 @@ impl Validator {
             completed_slots_receiver,
             leader_schedule_cache,
             waterclock_config,
-        ) = new_banks_from_block_buffer(ledger_path, config.account_paths.clone());
+        ) = new_treasuries_from_block_buffer(ledger_path, config.account_paths.clone());
 
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
@@ -329,7 +329,7 @@ impl Validator {
     }
 }
 
-pub fn new_banks_from_block_buffer(
+pub fn new_treasuries_from_block_buffer(
     block_buffer_pool_path: &str,
     account_paths: Option<String>,
 ) -> (

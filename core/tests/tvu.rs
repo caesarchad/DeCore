@@ -95,7 +95,7 @@ fn test_replay() {
         completed_slots_receiver,
         leader_schedule_cache,
         _,
-    ) = verifier::new_banks_from_block_buffer(&block_buffer_pool_path, None);
+    ) = verifier::new_treasuries_from_block_buffer(&block_buffer_pool_path, None);
     let working_treasury = treasury_forks.working_treasury();
     assert_eq!(
         working_treasury.get_balance(&mint_keypair.pubkey()),
