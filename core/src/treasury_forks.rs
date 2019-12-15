@@ -10,7 +10,7 @@ use std::time::Instant;
 use std::{borrow::Cow, convert, ffi::OsStr, path::Path, str};
 
 pub struct BankForks {
-    banks: HashMap<u64, Arc<Bank>>,
+    treasuries: HashMap<u64, Arc<Bank>>,
     working_treasury: Arc<Bank>,
     root: u64,
 }
@@ -18,17 +18,17 @@ pub struct BankForks {
 impl Index<u64> for BankForks {
     type Output = Arc<Bank>;
     fn index(&self, treasury_slot: u64) -> &Arc<Bank> {
-        &self.banks[&treasury_slot]
+        &self.treasuries[&treasury_slot]
     }
 }
 
 impl BankForks {
     pub fn new(treasury_slot: u64, treasury: Bank) -> Self {
-        let mut banks = HashMap::new();
+        let mut treasuries = HashMap::new();
         let working_treasury = Arc::new(treasury);
-        banks.insert(treasury_slot, working_treasury.clone());
+        treasuries.insert(treasury_slot, working_treasury.clone());
         Self {
-            banks,
+            treasuries,
             working_treasury,
             root: 0,
         }
@@ -37,7 +37,7 @@ impl BankForks {
     /// Create a map of treasury slot id to the set of ancestors for the treasury slot.
     pub fn ancestors(&self) -> HashMap<u64, HashSet<u64>> {
         let mut ancestors = HashMap::new();
-        for treasury in self.banks.values() {
+        for treasury in self.treasuries.values() {
             let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
             set.remove(&treasury.slot());
             ancestors.insert(treasury.slot(), set);
@@ -48,7 +48,7 @@ impl BankForks {
     /// Create a map of treasury slot id to the set of all of its descendants
     pub fn descendants(&self) -> HashMap<u64, HashSet<u64>> {
         let mut descendants = HashMap::new();
-        for treasury in self.banks.values() {
+        for treasury in self.treasuries.values() {
             let _ = descendants.entry(treasury.slot()).or_insert(HashSet::new());
             let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
             set.remove(&treasury.slot());
@@ -63,7 +63,7 @@ impl BankForks {
     }
 
     pub fn frozen_banks(&self) -> HashMap<u64, Arc<Bank>> {
-        self.banks
+        self.treasuries
             .iter()
             .filter(|(_, b)| b.is_frozen())
             .map(|(k, b)| (*k, b.clone()))
@@ -71,7 +71,7 @@ impl BankForks {
     }
 
     pub fn active_banks(&self) -> Vec<u64> {
-        self.banks
+        self.treasuries
             .iter()
             .filter(|(_, v)| !v.is_frozen())
             .map(|(k, _v)| *k)
@@ -79,25 +79,25 @@ impl BankForks {
     }
 
     pub fn get(&self, treasury_slot: u64) -> Option<&Arc<Bank>> {
-        self.banks.get(&treasury_slot)
+        self.treasuries.get(&treasury_slot)
     }
 
     pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
-        let mut banks = HashMap::new();
+        let mut treasuries = HashMap::new();
         let working_treasury = initial_banks[0].clone();
         for treasury in initial_banks {
-            banks.insert(treasury.slot(), treasury.clone());
+            treasuries.insert(treasury.slot(), treasury.clone());
         }
         Self {
             root,
-            banks,
+            treasuries,
             working_treasury,
         }
     }
 
     pub fn insert(&mut self, treasury: Bank) {
         let treasury = Arc::new(treasury);
-        let prev = self.banks.insert(treasury.slot(), treasury.clone());
+        let prev = self.treasuries.insert(treasury.slot(), treasury.clone());
         assert!(prev.is_none());
 
         self.working_treasury = treasury.clone();
@@ -112,7 +112,7 @@ impl BankForks {
         self.root = root;
         let set_root_start = Instant::now();
         let root_bank = self
-            .banks
+            .treasuries
             .get(&root)
             .expect("root treasury didn't exist in treasury_forks");
         let root_tx_count = root_bank
@@ -140,7 +140,7 @@ impl BankForks {
 
     fn prune_non_root(&mut self, root: u64) {
         let descendants = self.descendants();
-        self.banks
+        self.treasuries
             .retain(|slot, _| descendants[&root].contains(slot))
     }
 
@@ -215,9 +215,9 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
-        let child_bank = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
-        child_bank.register_tick(&Hash::default());
-        treasury_forks.insert(child_bank);
+        let child_treasury = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        child_treasury.register_tick(&Hash::default());
+        treasury_forks.insert(child_treasury);
         assert_eq!(treasury_forks[1u64].tick_height(), 1);
         assert_eq!(treasury_forks.working_treasury().tick_height(), 1);
     }
@@ -262,8 +262,8 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
-        let child_bank = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
-        treasury_forks.insert(child_bank);
+        let child_treasury = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        treasury_forks.insert(child_treasury);
         assert!(treasury_forks.frozen_banks().get(&0).is_some());
         assert!(treasury_forks.frozen_banks().get(&1).is_none());
     }
@@ -273,8 +273,8 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Bank::new(&genesis_block);
         let mut treasury_forks = BankForks::new(0, treasury);
-        let child_bank = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
-        treasury_forks.insert(child_bank);
+        let child_treasury = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        treasury_forks.insert(child_treasury);
         assert_eq!(treasury_forks.active_banks(), vec![1]);
     }
 

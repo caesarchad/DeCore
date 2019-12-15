@@ -33,26 +33,26 @@ fn test_accounts_create(bencher: &mut Bencher) {
 #[bench]
 fn test_accounts_squash(bencher: &mut Bencher) {
     let (genesis_block, _) = create_genesis_block(100_000);
-    let mut banks: Vec<Arc<Bank>> = Vec::with_capacity(10);
-    banks.push(Arc::new(Bank::new_with_paths(
+    let mut treasuries: Vec<Arc<Bank>> = Vec::with_capacity(10);
+    treasuries.push(Arc::new(Bank::new_with_paths(
         &genesis_block,
         Some("bench_a1".to_string()),
     )));
     let mut pubkeys: Vec<Pubkey> = vec![];
-    deposit_many(&banks[0], &mut pubkeys, 250000);
-    banks[0].freeze();
+    deposit_many(&treasuries[0], &mut pubkeys, 250000);
+    treasuries[0].freeze();
     // Measures the performance of the squash operation merging the accounts
     // with the majority of the accounts present in the parent treasury that is
     // moved over to this treasury.
     bencher.iter(|| {
-        banks.push(Arc::new(Bank::new_from_parent(
-            &banks[0],
+        treasuries.push(Arc::new(Bank::new_from_parent(
+            &treasuries[0],
             &Pubkey::default(),
             1u64,
         )));
         for accounts in 0..10000 {
-            banks[1].deposit(&pubkeys[accounts], (accounts + 1) as u64);
+            treasuries[1].deposit(&pubkeys[accounts], (accounts + 1) as u64);
         }
-        banks[1].squash();
+        treasuries[1].squash();
     });
 }

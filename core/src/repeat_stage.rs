@@ -399,7 +399,7 @@ impl ReplayStage {
         slot_full_sender: &Sender<(u64, Pubkey)>,
     ) -> Result<()> {
         let active_banks = treasury_forks.read().unwrap().active_banks();
-        trace!("active banks {:?}", active_banks);
+        trace!("active treasuries {:?}", active_banks);
 
         for treasury_slot in &active_banks {
             let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();

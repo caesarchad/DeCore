@@ -76,7 +76,7 @@ pub struct Bank {
     /// Bank fork (i.e. slot, i.e. block)
     slot: u64,
 
-    /// Bank height in term of banks
+    /// Bank height in term of treasuries
     bank_height: u64,
 
     /// The pubkey to send transactions fees to.

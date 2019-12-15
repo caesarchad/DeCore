@@ -879,7 +879,7 @@ mod tests {
     fn test_lazy_gc_fork() {
         //This test is pedantic
         //A fork is purged when a non root treasury is cleaned up.  If a fork is behind root but it is
-        //not root, it means we are retaining dead banks.
+        //not root, it means we are retaining dead treasuries.
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
         let pubkey = Pubkey::new_rand();

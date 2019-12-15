@@ -83,12 +83,12 @@ impl BankingStage {
         let verified_receiver = Arc::new(Mutex::new(verified_receiver));
         let verified_vote_receiver = Arc::new(Mutex::new(verified_vote_receiver));
 
-        // Single thread to generate entries from many banks.
+        // Single thread to generate entries from many treasuries.
         // This thread talks to waterclock_service and broadcasts the entries once they have been recorded.
         // Once an entry has been recorded, its blockhash is registered with the treasury.
         let exit = Arc::new(AtomicBool::new(false));
 
-        // Many banks that process transactions in parallel.
+        // Many treasuries that process transactions in parallel.
         let bank_thread_hdls: Vec<JoinHandle<()>> = (0..num_threads)
             .map(|i| {
                 let (verified_receiver, enable_forwarding) = if i < num_threads - 1 {

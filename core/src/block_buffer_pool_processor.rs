@@ -278,7 +278,7 @@ pub fn process_block_buffer_pool(
             entry_height += entries.len() as u64;
         }
 
-        treasury.freeze(); // all banks handled by this routine are created from complete slots
+        treasury.freeze(); // all treasuries handled by this routine are created from complete slots
 
         if block_buffer_pool.is_genesis(slot) {
             root = slot;
@@ -326,7 +326,7 @@ pub fn process_block_buffer_pool(
                     next_slot,
                 ));
                 trace!("Add child treasury for slot={}", next_slot);
-                // treasury_forks.insert(*next_slot, child_bank);
+                // treasury_forks.insert(*next_slot, child_treasury);
                 pending_slots.push((
                     next_slot,
                     next_meta,
@@ -348,8 +348,8 @@ pub fn process_block_buffer_pool(
         pending_slots.sort_by(|a, b| b.0.cmp(&a.0));
     }
 
-    let (banks, treasury_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
-    let treasury_forks = BankForks::new_from_banks(&banks, root);
+    let (treasuries, treasury_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
+    let treasury_forks = BankForks::new_from_banks(&treasuries, root);
     // info!(
     //     "{}",
     //     Info(format!("processing ledger...complete in {}ms, forks={}...",
@@ -571,7 +571,7 @@ pub mod tests {
             .collect::<Vec<_>>()
             .is_empty());
 
-        // Ensure treasury_forks holds the right banks
+        // Ensure treasury_forks holds the right treasuries
         for info in treasury_forks_info {
             assert_eq!(treasury_forks[info.treasury_slot].slot(), info.treasury_slot);
             assert!(treasury_forks[info.treasury_slot].is_frozen());
@@ -677,7 +677,7 @@ pub mod tests {
 
         assert_eq!(treasury_forks.root(), 1);
 
-        // Ensure treasury_forks holds the right banks
+        // Ensure treasury_forks holds the right treasuries
         for info in treasury_forks_info {
             assert_eq!(treasury_forks[info.treasury_slot].slot(), info.treasury_slot);
             assert!(treasury_forks[info.treasury_slot].is_frozen());

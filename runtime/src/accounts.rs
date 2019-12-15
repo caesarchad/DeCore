@@ -45,7 +45,7 @@ type AccountLocks = Mutex<HashSet<Pubkey>>;
 type RecordLocks = (
     // Record Locks for the current treasury
     Arc<AccountLocks>,
-    // Any unreleased record locks from all parent/grandparent banks. We use Arc<Mutex> to
+    // Any unreleased record locks from all parent/grandparent treasuries. We use Arc<Mutex> to
     // avoid copies when calling new_from_parent().
     Vec<Arc<AccountLocks>>,
 );
