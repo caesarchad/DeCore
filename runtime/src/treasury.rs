@@ -1515,7 +1515,7 @@ mod tests {
 
     /// Verifies that last ids and accounts are correctly referenced from parent
     #[test]
-    fn test_bank_parent_account_spend() {
+    fn test_treasury_parent_account_spend() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let key1 = Keypair::new();
         let key2 = Keypair::new();
