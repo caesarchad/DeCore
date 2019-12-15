@@ -94,7 +94,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
         .ancestors
         .clone();
     if let Some(hashmap) = subscriptions.get(hashmap_key) {
-        for (_bank_sub_id, (sink, confirmations)) in hashmap.iter() {
+        for (_treasury_sub_id, (sink, confirmations)) in hashmap.iter() {
             let desired_slot: Vec<u64> = current_ancestors
                 .iter()
                 .filter(|(_, &v)| v == *confirmations)
