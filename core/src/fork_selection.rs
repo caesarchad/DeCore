@@ -73,10 +73,10 @@ impl EpochStakes {
 
 impl Locktower {
     pub fn new_from_forks(treasury_forks: &BankForks, my_pubkey: &Pubkey) -> Self {
-        let mut frozen_banks: Vec<_> = treasury_forks.frozen_banks().values().cloned().collect();
-        frozen_banks.sort_by_key(|b| (b.parents().len(), b.slot()));
+        let mut frozen_treasuries: Vec<_> = treasury_forks.frozen_treasuries().values().cloned().collect();
+        frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
-            if let Some(treasury) = frozen_banks.last() {
+            if let Some(treasury) = frozen_treasuries.last() {
                 EpochStakes::new_from_bank(treasury, my_pubkey)
             } else {
                 return Self::default();
@@ -386,7 +386,7 @@ impl Locktower {
     fn find_heaviest_bank(&self, treasury_forks: &BankForks) -> Option<Arc<Bank>> {
         let ancestors = treasury_forks.ancestors();
         let mut bank_weights: Vec<_> = treasury_forks
-            .frozen_banks()
+            .frozen_treasuries()
             .values()
             .map(|b| {
                 (

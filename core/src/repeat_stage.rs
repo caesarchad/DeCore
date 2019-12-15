@@ -134,8 +134,8 @@ impl ReplayStage {
                     )?;
 
                     if ticks_per_slot == 0 {
-                        let frozen_banks = treasury_forks.read().unwrap().frozen_banks();
-                        let treasury = frozen_banks.values().next().unwrap();
+                        let frozen_treasuries = treasury_forks.read().unwrap().frozen_treasuries();
+                        let treasury = frozen_treasuries.values().next().unwrap();
                         ticks_per_slot = treasury.ticks_per_slot();
                     }
 
@@ -424,10 +424,10 @@ impl ReplayStage {
         // Locktower voting
         let descendants = treasury_forks.read().unwrap().descendants();
         let ancestors = treasury_forks.read().unwrap().ancestors();
-        let frozen_banks = treasury_forks.read().unwrap().frozen_banks();
+        let frozen_treasuries = treasury_forks.read().unwrap().frozen_treasuries();
 
-        trace!("frozen_banks {}", frozen_banks.len());
-        let mut votable: Vec<(u128, Arc<Bank>)> = frozen_banks
+        trace!("frozen_treasuries {}", frozen_treasuries.len());
+        let mut votable: Vec<(u128, Arc<Bank>)> = frozen_treasuries
             .values()
             .filter(|b| {
                 let is_votable = b.is_votable();
@@ -626,16 +626,16 @@ impl ReplayStage {
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         // Find the next slot that chains to the old slot
-        let frozen_banks = forks.frozen_banks();
-        let frozen_bank_slots: Vec<u64> = frozen_banks.keys().cloned().collect();
-        trace!("frozen_banks {:?}", frozen_bank_slots);
+        let frozen_treasuries = forks.frozen_treasuries();
+        let frozen_bank_slots: Vec<u64> = frozen_treasuries.keys().cloned().collect();
+        trace!("frozen_treasuries {:?}", frozen_bank_slots);
         let next_slots = block_buffer_pool
             .fetch_slot_from(&frozen_bank_slots)
             .expect("Db error");
         // Filter out what we've already seen
         trace!("generate new forks {:?}", next_slots);
         for (parent_id, children) in next_slots {
-            let parent_bank = frozen_banks
+            let parent_bank = frozen_treasuries
                 .get(&parent_id)
                 .expect("missing parent in treasury forks")
                 .clone();

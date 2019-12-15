@@ -62,7 +62,7 @@ impl BankForks {
         descendants
     }
 
-    pub fn frozen_banks(&self) -> HashMap<u64, Arc<Bank>> {
+    pub fn frozen_treasuries(&self) -> HashMap<u64, Arc<Bank>> {
         self.treasuries
             .iter()
             .filter(|(_, b)| b.is_frozen())
@@ -264,8 +264,8 @@ mod tests {
         let mut treasury_forks = BankForks::new(0, treasury);
         let child_treasury = Bank::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
         treasury_forks.insert(child_treasury);
-        assert!(treasury_forks.frozen_banks().get(&0).is_some());
-        assert!(treasury_forks.frozen_banks().get(&1).is_none());
+        assert!(treasury_forks.frozen_treasuries().get(&0).is_some());
+        assert!(treasury_forks.frozen_treasuries().get(&1).is_none());
     }
 
     #[test]
