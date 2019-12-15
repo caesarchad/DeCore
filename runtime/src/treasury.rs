@@ -1938,7 +1938,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_0_votable() {
+    fn test_treasury_0_votable() {
         let (genesis_block, _) = create_genesis_block(500);
         let treasury = Arc::new(Bank::new(&genesis_block));
         //set tick height to max
