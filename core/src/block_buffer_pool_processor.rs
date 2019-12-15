@@ -318,7 +318,7 @@ pub fn process_block_buffer_pool(
             // only process full slots in block_buffer_processor, replay_stage
             // handles any partials
             if next_meta.is_full() {
-                let next_bank = Arc::new(Bank::new_from_parent(
+                let next_treasury = Arc::new(Bank::new_from_parent(
                     &treasury,
                     &leader_schedule_cache
                         .slot_leader_at(next_slot, Some(&treasury))
@@ -330,7 +330,7 @@ pub fn process_block_buffer_pool(
                 pending_slots.push((
                     next_slot,
                     next_meta,
-                    next_bank,
+                    next_treasury,
                     entry_height,
                     last_entry_hash,
                 ));
