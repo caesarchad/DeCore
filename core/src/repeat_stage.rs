@@ -409,7 +409,7 @@ impl ReplayStage {
             }
             let max_tick_height = (*treasury_slot + 1) * treasury.ticks_per_slot() - 1;
             if treasury.tick_height() == max_tick_height {
-                Self::process_completed_bank(my_pubkey, treasury, slot_full_sender);
+                Self::process_completed_treasury(my_pubkey, treasury, slot_full_sender);
             }
         }
         Ok(())
@@ -602,7 +602,7 @@ impl ReplayStage {
         progress.retain(|k, _| r_treasury_forks.get(*k).is_some());
     }
 
-    fn process_completed_bank(
+    fn process_completed_treasury(
         my_pubkey: &Pubkey,
         treasury: Arc<Bank>,
         slot_full_sender: &Sender<(u64, Pubkey)>,
