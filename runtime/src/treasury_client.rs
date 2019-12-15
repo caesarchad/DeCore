@@ -196,11 +196,11 @@ impl BankClient {
     pub fn new_shared(treasury: &Arc<Bank>) -> Self {
         let (transaction_sender, transaction_receiver) = channel();
         let transaction_sender = Mutex::new(transaction_sender);
-        let thread_bank = treasury.clone();
+        let thread_treasury = treasury.clone();
         let treasury = treasury.clone();
         Builder::new()
             .name("morgan-treasury-client".to_string())
-            .spawn(move || Self::run(&thread_bank, transaction_receiver))
+            .spawn(move || Self::run(&thread_treasury, transaction_receiver))
             .unwrap();
         Self {
             treasury,
