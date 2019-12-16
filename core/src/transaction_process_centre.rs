@@ -1,7 +1,7 @@
 //! The `tpu` module implements the Transaction Processing Unit, a
-//! multi-stage transaction processing pipeline in software.
+//! multi-phase transaction processing pipeline in software.
 
-use crate::treasury_phase::TreasuryStage;
+use crate::treasury_phase::TreasuryPhase;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::propagate_phase::BroadcastPhase;
 use crate::node_group_info::NodeGroupInfo;
@@ -21,7 +21,7 @@ use std::thread;
 pub struct Tpu {
     fetch_phase: FetchPhase,
     sigverify_phase: SigVerifyPhase,
-    treasury_phase: TreasuryStage,
+    treasury_phase: TreasuryPhase,
     cluster_info_vote_listener: ClusterInfoVoteListener,
     broadcast_phase: BroadcastPhase,
 }
@@ -65,7 +65,7 @@ impl Tpu {
             &waterclock_recorder,
         );
 
-        let treasury_phase = TreasuryStage::new(
+        let treasury_phase = TreasuryPhase::new(
             &node_group_info,
             waterclock_recorder,
             verified_receiver,

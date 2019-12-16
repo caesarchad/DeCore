@@ -1,10 +1,10 @@
 //! The `tvu` module implements the Transaction Validation Unit, a
-//! multi-stage transaction validation pipeline in software.
+//! multi-phase transaction validation pipeline in software.
 //!
 //! 1. BlobFetchPhase
 //! - Incoming blobs are picked up from the TVU sockets and repair socket.
 //! 2. RetransmitPhase
-//! - Blobs are windowed until a contiguous chunk is available.  This stage also repairs and
+//! - Blobs are windowed until a contiguous chunk is available.  This phase also repairs and
 //! retransmits blobs that are in the queue.
 //! 3. ReplayPhase
 //! - Transactions in blobs are processed and applied to the treasury.
@@ -39,7 +39,7 @@ pub struct Tvu {
     retransmit_phase: RetransmitPhase,
     replay_phase: ReplayPhase,
     blockstream_service: Option<BlockstreamService>,
-    storage_phase: StoragePhase,
+    storage_stage: StoragePhase,
 }
 
 pub struct Sockets {
@@ -141,7 +141,7 @@ impl Tvu {
             None
         };
 
-        let storage_phase = StoragePhase::new(
+        let storage_stage = StoragePhase::new(
             storage_state,
             root_slot_receiver,
             Some(block_buffer_pool),
@@ -158,7 +158,7 @@ impl Tvu {
             retransmit_phase,
             replay_phase,
             blockstream_service,
-            storage_phase,
+            storage_stage,
         }
     }
 }
@@ -169,7 +169,7 @@ impl Service for Tvu {
     fn join(self) -> thread::Result<()> {
         self.retransmit_phase.join()?;
         self.fetch_phase.join()?;
-        self.storage_phase.join()?;
+        self.storage_stage.join()?;
         if self.blockstream_service.is_some() {
             self.blockstream_service.unwrap().join()?;
         }
@@ -237,7 +237,7 @@ pub mod tests {
     use crate::block_buffer_pool::get_tmp_ledger_path;
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use crate::storage_phase::STORAGE_ROTATE_TEST_COUNT;
+    use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
     use morgan_runtime::treasury::Treasury;
     use std::sync::atomic::Ordering;
 

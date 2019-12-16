@@ -35,7 +35,7 @@ fn retransmit(
         blobs.append(&mut nq);
     }
 
-    datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
+    datapoint_info!("retransmit-phase", ("count", blobs.len(), i64));
 
     let r_treasury = treasury_forks.read().unwrap().working_treasury();
     let treasury_epoch = r_treasury.get_stakers_epoch(r_treasury.slot());

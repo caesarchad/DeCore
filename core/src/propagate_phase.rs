@@ -1,4 +1,4 @@
-//! A stage to broadcast data from a leader node to validators
+//! A phase to broadcast data from a leader node to validators
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::{NodeGroupInfo, NodeGroupInfoError, DATA_PLANE_FANOUT};
@@ -265,10 +265,10 @@ impl BroadcastPhase {
     /// * `window` - Cache of blobs that we have broadcast
     /// * `receiver` - Receive channel for blobs to be retransmitted to all the layer 1 nodes.
     /// * `exit_sender` - Set to true when this service exits, allows rest of Tpu to exit cleanly.
-    /// Otherwise, when a Tpu closes, it only closes the stages that come after it. The stages
+    /// Otherwise, when a Tpu closes, it only closes the phasea that come after it. The phasea
     /// that come before could be blocked on a receive, and never notice that they need to
-    /// exit. Now, if any stage of the Tpu closes, it will lead to closing the WriteStage (b/c
-    /// WriteStage is the last stage in the pipeline), which will then close Broadcast service,
+    /// exit. Now, if any phase of the Tpu closes, it will lead to closing the WritePhase (b/c
+    /// WritePhase is the last phase in the pipeline), which will then close Broadcast service,
     /// which will then close FetchPhase in the Tpu, and then the rest of the Tpu,
     /// completing the cycle.
     #[allow(clippy::too_many_arguments)]
@@ -357,7 +357,7 @@ mod test {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
 
-        // Start up the broadcast stage
+        // Start up the broadcast phase
         let broadcast_service = BroadcastPhase::new(
             leader_info.sockets.broadcast,
             node_group_info,

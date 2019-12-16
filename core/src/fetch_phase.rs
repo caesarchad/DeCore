@@ -125,7 +125,7 @@ impl FetchPhase {
         let waterclock_recorder = waterclock_recorder.clone();
 
         let fwd_thread_hdl = Builder::new()
-            .name("morgan-fetch-stage-fwd-rcvr".to_string())
+            .name("morgan-fetch-phase-fwd-rcvr".to_string())
             .spawn(move || loop {
                 if let Err(e) =
                     Self::handle_forwarded_packets(&forward_receiver, &sender, &waterclock_recorder)

@@ -92,7 +92,7 @@ impl ReplayPhase {
     {
         let (root_slot_sender, root_slot_receiver) = channel();
         let (slot_full_sender, slot_full_receiver) = channel();
-        trace!("replay stage");
+        trace!("replay phase");
         let exit_ = exit.clone();
         let subscriptions = subscriptions.clone();
         let treasury_forks = treasury_forks.clone();
@@ -100,12 +100,12 @@ impl ReplayPhase {
         let my_pubkey = *my_pubkey;
         let mut ticks_per_slot = 0;
         let mut locktower = Locktower::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
-        // Start the replay stage loop
+        // Start the replay phase loop
         let leader_schedule_cache = leader_schedule_cache.clone();
         let vote_account = *vote_account;
         let voting_keypair = voting_keypair.cloned();
         let t_replay = Builder::new()
-            .name("morgan-replay-stage".to_string())
+            .name("morgan-replay-phase".to_string())
             .spawn(move || {
                 let _exit = Finalizer::new(exit_.clone());
                 let mut progress = HashMap::new();
@@ -197,7 +197,7 @@ impl ReplayPhase {
                     }
 
                     inc_new_counter_info!(
-                        "replicate_stage-duration",
+                        "replicate_phase-duration",
                         duration_as_ms(&now.elapsed()) as usize
                     );
                     let timer = Duration::from_millis(100);
@@ -287,7 +287,7 @@ impl ReplayPhase {
         let result = Self::replay_entries_into_treasury(treasury, entries, progress, num);
         if result.is_ok() {
             trace!("verified entries {}", len);
-            inc_new_counter_info!("replicate-stage_process_entries", len);
+            inc_new_counter_info!("replicate-phase_process_entries", len);
         } else {
             // info!("{}", Info(format!("debug to verify entries {}", len).to_string()));
             println!("{}",
@@ -297,7 +297,7 @@ impl ReplayPhase {
                 )
             );
             //TODO: mark this fork as failed
-            inc_new_counter_error!("replicate-stage_failed_process_entries", len);
+            inc_new_counter_error!("replicate-phase_failed_process_entries", len);
         }
         Ok(())
     }

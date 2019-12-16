@@ -1,5 +1,5 @@
 //! The `treasury_phase` processes Transaction messages. It is intended to be used
-//! to contruct a software pipeline. The stage uses all available CPU cores and
+//! to contruct a software pipeline. The phase uses all available CPU cores and
 //! can do its processing in parallel with signature verification on the GPU.
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
@@ -42,8 +42,8 @@ pub type UnprocessedPackets = Vec<PacketsAndOffsets>;
 // number of threads is 1 until mt treasury is ready
 pub const NUM_THREADS: u32 = 10;
 
-/// Stores the stage's thread handle and output receiver.
-pub struct TreasuryStage {
+/// Stores the phase's thread handle and output receiver.
+pub struct TreasuryPhase {
     treasury_thread_hdls: Vec<JoinHandle<()>>,
 }
 
@@ -54,8 +54,8 @@ pub enum BufferedPacketsDecision {
     Hold,
 }
 
-impl TreasuryStage {
-    /// Create the stage using `treasury`. Exit when `verified_receiver` is dropped.
+impl TreasuryPhase {
+    /// Create the phase using `treasury`. Exit when `verified_receiver` is dropped.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -103,7 +103,7 @@ impl TreasuryStage {
                 let exit = exit.clone();
                 let mut recv_start = Instant::now();
                 Builder::new()
-                    .name("morgan-treasury-stage-tx".to_string())
+                    .name("morgan-treasury-phase-tx".to_string())
                     .spawn(move || {
                         Self::process_loop(
                             &verified_receiver,
@@ -352,7 +352,7 @@ impl TreasuryStage {
                     buffered_packets.append(&mut unprocessed_packets);
                 }
                 Err(err) => {
-                    debug!("morgan-treasury-stage-tx: exit due to {:?}", err);
+                    debug!("morgan-treasury-phase-tx: exit due to {:?}", err);
                     break;
                 }
             }
@@ -416,7 +416,7 @@ impl TreasuryStage {
         let now = Instant::now();
         // Use a shorter maximum age when adding transactions into the pipeline.  This will reduce
         // the likelihood of any single thread getting starved and processing old ids.
-        // TODO: Treasury stage threads should be prioritized to complete faster then this queue
+        // TODO: Treasury phase threads should be prioritized to complete faster then this queue
         // expires.
         let (loaded_accounts, results) =
             treasury.load_and_execute_transactions(txs, lock_results, MAX_RECENT_BLOCKHASHES / 2);
@@ -809,7 +809,7 @@ impl TreasuryStage {
     }
 }
 
-impl Service for TreasuryStage {
+impl Service for TreasuryPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -883,7 +883,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let treasury_phase = TreasuryStage::new(
+            let treasury_phase = TreasuryPhase::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -918,7 +918,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let treasury_phase = TreasuryStage::new(
+            let treasury_phase = TreasuryPhase::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -967,7 +967,7 @@ mod tests {
                 create_test_recorder(&treasury, &block_buffer_pool);
             let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
             let node_group_info = Arc::new(RwLock::new(node_group_info));
-            let treasury_phase = TreasuryStage::new(
+            let treasury_phase = TreasuryPhase::new(
                 &node_group_info,
                 &waterclock_recorder,
                 verified_receiver,
@@ -1112,7 +1112,7 @@ mod tests {
                 let node_group_info =
                     NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
                 let node_group_info = Arc::new(RwLock::new(node_group_info));
-                let _treasury_phase = TreasuryStage::new_num_threads(
+                let _treasury_phase = TreasuryPhase::new_num_threads(
                     &node_group_info,
                     &waterclock_recorder,
                     verified_receiver,
@@ -1145,7 +1145,7 @@ mod tests {
                     .for_each(|x| assert_eq!(*x, Ok(())));
             }
 
-            // Assert the user holds one dif, not two. If the stage only outputs one
+            // Assert the user holds one dif, not two. If the phase only outputs one
             // entry, then the second transaction will be rejected, because it drives
             // the account balance below zero before the credit is added.
             assert_eq!(treasury.get_balance(&alice.pubkey()), 1);
@@ -1194,7 +1194,7 @@ mod tests {
             ];
 
             let mut results = vec![Ok(()), Ok(())];
-            TreasuryStage::record_transactions(
+            TreasuryPhase::record_transactions(
                 &treasury,
                 &transactions,
                 &results,
@@ -1210,7 +1210,7 @@ mod tests {
                 1,
                 InstructionError::new_result_with_negative_difs(),
             ));
-            TreasuryStage::record_transactions(
+            TreasuryPhase::record_transactions(
                 &treasury,
                 &transactions,
                 &results,
@@ -1223,7 +1223,7 @@ mod tests {
 
             // Other TransactionErrors should not be recorded
             results[0] = Err(TransactionError::AccountNotFound);
-            TreasuryStage::record_transactions(
+            TreasuryPhase::record_transactions(
                 &treasury,
                 &transactions,
                 &results,
@@ -1302,7 +1302,7 @@ mod tests {
         ];
 
         assert_eq!(
-            TreasuryStage::filter_transaction_indexes(
+            TreasuryPhase::filter_transaction_indexes(
                 transactions.clone(),
                 &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             ),
@@ -1310,7 +1310,7 @@ mod tests {
         );
 
         assert_eq!(
-            TreasuryStage::filter_transaction_indexes(
+            TreasuryPhase::filter_transaction_indexes(
                 transactions,
                 &vec![1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15],
             ),
@@ -1337,7 +1337,7 @@ mod tests {
         ];
 
         assert_eq!(
-            TreasuryStage::prepare_filter_for_pending_transactions(&transactions, &vec![2, 4, 5],),
+            TreasuryPhase::prepare_filter_for_pending_transactions(&transactions, &vec![2, 4, 5],),
             vec![
                 Err(TransactionError::BlockhashNotFound),
                 Err(TransactionError::BlockhashNotFound),
@@ -1349,7 +1349,7 @@ mod tests {
         );
 
         assert_eq!(
-            TreasuryStage::prepare_filter_for_pending_transactions(&transactions, &vec![0, 2, 3],),
+            TreasuryPhase::prepare_filter_for_pending_transactions(&transactions, &vec![0, 2, 3],),
             vec![
                 Ok(()),
                 Err(TransactionError::BlockhashNotFound),
@@ -1364,7 +1364,7 @@ mod tests {
     #[test]
     fn test_treasury_filter_valid_transaction_indexes() {
         assert_eq!(
-            TreasuryStage::filter_valid_transaction_indexes(
+            TreasuryPhase::filter_valid_transaction_indexes(
                 &vec![
                     Err(TransactionError::BlockhashNotFound),
                     Err(TransactionError::BlockhashNotFound),
@@ -1379,7 +1379,7 @@ mod tests {
         );
 
         assert_eq!(
-            TreasuryStage::filter_valid_transaction_indexes(
+            TreasuryPhase::filter_valid_transaction_indexes(
                 &vec![
                     Ok(()),
                     Err(TransactionError::BlockhashNotFound),
@@ -1400,20 +1400,20 @@ mod tests {
         let my_pubkey1 = Pubkey::new_rand();
 
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(None, true, false, &my_pubkey),
+            TreasuryPhase::consume_or_forward_packets(None, true, false, &my_pubkey),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(None, false, false, &my_pubkey),
+            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_pubkey),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(None, false, false, &my_pubkey1),
+            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_pubkey1),
             BufferedPacketsDecision::Hold
         );
 
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(
+            TreasuryPhase::consume_or_forward_packets(
                 Some(my_pubkey1.clone()),
                 false,
                 false,
@@ -1422,7 +1422,7 @@ mod tests {
             BufferedPacketsDecision::Forward
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(
+            TreasuryPhase::consume_or_forward_packets(
                 Some(my_pubkey1.clone()),
                 false,
                 true,
@@ -1431,7 +1431,7 @@ mod tests {
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(
+            TreasuryPhase::consume_or_forward_packets(
                 Some(my_pubkey1.clone()),
                 true,
                 false,
@@ -1440,7 +1440,7 @@ mod tests {
             BufferedPacketsDecision::Consume
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(
+            TreasuryPhase::consume_or_forward_packets(
                 Some(my_pubkey1.clone()),
                 false,
                 false,
@@ -1449,7 +1449,7 @@ mod tests {
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryStage::consume_or_forward_packets(
+            TreasuryPhase::consume_or_forward_packets(
                 Some(my_pubkey1.clone()),
                 true,
                 false,
@@ -1501,7 +1501,7 @@ mod tests {
 
             waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
 
-            TreasuryStage::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
+            TreasuryPhase::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
                 .0
                 .unwrap();
             waterclock_recorder.lock().unwrap().tick();
@@ -1533,7 +1533,7 @@ mod tests {
             )];
 
             assert_matches!(
-                TreasuryStage::process_and_record_transactions(
+                TreasuryPhase::process_and_record_transactions(
                     &treasury,
                     &transactions,
                     &waterclock_recorder,
@@ -1589,7 +1589,7 @@ mod tests {
 
             waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
 
-            let (result, unprocessed) = TreasuryStage::process_and_record_transactions(
+            let (result, unprocessed) = TreasuryPhase::process_and_record_transactions(
                 &treasury,
                 &transactions,
                 &waterclock_recorder,
@@ -1624,7 +1624,7 @@ mod tests {
             })
             .collect_vec();
 
-        let result = TreasuryStage::filter_valid_packets_for_forwarding(&all_packets);
+        let result = TreasuryPhase::filter_valid_packets_for_forwarding(&all_packets);
 
         assert_eq!(result.len(), 256);
 

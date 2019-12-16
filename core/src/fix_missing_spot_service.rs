@@ -835,7 +835,7 @@ mod test {
             .is_none());
 
         sleep(Duration::from_millis(10));
-        // Updating just the root again should update gossip (simulates replay stage updating root
+        // Updating just the root again should update gossip (simulates replay phase updating root
         // after a slot has been signaled as completed)
         RepairService::update_epoch_slots(
             my_pubkey.clone(),

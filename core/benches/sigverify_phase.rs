@@ -23,7 +23,7 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
     let (packet_s, packet_r) = channel();
     let (verified_s, verified_r) = channel();
     let sigverify_disabled = false;
-    let stage = SigVerifyPhase::new(packet_r, sigverify_disabled, verified_s);
+    let phase = SigVerifyPhase::new(packet_r, sigverify_disabled, verified_s);
 
     let now = Instant::now();
     let len = 4096;
@@ -79,5 +79,5 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
         }
         trace!("received: {}", received);
     });
-    stage.join().unwrap();
+    phase.join().unwrap();
 }

@@ -28,8 +28,8 @@ with open(sys.argv[1]) as fh:
 
 fig, ax = plt.subplots()
 
-for stage in phases_to_counters.keys():
-    plt.plot(phases_to_time[stage], phases_to_counters[stage], label=stage)
+for phase in phases_to_counters.keys():
+    plt.plot(phases_to_time[phase], phases_to_counters[phase], label=phase)
 
 plt.xlabel('ms')
 plt.ylabel('count')

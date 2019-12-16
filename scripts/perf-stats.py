@@ -35,36 +35,36 @@ with open(sys.argv[1]) as fh:
             phases_data[counter]['last_ts'] = x['now']
             phases_data[counter]['last_count'] = x['counts']
 
-for stage in phases_data.keys():
-    phases_data[stage]['data'].sort()
-    #mean_index = phases_data[stage]['count'] / 2
+for phase in phases_data.keys():
+    phases_data[phase]['data'].sort()
+    #mean_index = phases_data[phase]['count'] / 2
     mean = 0
     average = 0
     eightieth = 0
-    data_len = len(phases_data[stage]['data'])
+    data_len = len(phases_data[phase]['data'])
     mean_index = int(data_len / 2)
     eightieth_index = int(data_len * 0.8)
     #print("mean idx: {} data.len: {}".format(mean_index, data_len))
     if data_len > 0:
-        mean = phases_data[stage]['data'][mean_index]
-        average = float(sum(phases_data[stage]['data'])) / data_len
-        eightieth = phases_data[stage]['data'][eightieth_index]
-    print("stage: {} max: {:,.2f} min: {:.2f} count: {} total: {} mean: {:,.2f} average: {:,.2f} 80%: {:,.2f}".format(stage,
-                                                       phases_data[stage]['max_speed'],
-                                                       phases_data[stage]['min_speed'],
-                                                       phases_data[stage]['count'],
-                                                       phases_data[stage]['last_count'],
+        mean = phases_data[phase]['data'][mean_index]
+        average = float(sum(phases_data[phase]['data'])) / data_len
+        eightieth = phases_data[phase]['data'][eightieth_index]
+    print("phase: {} max: {:,.2f} min: {:.2f} count: {} total: {} mean: {:,.2f} average: {:,.2f} 80%: {:,.2f}".format(phase,
+                                                       phases_data[phase]['max_speed'],
+                                                       phases_data[phase]['min_speed'],
+                                                       phases_data[phase]['count'],
+                                                       phases_data[phase]['last_count'],
                                                        mean, average, eightieth))
     num = 5
     idx = -1
     if data_len >= num:
         print("    top {}: ".format(num), end='')
         for x in range(0, num):
-            print("{:,.2f}  ".format(phases_data[stage]['data'][idx]), end='')
+            print("{:,.2f}  ".format(phases_data[phase]['data'][idx]), end='')
             idx -= 1
-            if phases_data[stage]['data'][idx] < average:
+            if phases_data[phase]['data'][idx] < average:
                 break
         print("")
-    print("    max_ts: {} min_ts: {}".format(phases_data[stage]['max_speed_ts'], phases_data[stage]['min_speed_ts']))
+    print("    max_ts: {} min_ts: {}".format(phases_data[phase]['max_speed_ts'], phases_data[phase]['min_speed_ts']))
     print("\n")
 

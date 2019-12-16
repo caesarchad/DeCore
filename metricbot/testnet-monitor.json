@@ -1673,7 +1673,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT mean(\"total_peers\") as \"total peers\" FROM \"$testnet\".\"autogen\".\"vote_stage-peer_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)",
+          "query": "SELECT mean(\"total_peers\") as \"total peers\" FROM \"$testnet\".\"autogen\".\"vote_phase-peer_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1711,7 +1711,7 @@
           "hide": false,
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT mean(\"valid_peers\") as \"valid peers\" FROM \"$testnet\".\"autogen\".\"vote_stage-peer_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)",
+          "query": "SELECT mean(\"valid_peers\") as \"valid peers\" FROM \"$testnet\".\"autogen\".\"vote_phase-peer_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -4740,7 +4740,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"record\" FROM \"$testnet\".\"autogen\".\"record_stage-signals_received\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
+          "query": "SELECT sum(\"count\") AS \"record\" FROM \"$testnet\".\"autogen\".\"record_phase-signals_received\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -4778,7 +4778,7 @@
           "hide": false,
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"lwrite\" FROM \"$testnet\".\"autogen\".\"ledger_writer_stage-entries_received\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
+          "query": "SELECT sum(\"count\") AS \"lwrite\" FROM \"$testnet\".\"autogen\".\"ledger_writer_phase-entries_received\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
           "rawQuery": true,
           "refId": "D",
           "resultFormat": "time_series",
@@ -4815,7 +4815,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"fetchstage\" FROM \"$testnet\".\"autogen\".\"packets-recv_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
+          "query": "SELECT sum(\"count\") AS \"fetchphase\" FROM \"$testnet\".\"autogen\".\"packets-recv_count\" WHERE $timeFilter GROUP BY time($__interval) FILL(0)\n",
           "rawQuery": true,
           "refId": "G",
           "resultFormat": "time_series",
@@ -4963,7 +4963,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"retransmit\" FROM \"$testnet\".\"autogen\".\"retransmit-stage\" WHERE host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)",
+          "query": "SELECT sum(\"count\") AS \"retransmit\" FROM \"$testnet\".\"autogen\".\"retransmit-phase\" WHERE host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)",
           "rawQuery": true,
           "refId": "I",
           "resultFormat": "time_series",
@@ -5154,7 +5154,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"request\" FROM \"$testnet\".\"autogen\".\"request_stage-time_ms\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)\n",
+          "query": "SELECT sum(\"count\") AS \"request\" FROM \"$testnet\".\"autogen\".\"request_phase-time_ms\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)\n",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -5191,7 +5191,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT sum(\"count\") AS \"write\" FROM \"$testnet\".\"autogen\".\"ledger_writer_stage-time_ms\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)\n",
+          "query": "SELECT sum(\"count\") AS \"write\" FROM \"$testnet\".\"autogen\".\"ledger_writer_phase-time_ms\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)\n",
           "rawQuery": true,
           "refId": "D",
           "resultFormat": "time_series",
@@ -5326,7 +5326,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Time Spent in Stages ($hostid)",
+      "title": "Time Spent in Phases ($hostid)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -5370,7 +5370,7 @@
         "locktower-observed.squash_cache": "#ea6460",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -5579,7 +5579,7 @@
         "locktower-vote.last": "#00ffbb",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -5897,7 +5897,7 @@
         "waterclock_recorder-tick_lock_contention.sum": "#962d82",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -6280,7 +6280,7 @@
       "aliasColors": {
         "cluster-info.repair": "#ba43a9",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -6436,7 +6436,7 @@
       "aliasColors": {
         "cluster-info.repair": "#ba43a9",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -6555,7 +6555,7 @@
       "aliasColors": {
         "cluster-info.repair": "#ba43a9",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -6916,7 +6916,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT last(\"consumed\") AS \"validator\" FROM \"$testnet\".\"autogen\".\"window-stage\" WHERE host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)",
+          "query": "SELECT last(\"consumed\") AS \"validator\" FROM \"$testnet\".\"autogen\".\"window-phase\" WHERE host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval) FILL(0)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -7033,7 +7033,7 @@
         "cluster-info.repair": "#ba43a9",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -7193,7 +7193,7 @@
         "locktower-vote.last": "#00ffbb",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,
@@ -7353,7 +7353,7 @@
         "cluster-info.repair": "#ba43a9",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
-        "window-stage.consumed": "#5195ce"
+        "window-phase.consumed": "#5195ce"
       },
       "bars": false,
       "dashLength": 10,

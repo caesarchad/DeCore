@@ -1,4 +1,4 @@
-// A stage that handles generating the keys used to encrypt the ledger and sample it
+// A phase that handles generating the keys used to encrypt the ledger and sample it
 // for storage mining. miners submit storage proofs, validator then bundles them
 // to submit its proof for mining to be rewarded.
 
@@ -149,7 +149,7 @@ impl StoragePhase {
             let exit = exit.clone();
             let storage_keypair = storage_keypair.clone();
             Builder::new()
-                .name("morgan-storage-mining-verify-stage".to_string())
+                .name("morgan-storage-mining-verify-phase".to_string())
                 .spawn(move || {
                     let mut current_key = 0;
                     let mut slot_count = 0;
@@ -612,7 +612,7 @@ mod tests {
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_phase = StoragePhase::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             None,
@@ -624,7 +624,7 @@ mod tests {
             &node_group_info,
         );
         exit.store(true, Ordering::Relaxed);
-        storage_phase.join().unwrap();
+        storage_stage.join().unwrap();
     }
 
     fn test_node_group_info(id: &Pubkey) -> Arc<RwLock<NodeGroupInfo>> {
@@ -657,7 +657,7 @@ mod tests {
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_phase = StoragePhase::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
@@ -715,7 +715,7 @@ mod tests {
             )
         );
         exit.store(true, Ordering::Relaxed);
-        storage_phase.join().unwrap();
+        storage_stage.join().unwrap();
 
         #[cfg(not(all(feature = "cuda", feature = "chacha")))]
         assert_eq!(result, Hash::default());
@@ -748,7 +748,7 @@ mod tests {
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_phase = StoragePhase::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
@@ -797,7 +797,7 @@ mod tests {
 
         debug!("joining..?");
         exit.store(true, Ordering::Relaxed);
-        storage_phase.join().unwrap();
+        storage_stage.join().unwrap();
 
         {
             let keys = &storage_state.state.read().unwrap().storage_keys;
