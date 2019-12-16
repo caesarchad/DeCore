@@ -40,9 +40,9 @@ impl AsyncClient for TreasuryClient {
         &self,
         keypairs: &[&Keypair],
         message: Message,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let transaction = Transaction::new(&keypairs, message, recent_blockhash);
+        let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
         self.async_send_transaction(transaction)
     }
 
@@ -50,10 +50,10 @@ impl AsyncClient for TreasuryClient {
         &self,
         keypair: &Keypair,
         instruction: Instruction,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.async_send_message(&[keypair], message, recent_blockhash)
+        self.async_send_message(&[keypair], message, recent_transaction_seal)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -62,18 +62,18 @@ impl AsyncClient for TreasuryClient {
         difs: u64,
         keypair: &Keypair,
         pubkey: &Pubkey,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.async_send_instruction(keypair, transfer_instruction, recent_blockhash)
+        self.async_send_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
 
 impl SyncClient for TreasuryClient {
     fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
-        let blockhash = self.treasury.last_blockhash();
-        let transaction = Transaction::new(&keypairs, message, blockhash);
+        let transaction_seal = self.treasury.last_transaction_seal();
+        let transaction = Transaction::new(&keypairs, message, transaction_seal);
         self.treasury.process_transaction(&transaction)?;
         Ok(transaction.signatures.get(0).cloned().unwrap_or_default())
     }
@@ -106,10 +106,10 @@ impl SyncClient for TreasuryClient {
         Ok(self.treasury.get_signature_status(signature))
     }
 
-    fn get_recent_blockhash(&self) -> Result<(Hash, FeeCalculator)> {
-        let last_blockhash = self.treasury.last_blockhash();
+    fn get_recent_transaction_seal(&self) -> Result<(Hash, FeeCalculator)> {
+        let last_transaction_seal = self.treasury.last_transaction_seal();
         let fee_calculator = self.treasury.fee_calculator.clone();
-        Ok((last_blockhash, fee_calculator))
+        Ok((last_transaction_seal, fee_calculator))
     }
 
     fn get_transaction_count(&self) -> Result<u64> {
@@ -169,14 +169,14 @@ impl SyncClient for TreasuryClient {
         Ok(())
     }
 
-    fn get_new_blockhash(&self, blockhash: &Hash) -> Result<(Hash, FeeCalculator)> {
-        let (last_blockhash, fee_calculator) = self.get_recent_blockhash()?;
-        if last_blockhash != *blockhash {
-            Ok((last_blockhash, fee_calculator))
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, FeeCalculator)> {
+        let (last_transaction_seal, fee_calculator) = self.get_recent_transaction_seal()?;
+        if last_transaction_seal != *transaction_seal {
+            Ok((last_transaction_seal, fee_calculator))
         } else {
             Err(TransportError::IoError(io::Error::new(
                 io::ErrorKind::Other,
-                "Unable to get new blockhash",
+                "Unable to get new transaction_seal",
             )))
         }
     }

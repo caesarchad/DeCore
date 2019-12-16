@@ -22,7 +22,7 @@ use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::{
-    self, duration_as_us, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_BLOCKHASHES,
+    self, duration_as_us, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
     MAX_TRANSACTION_FORWARDING_DELAY,
 };
 use morgan_interface::transaction::{self, Transaction, TransactionError};
@@ -85,7 +85,7 @@ impl TreasuryPhase {
 
         // Single thread to generate entries from many treasuries.
         // This thread talks to waterclock_service and broadcasts the entries once they have been recorded.
-        // Once an entry has been recorded, its blockhash is registered with the treasury.
+        // Once an entry has been recorded, its transaction_seal is registered with the treasury.
         let exit = Arc::new(AtomicBool::new(false));
 
         // Many treasuries that process transactions in parallel.
@@ -419,7 +419,7 @@ impl TreasuryPhase {
         // TODO: Treasury phase threads should be prioritized to complete faster then this queue
         // expires.
         let (loaded_accounts, results) =
-            treasury.load_and_execute_transactions(txs, lock_results, MAX_RECENT_BLOCKHASHES / 2);
+            treasury.load_and_execute_transactions(txs, lock_results, MAX_RECENT_TRANSACTION_SEALS / 2);
         let load_execute_time = now.elapsed();
 
         let freeze_lock = treasury.freeze_lock();
@@ -571,7 +571,7 @@ impl TreasuryPhase {
         transactions: &[Transaction],
         pending_tx_indexes: &[usize],
     ) -> Vec<transaction::Result<()>> {
-        let mut mask = vec![Err(TransactionError::BlockhashNotFound); transactions.len()];
+        let mut mask = vec![Err(TransactionError::TransactionSealNotFound); transactions.len()];
         pending_tx_indexes.iter().for_each(|x| mask[*x] = Ok(()));
         mask
     }
@@ -624,7 +624,7 @@ impl TreasuryPhase {
         let result = treasury.check_transactions(
             transactions,
             &filter,
-            (MAX_RECENT_BLOCKHASHES - MAX_TRANSACTION_FORWARDING_DELAY) / 2,
+            (MAX_RECENT_TRANSACTION_SEALS - MAX_TRANSACTION_FORWARDING_DELAY) / 2,
             &mut error_counters,
         );
 
@@ -833,7 +833,7 @@ pub fn create_test_recorder(
     let waterclock_config = Arc::new(WaterClockConfig::default());
     let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
         treasury.tick_height(),
-        treasury.last_blockhash(),
+        treasury.last_transaction_seal(),
         treasury.slot(),
         Some(4),
         treasury.ticks_per_slot(),
@@ -906,7 +906,7 @@ mod tests {
         } = create_genesis_block(2);
         genesis_block.ticks_per_slot = 4;
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let start_hash = treasury.last_blockhash();
+        let start_hash = treasury.last_transaction_seal();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -940,7 +940,7 @@ mod tests {
             trace!("done");
             assert_eq!(entries.len(), genesis_block.ticks_per_slot as usize - 1);
             assert!(entries.verify(&start_hash));
-            assert_eq!(entries[entries.len() - 1].hash, treasury.last_blockhash());
+            assert_eq!(entries[entries.len() - 1].hash, treasury.last_transaction_seal());
             treasury_phase.join().unwrap();
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -955,7 +955,7 @@ mod tests {
             ..
         } = create_genesis_block(10);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let start_hash = treasury.last_blockhash();
+        let start_hash = treasury.last_transaction_seal();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
         let ledger_path = get_tmp_ledger_path!();
@@ -1018,7 +1018,7 @@ mod tests {
             waterclock_service.join().unwrap();
             drop(waterclock_recorder);
 
-            let mut blockhash = start_hash;
+            let mut transaction_seal = start_hash;
             let treasury = Treasury::new(&genesis_block);
             treasury.process_transaction(&fund_tx).unwrap();
             //receive entries + ticks
@@ -1034,8 +1034,8 @@ mod tests {
                             .iter()
                             .for_each(|x| assert_eq!(*x, Ok(())));
                     }
-                    assert!(entries.verify(&blockhash));
-                    blockhash = entries.last().unwrap().hash;
+                    assert!(entries.verify(&transaction_seal));
+                    transaction_seal = entries.last().unwrap().hash;
                 }
 
                 if treasury.get_balance(&to) == 1 {
@@ -1172,7 +1172,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 treasury.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 treasury.slot(),
                 None,
                 treasury.ticks_per_slot(),
@@ -1339,10 +1339,10 @@ mod tests {
         assert_eq!(
             TreasuryPhase::prepare_filter_for_pending_transactions(&transactions, &vec![2, 4, 5],),
             vec![
-                Err(TransactionError::BlockhashNotFound),
-                Err(TransactionError::BlockhashNotFound),
+                Err(TransactionError::TransactionSealNotFound),
+                Err(TransactionError::TransactionSealNotFound),
                 Ok(()),
-                Err(TransactionError::BlockhashNotFound),
+                Err(TransactionError::TransactionSealNotFound),
                 Ok(()),
                 Ok(())
             ]
@@ -1352,11 +1352,11 @@ mod tests {
             TreasuryPhase::prepare_filter_for_pending_transactions(&transactions, &vec![0, 2, 3],),
             vec![
                 Ok(()),
-                Err(TransactionError::BlockhashNotFound),
+                Err(TransactionError::TransactionSealNotFound),
                 Ok(()),
                 Ok(()),
-                Err(TransactionError::BlockhashNotFound),
-                Err(TransactionError::BlockhashNotFound),
+                Err(TransactionError::TransactionSealNotFound),
+                Err(TransactionError::TransactionSealNotFound),
             ]
         );
     }
@@ -1366,10 +1366,10 @@ mod tests {
         assert_eq!(
             TreasuryPhase::filter_valid_transaction_indexes(
                 &vec![
-                    Err(TransactionError::BlockhashNotFound),
-                    Err(TransactionError::BlockhashNotFound),
+                    Err(TransactionError::TransactionSealNotFound),
+                    Err(TransactionError::TransactionSealNotFound),
                     Ok(()),
-                    Err(TransactionError::BlockhashNotFound),
+                    Err(TransactionError::TransactionSealNotFound),
                     Ok(()),
                     Ok(())
                 ],
@@ -1382,8 +1382,8 @@ mod tests {
             TreasuryPhase::filter_valid_transaction_indexes(
                 &vec![
                     Ok(()),
-                    Err(TransactionError::BlockhashNotFound),
-                    Err(TransactionError::BlockhashNotFound),
+                    Err(TransactionError::TransactionSealNotFound),
+                    Err(TransactionError::TransactionSealNotFound),
                     Ok(()),
                     Ok(()),
                     Ok(())
@@ -1488,7 +1488,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 treasury.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 treasury.slot(),
                 Some(4),
                 treasury.ticks_per_slot(),
@@ -1576,7 +1576,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 treasury.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 treasury.slot(),
                 Some(4),
                 treasury.ticks_per_slot(),

@@ -18,7 +18,7 @@ pub fn test_multisig_tx() -> Transaction {
     let keypair1 = Keypair::new();
     let keypairs = vec![&keypair0, &keypair1];
     let difs = 5;
-    let blockhash = Hash::default();
+    let transaction_seal = Hash::default();
 
     let transfer_instruction = SystemInstruction::Transfer { difs };
 
@@ -33,7 +33,7 @@ pub fn test_multisig_tx() -> Transaction {
     Transaction::new_with_compiled_instructions(
         &keypairs,
         &[],
-        blockhash,
+        transaction_seal,
         program_ids,
         instructions,
     )

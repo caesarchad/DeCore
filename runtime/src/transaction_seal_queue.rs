@@ -10,7 +10,7 @@ struct HashAge {
 
 /// Low memory overhead, so can be cloned for every checkpoint
 #[derive(Clone)]
-pub struct BlockhashQueue {
+pub struct TransactionSealQueue {
     /// updated whenever an hash is registered
     hash_height: u64,
 
@@ -23,7 +23,7 @@ pub struct BlockhashQueue {
     max_age: usize,
 }
 
-impl BlockhashQueue {
+impl TransactionSealQueue {
     pub fn new(max_age: usize) -> Self {
         Self {
             ages: HashMap::new(),
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn test_register_hash() {
         let last_hash = Hash::default();
-        let mut hash_queue = BlockhashQueue::new(100);
+        let mut hash_queue = TransactionSealQueue::new(100);
         assert!(!hash_queue.check_hash(last_hash));
         hash_queue.register_hash(&last_hash);
         assert!(hash_queue.check_hash(last_hash));
@@ -122,7 +122,7 @@ mod tests {
     }
     #[test]
     fn test_reject_old_last_hash() {
-        let mut hash_queue = BlockhashQueue::new(100);
+        let mut hash_queue = TransactionSealQueue::new(100);
         let last_hash = hash(&serialize(&0).unwrap());
         for i in 0..102 {
             let last_hash = hash(&serialize(&i).unwrap());
@@ -133,9 +133,9 @@ mod tests {
     }
     /// test that when max age is 0, that a valid last_hash still passes the age check
     #[test]
-    fn test_queue_init_blockhash() {
+    fn test_queue_init_transaction_seal() {
         let last_hash = Hash::default();
-        let mut hash_queue = BlockhashQueue::new(100);
+        let mut hash_queue = TransactionSealQueue::new(100);
         hash_queue.register_hash(&last_hash);
         assert_eq!(last_hash, hash_queue.last_hash());
         assert!(hash_queue.check_hash_age(last_hash, 0));

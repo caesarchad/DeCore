@@ -141,7 +141,7 @@ impl LocalNodeGroup {
             .native_instruction_processors
             .extend_from_slice(&config.native_instruction_processors);
 
-        let (genesis_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (genesis_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let leader_ledger_path = tmp_copy_block_buffer!(&genesis_ledger_path);
         let leader_contact_info = leader_node.info.clone();
         let leader_storage_keypair = Arc::new(storage_keypair);
@@ -343,7 +343,7 @@ impl LocalNodeGroup {
 
         Self::setup_storage_account(&client, &storage_keypair, &storage_miner_keypair, true).unwrap();
 
-        let (miner_ledger_path, _blockhash) = create_new_tmp_ledger!(&self.genesis_block);
+        let (miner_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&self.genesis_block);
         let storage_miner = StorageMiner::new(
             &miner_ledger_path,
             storage_miner_node,
@@ -387,13 +387,13 @@ impl LocalNodeGroup {
         dest_pubkey: &Pubkey,
         difs: u64,
     ) -> u64 {
-        trace!("getting leader blockhash");
-        let (blockhash, _fee_calculator) = client.get_recent_blockhash().unwrap();
+        trace!("getting leader transaction_seal");
+        let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut tx = system_transaction::create_user_account(
             &source_keypair,
             dest_pubkey,
             difs,
-            blockhash,
+            transaction_seal,
         );
         // info!(
         //     "{}",
@@ -442,7 +442,7 @@ impl LocalNodeGroup {
                     0,
                     amount,
                 ),
-                client.get_recent_blockhash().unwrap().0,
+                client.get_recent_transaction_seal().unwrap().0,
             );
             client
                 .retry_transfer(&from_account, &mut transaction, 5)
@@ -460,7 +460,7 @@ impl LocalNodeGroup {
                     &stake_account_pubkey,
                     amount,
                 ),
-                client.get_recent_blockhash().unwrap().0,
+                client.get_recent_transaction_seal().unwrap().0,
             );
 
             client
@@ -477,7 +477,7 @@ impl LocalNodeGroup {
                     &stake_account_pubkey,
                     &vote_account_pubkey,
                 )],
-                client.get_recent_blockhash().unwrap().0,
+                client.get_recent_transaction_seal().unwrap().0,
             );
             client
                 .send_and_confirm_transaction(
@@ -540,8 +540,8 @@ impl LocalNodeGroup {
             Some(&from_keypair.pubkey()),
         );
         let signer_keys = vec![from_keypair.as_ref()];
-        let blockhash = client.get_recent_blockhash().unwrap().0;
-        let mut transaction = Transaction::new(&signer_keys, message, blockhash);
+        let transaction_seal = client.get_recent_transaction_seal().unwrap().0;
+        let mut transaction = Transaction::new(&signer_keys, message, transaction_seal);
         client
             .retry_transfer(&from_keypair, &mut transaction, 5)
             .map(|_signature| ())

@@ -237,7 +237,7 @@ pub(crate) mod tests {
             treasury.process_transaction(&Transaction::new_signed_instructions(
                 keypairs,
                 ixs,
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
             ))
             .unwrap();
         }

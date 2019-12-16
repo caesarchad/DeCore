@@ -177,7 +177,7 @@ mod test {
         } = create_genesis_block(1000);
         genesis_block.ticks_per_slot = ticks_per_slot;
 
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
         // Set up blockstream
@@ -190,17 +190,17 @@ mod test {
         let mut entries = create_ticks(4, Hash::default());
 
         let keypair = Keypair::new();
-        let mut blockhash = entries[3].hash;
+        let mut transaction_seal = entries[3].hash;
         let tx = system_transaction::create_user_account(
             &keypair,
             &keypair.pubkey(),
             1,
             Hash::default(),
         );
-        let entry = Entry::new(&mut blockhash, 1, vec![tx]);
-        blockhash = entry.hash;
+        let entry = Entry::new(&mut transaction_seal, 1, vec![tx]);
+        transaction_seal = entry.hash;
         entries.push(entry);
-        let final_tick = create_ticks(1, blockhash);
+        let final_tick = create_ticks(1, transaction_seal);
         entries.extend_from_slice(&final_tick);
 
         let expected_entries = entries.clone();

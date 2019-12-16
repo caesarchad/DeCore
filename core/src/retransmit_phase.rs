@@ -181,7 +181,7 @@ impl RetransmitPhase {
         repair_socket: Arc<UdpSocket>,
         fetch_phase_receiver: BlobReceiver,
         exit: &Arc<AtomicBool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
         epoch_schedule: EpochSchedule,
     ) -> Self {
@@ -209,7 +209,7 @@ impl RetransmitPhase {
             repair_socket,
             exit,
             repair_strategy,
-            genesis_blockhash,
+            genesis_transaction_seal,
             move |id, blob, working_treasury| {
                 should_retransmit_and_persist(blob, working_treasury, &leader_schedule_cache, id)
             },

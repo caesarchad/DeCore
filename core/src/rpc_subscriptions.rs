@@ -314,13 +314,13 @@ pub mod tests {
             ..
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
-        let blockhash = treasury.last_blockhash();
+        let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
             &alice.pubkey(),
-            blockhash,
+            transaction_seal,
             1,
             16,
             &morgan_budget_api::id(),
@@ -370,13 +370,13 @@ pub mod tests {
             ..
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
-        let blockhash = treasury.last_blockhash();
+        let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
             &alice.pubkey(),
-            blockhash,
+            transaction_seal,
             1,
             16,
             &morgan_budget_api::id(),
@@ -424,10 +424,10 @@ pub mod tests {
             ..
         } = create_genesis_block(100);
         let treasury = Treasury::new(&genesis_block);
-        let blockhash = treasury.last_blockhash();
+        let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, blockhash);
+        let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, transaction_seal);
         let signature = tx.signatures[0];
         treasury_forks
             .write()

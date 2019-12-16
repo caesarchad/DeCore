@@ -51,8 +51,8 @@ pub fn create_builtin_transactions(
                 .expect(&format!("{}:{}", line!(), file!()));
 
             let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
-            let (blockhash, _fee_calculator) = treasury_client.get_recent_blockhash().unwrap();
-            Transaction::new_signed_instructions(&[&rando0], vec![instruction], blockhash)
+            let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
+            Transaction::new_signed_instructions(&[&rando0], vec![instruction], transaction_seal)
         })
         .collect()
 }
@@ -74,8 +74,8 @@ pub fn create_native_loader_transactions(
                 .expect(&format!("{}:{}", line!(), file!()));
 
             let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
-            let (blockhash, _fee_calculator) = treasury_client.get_recent_blockhash().unwrap();
-            Transaction::new_signed_instructions(&[&rando0], vec![instruction], blockhash)
+            let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
+            Transaction::new_signed_instructions(&[&rando0], vec![instruction], transaction_seal)
         })
         .collect()
 }

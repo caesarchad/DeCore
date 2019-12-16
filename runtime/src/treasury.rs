@@ -5,7 +5,7 @@
 use crate::accounts::{AccountLockType, Accounts};
 use crate::accounts_db::{ErrorCounters, InstructionAccounts, InstructionLoaders};
 use crate::accounts_index::Fork;
-use crate::blockhash_queue::BlockhashQueue;
+use crate::transaction_seal_queue::TransactionSealQueue;
 use crate::epoch_schedule::EpochSchedule;
 use crate::locked_accounts_results::LockedAccountsResults;
 use crate::message_processor::{MessageProcessor, ProcessInstruction};
@@ -26,7 +26,7 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, Signature};
 use morgan_interface::syscall::slot_hashes::{self, SlotHashes};
 use morgan_interface::system_transaction;
-use morgan_interface::timing::{duration_as_ms, duration_as_us, MAX_RECENT_BLOCKHASHES};
+use morgan_interface::timing::{duration_as_ms, duration_as_us, MAX_RECENT_TRANSACTION_SEALS};
 use morgan_interface::transaction::{Result, Transaction, TransactionError};
 use std::borrow::Borrow;
 use std::cmp;
@@ -46,8 +46,8 @@ pub struct Treasury {
     /// A cache of signature statuses
     status_cache: Arc<RwLock<TreasuryStatusCache>>,
 
-    /// FIFO queue of `recent_blockhash` items
-    blockhash_queue: RwLock<BlockhashQueue>,
+    /// FIFO queue of `recent_transaction_seal` items
+    transaction_seal_queue: RwLock<TransactionSealQueue>,
 
     /// Previous checkpoint of this treasury
     parent: RwLock<Option<Arc<Treasury>>>,
@@ -103,9 +103,9 @@ pub struct Treasury {
     message_processor: MessageProcessor,
 }
 
-impl Default for BlockhashQueue {
+impl Default for TransactionSealQueue {
     fn default() -> Self {
-        Self::new(MAX_RECENT_BLOCKHASHES)
+        Self::new(MAX_RECENT_TRANSACTION_SEALS)
     }
 }
 
@@ -136,7 +136,7 @@ impl Treasury {
         assert_ne!(slot, parent.slot());
 
         let mut treasury = Self::default();
-        treasury.blockhash_queue = RwLock::new(parent.blockhash_queue.read().unwrap().clone());
+        treasury.transaction_seal_queue = RwLock::new(parent.transaction_seal_queue.read().unwrap().clone());
         treasury.status_cache = parent.status_cache.clone();
         treasury.treasury_height = parent.treasury_height + 1;
         treasury.fee_calculator = parent.fee_calculator.clone();
@@ -280,7 +280,7 @@ impl Treasury {
             self.store(pubkey, account);
         }
 
-        self.blockhash_queue
+        self.transaction_seal_queue
             .write()
             .unwrap()
             .genesis_hash(&genesis_block.hash());
@@ -324,20 +324,20 @@ impl Treasury {
     }
 
     /// Return the last block hash registered.
-    pub fn last_blockhash(&self) -> Hash {
-        self.blockhash_queue.read().unwrap().last_hash()
+    pub fn last_transaction_seal(&self) -> Hash {
+        self.transaction_seal_queue.read().unwrap().last_hash()
     }
 
-    /// Return a confirmed blockhash with NUM_BLOCKHASH_CONFIRMATIONS
-    pub fn confirmed_last_blockhash(&self) -> Hash {
-        const NUM_BLOCKHASH_CONFIRMATIONS: usize = 3;
+    /// Return a confirmed transaction_seal with NUM_TRANSACTION_SEAL_CONFIRMATIONS
+    pub fn confirmed_last_transaction_seal(&self) -> Hash {
+        const NUM_TRANSACTION_SEAL_CONFIRMATIONS: usize = 3;
 
         let parents = self.parents();
         if parents.is_empty() {
-            self.last_blockhash()
+            self.last_transaction_seal()
         } else {
-            let index = cmp::min(NUM_BLOCKHASH_CONFIRMATIONS, parents.len() - 1);
-            parents[index].last_blockhash()
+            let index = cmp::min(NUM_TRANSACTION_SEAL_CONFIRMATIONS, parents.len() - 1);
+            parents[index].last_transaction_seal()
         }
     }
 
@@ -359,7 +359,7 @@ impl Treasury {
         for (i, tx) in txs.iter().enumerate() {
             if Self::can_commit(&res[i]) && !tx.signatures.is_empty() {
                 status_cache.insert(
-                    &tx.message().recent_blockhash,
+                    &tx.message().recent_transaction_seal,
                     &tx.signatures[0],
                     self.slot(),
                     res[i].clone(),
@@ -379,7 +379,7 @@ impl Treasury {
         slots_and_stakes.sort_by(|a, b| b.0.cmp(&a.0));
 
         let max_slot = self.slot();
-        let min_slot = max_slot.saturating_sub(MAX_RECENT_BLOCKHASHES as u64);
+        let min_slot = max_slot.saturating_sub(MAX_RECENT_TRANSACTION_SEALS as u64);
 
         let mut total_stake = 0;
         for (slot, stake) in slots_and_stakes.iter() {
@@ -387,7 +387,7 @@ impl Treasury {
                 total_stake += stake;
                 if total_stake > supermajority_stake {
                     return self
-                        .blockhash_queue
+                        .transaction_seal_queue
                         .read()
                         .unwrap()
                         .hash_height_to_timestamp(*slot);
@@ -419,7 +419,7 @@ impl Treasury {
 
         // Register a new block hash if at the last tick in the slot
         if current_tick_height % self.ticks_per_slot == self.ticks_per_slot - 1 {
-            self.blockhash_queue.write().unwrap().register_hash(hash);
+            self.transaction_seal_queue.write().unwrap().register_hash(hash);
         }
     }
 
@@ -519,15 +519,15 @@ impl Treasury {
         max_age: usize,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<()>> {
-        let hash_queue = self.blockhash_queue.read().unwrap();
+        let hash_queue = self.transaction_seal_queue.read().unwrap();
         txs.iter()
             .zip(lock_results.into_iter())
             .map(|(tx, lock_res)| {
                 if lock_res.is_ok()
-                    && !hash_queue.check_hash_age(tx.message().recent_blockhash, max_age)
+                    && !hash_queue.check_hash_age(tx.message().recent_transaction_seal, max_age)
                 {
-                    error_counters.reserve_blockhash += 1;
-                    Err(TransactionError::BlockhashNotFound)
+                    error_counters.reserve_transaction_seal += 1;
+                    Err(TransactionError::TransactionSealNotFound)
                 } else {
                     lock_res
                 }
@@ -551,7 +551,7 @@ impl Treasury {
                     && rcache
                         .get_signature_status(
                             &tx.signatures[0],
-                            &tx.message().recent_blockhash,
+                            &tx.message().recent_transaction_seal,
                             &self.ancestors,
                         )
                         .is_some()
@@ -578,10 +578,10 @@ impl Treasury {
     }
 
     fn update_error_counters(error_counters: &ErrorCounters) {
-        if 0 != error_counters.blockhash_not_found {
+        if 0 != error_counters.transaction_seal_not_found {
             inc_new_counter_error!(
-                "treasury-process_transactions-error-blockhash_not_found",
-                error_counters.blockhash_not_found,
+                "treasury-process_transactions-error-transaction_seal_not_found",
+                error_counters.transaction_seal_not_found,
                 0,
                 1000
             );
@@ -594,10 +594,10 @@ impl Treasury {
                 1000
             );
         }
-        if 0 != error_counters.reserve_blockhash {
+        if 0 != error_counters.reserve_transaction_seal {
             inc_new_counter_error!(
-                "treasury-process_transactions-error-reserve_blockhash",
-                error_counters.reserve_blockhash,
+                "treasury-process_transactions-error-reserve_transaction_seal",
+                error_counters.reserve_transaction_seal,
                 0,
                 1000
             );
@@ -794,14 +794,14 @@ impl Treasury {
     #[must_use]
     pub fn process_transactions(&self, txs: &[Transaction]) -> Vec<Result<()>> {
         let lock_results = self.lock_accounts(txs);
-        self.load_execute_and_commit_transactions(txs, &lock_results, MAX_RECENT_BLOCKHASHES)
+        self.load_execute_and_commit_transactions(txs, &lock_results, MAX_RECENT_TRANSACTION_SEALS)
     }
 
     /// Create, sign, and process a Transaction from `keypair` to `to` of
-    /// `n` difs where `blockhash` is the last Entry ID observed by the client.
+    /// `n` difs where `transaction_seal` is the last Entry ID observed by the client.
     pub fn transfer(&self, n: u64, keypair: &Keypair, to: &Pubkey) -> Result<Signature> {
-        let blockhash = self.last_blockhash();
-        let tx = system_transaction::create_user_account(keypair, to, n, blockhash);
+        let transaction_seal = self.last_transaction_seal();
+        let tx = system_transaction::create_user_account(keypair, to, n, transaction_seal);
         let signature = tx.signatures[0];
         self.process_transaction(&tx).map(|_| signature)
     }
@@ -1071,7 +1071,7 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
         let pubkey = Pubkey::new_rand();
         let treasury = Treasury::new(&genesis_block);
-        assert_eq!(treasury.last_blockhash(), genesis_block.hash());
+        assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.get_balance(&pubkey), 1_000);
@@ -1087,7 +1087,7 @@ mod tests {
         let key1 = Pubkey::new_rand();
         let key2 = Pubkey::new_rand();
         let treasury = Treasury::new(&genesis_block);
-        assert_eq!(treasury.last_blockhash(), genesis_block.hash());
+        assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
         let t1 = system_transaction::transfer(&mint_keypair, &key1, 1, genesis_block.hash());
         let t2 = system_transaction::transfer(&mint_keypair, &key2, 1, genesis_block.hash());
@@ -1416,7 +1416,7 @@ mod tests {
         let results_alice = treasury.load_execute_and_commit_transactions(
             &pay_alice,
             &lock_result,
-            MAX_RECENT_BLOCKHASHES,
+            MAX_RECENT_TRANSACTION_SEALS,
         );
         assert_eq!(results_alice[0], Ok(()));
 
@@ -1733,7 +1733,7 @@ mod tests {
         let tx = Transaction::new_signed_instructions(
             &Vec::<&Keypair>::new(),
             vec![transfer_instruction],
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
 
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
@@ -1919,7 +1919,7 @@ mod tests {
         let transaction = Transaction::new_signed_instructions(
             &[&mint_keypair],
             instructions,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
 
         treasury.process_transaction(&transaction).unwrap();
@@ -1959,7 +1959,7 @@ mod tests {
             &keypair1,
             &keypair2.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
 
         // Should fail with TransactionError::AccountNotFound, which means

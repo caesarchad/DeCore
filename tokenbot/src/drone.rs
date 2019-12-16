@@ -50,12 +50,12 @@ pub enum DroneRequest {
     GetAirdrop {
         difs: u64,
         to: Pubkey,
-        blockhash: Hash,
+        transaction_seal: Hash,
     },
     GetReputation {
         reputations: u64,
         to: Pubkey,
-        blockhash: Hash,
+        transaction_seal: Hash,
     },
 }
 
@@ -115,7 +115,7 @@ impl Drone {
             DroneRequest::GetAirdrop {
                 difs,
                 to,
-                blockhash,
+                transaction_seal,
             } => {
                 if self.check_request_limit(difs) {
                     self.request_current += difs;
@@ -137,7 +137,7 @@ impl Drone {
                         difs,
                     );
                     let message = Message::new(vec![create_instruction]);
-                    Ok(Transaction::new(&[&self.mint_keypair], message, blockhash))
+                    Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
                 } else {
                     Err(Error::new(
                         ErrorKind::Other,
@@ -151,7 +151,7 @@ impl Drone {
             DroneRequest::GetReputation {
                 reputations,
                 to,
-                blockhash,
+                transaction_seal,
             } => {
                 if self.check_request_limit(reputations) {
                     self.request_current += reputations;
@@ -173,7 +173,7 @@ impl Drone {
                         reputations,
                     );
                     let message = Message::new(vec![create_instruction]);
-                    Ok(Transaction::new(&[&self.mint_keypair], message, blockhash))
+                    Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
                 } else {
                     Err(Error::new(
                         ErrorKind::Other,
@@ -249,17 +249,17 @@ pub fn request_airdrop_transaction(
     drone_addr: &SocketAddr,
     id: &Pubkey,
     difs: u64,
-    blockhash: Hash,
+    transaction_seal: Hash,
 ) -> Result<Transaction, Error> {
     // info!(
     //     "{}",
-    //     Info(format!("request_airdrop_transaction: drone_addr={} id={} difs={} blockhash={}",
-    //     drone_addr, id, difs, blockhash).to_string())
+    //     Info(format!("request_airdrop_transaction: drone_addr={} id={} difs={} transaction_seal={}",
+    //     drone_addr, id, difs, transaction_seal).to_string())
     // );
     println!("{}",
         printLn(
-            format!("request_airdrop_transaction: drone_addr={} id={} difs={} blockhash={}",
-                drone_addr, id, difs, blockhash).to_string(),
+            format!("request_airdrop_transaction: drone_addr={} id={} difs={} transaction_seal={}",
+                drone_addr, id, difs, transaction_seal).to_string(),
             module_path!().to_string()
         )
     );
@@ -268,7 +268,7 @@ pub fn request_airdrop_transaction(
     stream.set_read_timeout(Some(Duration::new(10, 0)))?;
     let req = DroneRequest::GetAirdrop {
         difs,
-        blockhash,
+        transaction_seal,
         to: *id,
     };
     let req = serialize(&req).expect("serialize drone request");
@@ -334,17 +334,17 @@ pub fn request_reputation_airdrop_transaction(
     drone_addr: &SocketAddr,
     id: &Pubkey,
     reputations: u64,
-    blockhash: Hash,
+    transaction_seal: Hash,
 ) -> Result<Transaction, Error> {
     // info!(
     //     "{}",
-    //     Info(format!("request_reputation_airdrop_transaction: drone_addr={} id={} reputations={} blockhash={}",
-    //     drone_addr, id, reputations, blockhash).to_string())
+    //     Info(format!("request_reputation_airdrop_transaction: drone_addr={} id={} reputations={} transaction_seal={}",
+    //     drone_addr, id, reputations, transaction_seal).to_string())
     // );
     println!("{}",
         printLn(
-            format!("request_reputation_airdrop_transaction: drone_addr={} id={} reputations={} blockhash={}",
-                drone_addr, id, reputations, blockhash).to_string(),
+            format!("request_reputation_airdrop_transaction: drone_addr={} id={} reputations={} transaction_seal={}",
+                drone_addr, id, reputations, transaction_seal).to_string(),
             module_path!().to_string()
         )
     );
@@ -353,7 +353,7 @@ pub fn request_reputation_airdrop_transaction(
     stream.set_read_timeout(Some(Duration::new(10, 0)))?;
     let req = DroneRequest::GetReputation {
         reputations,
-        blockhash,
+        transaction_seal,
         to: *id,
     };
     let req = serialize(&req).expect("serialize drone request");
@@ -553,11 +553,11 @@ mod tests {
     #[test]
     fn test_drone_build_airdrop_transaction() {
         let to = Pubkey::new_rand();
-        let blockhash = Hash::default();
+        let transaction_seal = Hash::default();
         let request = DroneRequest::GetAirdrop {
             difs: 2,
             to,
-            blockhash,
+            transaction_seal,
         };
 
         let mint = Keypair::new();
@@ -572,7 +572,7 @@ mod tests {
             message.account_keys,
             vec![mint_pubkey, to, Pubkey::default()]
         );
-        assert_eq!(message.recent_blockhash, blockhash);
+        assert_eq!(message.recent_transaction_seal, transaction_seal);
 
         assert_eq!(message.instructions.len(), 1);
         let instruction: SystemInstruction = deserialize(&message.instructions[0].data).unwrap();
@@ -595,11 +595,11 @@ mod tests {
     #[test]
     fn test_drone_build_reputation_airdrop_transaction() {
         let to = Pubkey::new_rand();
-        let blockhash = Hash::default();
+        let transaction_seal = Hash::default();
         let request = DroneRequest::GetReputation {
             reputations: 2,
             to,
-            blockhash,
+            transaction_seal,
         };
 
         let mint = Keypair::new();
@@ -614,7 +614,7 @@ mod tests {
             message.account_keys,
             vec![mint_pubkey, to, Pubkey::default()]
         );
-        assert_eq!(message.recent_blockhash, blockhash);
+        assert_eq!(message.recent_transaction_seal, transaction_seal);
 
         assert_eq!(message.instructions.len(), 1);
         let instruction: SystemInstruction = deserialize(&message.instructions[0].data).unwrap();
@@ -636,11 +636,11 @@ mod tests {
     #[test]
     fn test_process_drone_request() {
         let to = Pubkey::new_rand();
-        let blockhash = Hash::new(&to.as_ref());
+        let transaction_seal = Hash::new(&to.as_ref());
         let difs = 50;
         let req = DroneRequest::GetAirdrop {
             difs,
-            blockhash,
+            transaction_seal,
             to,
         };
         let req = serialize(&req).unwrap();
@@ -651,7 +651,7 @@ mod tests {
         let expected_instruction =
             system_instruction::create_user_account(&keypair.pubkey(), &to, difs);
         let message = Message::new(vec![expected_instruction]);
-        let expected_tx = Transaction::new(&[&keypair], message, blockhash);
+        let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
         LittleEndian::write_u16(&mut expected_vec_with_length, expected_bytes.len() as u16);
@@ -670,11 +670,11 @@ mod tests {
     #[test]
     fn test_process_reputation_drone_request() {
         let to = Pubkey::new_rand();
-        let blockhash = Hash::new(&to.as_ref());
+        let transaction_seal = Hash::new(&to.as_ref());
         let reputations = 50;
         let req = DroneRequest::GetReputation {
             reputations,
-            blockhash,
+            transaction_seal,
             to,
         };
         let req = serialize(&req).unwrap();
@@ -685,7 +685,7 @@ mod tests {
         let expected_instruction =
             system_instruction::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
         let message = Message::new(vec![expected_instruction]);
-        let expected_tx = Transaction::new(&[&keypair], message, blockhash);
+        let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
         LittleEndian::write_u16(&mut expected_vec_with_length, expected_bytes.len() as u16);

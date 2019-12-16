@@ -56,12 +56,12 @@ pub fn process_instruction(
                 tick_height / DEFAULT_TICKS_PER_SLOT,
             )
         }
-        StorageInstruction::AdvertiseStorageRecentBlockhash { hash, slot } => {
+        StorageInstruction::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
             if me_unsigned || !rest.is_empty() {
                 // This instruction must be signed by `me`
                 Err(InstructionError::InvalidArgument)?;
             }
-            storage_account.advertise_storage_recent_blockhash(
+            storage_account.advertise_storage_recent_transaction_seal(
                 hash,
                 slot,
                 tick_height / DEFAULT_TICKS_PER_SLOT,
@@ -187,7 +187,7 @@ mod tests {
         let mut user_account = Account::default();
         keyed_accounts.push(KeyedAccount::new(&pubkey, true, &mut user_account));
 
-        let ix = storage_instruction::advertise_recent_blockhash(
+        let ix = storage_instruction::advertise_recent_transaction_seal(
             &pubkey,
             Hash::default(),
             SLOTS_PER_SEGMENT,
@@ -294,12 +294,12 @@ mod tests {
         // tick the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
         for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_blockhash());
+            treasury.register_tick(&treasury.last_transaction_seal());
         }
 
         // advertise for storage segment 1
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT,
@@ -334,7 +334,7 @@ mod tests {
                 ));
         }
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 2,
@@ -344,7 +344,7 @@ mod tests {
 
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
         for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_blockhash());
+            treasury.register_tick(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
@@ -367,7 +367,7 @@ mod tests {
         );
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 3,
@@ -377,7 +377,7 @@ mod tests {
 
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
         for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_blockhash());
+            treasury.register_tick(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
@@ -403,7 +403,7 @@ mod tests {
 
         // tick the treasury into the next storage epoch so that rewards can be claimed
         for _ in 0..=TICKS_IN_SEGMENT {
-            treasury.register_tick(&treasury.last_blockhash());
+            treasury.register_tick(&treasury.last_transaction_seal());
         }
 
         assert_eq!(
@@ -534,7 +534,7 @@ mod tests {
         }
     }
 
-    fn get_storage_blockhash<C: SyncClient>(client: &C, account: &Pubkey) -> Hash {
+    fn get_storage_transaction_seal<C: SyncClient>(client: &C, account: &Pubkey) -> Hash {
         if let Some(storage_system_account_data) = client.get_account_data(&account).unwrap() {
             let contract = deserialize(&storage_system_account_data);
             if let Ok(contract) = contract {
@@ -563,13 +563,13 @@ mod tests {
         // tick the treasury up until it's moved into storage segment 2
         let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
         for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_blockhash());
+            treasury.register_tick(&treasury.last_transaction_seal());
         }
         let treasury_client = TreasuryClient::new(treasury);
 
         let x = 42;
         let x2 = x * 2;
-        let storage_blockhash = hash(&[x2]);
+        let storage_transaction_seal = hash(&[x2]);
 
         treasury_client
             .transfer(10, &mint_keypair, &miner_pubkey)
@@ -590,9 +590,9 @@ mod tests {
         treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_pubkey,
-                storage_blockhash,
+                storage_transaction_seal,
                 SLOTS_PER_SEGMENT,
             )],
             Some(&mint_pubkey),
@@ -623,8 +623,8 @@ mod tests {
             SLOTS_PER_SEGMENT
         );
         assert_eq!(
-            get_storage_blockhash(&treasury_client, &validator_pubkey),
-            storage_blockhash
+            get_storage_transaction_seal(&treasury_client, &validator_pubkey),
+            storage_transaction_seal
         );
     }
 }

@@ -717,7 +717,7 @@ impl BlockBufferPool {
             // TODO: remove me when replay_phase is iterating by block (BlockBufferPool)
             //    this verification is duplicating that of replay_phase, which
             //    can do this in parallel
-            blockhash: Option<Hash>,
+            transaction_seal: Option<Hash>,
             // https://github.com/rust-rocksdb/rust-rocksdb/issues/234
             //   rocksdb issue: the _block_buffer_pool member must be lower in the struct to prevent a crash
             //   when the db_iterator member above is dropped.
@@ -741,8 +741,8 @@ impl BlockBufferPool {
                         if let Ok(next_entries) =
                             deserialize::<Vec<Entry>>(&value[BLOB_HEADER_SIZE..])
                         {
-                            if let Some(blockhash) = self.blockhash {
-                                if !next_entries.verify(&blockhash) {
+                            if let Some(transaction_seal) = self.transaction_seal {
+                                if !next_entries.verify(&transaction_seal) {
                                     return None;
                                 }
                             }
@@ -752,7 +752,7 @@ impl BlockBufferPool {
                             }
                             self.entries = VecDeque::from(next_entries);
                             let entry = self.entries.pop_front().unwrap();
-                            self.blockhash = Some(entry.hash);
+                            self.transaction_seal = Some(entry.hash);
                             return Some(entry);
                         }
                     }
@@ -766,7 +766,7 @@ impl BlockBufferPool {
         Ok(EntryIterator {
             entries: VecDeque::new(),
             db_iterator,
-            blockhash: None,
+            transaction_seal: None,
         })
     }
 
@@ -1528,7 +1528,7 @@ fn renewal_on_slot(slot_meta: &MetaInfoCol, slot_meta_backup: &Option<MetaInfoCo
 
 // Creates a new ledger with slot 0 full of ticks (and only ticks).
 //
-// Returns the blockhash that can be used to append entries with.
+// Returns the transaction_seal that can be used to append entries with.
 pub fn make_new_ledger_file(ledger_path: &str, genesis_block: &GenesisBlock) -> Result<Hash> {
     let ticks_per_slot = genesis_block.ticks_per_slot;
     BlockBufferPool::remove_ledger_file(ledger_path)?;
@@ -1605,8 +1605,8 @@ macro_rules! create_new_tmp_ledger {
 // ticks)
 pub fn create_new_tmp_ledger(name: &str, genesis_block: &GenesisBlock) -> (String, Hash) {
     let ledger_path = fetch_interim_ledger_location(name);
-    let blockhash = make_new_ledger_file(&ledger_path, genesis_block).unwrap();
-    (ledger_path, blockhash)
+    let transaction_seal = make_new_ledger_file(&ledger_path, genesis_block).unwrap();
+    (ledger_path, transaction_seal)
 }
 
 #[macro_export]

@@ -171,7 +171,7 @@ impl WaterClockRecorder {
     pub fn reset(
         &mut self,
         tick_height: u64,
-        blockhash: Hash,
+        transaction_seal: Hash,
         start_slot: u64,
         my_next_leader_slot: Option<u64>,
         ticks_per_slot: u64,
@@ -183,18 +183,18 @@ impl WaterClockRecorder {
             // info!(
             //     "{}",
             //     Info(format!("reset waterclock from: {},{} to: {},{}",
-            //     waterclock.hash, self.tick_height, blockhash, tick_height,).to_string())
+            //     waterclock.hash, self.tick_height, transaction_seal, tick_height,).to_string())
             // );
             let info:String = format!(
                 "reset water clock from: {},{} to: {},{}",
                 waterclock.hash,
                 self.tick_height,
-                blockhash,
+                transaction_seal,
                 tick_height
             ).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
 
-            waterclock.reset(blockhash, self.waterclock_config.hashes_per_tick);
+            waterclock.reset(transaction_seal, self.waterclock_config.hashes_per_tick);
         }
 
         std::mem::swap(&mut cache, &mut self.tick_cache);
@@ -563,7 +563,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -597,7 +597,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -643,7 +643,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -687,7 +687,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -725,7 +725,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -765,7 +765,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -812,7 +812,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -856,7 +856,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -1054,7 +1054,7 @@ mod tests {
             genesis_block.ticks_per_slot = ticks_per_slot;
             let treasury = Arc::new(Treasury::new(&genesis_block));
 
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -1100,7 +1100,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -1118,7 +1118,7 @@ mod tests {
 
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 0,
                 None,
                 treasury.ticks_per_slot(),
@@ -1130,7 +1130,7 @@ mod tests {
             // Provide a leader slot 1 slot down
             waterclock_recorder.reset(
                 treasury.ticks_per_slot(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 0,
                 Some(2),
                 treasury.ticks_per_slot(),
@@ -1155,7 +1155,7 @@ mod tests {
             // reset waterclock now. it should discard the grace ticks wait
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 1,
                 Some(2),
                 treasury.ticks_per_slot(),
@@ -1168,7 +1168,7 @@ mod tests {
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 2,
                 Some(3),
                 treasury.ticks_per_slot(),
@@ -1203,7 +1203,7 @@ mod tests {
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 3,
                 Some(4),
                 treasury.ticks_per_slot(),
@@ -1223,7 +1223,7 @@ mod tests {
             assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 3,
                 Some(4),
                 treasury.ticks_per_slot(),
@@ -1237,7 +1237,7 @@ mod tests {
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 4,
                 Some(5),
                 treasury.ticks_per_slot(),
@@ -1262,7 +1262,7 @@ mod tests {
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
             let treasury = Arc::new(Treasury::new(&genesis_block));
-            let prev_hash = treasury.last_blockhash();
+            let prev_hash = treasury.last_transaction_seal();
             let (mut waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
                 0,
                 prev_hash,
@@ -1283,7 +1283,7 @@ mod tests {
 
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 0,
                 None,
                 treasury.ticks_per_slot(),
@@ -1297,7 +1297,7 @@ mod tests {
             // We reset with leader slot after 3 slots
             waterclock_recorder.reset(
                 waterclock_recorder.tick_height(),
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
                 0,
                 Some(treasury.slot() + 3),
                 treasury.ticks_per_slot(),

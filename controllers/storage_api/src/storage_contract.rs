@@ -48,7 +48,7 @@ pub enum StorageContract {
     ValidatorStorage {
         // Most recently advertised slot
         slot: u64,
-        // Most recently advertised blockhash
+        // Most recently advertised transaction_seal
         hash: Hash,
         lockout_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
         reward_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
@@ -168,7 +168,7 @@ impl<'a> StorageAccount<'a> {
         }
     }
 
-    pub fn advertise_storage_recent_blockhash(
+    pub fn advertise_storage_recent_transaction_seal(
         &mut self,
         hash: Hash,
         slot: u64,

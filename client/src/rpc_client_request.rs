@@ -86,7 +86,7 @@ impl GenericRpcClientRequest for MockRpcClientRequest {
                 let n = if self.url == "airdrop" { 0 } else { 50 };
                 Value::Number(Number::from(n))
             }
-            RpcRequest::GetRecentBlockhash => Value::Array(vec![
+            RpcRequest::GetRecentTransactionSeal => Value::Array(vec![
                 Value::String(PUBKEY.to_string()),
                 serde_json::to_value(FeeCalculator::default()).unwrap(),
             ]),

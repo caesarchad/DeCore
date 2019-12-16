@@ -35,7 +35,7 @@ fn nominal() {
     let genesis_block = create_genesis_block(100).genesis_block;
     let ticks_per_slot = genesis_block.ticks_per_slot;
 
-    let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
     let ticks = ticks_per_slot as usize;
 
     // Basic validation

@@ -10,14 +10,14 @@ pub fn request_airdrop_transaction(
     _drone_addr: &SocketAddr,
     _id: &Pubkey,
     difs: u64,
-    _blockhash: Hash,
+    _transaction_seal: Hash,
 ) -> Result<Transaction, Error> {
     if difs == 0 {
         Err(Error::new(ErrorKind::Other, "Airdrop failed"))?
     }
     let key = Keypair::new();
     let to = Pubkey::new_rand();
-    let blockhash = Hash::default();
-    let tx = system_transaction::create_user_account(&key, &to, difs, blockhash);
+    let transaction_seal = Hash::default();
+    let tx = system_transaction::create_user_account(&key, &to, difs, transaction_seal);
     Ok(tx)
 }

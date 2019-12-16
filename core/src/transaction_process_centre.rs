@@ -39,7 +39,7 @@ impl Tpu {
         sigverify_disabled: bool,
         block_buffer_pool: &Arc<BlockBufferPool>,
         exit: &Arc<AtomicBool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
     ) -> Self {
         node_group_info.write().unwrap().set_leader(id);
 
@@ -78,7 +78,7 @@ impl Tpu {
             entry_receiver,
             &exit,
             block_buffer_pool,
-            genesis_blockhash,
+            genesis_transaction_seal,
         );
 
         Self {

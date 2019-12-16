@@ -22,7 +22,7 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::system_transaction;
 use morgan_interface::timing::{
-    duration_as_ms, timestamp, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_BLOCKHASHES,
+    duration_as_ms, timestamp, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
 };
 use std::iter;
 use std::sync::atomic::Ordering;
@@ -294,7 +294,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let mut id = genesis_block.hash();
-        for _ in 0..(MAX_RECENT_BLOCKHASHES * DEFAULT_TICKS_PER_SLOT as usize) {
+        for _ in 0..(MAX_RECENT_TRANSACTION_SEALS * DEFAULT_TICKS_PER_SLOT as usize) {
             id = hash(&id.as_ref());
             treasury.register_tick(&id);
         }

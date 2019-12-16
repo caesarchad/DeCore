@@ -109,7 +109,7 @@ fn recv_window<F>(
     my_pubkey: &Pubkey,
     r: &BlobReceiver,
     retransmit: &BlobSender,
-    genesis_blockhash: &Hash,
+    genesis_transaction_seal: &Hash,
     blob_filter: F,
 ) -> Result<()>
 where
@@ -126,7 +126,7 @@ where
 
     blobs.retain(|blob| {
         blob_filter(&blob.read().unwrap())
-            && blob.read().unwrap().genesis_blockhash() == *genesis_blockhash
+            && blob.read().unwrap().genesis_transaction_seal() == *genesis_transaction_seal
     });
 
     retransmit_blobs(&blobs, retransmit, my_pubkey)?;
@@ -176,7 +176,7 @@ impl WindowService {
         repair_socket: Arc<UdpSocket>,
         exit: &Arc<AtomicBool>,
         repair_strategy: RepairStrategy,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
         blob_filter: F,
     ) -> WindowService
     where
@@ -199,7 +199,7 @@ impl WindowService {
             repair_strategy,
         );
         let exit = exit.clone();
-        let hash = *genesis_blockhash;
+        let hash = *genesis_transaction_seal;
         let blob_filter = Arc::new(blob_filter);
         let treasury_forks = treasury_forks.clone();
         let t_window = Builder::new()

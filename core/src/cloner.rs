@@ -109,7 +109,7 @@ pub(crate) fn sample_file(in_path: &Path, sample_offsets: &[u64]) -> io::Result<
     Ok(hasher.result())
 }
 
-fn get_slot_from_blockhash(signature: &ed25519_dalek::Signature, storage_slot: u64) -> u64 {
+fn get_slot_from_transaction_seal(signature: &ed25519_dalek::Signature, storage_slot: u64) -> u64 {
     let signature_vec = signature.to_bytes();
     let mut segment_index = u64::from(signature_vec[0])
         | (u64::from(signature_vec[1]) << 8)
@@ -211,7 +211,7 @@ impl StorageMiner {
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
         let treasury = Treasury::new_with_paths(&genesis_block, None);
-        let genesis_blockhash = treasury.last_blockhash();
+        let genesis_transaction_seal = treasury.last_transaction_seal();
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(ledger_path).expect("Expected to be able to open database ledger"),
         );
@@ -234,10 +234,10 @@ impl StorageMiner {
         let (nodes, _) = crate::gossip_service::find_node_group_host(&node_group_entrypoint.gossip, 1)?;
         let client = crate::gossip_service::get_client(&nodes);
 
-        let (storage_blockhash, storage_slot) = Self::poll_for_blockhash_and_slot(&node_group_info)?;
+        let (storage_transaction_seal, storage_slot) = Self::poll_for_transaction_seal_and_slot(&node_group_info)?;
 
-        let signature = storage_keypair.sign(storage_blockhash.as_ref());
-        let slot = get_slot_from_blockhash(&signature, storage_slot);
+        let signature = storage_keypair.sign(storage_transaction_seal.as_ref());
+        let slot = get_slot_from_transaction_seal(&signature, storage_slot);
         // info!("{}", Info(format!("replicating slot: {}", slot).to_string()));
         println!("{}",
             printLn(
@@ -266,7 +266,7 @@ impl StorageMiner {
             repair_socket,
             &exit,
             RepairStrategy::RepairRange(repair_slot_range),
-            &genesis_blockhash,
+            &genesis_transaction_seal,
             |_, _, _| true,
         );
 
@@ -500,14 +500,14 @@ impl StorageMiner {
         // check if the storage account exists
         let balance = client.poll_get_balance(&storage_keypair.pubkey());
         if balance.is_err() || balance.unwrap() == 0 {
-            let (blockhash, _fee_calculator) = client.get_recent_blockhash().expect("blockhash");
+            let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().expect("transaction_seal");
 
             let ix = storage_instruction::create_miner_storage_account(
                 &keypair.pubkey(),
                 &storage_keypair.pubkey(),
                 1,
             );
-            let tx = Transaction::new_signed_instructions(&[keypair], ix, blockhash);
+            let tx = Transaction::new_signed_instructions(&[keypair], ix, transaction_seal);
             let signature = client.async_send_transaction(tx)?;
             client
                 .poll_for_signature(&signature)
@@ -535,7 +535,7 @@ impl StorageMiner {
         // ...or no difs for fees
         assert!(client.poll_get_balance(&self.keypair.pubkey()).unwrap() > 0);
 
-        let (blockhash, _) = client.get_recent_blockhash().expect("No recent blockhash");
+        let (transaction_seal, _) = client.get_recent_transaction_seal().expect("No recent transaction_seal");
         let instruction = storage_instruction::mining_proof(
             &self.storage_keypair.pubkey(),
             self.hash,
@@ -546,7 +546,7 @@ impl StorageMiner {
         let mut transaction = Transaction::new(
             &[self.keypair.as_ref(), self.storage_keypair.as_ref()],
             message,
-            blockhash,
+            transaction_seal,
         );
         client
             .send_and_confirm_transaction(
@@ -572,7 +572,7 @@ impl StorageMiner {
         }
     }
 
-    fn poll_for_blockhash_and_slot(
+    fn poll_for_transaction_seal_and_slot(
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     ) -> Result<(String, u64)> {
         for _ in 0..10 {
@@ -583,8 +583,8 @@ impl StorageMiner {
                 let node_index = thread_rng().gen_range(0, rpc_peers.len());
                 RpcClient::new_socket(rpc_peers[node_index].rpc)
             };
-            let storage_blockhash = rpc_client
-                .retry_make_rpc_request(&RpcRequest::GetStorageBlockhash, None, 0)
+            let storage_transaction_seal = rpc_client
+                .retry_make_rpc_request(&RpcRequest::GetStorageTransactionSeal, None, 0)
                 .expect("rpc request")
                 .to_string();
             let storage_slot = rpc_client
@@ -600,7 +600,7 @@ impl StorageMiner {
                 )
             );
             if get_segment_from_slot(storage_slot) != 0 {
-                return Ok((storage_blockhash, storage_slot));
+                return Ok((storage_transaction_seal, storage_slot));
             }
             // info!("{}", Info(format!("waiting for segment...").to_string()));
             println!("{}",
@@ -613,7 +613,7 @@ impl StorageMiner {
         }
         Err(Error::new(
             ErrorKind::Other,
-            "Couldn't get blockhash or slot",
+            "Couldn't get transaction_seal or slot",
         ))?
     }
 }

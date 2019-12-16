@@ -72,7 +72,7 @@ impl Tvu {
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         exit: &Arc<AtomicBool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
     ) -> Self
     where
@@ -110,7 +110,7 @@ impl Tvu {
             repair_socket,
             blob_fetch_receiver,
             &exit,
-            genesis_blockhash,
+            genesis_transaction_seal,
             completed_slots_receiver,
             *treasury_forks.read().unwrap().working_treasury().epoch_schedule(),
         );

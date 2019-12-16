@@ -17,14 +17,14 @@ pub const NUM_CONSECUTIVE_LEADER_SLOTS: u64 = 8;
 
 /// The time window of recent block hash values that the treasury will track the signatures
 /// of over. Once the treasury discards a block hash, it will reject any transactions that use
-/// that `recent_blockhash` in a transaction. Lowering this value reduces memory consumption,
-/// but requires clients to update its `recent_blockhash` more frequently. Raising the value
+/// that `recent_transaction_seal` in a transaction. Lowering this value reduces memory consumption,
+/// but requires clients to update its `recent_transaction_seal` more frequently. Raising the value
 /// lengthens the time a client must wait to be certain a missing transaction will
 /// not be processed by the network.
 pub const MAX_HASH_AGE_IN_SECONDS: usize = 120;
 
 // This must be <= MAX_HASH_AGE_IN_SECONDS, otherwise there's risk for DuplicateSignature errors
-pub const MAX_RECENT_BLOCKHASHES: usize = MAX_HASH_AGE_IN_SECONDS;
+pub const MAX_RECENT_TRANSACTION_SEALS: usize = MAX_HASH_AGE_IN_SECONDS;
 
 /// This is maximum time consumed in forwarding a transaction from one node to next, before
 /// it can be processed in the target node

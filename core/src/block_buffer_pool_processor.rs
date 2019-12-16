@@ -9,7 +9,7 @@ use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::timing::duration_as_ms;
-use morgan_interface::timing::MAX_RECENT_BLOCKHASHES;
+use morgan_interface::timing::MAX_RECENT_TRANSACTION_SEALS;
 use morgan_interface::transaction::Result;
 use morgan_interface::transaction::Transaction;
 use std::result;
@@ -37,7 +37,7 @@ fn par_execute_entries(
             let results = treasury.load_execute_and_commit_transactions(
                 &e.transactions,
                 locked_accounts,
-                MAX_RECENT_BLOCKHASHES,
+                MAX_RECENT_TRANSACTION_SEALS,
             );
             let mut first_err = None;
             for (r, tx) in results.iter().zip(e.transactions.iter()) {
@@ -157,7 +157,7 @@ pub fn process_block_buffer_pool(
         let slot = 0;
         let treasury = Arc::new(Treasury::new_with_paths(&genesis_block, account_paths));
         let entry_height = 0;
-        let last_entry_hash = treasury.last_blockhash();
+        let last_entry_hash = treasury.last_transaction_seal();
 
         // Load the metadata for this slot
         let meta = block_buffer_pool
@@ -456,7 +456,7 @@ pub mod tests {
         */
 
         // Create a new ledger with slot 0 full of ticks
-        let (ledger_path, mut blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, mut transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
 
         let block_buffer_pool =
@@ -467,8 +467,8 @@ pub mod tests {
         {
             let parent_slot = 0;
             let slot = 1;
-            let mut entries = create_ticks(ticks_per_slot, blockhash);
-            blockhash = entries.last().unwrap().hash;
+            let mut entries = create_ticks(ticks_per_slot, transaction_seal);
+            transaction_seal = entries.last().unwrap().hash;
 
             // throw away last one
             entries.pop();
@@ -478,7 +478,7 @@ pub mod tests {
         }
 
         // slot 2, points at slot 1
-        fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, blockhash);
+        fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, transaction_seal);
 
         let (mut _treasury_forks, treasury_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
@@ -501,9 +501,9 @@ pub mod tests {
         let ticks_per_slot = genesis_block.ticks_per_slot;
 
         // Create a new ledger with slot 0 full of ticks
-        let (ledger_path, blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
-        let mut last_entry_hash = blockhash;
+        let mut last_entry_hash = transaction_seal;
 
         /*
             Build a block_buffer_pool in the ledger with the following fork structure:
@@ -588,9 +588,9 @@ pub mod tests {
         let ticks_per_slot = genesis_block.ticks_per_slot;
 
         // Create a new ledger with slot 0 full of ticks
-        let (ledger_path, blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
-        let mut last_entry_hash = blockhash;
+        let mut last_entry_hash = transaction_seal;
 
         /*
             Build a block_buffer_pool in the ledger with the following fork structure:
@@ -692,8 +692,8 @@ pub mod tests {
         let ticks_per_slot = genesis_block.ticks_per_slot;
 
         // Create a new ledger with slot 0 full of ticks
-        let (ledger_path, blockhash) = create_new_tmp_ledger!(&genesis_block);
-        let mut last_entry_hash = blockhash;
+        let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
+        let mut last_entry_hash = transaction_seal;
 
         let block_buffer_pool =
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to successfully open database ledger");
@@ -796,7 +796,7 @@ pub mod tests {
         // First, ensure the TX is rejected because of the unregistered last ID
         assert_eq!(
             treasury.process_transaction(&tx),
-            Err(TransactionError::BlockhashNotFound)
+            Err(TransactionError::TransactionSealNotFound)
         );
 
         // Now ensure the TX is accepted despite pointing to the ID of an empty entry.
@@ -819,7 +819,7 @@ pub mod tests {
 
         let deducted_from_mint = 3;
         let mut entries = vec![];
-        let blockhash = genesis_block.hash();
+        let transaction_seal = genesis_block.hash();
         for _ in 0..deducted_from_mint {
             // Transfer one token from the mint to a random account
             let keypair = Keypair::new();
@@ -827,7 +827,7 @@ pub mod tests {
                 &mint_keypair,
                 &keypair.pubkey(),
                 1,
-                blockhash,
+                transaction_seal,
             );
             let entry = Entry::new(&last_entry_hash, 1, vec![tx]);
             last_entry_hash = entry.hash;
@@ -840,7 +840,7 @@ pub mod tests {
                 &keypair,
                 &keypair2.pubkey(),
                 42,
-                blockhash,
+                transaction_seal,
             );
             let entry = Entry::new(&last_entry_hash, 1, vec![tx]);
             last_entry_hash = entry.hash;
@@ -875,7 +875,7 @@ pub mod tests {
             mint - deducted_from_mint
         );
         assert_eq!(treasury.tick_height(), 2 * genesis_block.ticks_per_slot - 1);
-        assert_eq!(treasury.last_blockhash(), entries.last().unwrap().hash);
+        assert_eq!(treasury.last_transaction_seal(), entries.last().unwrap().hash);
     }
 
     #[test]
@@ -884,7 +884,7 @@ pub mod tests {
             mut genesis_block, ..
         } = create_genesis_block(123);
         genesis_block.ticks_per_slot = 1;
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
         let (treasury_forks, treasury_forks_info, _) =
@@ -925,27 +925,27 @@ pub mod tests {
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
 
-        let blockhash = treasury.last_blockhash();
+        let transaction_seal = treasury.last_transaction_seal();
 
         // ensure treasury can process 2 entries that have a common account and no tick is registered
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
             2,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
-        let entry_1 = next_entry(&blockhash, 1, vec![tx]);
+        let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             2,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
         assert_eq!(process_entries(&treasury, &[entry_1, entry_2]), Ok(()));
         assert_eq!(treasury.get_balance(&keypair1.pubkey()), 2);
         assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
-        assert_eq!(treasury.last_blockhash(), blockhash);
+        assert_eq!(treasury.last_transaction_seal(), transaction_seal);
     }
 
     #[test]
@@ -966,13 +966,13 @@ pub mod tests {
 
         // construct an Entry whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
-            &treasury.last_blockhash(),
+            &treasury.last_transaction_seal(),
             1,
             vec![system_transaction::create_user_account(
                 &keypair1,
                 &mint_keypair.pubkey(),
                 1,
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
             )],
         );
 
@@ -984,13 +984,13 @@ pub mod tests {
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // should be fine
                 system_transaction::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // will collide
             ],
         );
@@ -1025,20 +1025,20 @@ pub mod tests {
 
         // construct an Entry whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
-            &treasury.last_blockhash(),
+            &treasury.last_transaction_seal(),
             1,
             vec![
                 system_transaction::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     1,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ),
                 system_transaction::transfer(
                     &keypair4,
                     &keypair4.pubkey(),
                     1,
-                    Hash::default(), // Should cause a transaction failure with BlockhashNotFound
+                    Hash::default(), // Should cause a transaction failure with TransactionSealNotFound
                 ),
             ],
         );
@@ -1051,13 +1051,13 @@ pub mod tests {
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // should be fine
                 system_transaction::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // will collide
             ],
         );
@@ -1107,13 +1107,13 @@ pub mod tests {
 
         // 3 entries: first has a transfer, 2nd has a conflict with 1st, 3rd has a conflict with itself
         let entry_1_to_mint = next_entry(
-            &treasury.last_blockhash(),
+            &treasury.last_transaction_seal(),
             1,
             vec![system_transaction::transfer(
                 &keypair1,
                 &mint_keypair.pubkey(),
                 1,
-                treasury.last_blockhash(),
+                treasury.last_transaction_seal(),
             )],
         );
         // should now be:
@@ -1129,13 +1129,13 @@ pub mod tests {
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // should be fine
                 system_transaction::transfer(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // will collide with predecessor
             ],
         );
@@ -1152,13 +1152,13 @@ pub mod tests {
                     &keypair1,
                     &keypair3.pubkey(),
                     1,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ),
                 system_transaction::transfer(
                     &keypair1,
                     &keypair2.pubkey(),
                     1,
-                    treasury.last_blockhash(),
+                    treasury.last_transaction_seal(),
                 ), // should be fine
             ],
         );
@@ -1201,37 +1201,37 @@ pub mod tests {
             &mint_keypair,
             &keypair1.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
 
         // ensure treasury can process 2 entries that do not have a common account and no tick is registered
-        let blockhash = treasury.last_blockhash();
+        let transaction_seal = treasury.last_transaction_seal();
         let tx = system_transaction::create_user_account(
             &keypair1,
             &keypair3.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
-        let entry_1 = next_entry(&blockhash, 1, vec![tx]);
+        let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let tx = system_transaction::create_user_account(
             &keypair2,
             &keypair4.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
         assert_eq!(process_entries(&treasury, &[entry_1, entry_2]), Ok(()));
         assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
         assert_eq!(treasury.get_balance(&keypair4.pubkey()), 1);
-        assert_eq!(treasury.last_blockhash(), blockhash);
+        assert_eq!(treasury.last_transaction_seal(), transaction_seal);
     }
 
     #[test]
@@ -1252,32 +1252,32 @@ pub mod tests {
             &mint_keypair,
             &keypair1.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
 
-        let blockhash = treasury.last_blockhash();
-        while blockhash == treasury.last_blockhash() {
+        let transaction_seal = treasury.last_transaction_seal();
+        while transaction_seal == treasury.last_transaction_seal() {
             treasury.register_tick(&Hash::default());
         }
 
         // ensure treasury can process 2 entries that do not have a common account and tick is registered
         let tx =
-            system_transaction::create_user_account(&keypair2, &keypair3.pubkey(), 1, blockhash);
-        let entry_1 = next_entry(&blockhash, 1, vec![tx]);
+            system_transaction::create_user_account(&keypair2, &keypair3.pubkey(), 1, transaction_seal);
+        let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let tick = next_entry(&entry_1.hash, 1, vec![]);
         let tx = system_transaction::create_user_account(
             &keypair1,
             &keypair4.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&tick.hash, 1, vec![tx]);
         assert_eq!(
@@ -1292,7 +1292,7 @@ pub mod tests {
             &keypair2,
             &keypair3.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         let entry_3 = next_entry(&entry_2.hash, 1, vec![tx]);
         assert_eq!(
@@ -1331,16 +1331,16 @@ pub mod tests {
             system_transaction::create_user_account(&mint_keypair, &pubkey, 1000, Hash::default());
         let signature = tx.signatures[0];
 
-        // Should fail with blockhash not found
+        // Should fail with transaction_seal not found
         assert_eq!(
             treasury.process_transaction(&tx).map(|_| signature),
-            Err(TransactionError::BlockhashNotFound)
+            Err(TransactionError::TransactionSealNotFound)
         );
 
-        // Should fail again with blockhash not found
+        // Should fail again with transaction_seal not found
         assert_eq!(
             treasury.process_transaction(&tx).map(|_| signature),
-            Err(TransactionError::BlockhashNotFound)
+            Err(TransactionError::TransactionSealNotFound)
         );
     }
 
@@ -1358,17 +1358,17 @@ pub mod tests {
             &mint_keypair,
             &keypair1.pubkey(),
             1,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
         let fail_tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             2,
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
         );
 
         let entry_1_to_mint = next_entry(
-            &treasury.last_blockhash(),
+            &treasury.last_transaction_seal(),
             1,
             vec![
                 success_tx,
@@ -1408,7 +1408,7 @@ pub mod tests {
         }
 
         let mut i = 0;
-        let mut hash = treasury.last_blockhash();
+        let mut hash = treasury.last_transaction_seal();
         loop {
             let entries: Vec<_> = (0..NUM_TRANSFERS)
                 .map(|i| {
@@ -1419,7 +1419,7 @@ pub mod tests {
                             &keypairs[i],
                             &keypairs[i + NUM_TRANSFERS].pubkey(),
                             1,
-                            treasury.last_blockhash(),
+                            treasury.last_transaction_seal(),
                         )],
                     )
                 })
@@ -1443,7 +1443,7 @@ pub mod tests {
                             &keypairs[i + NUM_TRANSFERS],
                             &keypairs[i].pubkey(),
                             1,
-                            treasury.last_blockhash(),
+                            treasury.last_transaction_seal(),
                         )],
                     )
                 })

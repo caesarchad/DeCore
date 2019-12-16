@@ -76,7 +76,7 @@ pub trait BlockstreamEvents {
         slot: u64,
         tick_height: u64,
         leader_pubkey: &Pubkey,
-        blockhash: Hash,
+        transaction_seal: Hash,
     ) -> Result<()>;
 }
 
@@ -177,7 +177,7 @@ where
         slot: u64,
         tick_height: u64,
         leader_pubkey: &Pubkey,
-        blockhash: Hash,
+        transaction_seal: Hash,
     ) -> Result<()> {
         let payload = format!(
             r#"{{"dt":"{}","t":"block","s":{},"h":{},"l":"{:?}","hash":"{:?}"}}"#,
@@ -185,7 +185,7 @@ where
             slot,
             tick_height,
             leader_pubkey,
-            blockhash,
+            transaction_seal,
         );
         // error!("{}", Error(format!("block_event: {:?}", payload).to_string()));
         println!(
@@ -267,7 +267,7 @@ mod test {
         let blockstream = MockBlockstream::new("test_stream".to_string());
         let ticks_per_slot = 5;
 
-        let mut blockhash = Hash::default();
+        let mut transaction_seal = Hash::default();
         let mut entries = Vec::new();
         let mut expected_entries = Vec::new();
 
@@ -279,12 +279,12 @@ mod test {
         for tick_height in tick_height_initial..=tick_height_final {
             if tick_height == 5 {
                 blockstream
-                    .emit_block_event(curr_slot, tick_height - 1, &leader_pubkey, blockhash)
+                    .emit_block_event(curr_slot, tick_height - 1, &leader_pubkey, transaction_seal)
                     .unwrap();
                 curr_slot += 1;
             }
-            let entry = Entry::new(&mut blockhash, 1, vec![]); // just ticks
-            blockhash = entry.hash;
+            let entry = Entry::new(&mut transaction_seal, 1, vec![]); // just ticks
+            transaction_seal = entry.hash;
             blockstream
                 .emit_entry_event(curr_slot, tick_height, &leader_pubkey, &entry)
                 .unwrap();

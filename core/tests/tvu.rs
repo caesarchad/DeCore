@@ -83,7 +83,7 @@ fn test_replay() {
     } = create_genesis_block_with_leader(mint_balance, &leader.info.id, leader_balance);
     genesis_block.ticks_per_slot = 160;
     genesis_block.slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
-    let (block_buffer_pool_path, blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (block_buffer_pool_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     let tvu_addr = target1.info.tvu;
 
@@ -148,7 +148,7 @@ fn test_replay() {
         let num_transfers = 10;
         let mut transfer_amount = 501;
         let bob_keypair = Keypair::new();
-        let mut cur_hash = blockhash;
+        let mut cur_hash = transaction_seal;
         for i in 0..num_transfers {
             let entry0 = next_entry_mut(&mut cur_hash, i, vec![]);
             let entry_tick0 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
@@ -157,7 +157,7 @@ fn test_replay() {
                 &mint_keypair,
                 &bob_keypair.pubkey(),
                 transfer_amount,
-                blockhash,
+                transaction_seal,
             );
             let entry_tick1 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
             let entry1 = next_entry_mut(&mut cur_hash, i + num_transfers, vec![tx0]);

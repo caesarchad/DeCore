@@ -50,7 +50,7 @@ impl Broadcast {
         receiver: &Receiver<WorkingTreasuryEntries>,
         sock: &UdpSocket,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
     ) -> Result<()> {
         let timer = Duration::new(1, 0);
         let (mut treasury, entries) = receiver.recv_timeout(timer)?;
@@ -115,7 +115,7 @@ impl Broadcast {
         index_blobs_with_genesis(
             &blobs,
             &self.id,
-            genesis_blockhash,
+            genesis_transaction_seal,
             blob_index,
             treasury.slot(),
             treasury.parent().map_or(0, |parent| parent.slot()),
@@ -219,7 +219,7 @@ impl BroadcastPhase {
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         receiver: &Receiver<WorkingTreasuryEntries>,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
     ) -> BroadcastPhaseReturnType {
         let me = node_group_info.read().unwrap().my_data().clone();
         let coding_generator = CodingGenerator::default();
@@ -232,7 +232,7 @@ impl BroadcastPhase {
 
         loop {
             if let Err(e) =
-                broadcast.run(&node_group_info, receiver, sock, block_buffer_pool, genesis_blockhash)
+                broadcast.run(&node_group_info, receiver, sock, block_buffer_pool, genesis_transaction_seal)
             {
                 match e {
                     Error::RecvTimeoutError(RecvTimeoutError::Disconnected) | Error::SendError => {
@@ -278,11 +278,11 @@ impl BroadcastPhase {
         receiver: Receiver<WorkingTreasuryEntries>,
         exit_sender: &Arc<AtomicBool>,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
     ) -> Self {
         let block_buffer_pool = block_buffer_pool.clone();
         let exit_sender = exit_sender.clone();
-        let genesis_blockhash = *genesis_blockhash;
+        let genesis_transaction_seal = *genesis_transaction_seal;
         let thread_hdl = Builder::new()
             .name("morgan-broadcaster".to_string())
             .spawn(move || {
@@ -292,7 +292,7 @@ impl BroadcastPhase {
                     &node_group_info,
                     &receiver,
                     &block_buffer_pool,
-                    &genesis_blockhash,
+                    &genesis_transaction_seal,
                 )
             })
             .unwrap();

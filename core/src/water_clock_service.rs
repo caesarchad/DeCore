@@ -116,7 +116,7 @@ mod tests {
     fn test_waterclock_service() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let prev_hash = treasury.last_blockhash();
+        let prev_hash = treasury.last_transaction_seal();
         let ledger_path = get_tmp_ledger_path!();
         {
             let block_buffer_pool =

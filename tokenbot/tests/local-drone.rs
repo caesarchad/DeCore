@@ -12,16 +12,16 @@ fn test_local_drone() {
     let keypair = Keypair::new();
     let to = Pubkey::new_rand();
     let difs = 50;
-    let blockhash = Hash::new(&to.as_ref());
+    let transaction_seal = Hash::new(&to.as_ref());
     let create_instruction =
         system_instruction::create_user_account(&keypair.pubkey(), &to, difs);
     let message = Message::new(vec![create_instruction]);
-    let expected_tx = Transaction::new(&[&keypair], message, blockhash);
+    let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
 
     let (sender, receiver) = channel();
     run_local_drone(keypair, sender, None);
     let drone_addr = receiver.recv().unwrap();
 
-    let result = request_airdrop_transaction(&drone_addr, &to, difs, blockhash);
+    let result = request_airdrop_transaction(&drone_addr, &to, difs, transaction_seal);
     assert_eq!(expected_tx, result.unwrap());
 }

@@ -95,7 +95,7 @@ impl Validator {
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
         let treasury = Treasury::new_with_paths(&genesis_block, None);
-        let genesis_blockhash = treasury.last_blockhash();
+        let genesis_transaction_seal = treasury.last_transaction_seal();
 
         let (
             treasury_forks,
@@ -116,13 +116,13 @@ impl Validator {
         //     "{}",
         //     Info(format!("starting Water Clock... {} {}",
         //     treasury.tick_height(),
-        //     treasury.last_blockhash()).to_string())
+        //     treasury.last_transaction_seal()).to_string())
         // );
         println!("{}",
             printLn(
                 format!("starting water clock... {} {}",
                     treasury.tick_height(),
-                    treasury.last_blockhash()).to_string(),
+                    treasury.last_transaction_seal()).to_string(),
                 module_path!().to_string()
             )
         );
@@ -131,7 +131,7 @@ impl Validator {
         let waterclock_config = Arc::new(waterclock_config);
         let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new_with_clear_signal(
             treasury.tick_height(),
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
             treasury.slot(),
             leader_schedule_cache.next_leader_slot(&id, treasury.slot(), &treasury, Some(&block_buffer_pool)),
             treasury.ticks_per_slot(),
@@ -274,7 +274,7 @@ impl Validator {
             &waterclock_recorder,
             &leader_schedule_cache,
             &exit,
-            &genesis_blockhash,
+            &genesis_transaction_seal,
             completed_slots_receiver,
         );
 
@@ -300,7 +300,7 @@ impl Validator {
             config.sigverify_disabled,
             &block_buffer_pool,
             &exit,
-            &genesis_blockhash,
+            &genesis_transaction_seal,
         );
 
         inc_new_counter_info!("fullnode-new", 1);
@@ -402,7 +402,7 @@ pub fn new_validator_for_tests() -> (Validator, ContactInfo, Keypair, String) {
         .native_instruction_processors
         .push(morgan_budget_controller!());
 
-    let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     let voting_keypair = Arc::new(Keypair::new());
     let storage_keypair = Arc::new(Keypair::new());
@@ -437,7 +437,7 @@ mod tests {
         let validator_node = Node::new_localhost_with_pubkey(&validator_keypair.pubkey());
         let genesis_block =
             create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000).genesis_block;
-        let (validator_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let voting_keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
@@ -468,7 +468,7 @@ mod tests {
                 let genesis_block =
                     create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000)
                         .genesis_block;
-                let (validator_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+                let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
                 ledger_paths.push(validator_ledger_path.clone());
                 let voting_keypair = Arc::new(Keypair::new());
                 let storage_keypair = Arc::new(Keypair::new());

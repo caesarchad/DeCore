@@ -44,7 +44,7 @@ pub struct StorageStateInner {
     storage_results: StorageResults,
     storage_keys: StorageKeys,
     storage_miner_map: StorageMinerMap,
-    storage_blockhash: Hash,
+    storage_transaction_seal: Hash,
     slot: u64,
 }
 
@@ -87,7 +87,7 @@ impl StorageState {
             storage_results,
             storage_miner_map,
             slot: 0,
-            storage_blockhash: Hash::default(),
+            storage_transaction_seal: Hash::default(),
         };
 
         StorageState {
@@ -105,8 +105,8 @@ impl StorageState {
         self.state.read().unwrap().storage_results[idx]
     }
 
-    pub fn get_storage_blockhash(&self) -> Hash {
-        self.state.read().unwrap().storage_blockhash
+    pub fn get_storage_transaction_seal(&self) -> Hash {
+        self.state.read().unwrap().storage_transaction_seal
     }
 
     pub fn get_slot(&self) -> u64 {
@@ -269,7 +269,7 @@ impl StoragePhase {
         transactions_socket: &UdpSocket,
     ) -> io::Result<()> {
         let working_treasury = treasury_forks.read().unwrap().working_treasury();
-        let blockhash = working_treasury.confirmed_last_blockhash();
+        let transaction_seal = working_treasury.confirmed_last_transaction_seal();
         let keypair_balance = working_treasury.get_balance(&keypair.pubkey());
 
         if keypair_balance == 0 {
@@ -308,7 +308,7 @@ impl StoragePhase {
 
         let signer_keys = vec![keypair.as_ref(), storage_keypair.as_ref()];
         let message = Message::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
-        let transaction = Transaction::new(&signer_keys, message, blockhash);
+        let transaction = Transaction::new(&signer_keys, message, transaction_seal);
 
         transactions_socket.send_to(
             &bincode::serialize(&transaction).unwrap(),
@@ -328,7 +328,7 @@ impl StoragePhase {
         let mut seed = [0u8; 32];
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
-        let ix = storage_instruction::advertise_recent_blockhash(
+        let ix = storage_instruction::advertise_recent_transaction_seal(
             &storage_keypair.pubkey(),
             entry_id,
             slot,
@@ -505,7 +505,7 @@ impl StoragePhase {
                         }
                     }
                     if *slot_count % storage_rotate_count == 0 {
-                        // assume the last entry in the slot is the blockhash for that slot
+                        // assume the last entry in the slot is the transaction_seal for that slot
                         let entry_hash = entries.last().unwrap().hash;
                         debug!(
                             "crosses sending at root slot: {}! with last entry's hash {}",
@@ -642,7 +642,7 @@ mod tests {
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let ticks_per_slot = genesis_block.ticks_per_slot;
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(64);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
@@ -735,7 +735,7 @@ mod tests {
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let ticks_per_slot = genesis_block.ticks_per_slot;;
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(128);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());

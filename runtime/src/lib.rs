@@ -4,7 +4,7 @@ mod accounts_index;
 pub mod append_vec;
 pub mod treasury;
 pub mod treasury_client;
-mod blockhash_queue;
+mod transaction_seal_queue;
 pub mod bloom;
 pub mod epoch_schedule;
 pub mod genesis_utils;

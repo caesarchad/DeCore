@@ -24,7 +24,7 @@ fn test_rpc_send_tx() {
     let request = json!({
        "jsonrpc": "2.0",
        "id": 1,
-       "method": "getLatestBlockhash",
+       "method": "getLatestTransactionSeal",
        "params": json!([])
     });
     let rpc_addr = leader_data.rpc;
@@ -36,16 +36,16 @@ fn test_rpc_send_tx() {
         .send()
         .unwrap();
     let json: Value = serde_json::from_str(&response.text().unwrap()).unwrap();
-    let blockhash: Hash = json["result"][0].as_str().unwrap().parse().unwrap();
+    let transaction_seal: Hash = json["result"][0].as_str().unwrap().parse().unwrap();
 
-    // info!("{}", Info(format!("blockhash: {:?}", blockhash).to_string()));
+    // info!("{}", Info(format!("transaction_seal: {:?}", transaction_seal).to_string()));
     println!("{}",
         printLn(
-            format!("blockhash: {:?}", blockhash).to_string(),
+            format!("transaction_seal: {:?}", transaction_seal).to_string(),
             module_path!().to_string()
         )
     );
-    let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+    let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
     let serial_tx = serialize(&tx).unwrap();
 
     let client = reqwest::Client::new();

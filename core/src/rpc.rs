@@ -80,9 +80,9 @@ impl JsonRpcRequestProcessor {
         self.treasury().get_reputation(&pubkey)
     }
 
-    fn get_recent_blockhash(&self) -> (String, FeeCalculator) {
+    fn get_recent_transaction_seal(&self) -> (String, FeeCalculator) {
         (
-            self.treasury().confirmed_last_blockhash().to_string(),
+            self.treasury().confirmed_last_transaction_seal().to_string(),
             self.treasury().fee_calculator.clone(),
         )
     }
@@ -118,8 +118,8 @@ impl JsonRpcRequestProcessor {
             .collect::<Vec<_>>())
     }
 
-    fn get_storage_blockhash(&self) -> Result<String> {
-        Ok(self.storage_state.get_storage_blockhash().to_string())
+    fn get_storage_transaction_seal(&self) -> Result<String> {
+        Ok(self.storage_state.get_storage_transaction_seal().to_string())
     }
 
     fn get_storage_slot(&self) -> Result<u64> {
@@ -200,8 +200,8 @@ pub trait RpcSol {
     #[rpc(meta, name = "getClusterNodes")]
     fn get_cluster_nodes(&self, _: Self::Metadata) -> Result<Vec<RpcContactInfo>>;
 
-    #[rpc(meta, name = "getLatestBlockhash")]
-    fn get_recent_blockhash(&self, _: Self::Metadata) -> Result<(String, FeeCalculator)>;
+    #[rpc(meta, name = "getLatestTransactionSeal")]
+    fn get_recent_transaction_seal(&self, _: Self::Metadata) -> Result<(String, FeeCalculator)>;
 
     #[rpc(meta, name = "getSignatureState")]
     fn get_signature_status(
@@ -228,8 +228,8 @@ pub trait RpcSol {
     #[rpc(meta, name = "getEpochVoteAccounts")]
     fn get_epoch_vote_accounts(&self, _: Self::Metadata) -> Result<Vec<(Pubkey, u64, VoteState)>>;
 
-    #[rpc(meta, name = "getStorageBlockhash")]
-    fn get_storage_blockhash(&self, _: Self::Metadata) -> Result<String>;
+    #[rpc(meta, name = "getStorageTransactionSeal")]
+    fn get_storage_transaction_seal(&self, _: Self::Metadata) -> Result<String>;
 
     #[rpc(meta, name = "getStorageSlot")]
     fn get_storage_slot(&self, _: Self::Metadata) -> Result<u64>;
@@ -317,13 +317,13 @@ impl RpcSol for RpcSolImpl {
             .collect())
     }
 
-    fn get_recent_blockhash(&self, meta: Self::Metadata) -> Result<(String, FeeCalculator)> {
-        debug!("get_recent_blockhash rpc request received");
+    fn get_recent_transaction_seal(&self, meta: Self::Metadata) -> Result<(String, FeeCalculator)> {
+        debug!("get_recent_transaction_seal rpc request received");
         Ok(meta
             .request_processor
             .read()
             .unwrap()
-            .get_recent_blockhash())
+            .get_recent_transaction_seal())
     }
 
     fn get_signature_status(
@@ -378,13 +378,13 @@ impl RpcSol for RpcSolImpl {
             .ok_or_else(Error::invalid_request)?;
         let pubkey = verify_pubkey(id)?;
 
-        let blockhash = meta
+        let transaction_seal = meta
             .request_processor
             .read()
             .unwrap()
             .treasury()
-            .confirmed_last_blockhash();
-        let transaction = request_airdrop_transaction(&drone_addr, &pubkey, difs, blockhash)
+            .confirmed_last_transaction_seal();
+        let transaction = request_airdrop_transaction(&drone_addr, &pubkey, difs, transaction_seal)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_airdrop_transaction failed: {:?}", err).to_string()));
                 println!("{}",
@@ -467,13 +467,13 @@ impl RpcSol for RpcSolImpl {
             .ok_or_else(Error::invalid_request)?;
         let pubkey = verify_pubkey(id)?;
 
-        let blockhash = meta
+        let transaction_seal = meta
             .request_processor
             .read()
             .unwrap()
             .treasury()
-            .confirmed_last_blockhash();
-        let transaction = request_reputation_airdrop_transaction(&drone_addr, &pubkey, reputations, blockhash)
+            .confirmed_last_transaction_seal();
+        let transaction = request_reputation_airdrop_transaction(&drone_addr, &pubkey, reputations, transaction_seal)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_reputation_airdrop_transaction failed: {:?}", err).to_string()));
                 println!("{}",
@@ -615,11 +615,11 @@ impl RpcSol for RpcSolImpl {
             .get_epoch_vote_accounts()
     }
 
-    fn get_storage_blockhash(&self, meta: Self::Metadata) -> Result<String> {
+    fn get_storage_transaction_seal(&self, meta: Self::Metadata) -> Result<String> {
         meta.request_processor
             .read()
             .unwrap()
-            .get_storage_blockhash()
+            .get_storage_transaction_seal()
     }
 
     fn get_storage_slot(&self, meta: Self::Metadata) -> Result<u64> {
@@ -658,11 +658,11 @@ mod tests {
         let treasury = treasury_forks.read().unwrap().working_treasury();
         let exit = Arc::new(AtomicBool::new(false));
 
-        let blockhash = treasury.confirmed_last_blockhash();
-        let tx = system_transaction::transfer(&alice, pubkey, 20, blockhash);
+        let transaction_seal = treasury.confirmed_last_transaction_seal();
+        let tx = system_transaction::transfer(&alice, pubkey, 20, transaction_seal);
         treasury.process_transaction(&tx).expect("process transaction");
 
-        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, blockhash);
+        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
         let _ = treasury.process_transaction(&tx);
 
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
@@ -685,7 +685,7 @@ mod tests {
             request_processor,
             node_group_info,
         };
-        (io, meta, blockhash, alice, leader.id)
+        (io, meta, transaction_seal, alice, leader.id)
     }
 
     #[test]
@@ -701,8 +701,8 @@ mod tests {
             &exit,
         );
         thread::spawn(move || {
-            let blockhash = treasury.confirmed_last_blockhash();
-            let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+            let transaction_seal = treasury.confirmed_last_transaction_seal();
+            let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
             treasury.process_transaction(&tx).expect("process transaction");
         })
         .join()
@@ -713,7 +713,7 @@ mod tests {
     #[test]
     fn test_rpc_get_balance() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getDif","params":["{}"]}}"#,
@@ -731,7 +731,7 @@ mod tests {
     #[test]
     fn test_rpc_get_reputation() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getReputation","params":["{}"]}}"#,
@@ -749,7 +749,7 @@ mod tests {
     #[test]
     fn test_rpc_get_cluster_nodes() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getClusterNodes"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -769,7 +769,7 @@ mod tests {
     #[test]
     fn test_rpc_get_slot_leader() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getRoundLeader"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -785,7 +785,7 @@ mod tests {
     #[test]
     fn test_rpc_get_tx_count() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getTxnCnt"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -800,7 +800,7 @@ mod tests {
     #[test]
     fn test_rpc_get_account_info() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["{}"]}}"#,
@@ -828,8 +828,8 @@ mod tests {
     #[test]
     fn test_rpc_confirm_tx() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, blockhash, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+        let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"confirmTxn","params":["{}"]}}"#,
@@ -847,8 +847,8 @@ mod tests {
     #[test]
     fn test_rpc_get_signature_status() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, blockhash, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+        let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
@@ -868,7 +868,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on unprocessed tx
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 10, blockhash);
+        let tx = system_transaction::transfer(&alice, &bob_pubkey, 10, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -887,7 +887,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on a TransactionError
-        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, blockhash);
+        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -909,15 +909,15 @@ mod tests {
     }
 
     #[test]
-    fn test_rpc_get_recent_blockhash() {
+    fn test_rpc_get_recent_transaction_seal() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
-        let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash"}}"#);
+        let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getLatestTransactionSeal"}}"#);
         let res = io.handle_request_sync(&req, meta);
         let expected = format!(
             r#"{{"jsonrpc":"2.0","result":["{}", {{"difsPerSignature": 0}}],"id":1}}"#,
-            blockhash
+            transaction_seal
         );
         let expected: Response =
             serde_json::from_str(&expected).expect("expected response deserialization");
@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn test_rpc_fail_request_airdrop() {
         let bob_pubkey = Pubkey::new_rand();
-        let (io, meta, _blockhash, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         // Expect internal error because no drone is available
         let req = format!(

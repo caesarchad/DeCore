@@ -1,6 +1,6 @@
 //! named accounts for synthesized data accounts for treasury state, etc.
 //!
-//! this account carries the Treasury's most recent blockhashes for some N parents
+//! this account carries the Treasury's most recent transaction_seals for some N parents
 //!
 use crate::account::Account;
 use crate::account_utils::State;

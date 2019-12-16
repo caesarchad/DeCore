@@ -357,9 +357,9 @@ impl ReplayPhase {
             );
 
             let mut vote_tx = Transaction::new_unsigned_instructions(vec![vote_ix]);
-            let blockhash = treasury.last_blockhash();
-            vote_tx.partial_sign(&[node_keypair.as_ref()], blockhash);
-            vote_tx.partial_sign(&[voting_keypair.as_ref()], blockhash);
+            let transaction_seal = treasury.last_transaction_seal();
+            vote_tx.partial_sign(&[node_keypair.as_ref()], transaction_seal);
+            vote_tx.partial_sign(&[voting_keypair.as_ref()], transaction_seal);
             node_group_info.write().unwrap().push_vote(vote_tx);
         }
         Ok(())
@@ -377,7 +377,7 @@ impl ReplayPhase {
             leader_schedule_cache.next_leader_slot(&my_pubkey, treasury.slot(), &treasury, Some(block_buffer_pool));
         waterclock_recorder.lock().unwrap().reset(
             treasury.tick_height(),
-            treasury.last_blockhash(),
+            treasury.last_transaction_seal(),
             treasury.slot(),
             next_leader_slot,
             ticks_per_slot,
@@ -553,7 +553,7 @@ impl ReplayPhase {
         let treasury_slot = treasury.slot();
         let treasury_progress = &mut progress
             .entry(treasury_slot)
-            .or_insert(ForkProgress::new(treasury.last_blockhash()));
+            .or_insert(ForkProgress::new(treasury.last_transaction_seal()));
         block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, treasury_progress.num_blobs as u64, None)
     }
 
@@ -565,7 +565,7 @@ impl ReplayPhase {
     ) -> Result<()> {
         let treasury_progress = &mut progress
             .entry(treasury.slot())
-            .or_insert(ForkProgress::new(treasury.last_blockhash()));
+            .or_insert(ForkProgress::new(treasury.last_transaction_seal()));
         let result = Self::verify_and_process_entries(&treasury, &entries, &treasury_progress.last_entry);
         treasury_progress.num_blobs += num;
         if let Some(last_entry) = entries.last() {
@@ -585,7 +585,7 @@ impl ReplayPhase {
                 entries.len(),
                 treasury.tick_height(),
                 last_entry,
-                treasury.last_blockhash()
+                treasury.last_transaction_seal()
             );
             return Err(Error::BlobError(BlobError::VerificationFailed));
         }

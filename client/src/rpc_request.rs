@@ -10,11 +10,11 @@ pub enum RpcRequest {
     GetBalance,
     GetClusterNodes,
     GetNumBlocksSinceSignatureConfirmation,
-    GetRecentBlockhash,
+    GetRecentTransactionSeal,
     GetSignatureStatus,
     GetSlotLeader,
     GetEpochVoteAccounts,
-    GetStorageBlockhash,
+    GetStorageTransactionSeal,
     GetStorageSlot,
     GetStoragePubkeysForSlot,
     GetTransactionCount,
@@ -37,11 +37,11 @@ impl RpcRequest {
             RpcRequest::GetNumBlocksSinceSignatureConfirmation => {
                 "getNumBlocksSinceSignatureConfirmation"
             }
-            RpcRequest::GetRecentBlockhash => "getLatestBlockhash",
+            RpcRequest::GetRecentTransactionSeal => "getLatestTransactionSeal",
             RpcRequest::GetSignatureStatus => "getSignatureState",
             RpcRequest::GetSlotLeader => "getRoundLeader",
             RpcRequest::GetEpochVoteAccounts => "getEpochVoteAccounts",
-            RpcRequest::GetStorageBlockhash => "getStorageBlockhash",
+            RpcRequest::GetStorageTransactionSeal => "getStorageTransactionSeal",
             RpcRequest::GetStorageSlot => "getStorageSlot",
             RpcRequest::GetStoragePubkeysForSlot => "getStoragePubkeysForSlot",
             RpcRequest::GetTransactionCount => "getTxnCnt",
@@ -100,9 +100,9 @@ mod tests {
         let request = test_request.build_request_json(1, Some(addr));
         assert_eq!(request["method"], "getDif");
 
-        let test_request = RpcRequest::GetRecentBlockhash;
+        let test_request = RpcRequest::GetRecentTransactionSeal;
         let request = test_request.build_request_json(1, None);
-        assert_eq!(request["method"], "getLatestBlockhash");
+        assert_eq!(request["method"], "getLatestTransactionSeal");
 
         let test_request = RpcRequest::GetTransactionCount;
         let request = test_request.build_request_json(1, None);

@@ -149,7 +149,7 @@ pub struct Message {
     pub account_keys: Vec<Pubkey>,
 
     /// The id of a recent ledger entry.
-    pub recent_blockhash: Hash,
+    pub recent_transaction_seal: Hash,
 
     /// Programs that will be executed in sequence and committed in one atomic transaction if all
     /// succeed.
@@ -163,7 +163,7 @@ impl Message {
         num_credit_only_signed_accounts: u8,
         num_credit_only_unsigned_accounts: u8,
         account_keys: Vec<Pubkey>,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
         instructions: Vec<CompiledInstruction>,
     ) -> Self {
         Self {
@@ -173,7 +173,7 @@ impl Message {
                 num_credit_only_unsigned_accounts,
             },
             account_keys,
-            recent_blockhash,
+            recent_transaction_seal,
             instructions,
         }
     }
@@ -531,7 +531,7 @@ mod tests {
                 num_credit_only_unsigned_accounts: 1,
             },
             account_keys: vec![key0, key1, key2, key3, key4, key5],
-            recent_blockhash: Hash::default(),
+            recent_transaction_seal: Hash::default(),
             instructions: vec![],
         };
         assert_eq!(message.is_credit_debit(0), true);

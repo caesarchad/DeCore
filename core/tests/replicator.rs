@@ -187,7 +187,7 @@ fn test_storage_miner_startup_leader_hang() {
     );
     let leader_ledger_path = "path_to_leder_ledger_file";
     let (genesis_block, _mint_keypair) = create_genesis_block(10_000);
-    let (miner_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (miner_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     {
         let storage_miner_keypair = Arc::new(Keypair::new());
@@ -251,7 +251,7 @@ fn test_storage_miner_startup_ledger_hang() {
 
     // Pass bad TVU sockets to prevent successful ledger download
     storage_miner_node.sockets.tvu = vec![std::net::UdpSocket::bind("0.0.0.0:0").unwrap()];
-    let (miner_ledger_path, _blockhash) = create_new_tmp_ledger!(&node_group.genesis_block);
+    let (miner_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&node_group.genesis_block);
 
     let storage_miner_res = StorageMiner::new(
         &miner_ledger_path,
