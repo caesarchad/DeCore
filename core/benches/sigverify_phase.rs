@@ -7,7 +7,7 @@ use log::*;
 use rand::{thread_rng, Rng};
 use morgan::packet::to_packets_chunked;
 use morgan::service::Service;
-use morgan::signature_verify_stage::SigVerifyStage;
+use morgan::signature_verify_phase ::SigVerifyPhase;
 use morgan::test_tx::test_tx;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -18,12 +18,12 @@ use std::time::{Duration, Instant};
 use test::Bencher;
 
 #[bench]
-fn bench_sigverify_stage(bencher: &mut Bencher) {
+fn bench_sigverify_phase(bencher: &mut Bencher) {
     morgan_logger::setup();
     let (packet_s, packet_r) = channel();
     let (verified_s, verified_r) = channel();
     let sigverify_disabled = false;
-    let stage = SigVerifyStage::new(packet_r, sigverify_disabled, verified_s);
+    let stage = SigVerifyPhase::new(packet_r, sigverify_disabled, verified_s);
 
     let now = Instant::now();
     let len = 4096;

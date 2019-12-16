@@ -315,7 +315,7 @@ pub fn process_block_buffer_pool(
                 })?
                 .unwrap();
 
-            // only process full slots in block_buffer_processor, replay_stage
+            // only process full slots in block_buffer_processor, replay_phase
             // handles any partials
             if next_meta.is_full() {
                 let next_treasury = Arc::new(Treasury::new_from_parent(

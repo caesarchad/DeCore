@@ -53,7 +53,7 @@ pub struct StorageState {
     state: Arc<RwLock<StorageStateInner>>,
 }
 
-pub struct StorageStage {
+pub struct StoragePhase {
     t_storage_mining_verifier: JoinHandle<()>,
     t_storage_create_accounts: JoinHandle<()>,
 }
@@ -129,7 +129,7 @@ impl StorageState {
     }
 }
 
-impl StorageStage {
+impl StoragePhase {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage_state: &StorageState,
@@ -254,7 +254,7 @@ impl StorageStage {
                 .unwrap()
         };
 
-        StorageStage {
+        StoragePhase {
             t_storage_mining_verifier,
             t_storage_create_accounts,
         }
@@ -568,7 +568,7 @@ impl StorageStage {
     }
 }
 
-impl Service for StorageStage {
+impl Service for StoragePhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -601,7 +601,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn test_storage_stage_none_ledger() {
+    fn test_storage_phase_none_ledger() {
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
         let exit = Arc::new(AtomicBool::new(false));
@@ -612,7 +612,7 @@ mod tests {
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_phase = StoragePhase::new(
             &storage_state,
             slot_receiver,
             None,
@@ -624,7 +624,7 @@ mod tests {
             &node_group_info,
         );
         exit.store(true, Ordering::Relaxed);
-        storage_stage.join().unwrap();
+        storage_phase.join().unwrap();
     }
 
     fn test_node_group_info(id: &Pubkey) -> Arc<RwLock<NodeGroupInfo>> {
@@ -634,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_stage_process_entries() {
+    fn test_storage_phase_process_entries() {
         morgan_logger::setup();
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
@@ -657,7 +657,7 @@ mod tests {
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_phase = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
@@ -715,7 +715,7 @@ mod tests {
             )
         );
         exit.store(true, Ordering::Relaxed);
-        storage_stage.join().unwrap();
+        storage_phase.join().unwrap();
 
         #[cfg(not(all(feature = "cuda", feature = "chacha")))]
         assert_eq!(result, Hash::default());
@@ -727,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_stage_process_proof_entries() {
+    fn test_storage_phase_process_proof_entries() {
         morgan_logger::setup();
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
@@ -748,7 +748,7 @@ mod tests {
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_phase = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
@@ -797,7 +797,7 @@ mod tests {
 
         debug!("joining..?");
         exit.store(true, Ordering::Relaxed);
-        storage_stage.join().unwrap();
+        storage_phase.join().unwrap();
 
         {
             let keys = &storage_state.state.read().unwrap().storage_keys;

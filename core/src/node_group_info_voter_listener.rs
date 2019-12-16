@@ -2,7 +2,7 @@ use crate::node_group_info::{NodeGroupInfo, GOSSIP_SLEEP_MILLIS};
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::Result;
 use crate::service::Service;
-use crate::signature_verify_stage::VerifiedPackets;
+use crate::signature_verify_phase ::VerifiedPackets;
 use crate::{packet, signature_verify};
 use morgan_metricbot::inc_new_counter_debug;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -1,4 +1,4 @@
-use crate::fetch_spot_stage::BlobFetchStage;
+use crate::fetch_spot_phase::BlobFetchPhase;
 use crate::block_buffer_pool::BlockBufferPool;
 #[cfg(feature = "chacha")]
 use crate::chacha::{chacha_cbc_encrypt_ledger, CHACHA_BLOCK_SIZE};
@@ -48,7 +48,7 @@ pub enum StorageMinerRequest {
 
 pub struct StorageMiner {
     gossip_service: GossipService,
-    fetch_stage: BlobFetchStage,
+    fetch_phase: BlobFetchPhase,
     window_service: WindowService,
     thread_handles: Vec<JoinHandle<()>>,
     exit: Arc<AtomicBool>,
@@ -254,7 +254,7 @@ impl StorageMiner {
             node.sockets.tvu.into_iter().map(Arc::new).collect();
         blob_sockets.push(repair_socket.clone());
         let (blob_fetch_sender, blob_fetch_receiver) = channel();
-        let fetch_stage = BlobFetchStage::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
+        let fetch_phase = BlobFetchPhase::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
 
         let (retransmit_sender, retransmit_receiver) = channel();
 
@@ -300,7 +300,7 @@ impl StorageMiner {
 
         Ok(Self {
             gossip_service,
-            fetch_stage,
+            fetch_phase,
             window_service,
             thread_handles,
             exit,
@@ -458,7 +458,7 @@ impl StorageMiner {
 
         #[cfg(feature = "chacha")]
         {
-            use crate::storage_stage::NUM_STORAGE_SAMPLES;
+            use crate::storage_phase::NUM_STORAGE_SAMPLES;
             use rand::SeedableRng;
             use rand_chacha::ChaChaRng;
 
@@ -565,7 +565,7 @@ impl StorageMiner {
 
     pub fn join(self) {
         self.gossip_service.join().unwrap();
-        self.fetch_stage.join().unwrap();
+        self.fetch_phase.join().unwrap();
         self.window_service.join().unwrap();
         for handle in self.thread_handles {
             handle.join().unwrap();

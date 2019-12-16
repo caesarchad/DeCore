@@ -1,15 +1,15 @@
 //! The `tpu` module implements the Transaction Processing Unit, a
 //! multi-stage transaction processing pipeline in software.
 
-use crate::treasury_stage::TreasuryStage;
+use crate::treasury_phase::TreasuryStage;
 use crate::block_buffer_pool::BlockBufferPool;
-use crate::propagate_stage::BroadcastStage;
+use crate::propagate_phase::BroadcastPhase;
 use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info_voter_listener::ClusterInfoVoteListener;
-use crate::fetch_stage::FetchStage;
+use crate::fetch_phase::FetchPhase;
 use crate::water_clock_recorder::{WaterClockRecorder, WorkingTreasuryEntries};
 use crate::service::Service;
-use crate::signature_verify_stage::SigVerifyStage;
+use crate::signature_verify_phase ::SigVerifyPhase;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use std::net::UdpSocket;
@@ -19,11 +19,11 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 pub struct Tpu {
-    fetch_stage: FetchStage,
-    sigverify_stage: SigVerifyStage,
+    fetch_phase: FetchPhase,
+    sigverify_phase: SigVerifyPhase,
     treasury_phase: TreasuryStage,
     cluster_info_vote_listener: ClusterInfoVoteListener,
-    broadcast_stage: BroadcastStage,
+    broadcast_phase: BroadcastPhase,
 }
 
 impl Tpu {
@@ -44,7 +44,7 @@ impl Tpu {
         node_group_info.write().unwrap().set_leader(id);
 
         let (packet_sender, packet_receiver) = channel();
-        let fetch_stage = FetchStage::new_with_sender(
+        let fetch_phase = FetchPhase::new_with_sender(
             transactions_sockets,
             tpu_via_blobs_sockets,
             &exit,
@@ -53,8 +53,8 @@ impl Tpu {
         );
         let (verified_sender, verified_receiver) = channel();
 
-        let sigverify_stage =
-            SigVerifyStage::new(packet_receiver, sigverify_disabled, verified_sender.clone());
+        let sigverify_phase =
+            SigVerifyPhase::new(packet_receiver, sigverify_disabled, verified_sender.clone());
 
         let (verified_vote_sender, verified_vote_receiver) = channel();
         let cluster_info_vote_listener = ClusterInfoVoteListener::new(
@@ -72,7 +72,7 @@ impl Tpu {
             verified_vote_receiver,
         );
 
-        let broadcast_stage = BroadcastStage::new(
+        let broadcast_phase = BroadcastPhase::new(
             broadcast_socket,
             node_group_info.clone(),
             entry_receiver,
@@ -82,11 +82,11 @@ impl Tpu {
         );
 
         Self {
-            fetch_stage,
-            sigverify_stage,
+            fetch_phase,
+            sigverify_phase,
             treasury_phase,
             cluster_info_vote_listener,
-            broadcast_stage,
+            broadcast_phase,
         }
     }
 }
@@ -96,11 +96,11 @@ impl Service for Tpu {
 
     fn join(self) -> thread::Result<()> {
         let mut results = vec![];
-        results.push(self.fetch_stage.join());
-        results.push(self.sigverify_stage.join());
+        results.push(self.fetch_phase.join());
+        results.push(self.sigverify_phase.join());
         results.push(self.cluster_info_vote_listener.join());
         results.push(self.treasury_phase.join());
-        let broadcast_result = self.broadcast_stage.join();
+        let broadcast_result = self.broadcast_phase.join();
         for result in results {
             result?;
         }

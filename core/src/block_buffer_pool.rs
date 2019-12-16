@@ -714,8 +714,8 @@ impl BlockBufferPool {
         struct EntryIterator {
             db_iterator: Cursor<cf::DataColumn>,
 
-            // TODO: remove me when replay_stage is iterating by block (BlockBufferPool)
-            //    this verification is duplicating that of replay_stage, which
+            // TODO: remove me when replay_phase is iterating by block (BlockBufferPool)
+            //    this verification is duplicating that of replay_phase, which
             //    can do this in parallel
             blockhash: Option<Hash>,
             // https://github.com/rust-rocksdb/rust-rocksdb/issues/234

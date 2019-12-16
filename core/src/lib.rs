@@ -7,9 +7,9 @@
 
 // pub mod treasury_forks;
 pub mod treasury_forks;
-pub mod treasury_stage;
-pub mod fetch_spot_stage;
-pub mod propagate_stage;
+pub mod treasury_phase;
+pub mod fetch_spot_phase;
+pub mod propagate_phase;
 #[cfg(feature = "chacha")]
 pub mod chacha;
 #[cfg(all(feature = "chacha", feature = "cuda"))]
@@ -34,7 +34,7 @@ pub mod node_group_info_fixer_listener;
 pub mod node_group_tests;
 pub mod entry_info;
 pub mod expunge;
-pub mod fetch_stage;
+pub mod fetch_phase;
 pub mod create_keys;
 pub mod genesis_utils;
 pub mod gossip_service;
@@ -50,10 +50,10 @@ pub mod water_clock_recorder;
 pub mod water_clock_service;
 pub mod recvmmsg;
 pub mod fix_missing_spot_service;
-pub mod repeat_stage;
+pub mod repeat_phase;
 pub mod cloner;
 pub mod result;
-pub mod retransmit_stage;
+pub mod retransmit_phase;
 pub mod rpc;
 pub mod rpc_pub_sub;
 pub mod rpc_pub_subervice;
@@ -61,7 +61,7 @@ pub mod rpc_service;
 pub mod rpc_subscriptions;
 pub mod service;
 pub mod signature_verify;
-pub mod signature_verify_stage;
+pub mod signature_verify_phase;
 pub mod staking_utils;
 pub mod storage_stage;
 pub mod streamer;

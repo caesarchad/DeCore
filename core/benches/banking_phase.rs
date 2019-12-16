@@ -7,7 +7,7 @@ extern crate morgan;
 use log::*;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-use morgan::treasury_stage::{create_test_recorder, TreasuryStage};
+use morgan::treasury_phase::{create_test_recorder, TreasuryStage};
 use morgan::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
 use morgan::node_group_info::NodeGroupInfo;
 use morgan::node_group_info::Node;

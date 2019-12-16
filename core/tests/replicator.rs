@@ -12,7 +12,7 @@ use morgan::gossip_service::find_node_group_host;
 use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
 use morgan::cloner::StorageMiner;
 use morgan::cloner::StorageMinerRequest;
-use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+use morgan::storage_phase::STORAGE_ROTATE_TEST_COUNT;
 use morgan::streamer::blob_receiver;
 use morgan::verifier::ValidatorConfig;
 use morgan_client::thin_client::create_client;

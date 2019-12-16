@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BroadcastStageReturnType {
+pub enum BroadcastPhaseReturnType {
     ChannelDisconnected,
 }
 
@@ -190,7 +190,7 @@ impl Broadcast {
     }
 }
 
-// Implement a destructor for the BroadcastStage thread to signal it exited
+// Implement a destructor for the BroadcastPhase thread to signal it exited
 // even on panics
 struct Finalizer {
     exit_sender: Arc<AtomicBool>,
@@ -208,11 +208,11 @@ impl Drop for Finalizer {
     }
 }
 
-pub struct BroadcastStage {
-    thread_hdl: JoinHandle<BroadcastStageReturnType>,
+pub struct BroadcastPhase {
+    thread_hdl: JoinHandle<BroadcastPhaseReturnType>,
 }
 
-impl BroadcastStage {
+impl BroadcastPhase {
     #[allow(clippy::too_many_arguments)]
     fn run(
         sock: &UdpSocket,
@@ -220,7 +220,7 @@ impl BroadcastStage {
         receiver: &Receiver<WorkingTreasuryEntries>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         genesis_blockhash: &Hash,
-    ) -> BroadcastStageReturnType {
+    ) -> BroadcastPhaseReturnType {
         let me = node_group_info.read().unwrap().my_data().clone();
         let coding_generator = CodingGenerator::default();
 
@@ -236,7 +236,7 @@ impl BroadcastStage {
             {
                 match e {
                     Error::RecvTimeoutError(RecvTimeoutError::Disconnected) | Error::SendError => {
-                        return BroadcastStageReturnType::ChannelDisconnected;
+                        return BroadcastPhaseReturnType::ChannelDisconnected;
                     }
                     Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                     Error::NodeGroupInfoError(NodeGroupInfoError::NoPeers) => (), // TODO: Why are the unit-tests throwing hundreds of these?
@@ -269,7 +269,7 @@ impl BroadcastStage {
     /// that come before could be blocked on a receive, and never notice that they need to
     /// exit. Now, if any stage of the Tpu closes, it will lead to closing the WriteStage (b/c
     /// WriteStage is the last stage in the pipeline), which will then close Broadcast service,
-    /// which will then close FetchStage in the Tpu, and then the rest of the Tpu,
+    /// which will then close FetchPhase in the Tpu, and then the rest of the Tpu,
     /// completing the cycle.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -301,10 +301,10 @@ impl BroadcastStage {
     }
 }
 
-impl Service for BroadcastStage {
-    type JoinReturnType = BroadcastStageReturnType;
+impl Service for BroadcastPhase {
+    type JoinReturnType = BroadcastPhaseReturnType;
 
-    fn join(self) -> thread::Result<BroadcastStageReturnType> {
+    fn join(self) -> thread::Result<BroadcastPhaseReturnType> {
         self.thread_hdl.join()
     }
 }
@@ -326,9 +326,9 @@ mod test {
     use std::thread::sleep;
     use std::time::Duration;
 
-    struct MockBroadcastStage {
+    struct MockBroadcastPhase {
         block_buffer_pool: Arc<BlockBufferPool>,
-        broadcast_service: BroadcastStage,
+        broadcast_service: BroadcastPhase,
         treasury: Arc<Treasury>,
     }
 
@@ -336,7 +336,7 @@ mod test {
         leader_pubkey: &Pubkey,
         ledger_path: &str,
         entry_receiver: Receiver<WorkingTreasuryEntries>,
-    ) -> MockBroadcastStage {
+    ) -> MockBroadcastPhase {
         // Make the database ledger
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(ledger_path).unwrap());
 
@@ -358,7 +358,7 @@ mod test {
         let treasury = Arc::new(Treasury::new(&genesis_block));
 
         // Start up the broadcast stage
-        let broadcast_service = BroadcastStage::new(
+        let broadcast_service = BroadcastPhase::new(
             leader_info.sockets.broadcast,
             node_group_info,
             entry_receiver,
@@ -367,7 +367,7 @@ mod test {
             &Hash::default(),
         );
 
-        MockBroadcastStage {
+        MockBroadcastPhase {
             block_buffer_pool,
             broadcast_service,
             treasury,

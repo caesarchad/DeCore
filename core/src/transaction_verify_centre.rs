@@ -1,30 +1,30 @@
 //! The `tvu` module implements the Transaction Validation Unit, a
 //! multi-stage transaction validation pipeline in software.
 //!
-//! 1. BlobFetchStage
+//! 1. BlobFetchPhase
 //! - Incoming blobs are picked up from the TVU sockets and repair socket.
-//! 2. RetransmitStage
+//! 2. RetransmitPhase
 //! - Blobs are windowed until a contiguous chunk is available.  This stage also repairs and
 //! retransmits blobs that are in the queue.
-//! 3. ReplayStage
+//! 3. ReplayPhase
 //! - Transactions in blobs are processed and applied to the treasury.
 //! - TODO We need to verify the signatures in the blobs.
-//! 4. StorageStage
+//! 4. StoragePhase
 //! - Generating the keys used to encrypt the ledger and sample it for storage mining.
 
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
-use crate::fetch_spot_stage::BlobFetchStage;
+use crate::fetch_spot_phase::BlobFetchPhase;
 use crate::block_stream_service::BlockstreamService;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::NodeGroupInfo;
 use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::water_clock_recorder::WaterClockRecorder;
-use crate::repeat_stage::ReplayStage;
-use crate::retransmit_stage::RetransmitStage;
+use crate::repeat_phase::ReplayPhase;
+use crate::retransmit_phase::RetransmitPhase;
 use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
-use crate::storage_stage::{StorageStage, StorageState};
+use crate::storage_stage::{StoragePhase, StorageState};
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -35,11 +35,11 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 pub struct Tvu {
-    fetch_stage: BlobFetchStage,
-    retransmit_stage: RetransmitStage,
-    replay_stage: ReplayStage,
+    fetch_phase: BlobFetchPhase,
+    retransmit_phase: RetransmitPhase,
+    replay_phase: ReplayPhase,
     blockstream_service: Option<BlockstreamService>,
-    storage_stage: StorageStage,
+    storage_phase: StoragePhase,
 }
 
 pub struct Sockets {
@@ -96,12 +96,12 @@ impl Tvu {
         let mut blob_sockets: Vec<Arc<UdpSocket>> =
             fetch_sockets.into_iter().map(Arc::new).collect();
         blob_sockets.push(repair_socket.clone());
-        let fetch_stage = BlobFetchStage::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
+        let fetch_phase = BlobFetchPhase::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
 
         //TODO
         //the packets coming out of blob_receiver need to be sent to the GPU and verified
         //then sent to the window, which does the erasure coding reconstruction
-        let retransmit_stage = RetransmitStage::new(
+        let retransmit_phase = RetransmitPhase::new(
             treasury_forks.clone(),
             leader_schedule_cache,
             block_buffer_pool.clone(),
@@ -115,7 +115,7 @@ impl Tvu {
             *treasury_forks.read().unwrap().working_treasury().epoch_schedule(),
         );
 
-        let (replay_stage, slot_full_receiver, root_slot_receiver) = ReplayStage::new(
+        let (replay_phase, slot_full_receiver, root_slot_receiver) = ReplayPhase::new(
             &keypair.pubkey(),
             vote_account,
             voting_keypair,
@@ -141,7 +141,7 @@ impl Tvu {
             None
         };
 
-        let storage_stage = StorageStage::new(
+        let storage_phase = StoragePhase::new(
             storage_state,
             root_slot_receiver,
             Some(block_buffer_pool),
@@ -154,11 +154,11 @@ impl Tvu {
         );
 
         Tvu {
-            fetch_stage,
-            retransmit_stage,
-            replay_stage,
+            fetch_phase,
+            retransmit_phase,
+            replay_phase,
             blockstream_service,
-            storage_stage,
+            storage_phase,
         }
     }
 }
@@ -167,13 +167,13 @@ impl Service for Tvu {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
-        self.retransmit_stage.join()?;
-        self.fetch_stage.join()?;
-        self.storage_stage.join()?;
+        self.retransmit_phase.join()?;
+        self.fetch_phase.join()?;
+        self.storage_phase.join()?;
         if self.blockstream_service.is_some() {
             self.blockstream_service.unwrap().join()?;
         }
-        self.replay_stage.join()?;
+        self.replay_phase.join()?;
         Ok(())
     }
 }
@@ -233,11 +233,11 @@ pub(super) fn has_license_header(file: &Path, contents: &str) -> Result<(), Cow<
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::treasury_stage::create_test_recorder;
+    use crate::treasury_phase::create_test_recorder;
     use crate::block_buffer_pool::get_tmp_ledger_path;
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+    use crate::storage_phase::STORAGE_ROTATE_TEST_COUNT;
     use morgan_runtime::treasury::Treasury;
     use std::sync::atomic::Ordering;
 

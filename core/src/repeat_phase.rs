@@ -1,4 +1,4 @@
-//! The `replay_stage` replays transactions broadcast by the leader.
+//! The `replay_phase` replays transactions broadcast by the leader.
 
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
@@ -34,7 +34,7 @@ use chrono::prelude::*;
 
 pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
 
-// Implement a destructor for the ReplayStage thread to signal it exited
+// Implement a destructor for the ReplayPhase thread to signal it exited
 // even on panics
 struct Finalizer {
     exit_sender: Arc<AtomicBool>,
@@ -52,7 +52,7 @@ impl Drop for Finalizer {
     }
 }
 
-pub struct ReplayStage {
+pub struct ReplayPhase {
     t_replay: JoinHandle<Result<()>>,
 }
 
@@ -72,7 +72,7 @@ impl ForkProgress {
     }
 }
 
-impl ReplayStage {
+impl ReplayPhase {
     #[allow(clippy::new_ret_no_self, clippy::too_many_arguments)]
     pub fn new<T>(
         my_pubkey: &Pubkey,
@@ -244,7 +244,7 @@ impl ReplayStage {
                     if next_leader == *my_pubkey && reached_leader_tick {
                         debug!("{} starting tpu for slot {}", my_pubkey, waterclock_slot);
                         datapoint_warn!(
-                            "replay_stage-new_leader",
+                            "replay_phase-new_leader",
                             ("count", waterclock_slot, i64),
                             ("grace", grace_ticks, i64));
                         let tpu_treasury = Treasury::new_from_parent(&parent, my_pubkey, waterclock_slot);
@@ -494,7 +494,7 @@ impl ReplayStage {
             //         votable.len(),
             //         weights).to_string()
             //     ),
-            //     Info(format!("morgan::replay_stage").to_string())
+            //     Info(format!("morgan::replay_phase").to_string())
             // );
             let info: String = format!("@{:?} fork selection duration: {:?} num: {} weights: {:?}",
                 timing::timestamp(),
@@ -503,7 +503,7 @@ impl ReplayStage {
                 weights).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
         }
-        inc_new_counter_info!("replay_stage-locktower_duration", ms as usize);
+        inc_new_counter_info!("replay_phase-locktower_duration", ms as usize);
 
         votable
     }
@@ -660,7 +660,7 @@ impl ReplayStage {
     }
 }
 
-impl Service for ReplayStage {
+impl Service for ReplayPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -674,7 +674,7 @@ mod test {
     use crate::block_buffer_pool::get_tmp_ledger_path;
     use crate::genesis_utils::create_genesis_block;
     use crate::packet::Blob;
-    use crate::repeat_stage::ReplayStage;
+    use crate::repeat_phase::ReplayPhase;
     use morgan_interface::hash::Hash;
     use std::fs::remove_dir_all;
     use std::sync::{Arc, RwLock};
@@ -699,7 +699,7 @@ mod test {
             blob_slot_1.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_1]).unwrap();
             assert!(treasury_forks.get(1).is_none());
-            ReplayStage::generate_new_treasury_forks(
+            ReplayPhase::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
@@ -712,7 +712,7 @@ mod test {
             blob_slot_2.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_2]).unwrap();
             assert!(treasury_forks.get(2).is_none());
-            ReplayStage::generate_new_treasury_forks(
+            ReplayPhase::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
@@ -731,7 +731,7 @@ mod test {
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury0)));
         let mut progress = HashMap::new();
         progress.insert(5, ForkProgress::new(Hash::default()));
-        ReplayStage::handle_new_root(&treasury_forks, &mut progress);
+        ReplayPhase::handle_new_root(&treasury_forks, &mut progress);
         assert!(progress.is_empty());
     }
 }

@@ -1,4 +1,4 @@
-//! The `retransmit_stage` retransmits blobs between validators
+//! The `retransmit_phase` retransmits blobs between validators
 
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
@@ -164,12 +164,12 @@ impl KVCategorizer for ErrorCategorizer {
     }
 }
 
-pub struct RetransmitStage {
+pub struct RetransmitPhase {
     thread_hdls: Vec<JoinHandle<()>>,
     window_service: WindowService,
 }
 
-impl RetransmitStage {
+impl RetransmitPhase {
     #[allow(clippy::new_ret_no_self)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -179,7 +179,7 @@ impl RetransmitStage {
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         retransmit_socket: Arc<UdpSocket>,
         repair_socket: Arc<UdpSocket>,
-        fetch_stage_receiver: BlobReceiver,
+        fetch_phase_receiver: BlobReceiver,
         exit: &Arc<AtomicBool>,
         genesis_blockhash: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
@@ -204,7 +204,7 @@ impl RetransmitStage {
         let window_service = WindowService::new(
             block_buffer_pool,
             node_group_info.clone(),
-            fetch_stage_receiver,
+            fetch_phase_receiver,
             retransmit_sender,
             repair_socket,
             exit,
@@ -223,7 +223,7 @@ impl RetransmitStage {
     }
 }
 
-impl Service for RetransmitStage {
+impl Service for RetransmitPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

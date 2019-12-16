@@ -264,11 +264,11 @@ impl NodeGroupInfoFixListener {
         let slot_iter = block_buffer_pool.based_slot_repeater(repairee_epoch_slots.root + 1);
 
         if slot_iter.is_err() {
-            // warn!("Root for repairee is on different fork OR replay_stage hasn't marked this slot as root yet");
+            // warn!("Root for repairee is on different fork OR replay_phase hasn't marked this slot as root yet");
             println!(
                 "{}",
                 Warn(
-                    format!("Root for repairee is on different fork OR replay_stage hasn't marked this slot as root yet").to_string(),
+                    format!("Root for repairee is on different fork OR replay_phase hasn't marked this slot as root yet").to_string(),
                     module_path!().to_string()
                 )
             );

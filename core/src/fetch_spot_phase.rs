@@ -1,4 +1,4 @@
-//! The `blob_fetch_stage` pulls blobs from UDP sockets and sends it to a channel.
+//! The `blob_fetch_phase` pulls blobs from UDP sockets and sends it to a channel.
 
 use crate::service::Service;
 use crate::streamer::{self, BlobSender};
@@ -9,11 +9,11 @@ use std::thread::{self, JoinHandle};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub struct BlobFetchStage {
+pub struct BlobFetchPhase {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-impl BlobFetchStage {
+impl BlobFetchPhase {
     pub fn new(socket: Arc<UdpSocket>, sender: &BlobSender, exit: &Arc<AtomicBool>) -> Self {
         Self::new_multi_socket(vec![socket], sender, exit)
     }
@@ -31,7 +31,7 @@ impl BlobFetchStage {
     }
 }
 
-impl Service for BlobFetchStage {
+impl Service for BlobFetchPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

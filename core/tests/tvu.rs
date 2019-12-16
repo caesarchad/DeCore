@@ -2,7 +2,7 @@
 extern crate morgan;
 
 use log::*;
-use morgan::treasury_stage::create_test_recorder;
+use morgan::treasury_phase::create_test_recorder;
 use morgan::block_buffer_pool::{create_new_tmp_ledger, BlockBufferPool};
 use morgan::node_group_info::{NodeGroupInfo, Node};
 use morgan::entry_info::next_entry_mut;
@@ -12,8 +12,8 @@ use morgan::gossip_service::GossipService;
 use morgan::packet::index_blobs;
 use morgan::rpc_subscriptions::RpcSubscriptions;
 use morgan::service::Service;
-use morgan::storage_stage::StorageState;
-use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+use morgan::storage_phase::StorageState;
+use morgan::storage_phase::STORAGE_ROTATE_TEST_COUNT;
 use morgan::streamer;
 use morgan::transaction_verify_centre::{Sockets, Tvu};
 use morgan::verifier;

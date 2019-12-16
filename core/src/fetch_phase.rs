@@ -1,4 +1,4 @@
-//! The `fetch_stage` batches input from a UDP socket and sends it to a channel.
+//! The `fetch_phase` batches input from a UDP socket and sends it to a channel.
 
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
@@ -38,11 +38,11 @@ impl Default for DebugInterfaceConfig {
     }
 }
 
-pub struct FetchStage {
+pub struct FetchPhase {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-impl FetchStage {
+impl FetchPhase {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         sockets: Vec<UdpSocket>,
@@ -92,14 +92,14 @@ impl FetchStage {
             .unwrap()
             .would_be_leader(DEFAULT_TICKS_PER_SLOT * 2)
         {
-            inc_new_counter_debug!("fetch_stage-honor_forwards", len);
+            inc_new_counter_debug!("fetch_phase-honor_forwards", len);
             for packets in batch {
                 if sendr.send(packets).is_err() {
                     return Err(Error::SendError);
                 }
             }
         } else {
-            inc_new_counter_info!("fetch_stage-discard_forwards", len);
+            inc_new_counter_info!("fetch_phase-discard_forwards", len);
         }
 
         Ok(())
@@ -156,7 +156,7 @@ impl FetchStage {
     }
 }
 
-impl Service for FetchStage {
+impl Service for FetchPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
