@@ -94,7 +94,7 @@ matches = "0.1.6"
 
 
 [[bench]]
-name = "banking_phase"
+name = "treasury_phase"
 
 [[bench]]
 name = "block_buffer_pool"

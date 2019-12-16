@@ -6,7 +6,7 @@
 //! 2. RetransmitPhase
 //! - Blobs are windowed until a contiguous chunk is available.  This phase also repairs and
 //! retransmits blobs that are in the queue.
-//! 3. ReplayPhase
+//! 3. RepeatPhase
 //! - Transactions in blobs are processed and applied to the treasury.
 //! - TODO We need to verify the signatures in the blobs.
 //! 4. StoragePhase
@@ -20,7 +20,7 @@ use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::NodeGroupInfo;
 use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::water_clock_recorder::WaterClockRecorder;
-use crate::repeat_phase::ReplayPhase;
+use crate::repeat_phase::RepeatPhase;
 use crate::retransmit_phase::RetransmitPhase;
 use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
@@ -37,7 +37,7 @@ use std::thread;
 pub struct Tvu {
     fetch_phase: BlobFetchPhase,
     retransmit_phase: RetransmitPhase,
-    replay_phase: ReplayPhase,
+    replay_phase: RepeatPhase,
     blockstream_service: Option<BlockstreamService>,
     storage_stage: StoragePhase,
 }
@@ -115,7 +115,7 @@ impl Tvu {
             *treasury_forks.read().unwrap().working_treasury().epoch_schedule(),
         );
 
-        let (replay_phase, slot_full_receiver, root_slot_receiver) = ReplayPhase::new(
+        let (replay_phase, slot_full_receiver, root_slot_receiver) = RepeatPhase::new(
             &keypair.pubkey(),
             vote_account,
             voting_keypair,
