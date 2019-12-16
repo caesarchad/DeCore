@@ -34,7 +34,7 @@ use chrono::prelude::*;
 
 pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
 
-// Implement a destructor for the ReplayPhase thread to signal it exited
+// Implement a destructor for the RepeatPhase thread to signal it exited
 // even on panics
 struct Finalizer {
     exit_sender: Arc<AtomicBool>,
@@ -52,7 +52,7 @@ impl Drop for Finalizer {
     }
 }
 
-pub struct ReplayPhase {
+pub struct RepeatPhase {
     t_replay: JoinHandle<Result<()>>,
 }
 
@@ -72,7 +72,7 @@ impl ForkProgress {
     }
 }
 
-impl ReplayPhase {
+impl RepeatPhase {
     #[allow(clippy::new_ret_no_self, clippy::too_many_arguments)]
     pub fn new<T>(
         my_pubkey: &Pubkey,
@@ -660,7 +660,7 @@ impl ReplayPhase {
     }
 }
 
-impl Service for ReplayPhase {
+impl Service for RepeatPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -674,7 +674,7 @@ mod test {
     use crate::block_buffer_pool::get_tmp_ledger_path;
     use crate::genesis_utils::create_genesis_block;
     use crate::packet::Blob;
-    use crate::repeat_phase::ReplayPhase;
+    use crate::repeat_phase::RepeatPhase;
     use morgan_interface::hash::Hash;
     use std::fs::remove_dir_all;
     use std::sync::{Arc, RwLock};
@@ -699,7 +699,7 @@ mod test {
             blob_slot_1.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_1]).unwrap();
             assert!(treasury_forks.get(1).is_none());
-            ReplayPhase::generate_new_treasury_forks(
+            RepeatPhase::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
@@ -712,7 +712,7 @@ mod test {
             blob_slot_2.set_parent(0);
             block_buffer_pool.insert_data_blobs(&vec![blob_slot_2]).unwrap();
             assert!(treasury_forks.get(2).is_none());
-            ReplayPhase::generate_new_treasury_forks(
+            RepeatPhase::generate_new_treasury_forks(
                 &block_buffer_pool,
                 &mut treasury_forks,
                 &leader_schedule_cache,
@@ -731,7 +731,7 @@ mod test {
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury0)));
         let mut progress = HashMap::new();
         progress.insert(5, ForkProgress::new(Hash::default()));
-        ReplayPhase::handle_new_root(&treasury_forks, &mut progress);
+        RepeatPhase::handle_new_root(&treasury_forks, &mut progress);
         assert!(progress.is_empty());
     }
 }
