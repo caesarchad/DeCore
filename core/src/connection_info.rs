@@ -22,9 +22,9 @@ pub struct ContactInfo {
     /// address to connect to for replication
     pub tvu: SocketAddr,
     /// transactions address
-    pub tpu: SocketAddr,
+    pub transaction_digesting_module: SocketAddr,
     /// address to forward unprocessed transactions to
-    pub tpu_via_blobs: SocketAddr,
+    pub transaction_digesting_module_via_blobs: SocketAddr,
     /// storage data address
     pub storage_addr: SocketAddr,
     /// address to which to send JSON-RPC requests
@@ -94,8 +94,8 @@ impl Default for ContactInfo {
             id: Pubkey::default(),
             gossip: socketaddr_any!(),
             tvu: socketaddr_any!(),
-            tpu: socketaddr_any!(),
-            tpu_via_blobs: socketaddr_any!(),
+            transaction_digesting_module: socketaddr_any!(),
+            transaction_digesting_module_via_blobs: socketaddr_any!(),
             storage_addr: socketaddr_any!(),
             rpc: socketaddr_any!(),
             rpc_pubsub: socketaddr_any!(),
@@ -110,8 +110,8 @@ impl ContactInfo {
         id: &Pubkey,
         gossip: SocketAddr,
         tvu: SocketAddr,
-        tpu: SocketAddr,
-        tpu_via_blobs: SocketAddr,
+        transaction_digesting_module: SocketAddr,
+        transaction_digesting_module_via_blobs: SocketAddr,
         storage_addr: SocketAddr,
         rpc: SocketAddr,
         rpc_pubsub: SocketAddr,
@@ -122,8 +122,8 @@ impl ContactInfo {
             signature: Signature::default(),
             gossip,
             tvu,
-            tpu,
-            tpu_via_blobs,
+            transaction_digesting_module,
+            transaction_digesting_module_via_blobs,
             storage_addr,
             rpc,
             rpc_pubsub,
@@ -171,18 +171,18 @@ impl ContactInfo {
             nxt_addr
         }
 
-        let tpu_addr = *bind_addr;
+        let transaction_digesting_module_addr = *bind_addr;
         let gossip_addr = next_port(&bind_addr, 1);
         let tvu_addr = next_port(&bind_addr, 2);
-        let tpu_via_blobs_addr = next_port(&bind_addr, 3);
+        let transaction_digesting_module_via_blobs_addr = next_port(&bind_addr, 3);
         let rpc_addr = SocketAddr::new(bind_addr.ip(), rpc_port::DEFAULT_RPC_PORT);
         let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), rpc_port::DEFAULT_RPC_PUBSUB_PORT);
         Self::new(
             pubkey,
             gossip_addr,
             tvu_addr,
-            tpu_addr,
-            tpu_via_blobs_addr,
+            transaction_digesting_module_addr,
+            transaction_digesting_module_via_blobs_addr,
             "0.0.0.0:0".parse().unwrap(),
             rpc_addr,
             rpc_pubsub_addr,
@@ -226,12 +226,12 @@ impl ContactInfo {
     }
 
     pub fn client_facing_addr(&self) -> (SocketAddr, SocketAddr) {
-        (self.rpc, self.tpu)
+        (self.rpc, self.transaction_digesting_module)
     }
 
     pub fn valid_client_facing_addr(&self) -> Option<(SocketAddr, SocketAddr)> {
-        if ContactInfo::is_valid_address(&self.rpc) && ContactInfo::is_valid_address(&self.tpu) {
-            Some((self.rpc, self.tpu))
+        if ContactInfo::is_valid_address(&self.rpc) && ContactInfo::is_valid_address(&self.transaction_digesting_module) {
+            Some((self.rpc, self.transaction_digesting_module))
         } else {
             None
         }
@@ -249,8 +249,8 @@ impl Signable for ContactInfo {
             id: Pubkey,
             gossip: SocketAddr,
             tvu: SocketAddr,
-            tpu: SocketAddr,
-            tpu_via_blobs: SocketAddr,
+            transaction_digesting_module: SocketAddr,
+            transaction_digesting_module_via_blobs: SocketAddr,
             storage_addr: SocketAddr,
             rpc: SocketAddr,
             rpc_pubsub: SocketAddr,
@@ -262,9 +262,9 @@ impl Signable for ContactInfo {
             id: me.id,
             gossip: me.gossip,
             tvu: me.tvu,
-            tpu: me.tpu,
+            transaction_digesting_module: me.transaction_digesting_module,
             storage_addr: me.storage_addr,
-            tpu_via_blobs: me.tpu_via_blobs,
+            transaction_digesting_module_via_blobs: me.transaction_digesting_module_via_blobs,
             rpc: me.rpc,
             rpc_pubsub: me.rpc_pubsub,
             wallclock: me.wallclock,
@@ -304,10 +304,10 @@ mod tests {
         let ci = ContactInfo::default();
         assert!(ci.gossip.ip().is_unspecified());
         assert!(ci.tvu.ip().is_unspecified());
-        assert!(ci.tpu_via_blobs.ip().is_unspecified());
+        assert!(ci.transaction_digesting_module_via_blobs.ip().is_unspecified());
         assert!(ci.rpc.ip().is_unspecified());
         assert!(ci.rpc_pubsub.ip().is_unspecified());
-        assert!(ci.tpu.ip().is_unspecified());
+        assert!(ci.transaction_digesting_module.ip().is_unspecified());
         assert!(ci.storage_addr.ip().is_unspecified());
     }
     #[test]
@@ -315,10 +315,10 @@ mod tests {
         let ci = ContactInfo::new_multicast();
         assert!(ci.gossip.ip().is_multicast());
         assert!(ci.tvu.ip().is_multicast());
-        assert!(ci.tpu_via_blobs.ip().is_multicast());
+        assert!(ci.transaction_digesting_module_via_blobs.ip().is_multicast());
         assert!(ci.rpc.ip().is_multicast());
         assert!(ci.rpc_pubsub.ip().is_multicast());
-        assert!(ci.tpu.ip().is_multicast());
+        assert!(ci.transaction_digesting_module.ip().is_multicast());
         assert!(ci.storage_addr.ip().is_multicast());
     }
     #[test]
@@ -327,20 +327,20 @@ mod tests {
         let ci = ContactInfo::new_gossip_entry_point(&addr);
         assert_eq!(ci.gossip, addr);
         assert!(ci.tvu.ip().is_unspecified());
-        assert!(ci.tpu_via_blobs.ip().is_unspecified());
+        assert!(ci.transaction_digesting_module_via_blobs.ip().is_unspecified());
         assert!(ci.rpc.ip().is_unspecified());
         assert!(ci.rpc_pubsub.ip().is_unspecified());
-        assert!(ci.tpu.ip().is_unspecified());
+        assert!(ci.transaction_digesting_module.ip().is_unspecified());
         assert!(ci.storage_addr.ip().is_unspecified());
     }
     #[test]
     fn test_socketaddr() {
         let addr = socketaddr!("127.0.0.1:10");
         let ci = ContactInfo::new_with_socketaddr(&addr);
-        assert_eq!(ci.tpu, addr);
+        assert_eq!(ci.transaction_digesting_module, addr);
         assert_eq!(ci.gossip.port(), 11);
         assert_eq!(ci.tvu.port(), 12);
-        assert_eq!(ci.tpu_via_blobs.port(), 13);
+        assert_eq!(ci.transaction_digesting_module_via_blobs.port(), 13);
         assert_eq!(ci.rpc.port(), 10099);
         assert_eq!(ci.rpc_pubsub.port(), 10100);
         assert!(ci.storage_addr.ip().is_unspecified());
@@ -355,8 +355,8 @@ mod tests {
         assert_eq!(d1.id, keypair.pubkey());
         assert_eq!(d1.gossip, socketaddr!("127.0.0.1:1235"));
         assert_eq!(d1.tvu, socketaddr!("127.0.0.1:1236"));
-        assert_eq!(d1.tpu_via_blobs, socketaddr!("127.0.0.1:1237"));
-        assert_eq!(d1.tpu, socketaddr!("127.0.0.1:1234"));
+        assert_eq!(d1.transaction_digesting_module_via_blobs, socketaddr!("127.0.0.1:1237"));
+        assert_eq!(d1.transaction_digesting_module, socketaddr!("127.0.0.1:1234"));
         assert_eq!(d1.rpc, socketaddr!("127.0.0.1:10099"));
         assert_eq!(d1.rpc_pubsub, socketaddr!("127.0.0.1:10100"));
     }
@@ -365,7 +365,7 @@ mod tests {
     fn test_valid_client_facing() {
         let mut ci = ContactInfo::default();
         assert_eq!(ci.valid_client_facing_addr(), None);
-        ci.tpu = socketaddr!("127.0.0.1:123");
+        ci.transaction_digesting_module = socketaddr!("127.0.0.1:123");
         assert_eq!(ci.valid_client_facing_addr(), None);
         ci.rpc = socketaddr!("127.0.0.1:234");
         assert!(ci.valid_client_facing_addr().is_some());

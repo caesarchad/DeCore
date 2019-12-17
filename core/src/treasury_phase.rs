@@ -130,7 +130,7 @@ impl TreasuryPhase {
 
     fn forward_buffered_packets(
         socket: &std::net::UdpSocket,
-        tpu_via_blobs: &std::net::SocketAddr,
+        transaction_digesting_module_via_blobs: &std::net::SocketAddr,
         unprocessed_packets: &[PacketsAndOffsets],
     ) -> std::io::Result<()> {
         let packets = Self::filter_valid_packets_for_forwarding(unprocessed_packets);
@@ -138,7 +138,7 @@ impl TreasuryPhase {
         let blobs = packet::packets_to_blobs(&packets);
 
         for blob in blobs {
-            socket.send_to(&blob.data[..blob.meta.size], tpu_via_blobs)?;
+            socket.send_to(&blob.data[..blob.meta.size], transaction_digesting_module_via_blobs)?;
         }
 
         Ok(())
@@ -283,7 +283,7 @@ impl TreasuryPhase {
                             .map_or(Ok(()), |leader| {
                                 let _ = Self::forward_buffered_packets(
                                     &socket,
-                                    &leader.tpu_via_blobs,
+                                    &leader.transaction_digesting_module_via_blobs,
                                     &buffered_packets,
                                 );
                                 buffered_packets.clear();

@@ -5174,7 +5174,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "TPU Channel Pressure ($hostid)",
+      "title": "transaction digesting module Channel Pressure ($hostid)",
       "tooltip": {
         "shared": true,
         "sort": 0,

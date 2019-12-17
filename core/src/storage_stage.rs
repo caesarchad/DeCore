@@ -312,7 +312,7 @@ impl StoragePhase {
 
         transactions_socket.send_to(
             &bincode::serialize(&transaction).unwrap(),
-            node_group_info.read().unwrap().my_data().tpu,
+            node_group_info.read().unwrap().my_data().transaction_digesting_module,
         )?;
         Ok(())
     }

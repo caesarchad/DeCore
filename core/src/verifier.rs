@@ -16,7 +16,7 @@ use crate::rpc_service::JsonRpcService;
 use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
 use crate::storage_stage::StorageState;
-use crate::transaction_process_centre::Tpu;
+use crate::transaction_process_centre::TransactionDigestingModule;
 use crate::transaction_verify_centre::{Sockets, Tvu};
 use morgan_metricbot::inc_new_counter_info;
 use morgan_runtime::treasury::Treasury;
@@ -67,7 +67,7 @@ pub struct Validator {
     gossip_service: GossipService,
     waterclock_recorder: Arc<Mutex<WaterClockRecorder>>,
     waterclock_service: WaterClockService,
-    tpu: Tpu,
+    transaction_digesting_module: TransactionDigestingModule,
     tvu: Tvu,
     ip_echo_server: morgan_netutil::IpEchoServer,
 }
@@ -289,13 +289,13 @@ impl Validator {
             );
         }
 
-        let tpu = Tpu::new(
+        let transaction_digesting_module = TransactionDigestingModule::new(
             &id,
             &node_group_info,
             &waterclock_recorder,
             entry_receiver,
-            node.sockets.tpu,
-            node.sockets.tpu_via_blobs,
+            node.sockets.transaction_digesting_module,
+            node.sockets.transaction_digesting_module_via_blobs,
             node.sockets.broadcast,
             config.sigverify_disabled,
             &block_buffer_pool,
@@ -309,7 +309,7 @@ impl Validator {
             gossip_service,
             rpc_service,
             rpc_pubsub_service,
-            tpu,
+            transaction_digesting_module,
             tvu,
             exit,
             waterclock_service,
@@ -377,7 +377,7 @@ impl Service for Validator {
         }
 
         self.gossip_service.join()?;
-        self.tpu.join()?;
+        self.transaction_digesting_module.join()?;
         self.tvu.join()?;
         self.ip_echo_server.shutdown_now();
 

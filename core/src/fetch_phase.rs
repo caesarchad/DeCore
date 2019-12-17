@@ -46,28 +46,28 @@ impl FetchPhase {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         sockets: Vec<UdpSocket>,
-        tpu_via_blobs_sockets: Vec<UdpSocket>,
+        transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> (Self, PacketReceiver) {
         let (sender, receiver) = channel();
         (
-            Self::new_with_sender(sockets, tpu_via_blobs_sockets, exit, &sender, &waterclock_recorder),
+            Self::new_with_sender(sockets, transaction_digesting_module_via_blobs_sockets, exit, &sender, &waterclock_recorder),
             receiver,
         )
     }
     pub fn new_with_sender(
         sockets: Vec<UdpSocket>,
-        tpu_via_blobs_sockets: Vec<UdpSocket>,
+        transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
         sender: &PacketSender,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
         let tx_sockets = sockets.into_iter().map(Arc::new).collect();
-        let tpu_via_blobs_sockets = tpu_via_blobs_sockets.into_iter().map(Arc::new).collect();
+        let transaction_digesting_module_via_blobs_sockets = transaction_digesting_module_via_blobs_sockets.into_iter().map(Arc::new).collect();
         Self::new_multi_socket(
             tx_sockets,
-            tpu_via_blobs_sockets,
+            transaction_digesting_module_via_blobs_sockets,
             exit,
             &sender,
             &waterclock_recorder,
@@ -107,17 +107,17 @@ impl FetchPhase {
 
     fn new_multi_socket(
         sockets: Vec<Arc<UdpSocket>>,
-        tpu_via_blobs_sockets: Vec<Arc<UdpSocket>>,
+        transaction_digesting_module_via_blobs_sockets: Vec<Arc<UdpSocket>>,
         exit: &Arc<AtomicBool>,
         sender: &PacketSender,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
-        let tpu_threads = sockets
+        let transaction_digesting_module_threads = sockets
             .into_iter()
             .map(|socket| streamer::receiver(socket, &exit, sender.clone()));
 
         let (forward_sender, forward_receiver) = channel();
-        let tpu_via_blobs_threads = tpu_via_blobs_sockets
+        let transaction_digesting_module_via_blobs_threads = transaction_digesting_module_via_blobs_sockets
             .into_iter()
             .map(|socket| streamer::blob_packet_receiver(socket, &exit, forward_sender.clone()));
 
@@ -150,7 +150,7 @@ impl FetchPhase {
             })
             .unwrap();
 
-        let mut thread_hdls: Vec<_> = tpu_threads.chain(tpu_via_blobs_threads).collect();
+        let mut thread_hdls: Vec<_> = transaction_digesting_module_threads.chain(transaction_digesting_module_via_blobs_threads).collect();
         thread_hdls.push(fwd_thread_hdl);
         Self { thread_hdls }
     }

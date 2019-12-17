@@ -149,9 +149,9 @@ impl JsonRpcRequestProcessor {
     }
 }
 
-fn get_tpu_addr(node_group_info: &Arc<RwLock<NodeGroupInfo>>) -> Result<SocketAddr> {
+fn get_transaction_digesting_module_addr(node_group_info: &Arc<RwLock<NodeGroupInfo>>) -> Result<SocketAddr> {
     let contact_info = node_group_info.read().unwrap().my_data();
-    Ok(contact_info.tpu)
+    Ok(contact_info.transaction_digesting_module)
 }
 
 fn verify_pubkey(input: String) -> Result<Pubkey> {
@@ -175,8 +175,8 @@ pub struct RpcContactInfo {
     pub id: String,
     /// Gossip port
     pub gossip: Option<SocketAddr>,
-    /// Tpu port
-    pub tpu: Option<SocketAddr>,
+    /// TransactionDigestingModule port
+    pub transaction_digesting_module: Option<SocketAddr>,
     /// JSON RPC port
     pub rpc: Option<SocketAddr>,
 }
@@ -307,7 +307,7 @@ impl RpcSol for RpcSolImpl {
                     Some(RpcContactInfo {
                         id: contact_info.id.to_string(),
                         gossip: Some(contact_info.gossip),
-                        tpu: valid_address_or_none(&contact_info.tpu),
+                        transaction_digesting_module: valid_address_or_none(&contact_info.transaction_digesting_module),
                         rpc: valid_address_or_none(&contact_info.rpc),
                     })
                 } else {
@@ -408,7 +408,7 @@ impl RpcSol for RpcSolImpl {
         })?;
 
         let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_tpu_addr(&meta.node_group_info)?;
+        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
         transactions_socket
             .send_to(&data, transactions_addr)
             .map_err(|err| {
@@ -497,7 +497,7 @@ impl RpcSol for RpcSolImpl {
         })?;
 
         let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_tpu_addr(&meta.node_group_info)?;
+        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
         transactions_socket
             .send_to(&data, transactions_addr)
             .map_err(|err| {
@@ -573,7 +573,7 @@ impl RpcSol for RpcSolImpl {
             return Err(Error::invalid_request());
         }
         let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_tpu_addr(&meta.node_group_info)?;
+        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
         trace!("send_transaction: leader is {:?}", &transactions_addr);
         transactions_socket
             .send_to(&data, transactions_addr)
@@ -757,7 +757,7 @@ mod tests {
             .expect("actual response deserialization");
 
         let expected = format!(
-            r#"{{"jsonrpc":"2.0","result":[{{"id": "{}", "gossip": "127.0.0.1:1235", "tpu": "127.0.0.1:1234", "rpc": "127.0.0.1:10099"}}],"id":1}}"#,
+            r#"{{"jsonrpc":"2.0","result":[{{"id": "{}", "gossip": "127.0.0.1:1235", "transaction_digesting_module": "127.0.0.1:1234", "rpc": "127.0.0.1:10099"}}],"id":1}}"#,
             leader_pubkey,
         );
 
@@ -981,12 +981,12 @@ mod tests {
     }
 
     #[test]
-    fn test_rpc_get_tpu_addr() {
+    fn test_rpc_get_transaction_digesting_module_addr() {
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             ContactInfo::new_with_socketaddr(&socketaddr!("127.0.0.1:1234")),
         )));
         assert_eq!(
-            get_tpu_addr(&node_group_info),
+            get_transaction_digesting_module_addr(&node_group_info),
             Ok(socketaddr!("127.0.0.1:1234"))
         );
     }

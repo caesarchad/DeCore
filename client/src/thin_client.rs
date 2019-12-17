@@ -1,5 +1,5 @@
 //! The `thin_client` module is a client-side object that interfaces with
-//! a server-side TPU.  Client code should use this object instead of writing
+//! a server-side transaction digesting module.  Client code should use this object instead of writing
 //! messages to the network directly. The binary encoding of its messages are
 //! unstable and may change in future releases.
 
@@ -31,7 +31,7 @@ pub struct ThinClient {
 
 impl ThinClient {
     /// Create a new ThinClient that will interface with the Rpc at `rpc_addr` using TCP
-    /// and the Tpu at `transactions_addr` over `transactions_socket` using UDP.
+    /// and the TransactionDigestingModule at `transactions_addr` over `transactions_socket` using UDP.
     pub fn new(
         rpc_addr: SocketAddr,
         transactions_addr: SocketAddr,
@@ -291,16 +291,16 @@ impl AsyncClient for ThinClient {
     }
 }
 
-pub fn create_client((rpc, tpu): (SocketAddr, SocketAddr), range: (u16, u16)) -> ThinClient {
+pub fn create_client((rpc, transaction_digesting_module): (SocketAddr, SocketAddr), range: (u16, u16)) -> ThinClient {
     let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new(rpc, tpu, transactions_socket)
+    ThinClient::new(rpc, transaction_digesting_module, transactions_socket)
 }
 
 pub fn create_client_with_timeout(
-    (rpc, tpu): (SocketAddr, SocketAddr),
+    (rpc, transaction_digesting_module): (SocketAddr, SocketAddr),
     range: (u16, u16),
     timeout: Duration,
 ) -> ThinClient {
     let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new_socket_with_timeout(rpc, tpu, transactions_socket, timeout)
+    ThinClient::new_socket_with_timeout(rpc, transaction_digesting_module, transactions_socket, timeout)
 }

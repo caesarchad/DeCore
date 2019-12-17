@@ -707,7 +707,7 @@ mod tests {
         config.duration = Duration::from_secs(5);
 
         let client = create_client(
-            (node_group.entry_point_info.rpc, node_group.entry_point_info.tpu),
+            (node_group.entry_point_info.rpc, node_group.entry_point_info.transaction_digesting_module),
             FULLNODE_PORT_RANGE,
         );
 

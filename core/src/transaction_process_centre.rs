@@ -1,4 +1,4 @@
-//! The `tpu` module implements the Transaction Processing Unit, a
+//! The `transaction_digesting_module` module implements the Transaction Processing Unit, a
 //! multi-phase transaction processing pipeline in software.
 
 use crate::treasury_phase::TreasuryPhase;
@@ -18,7 +18,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-pub struct Tpu {
+pub struct TransactionDigestingModule {
     fetch_phase: FetchPhase,
     sigverify_phase: SigVerifyPhase,
     treasury_phase: TreasuryPhase,
@@ -26,7 +26,7 @@ pub struct Tpu {
     broadcast_phase: BroadcastPhase,
 }
 
-impl Tpu {
+impl TransactionDigestingModule {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: &Pubkey,
@@ -34,7 +34,7 @@ impl Tpu {
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         entry_receiver: Receiver<WorkingTreasuryEntries>,
         transactions_sockets: Vec<UdpSocket>,
-        tpu_via_blobs_sockets: Vec<UdpSocket>,
+        transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         broadcast_socket: UdpSocket,
         sigverify_disabled: bool,
         block_buffer_pool: &Arc<BlockBufferPool>,
@@ -46,7 +46,7 @@ impl Tpu {
         let (packet_sender, packet_receiver) = channel();
         let fetch_phase = FetchPhase::new_with_sender(
             transactions_sockets,
-            tpu_via_blobs_sockets,
+            transaction_digesting_module_via_blobs_sockets,
             &exit,
             &packet_sender,
             &waterclock_recorder,
@@ -91,7 +91,7 @@ impl Tpu {
     }
 }
 
-impl Service for Tpu {
+impl Service for TransactionDigestingModule {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

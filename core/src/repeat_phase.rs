@@ -122,7 +122,7 @@ impl RepeatPhase {
                         &leader_schedule_cache,
                     );
 
-                    let mut is_tpu_treasury_active = waterclock_recorder.lock().unwrap().treasury().is_some();
+                    let mut is_transaction_digesting_module_treasury_active = waterclock_recorder.lock().unwrap().treasury().is_some();
 
                     Self::replay_active_treasuries(
                         &block_buffer_pool,
@@ -167,17 +167,17 @@ impl RepeatPhase {
                             &leader_schedule_cache,
                         );
 
-                        is_tpu_treasury_active = false;
+                        is_transaction_digesting_module_treasury_active = false;
                     }
 
-                    let (reached_leader_tick, grace_ticks) = if !is_tpu_treasury_active {
+                    let (reached_leader_tick, grace_ticks) = if !is_transaction_digesting_module_treasury_active {
                         let waterclock = waterclock_recorder.lock().unwrap();
                         waterclock.reached_leader_tick()
                     } else {
                         (false, 0)
                     };
 
-                    if !is_tpu_treasury_active {
+                    if !is_transaction_digesting_module_treasury_active {
                         assert!(ticks_per_slot > 0);
                         let waterclock_tick_height = waterclock_recorder.lock().unwrap().tick_height();
                         let waterclock_slot = leader_arrange_utils::tick_height_to_slot(
@@ -242,25 +242,25 @@ impl RepeatPhase {
                     );
                     node_group_info.write().unwrap().set_leader(&next_leader);
                     if next_leader == *my_pubkey && reached_leader_tick {
-                        debug!("{} starting tpu for slot {}", my_pubkey, waterclock_slot);
+                        debug!("{} starting transaction_digesting_module for slot {}", my_pubkey, waterclock_slot);
                         datapoint_warn!(
                             "replay_phase-new_leader",
                             ("count", waterclock_slot, i64),
                             ("grace", grace_ticks, i64));
-                        let tpu_treasury = Treasury::new_from_parent(&parent, my_pubkey, waterclock_slot);
-                        treasury_forks.write().unwrap().insert(tpu_treasury);
-                        if let Some(tpu_treasury) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
+                        let transaction_digesting_module_treasury = Treasury::new_from_parent(&parent, my_pubkey, waterclock_slot);
+                        treasury_forks.write().unwrap().insert(transaction_digesting_module_treasury);
+                        if let Some(transaction_digesting_module_treasury) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
                             assert_eq!(
                                 treasury_forks.read().unwrap().working_treasury().slot(),
-                                tpu_treasury.slot()
+                                transaction_digesting_module_treasury.slot()
                             );
                             debug!(
                                 "waterclock_recorder new working treasury: me: {} next_slot: {} next_leader: {}",
                                 my_pubkey,
-                                tpu_treasury.slot(),
+                                transaction_digesting_module_treasury.slot(),
                                 next_leader
                             );
-                            waterclock_recorder.lock().unwrap().set_treasury(&tpu_treasury);
+                            waterclock_recorder.lock().unwrap().set_treasury(&transaction_digesting_module_treasury);
                         }
                     }
                 })

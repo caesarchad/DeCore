@@ -264,12 +264,12 @@ impl BroadcastPhase {
     /// * `node_group_info` - NodeGroupInfo structure
     /// * `window` - Cache of blobs that we have broadcast
     /// * `receiver` - Receive channel for blobs to be retransmitted to all the layer 1 nodes.
-    /// * `exit_sender` - Set to true when this service exits, allows rest of Tpu to exit cleanly.
-    /// Otherwise, when a Tpu closes, it only closes the phasea that come after it. The phasea
+    /// * `exit_sender` - Set to true when this service exits, allows rest of TransactionDigestingModule to exit cleanly.
+    /// Otherwise, when a TransactionDigestingModule closes, it only closes the phasea that come after it. The phasea
     /// that come before could be blocked on a receive, and never notice that they need to
-    /// exit. Now, if any phase of the Tpu closes, it will lead to closing the WritePhase (b/c
+    /// exit. Now, if any phase of the TransactionDigestingModule closes, it will lead to closing the WritePhase (b/c
     /// WritePhase is the last phase in the pipeline), which will then close Broadcast service,
-    /// which will then close FetchPhase in the Tpu, and then the rest of the Tpu,
+    /// which will then close FetchPhase in the TransactionDigestingModule, and then the rest of the TransactionDigestingModule,
     /// completing the cycle.
     #[allow(clippy::too_many_arguments)]
     pub fn new(

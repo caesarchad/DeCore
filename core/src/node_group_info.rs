@@ -283,13 +283,13 @@ impl NodeGroupInfo {
 
                 format!(
                     "- gossip: {:20} | {:5}ms | {} {}\n  \
-                     tpu:    {:20} |         |\n  \
+                     transaction_digesting_module:    {:20} |         |\n  \
                      rpc:    {:20} |         |\n",
                     addr_to_string(&node.gossip),
                     now.saturating_sub(last_updated),
                     node.id,
                     if node.id == my_pubkey { "(me)" } else { "" }.to_string(),
-                    addr_to_string(&node.tpu),
+                    addr_to_string(&node.transaction_digesting_module),
                     addr_to_string(&node.rpc),
                 )
             })
@@ -315,7 +315,7 @@ impl NodeGroupInfo {
         )
     }
 
-    /// Record the id of the current leader for use by `leader_tpu_via_blobs()`
+    /// Record the id of the current leader for use by `leader_transaction_digesting_module_via_blobs()`
     pub fn set_leader(&mut self, leader_pubkey: &Pubkey) {
         if *leader_pubkey != self.gossip_leader_pubkey {
             // warn!(
@@ -508,7 +508,7 @@ impl NodeGroupInfo {
     }
 
     fn is_spy_node(contact_info: &ContactInfo) -> bool {
-        (!ContactInfo::is_valid_address(&contact_info.tpu)
+        (!ContactInfo::is_valid_address(&contact_info.transaction_digesting_module)
             || !ContactInfo::is_valid_address(&contact_info.gossip)
             || !ContactInfo::is_valid_address(&contact_info.tvu))
             && !ContactInfo::is_valid_address(&contact_info.storage_addr)
@@ -516,7 +516,7 @@ impl NodeGroupInfo {
 
     pub fn is_storage_miner(contact_info: &ContactInfo) -> bool {
         ContactInfo::is_valid_address(&contact_info.storage_addr)
-            && !ContactInfo::is_valid_address(&contact_info.tpu)
+            && !ContactInfo::is_valid_address(&contact_info.transaction_digesting_module)
     }
 
     fn sort_by_stake<S: std::hash::BuildHasher>(
@@ -577,7 +577,7 @@ impl NodeGroupInfo {
     }
 
     /// compute broadcast table
-    pub fn tpu_peers(&self) -> Vec<ContactInfo> {
+    pub fn transaction_digesting_module_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
             .crds
@@ -585,7 +585,7 @@ impl NodeGroupInfo {
             .values()
             .filter_map(|x| x.value.contact_info())
             .filter(|x| x.id != me)
-            .filter(|x| ContactInfo::is_valid_address(&x.tpu))
+            .filter(|x| ContactInfo::is_valid_address(&x.transaction_digesting_module))
             .cloned()
             .collect()
     }
@@ -1595,8 +1595,8 @@ pub fn compute_retransmit_peers<S: std::hash::BuildHasher>(
 pub struct Sockets {
     pub gossip: UdpSocket,
     pub tvu: Vec<UdpSocket>,
-    pub tpu: Vec<UdpSocket>,
-    pub tpu_via_blobs: Vec<UdpSocket>,
+    pub transaction_digesting_module: Vec<UdpSocket>,
+    pub transaction_digesting_module_via_blobs: Vec<UdpSocket>,
     pub broadcast: UdpSocket,
     pub repair: UdpSocket,
     pub retransmit: UdpSocket,
@@ -1640,8 +1640,8 @@ impl Node {
             sockets: Sockets {
                 gossip,
                 tvu: vec![tvu],
-                tpu: vec![],
-                tpu_via_blobs: vec![],
+                transaction_digesting_module: vec![],
+                transaction_digesting_module_via_blobs: vec![],
                 broadcast,
                 repair,
                 retransmit,
@@ -1650,10 +1650,10 @@ impl Node {
         }
     }
     pub fn new_localhost_with_pubkey(pubkey: &Pubkey) -> Self {
-        let tpu = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let transaction_digesting_module = UdpSocket::bind("127.0.0.1:0").unwrap();
         let gossip = UdpSocket::bind("127.0.0.1:0").unwrap();
         let tvu = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let tpu_via_blobs = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let transaction_digesting_module_via_blobs = UdpSocket::bind("127.0.0.1:0").unwrap();
         let repair = UdpSocket::bind("127.0.0.1:0").unwrap();
         let rpc_port = find_available_port_in_range((1024, 65535)).unwrap();
         let rpc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), rpc_port);
@@ -1668,8 +1668,8 @@ impl Node {
             pubkey,
             gossip.local_addr().unwrap(),
             tvu.local_addr().unwrap(),
-            tpu.local_addr().unwrap(),
-            tpu_via_blobs.local_addr().unwrap(),
+            transaction_digesting_module.local_addr().unwrap(),
+            transaction_digesting_module_via_blobs.local_addr().unwrap(),
             storage.local_addr().unwrap(),
             rpc_addr,
             rpc_pubsub_addr,
@@ -1680,8 +1680,8 @@ impl Node {
             sockets: Sockets {
                 gossip,
                 tvu: vec![tvu],
-                tpu: vec![tpu],
-                tpu_via_blobs: vec![tpu_via_blobs],
+                transaction_digesting_module: vec![transaction_digesting_module],
+                transaction_digesting_module_via_blobs: vec![transaction_digesting_module_via_blobs],
                 broadcast,
                 repair,
                 retransmit,
@@ -1713,10 +1713,10 @@ impl Node {
 
         let (tvu_port, tvu_sockets) = multi_bind_in_range(port_range, 8).expect("tvu multi_bind");
 
-        let (tpu_port, tpu_sockets) = multi_bind_in_range(port_range, 32).expect("tpu multi_bind");
+        let (transaction_digesting_module_port, transaction_digesting_module_sockets) = multi_bind_in_range(port_range, 32).expect("transaction_digesting_module multi_bind");
 
-        let (tpu_via_blobs_port, tpu_via_blobs_sockets) =
-            multi_bind_in_range(port_range, 8).expect("tpu multi_bind");
+        let (transaction_digesting_module_via_blobs_port, transaction_digesting_module_via_blobs_sockets) =
+            multi_bind_in_range(port_range, 8).expect("transaction_digesting_module multi_bind");
 
         let (_, repair) = Self::bind(port_range);
         let (_, broadcast) = Self::bind(port_range);
@@ -1726,8 +1726,8 @@ impl Node {
             pubkey,
             SocketAddr::new(gossip_addr.ip(), gossip_port),
             SocketAddr::new(gossip_addr.ip(), tvu_port),
-            SocketAddr::new(gossip_addr.ip(), tpu_port),
-            SocketAddr::new(gossip_addr.ip(), tpu_via_blobs_port),
+            SocketAddr::new(gossip_addr.ip(), transaction_digesting_module_port),
+            SocketAddr::new(gossip_addr.ip(), transaction_digesting_module_via_blobs_port),
             socketaddr_any!(),
             socketaddr_any!(),
             socketaddr_any!(),
@@ -1740,8 +1740,8 @@ impl Node {
             sockets: Sockets {
                 gossip,
                 tvu: tvu_sockets,
-                tpu: tpu_sockets,
-                tpu_via_blobs: tpu_via_blobs_sockets,
+                transaction_digesting_module: transaction_digesting_module_sockets,
+                transaction_digesting_module_via_blobs: transaction_digesting_module_via_blobs_sockets,
                 broadcast,
                 repair,
                 retransmit,
@@ -1761,10 +1761,10 @@ impl Node {
         new.sockets.storage = Some(storage_socket);
 
         let empty = socketaddr_any!();
-        new.info.tpu = empty;
-        new.info.tpu_via_blobs = empty;
-        new.sockets.tpu = vec![];
-        new.sockets.tpu_via_blobs = vec![];
+        new.info.transaction_digesting_module = empty;
+        new.info.transaction_digesting_module_via_blobs = empty;
+        new.sockets.transaction_digesting_module = vec![];
+        new.sockets.transaction_digesting_module_via_blobs = vec![];
 
         new
     }
@@ -2100,7 +2100,7 @@ mod tests {
         check_socket(&node.sockets.repair, ip, range);
 
         check_sockets(&node.sockets.tvu, ip, range);
-        check_sockets(&node.sockets.tpu, ip, range);
+        check_sockets(&node.sockets.transaction_digesting_module, ip, range);
     }
 
     #[test]
