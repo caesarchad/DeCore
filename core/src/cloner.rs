@@ -458,7 +458,7 @@ impl StorageMiner {
 
         #[cfg(feature = "chacha")]
         {
-            use crate::storage_phase::NUM_STORAGE_SAMPLES;
+            use crate::storage_stage::NUM_STORAGE_SAMPLES;
             use rand::SeedableRng;
             use rand_chacha::ChaChaRng;
 

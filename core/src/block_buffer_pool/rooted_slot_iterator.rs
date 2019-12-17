@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn test_rooted_slot_iterator() {
-        let block_buffer_pool_path = fetch_interim_ledger_location("test_rooted_slot_iterator");
+        let block_buffer_pool_path = get_tmp_ledger_path("test_rooted_slot_iterator");
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         block_buffer_pool.set_genesis(0, 0).unwrap();
         let ticks_per_slot = 5;

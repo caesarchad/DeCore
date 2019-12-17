@@ -589,7 +589,7 @@ impl Drop for LocalNodeGroup {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storage_phase::STORAGE_ROTATE_TEST_COUNT;
+    use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
     use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
 
     #[test]

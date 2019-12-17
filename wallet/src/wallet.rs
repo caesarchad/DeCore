@@ -1688,7 +1688,7 @@ pub fn app<'ab, 'v>(name: &str, about: &'ab str, version: &'v str) -> App<'ab, '
 mod tests {
     use super::*;
     use serde_json::Value;
-    use morgan_client::mock_rpc_client_request::SIGNATURE;
+    use morgan_client::rpc_client_request::SIGNATURE;
     use morgan_interface::signature::gen_keypair_file;
     use morgan_interface::transaction::TransactionError;
     use std::net::{Ipv4Addr, SocketAddr};

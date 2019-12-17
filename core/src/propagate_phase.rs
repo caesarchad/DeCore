@@ -377,7 +377,7 @@ mod test {
     #[test]
     fn test_broadcast_ledger() {
         morgan_logger::setup();
-        let ledger_path = fetch_interim_ledger_location("test_broadcast_ledger");
+        let ledger_path = get_tmp_ledger_path("test_broadcast_ledger");
 
         {
             // Create the leader scheduler
