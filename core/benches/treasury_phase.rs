@@ -8,7 +8,7 @@ use log::*;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use morgan::treasury_phase::{create_test_recorder, TreasuryPhase};
-use morgan::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
 use morgan::node_group_info::NodeGroupInfo;
 use morgan::node_group_info::Node;
 use morgan::genesis_utils::{create_genesis_block, GenesisBlockInfo};
@@ -53,7 +53,7 @@ fn check_txs(receiver: &Arc<Receiver<WorkingTreasuryEntries>>, ref_tx_count: usi
 fn bench_consume_buffered(bencher: &mut Bencher) {
     let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(100_000);
     let treasury = Arc::new(Treasury::new(&genesis_block));
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let my_pubkey = Pubkey::new_rand();
     {
         let block_buffer_pool = Arc::new(
@@ -150,7 +150,7 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
             (x, iter::repeat(1).take(len).collect())
         })
         .collect();
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -276,7 +276,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         })
         .collect();
 
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),

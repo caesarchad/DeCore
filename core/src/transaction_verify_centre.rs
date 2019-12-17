@@ -234,7 +234,7 @@ pub(super) fn has_license_header(file: &Path, contents: &str) -> Result<(), Cow<
 pub mod tests {
     use super::*;
     use crate::treasury_phase::create_test_recorder;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
@@ -258,7 +258,7 @@ pub mod tests {
         cluster_info1.insert_info(leader.info.clone());
         let cref1 = Arc::new(RwLock::new(cluster_info1));
 
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, l_receiver, completed_slots_receiver) =
             BlockBufferPool::open_by_message(&block_buffer_pool_path)
                 .expect("Expected to successfully open ledger");

@@ -101,7 +101,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::leader_arrange_cache::LeaderScheduleCache;
     use crate::water_clock_recorder::WorkingTreasury;
@@ -117,7 +117,7 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let prev_hash = treasury.last_transaction_seal();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");

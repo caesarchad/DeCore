@@ -671,7 +671,7 @@ impl Service for RepeatPhase {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::genesis_utils::create_genesis_block;
     use crate::packet::Blob;
     use crate::repeat_phase::RepeatPhase;
@@ -681,7 +681,7 @@ mod test {
 
     #[test]
     fn test_child_slots_of_same_parent() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),

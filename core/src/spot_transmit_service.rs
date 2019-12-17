@@ -263,7 +263,7 @@ mod test {
     use super::*;
     // use crate::treasury_forks::TreasuryForks;
     use crate::treasury_forks::TreasuryForks;
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::entry_info::{make_consecutive_blobs, make_tiny_test_entries, EntrySlice};
     use crate::genesis_utils::create_genesis_block_with_leader;
@@ -281,7 +281,7 @@ mod test {
 
     #[test]
     fn test_process_blob() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap());
         let num_entries = 10;
         let original_entries = make_tiny_test_entries(num_entries);
@@ -363,7 +363,7 @@ mod test {
         let (s_reader, r_reader) = channel();
         let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
             .expect("Expected to be able to open database ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
@@ -450,7 +450,7 @@ mod test {
         let (s_reader, r_reader) = channel();
         let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
             .expect("Expected to be able to open database ledger");
 

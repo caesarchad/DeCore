@@ -1573,13 +1573,13 @@ macro_rules! tmp_ledger_name {
 }
 
 #[macro_export]
-macro_rules! get_tmp_ledger_path {
+macro_rules! fetch_interim_ledger_location {
     () => {
-        get_tmp_ledger_path(tmp_ledger_name!())
+        fetch_interim_ledger_location(tmp_ledger_name!())
     };
 }
 
-pub fn get_tmp_ledger_path(name: &str) -> String {
+pub fn fetch_interim_ledger_location(name: &str) -> String {
     use std::env;
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string());
     let keypair = Keypair::new();
@@ -1604,7 +1604,7 @@ macro_rules! create_new_tmp_ledger {
 // Note: like `make_new_ledger_file` the returned ledger will have slot 0 full of ticks (and only
 // ticks)
 pub fn create_new_tmp_ledger(name: &str, genesis_block: &GenesisBlock) -> (String, Hash) {
-    let ledger_path = get_tmp_ledger_path(name);
+    let ledger_path = fetch_interim_ledger_location(name);
     let transaction_seal = make_new_ledger_file(&ledger_path, genesis_block).unwrap();
     (ledger_path, transaction_seal)
 }
@@ -1617,7 +1617,7 @@ macro_rules! tmp_copy_block_buffer {
 }
 
 pub fn tmp_copy_block_buffer(from: &str, name: &str) -> String {
-    let path = get_tmp_ledger_path(name);
+    let path = fetch_interim_ledger_location(name);
 
     let block_buffer_pool = BlockBufferPool::open_ledger_file(from).unwrap();
     let blobs = block_buffer_pool.fetch_iterator_blobs();
@@ -1653,7 +1653,7 @@ pub mod tests {
     #[test]
     fn test_write_entries() {
         morgan_logger::setup();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let ticks_per_slot = 10;
             let num_slots = 10;
@@ -1732,7 +1732,7 @@ pub mod tests {
 
     #[test]
     fn test_put_get_simple() {
-        let ledger_path = get_tmp_ledger_path("test_put_get_simple");
+        let ledger_path = fetch_interim_ledger_location("test_put_get_simple");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
         // Test meta column family
@@ -1786,7 +1786,7 @@ pub mod tests {
         let blob_locks: Vec<_> = shared_blobs.iter().map(|b| b.read().unwrap()).collect();
         let blobs: Vec<&Blob> = blob_locks.iter().map(|b| &**b).collect();
 
-        let ledger_path = get_tmp_ledger_path("test_read_blobs_bytes");
+        let ledger_path = fetch_interim_ledger_location("test_read_blobs_bytes");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
         ledger.update_blobs(blobs.clone()).unwrap();
 
@@ -1849,7 +1849,7 @@ pub mod tests {
 
         let (blobs, entries) = make_slot_entries(0, 0, num_entries);
 
-        let ledger_path = get_tmp_ledger_path("test_insert_data_blobs_basic");
+        let ledger_path = fetch_interim_ledger_location("test_insert_data_blobs_basic");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
         // Insert last blob, we're missing the other blobs, so no consecutive
@@ -1894,7 +1894,7 @@ pub mod tests {
         let num_entries = 10;
         let (blobs, entries) = make_slot_entries(0, 0, num_entries);
 
-        let ledger_path = get_tmp_ledger_path("test_insert_data_blobs_reverse");
+        let ledger_path = fetch_interim_ledger_location("test_insert_data_blobs_reverse");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
         // Insert blobs in reverse, check for consecutive returned blobs
@@ -1931,7 +1931,7 @@ pub mod tests {
     #[test]
     pub fn test_iteration_order() {
         let slot = 0;
-        let block_buffer_pool_path = get_tmp_ledger_path("test_iteration_order");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_iteration_order");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -1969,7 +1969,7 @@ pub mod tests {
 
     #[test]
     pub fn test_get_slot_entries1() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_get_slot_entries1");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_get_slot_entries1");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let entries = make_tiny_test_entries(8);
@@ -2001,7 +2001,7 @@ pub mod tests {
 
     #[test]
     pub fn test_get_slot_entries2() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_get_slot_entries2");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_get_slot_entries2");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -2032,7 +2032,7 @@ pub mod tests {
     #[test]
     pub fn test_get_slot_entries3() {
         // Test inserting/fetching blobs which contain multiple entries per blob
-        let block_buffer_pool_path = get_tmp_ledger_path("test_get_slot_entries3");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_get_slot_entries3");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let num_slots = 5 as u64;
@@ -2064,7 +2064,7 @@ pub mod tests {
 
     #[test]
     pub fn test_insert_data_blobs_consecutive() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_insert_data_blobs_consecutive");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_insert_data_blobs_consecutive");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             for i in 0..4 {
@@ -2116,7 +2116,7 @@ pub mod tests {
     #[test]
     pub fn test_insert_data_blobs_duplicate() {
         // Create RocksDb ledger
-        let block_buffer_pool_path = get_tmp_ledger_path("test_insert_data_blobs_duplicate");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_insert_data_blobs_duplicate");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -2168,7 +2168,7 @@ pub mod tests {
     pub fn test_genesis_and_entry_iterator() {
         let entries = make_tiny_test_entries_from_hash(&Hash::default(), 10);
 
-        let ledger_path = get_tmp_ledger_path("test_genesis_and_entry_iterator");
+        let ledger_path = fetch_interim_ledger_location("test_genesis_and_entry_iterator");
         {
             source(&ledger_path, &Keypair::new(), &entries).unwrap();
 
@@ -2185,7 +2185,7 @@ pub mod tests {
     #[test]
     pub fn test_entry_iterator_up_to_consumed() {
         let entries = make_tiny_test_entries_from_hash(&Hash::default(), 3);
-        let ledger_path = get_tmp_ledger_path("test_genesis_and_entry_iterator");
+        let ledger_path = fetch_interim_ledger_location("test_genesis_and_entry_iterator");
         {
             // put entries except last 2 into ledger
             source(&ledger_path, &Keypair::new(), &entries[..entries.len() - 2]).unwrap();
@@ -2220,7 +2220,7 @@ pub mod tests {
     #[test]
     pub fn test_new_blobs_signal() {
         // Initialize ledger
-        let ledger_path = get_tmp_ledger_path("test_new_blobs_signal");
+        let ledger_path = fetch_interim_ledger_location("test_new_blobs_signal");
         let (ledger, recvr, _) = BlockBufferPool::open_by_message(&ledger_path).unwrap();
         let ledger = Arc::new(ledger);
 
@@ -2300,7 +2300,7 @@ pub mod tests {
     #[test]
     pub fn test_completed_blobs_signal() {
         // Initialize ledger
-        let ledger_path = get_tmp_ledger_path("test_completed_blobs_signal");
+        let ledger_path = fetch_interim_ledger_location("test_completed_blobs_signal");
         let (ledger, _, recvr) = BlockBufferPool::open_by_message(&ledger_path).unwrap();
         let ledger = Arc::new(ledger);
 
@@ -2323,7 +2323,7 @@ pub mod tests {
     #[test]
     pub fn test_completed_blobs_signal_orphans() {
         // Initialize ledger
-        let ledger_path = get_tmp_ledger_path("test_completed_blobs_signal_orphans");
+        let ledger_path = fetch_interim_ledger_location("test_completed_blobs_signal_orphans");
         let (ledger, _, recvr) = BlockBufferPool::open_by_message(&ledger_path).unwrap();
         let ledger = Arc::new(ledger);
 
@@ -2361,7 +2361,7 @@ pub mod tests {
     #[test]
     pub fn test_completed_blobs_signal_many() {
         // Initialize ledger
-        let ledger_path = get_tmp_ledger_path("test_completed_blobs_signal_many");
+        let ledger_path = fetch_interim_ledger_location("test_completed_blobs_signal_many");
         let (ledger, _, recvr) = BlockBufferPool::open_by_message(&ledger_path).unwrap();
         let ledger = Arc::new(ledger);
 
@@ -2391,7 +2391,7 @@ pub mod tests {
 
     #[test]
     pub fn test_handle_chaining_basic() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_handle_chaining_basic");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_handle_chaining_basic");
         {
             let entries_per_slot = 2;
             let num_slots = 3;
@@ -2455,7 +2455,7 @@ pub mod tests {
 
     #[test]
     pub fn test_handle_chaining_missing_slots() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_handle_chaining_missing_slots");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_handle_chaining_missing_slots");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let num_slots = 30;
@@ -2535,7 +2535,7 @@ pub mod tests {
 
     #[test]
     pub fn test_forward_chaining_is_connected() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_forward_chaining_is_connected");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_forward_chaining_is_connected");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let num_slots = 15;
@@ -2618,7 +2618,7 @@ pub mod tests {
 
     #[test]
     pub fn test_chaining_tree() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_chaining_tree");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_chaining_tree");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let num_tree_levels = 6;
@@ -2718,7 +2718,7 @@ pub mod tests {
 
     #[test]
     pub fn test_get_slots_since() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_get_slots_since");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_get_slots_since");
 
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
@@ -2755,7 +2755,7 @@ pub mod tests {
 
     #[test]
     fn test_orphans() {
-        let block_buffer_pool_path = get_tmp_ledger_path("test_orphans");
+        let block_buffer_pool_path = fetch_interim_ledger_location("test_orphans");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -2811,7 +2811,7 @@ pub mod tests {
     }
 
     fn test_insert_data_blobs_slots(name: &str, should_bulk_write: bool) {
-        let block_buffer_pool_path = get_tmp_ledger_path(name);
+        let block_buffer_pool_path = fetch_interim_ledger_location(name);
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -2868,7 +2868,7 @@ pub mod tests {
     #[test]
     fn test_find_missing_data_indexes() {
         let slot = 0;
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Write entries
@@ -2953,7 +2953,7 @@ pub mod tests {
     fn test_find_missing_data_indexes_sanity() {
         let slot = 0;
 
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Early exit conditions
@@ -2997,7 +2997,7 @@ pub mod tests {
     #[test]
     pub fn test_no_missing_blob_indexes() {
         let slot = 0;
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Write entries
@@ -3027,7 +3027,7 @@ pub mod tests {
     #[test]
     pub fn test_should_insert_blob() {
         let (mut blobs, _) = make_slot_entries(0, 0, 20);
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Insert the first 5 blobs, we don't have a "is_last" blob yet
@@ -3086,7 +3086,7 @@ pub mod tests {
     #[test]
     pub fn test_insert_multiple_is_last() {
         let (mut blobs, _) = make_slot_entries(0, 0, 20);
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Inserting multiple blobs with the is_last flag set should only insert
@@ -3110,7 +3110,7 @@ pub mod tests {
     #[test]
     fn test_slot_data_iterator() {
         // Construct the blobs
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         let blobs_per_slot = 10;
         let slots = vec![2, 4, 8, 12];
@@ -3137,7 +3137,7 @@ pub mod tests {
 
     #[test]
     fn test_set_root() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         block_buffer_pool.set_genesis(0, 0).unwrap();
         let chained_slots = vec![0, 2, 4, 7, 12, 15];
@@ -3188,7 +3188,7 @@ pub mod tests {
             use crate::expunge::ERASURE_SET_SIZE;
             use ErasureMetaStatus::{DataFull, StillNeed};
 
-            let path = get_tmp_ledger_path!();
+            let path = fetch_interim_ledger_location!();
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&path).unwrap();
 
             // two erasure sets
@@ -3306,7 +3306,7 @@ pub mod tests {
 
             let slot = 0;
 
-            let ledger_path = get_tmp_ledger_path!();
+            let ledger_path = fetch_interim_ledger_location!();
 
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
             let num_sets = 3;
@@ -3386,7 +3386,7 @@ pub mod tests {
             const SET_INDEX: u64 = 0;
 
             morgan_logger::setup();
-            let ledger_path = get_tmp_ledger_path!();
+            let ledger_path = fetch_interim_ledger_location!();
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
             let data_blobs = make_slot_entries(SLOT, 0, NUM_DATA as u64)
                 .0
@@ -3446,7 +3446,7 @@ pub mod tests {
             let max_erasure_sets = 16;
             morgan_logger::setup();
 
-            let path = get_tmp_ledger_path!();
+            let path = fetch_interim_ledger_location!();
             let mut rng = thread_rng();
 
             // Specification should generate a ledger where each slot has an random number of

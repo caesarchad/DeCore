@@ -1787,7 +1787,7 @@ fn report_time_spent(label: &str, time: &Duration, extra: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::tests::make_many_slot_entries;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::propagation_value::CrdsValueLabel;
@@ -1925,7 +1925,7 @@ mod tests {
     #[test]
     fn run_window_request() {
         morgan_logger::setup();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
             let me = ContactInfo::new(
@@ -1984,7 +1984,7 @@ mod tests {
     #[test]
     fn run_highest_window_request() {
         morgan_logger::setup();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
             let rv =
@@ -2031,7 +2031,7 @@ mod tests {
     #[test]
     fn run_orphan() {
         morgan_logger::setup();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
             let rv = NodeGroupInfo::run_orphan(&socketaddr_any!(), Some(&block_buffer_pool), 2, 0);

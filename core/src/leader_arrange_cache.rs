@@ -177,7 +177,7 @@ mod tests {
     use std::sync::Arc;
     use std::thread::Builder;
 
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
 
     #[test]
     fn test_slot_leader_at() {
@@ -313,7 +313,7 @@ mod tests {
 
         let treasury = Treasury::new(&genesis_block);
         let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),

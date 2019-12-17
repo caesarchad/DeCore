@@ -174,7 +174,7 @@ impl std::iter::FromIterator<[u8; 2]> for WrappedShard {
 
 #[cfg(test)]
 mod tests {
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
     use crate::entry_info::Entry;
@@ -218,7 +218,7 @@ mod tests {
     fn test_encrypt_ledger() {
         morgan_logger::setup();
         let ledger_dir = "chacha_test_encrypt_file";
-        let ledger_path = get_tmp_ledger_path(ledger_dir);
+        let ledger_path = fetch_interim_ledger_location(ledger_dir);
         let ticks_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let out_path = Path::new("test_chacha_encrypt_file_output.txt.enc");

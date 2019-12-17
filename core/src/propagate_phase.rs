@@ -312,7 +312,7 @@ impl Service for BroadcastPhase {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::entry_info::create_ticks;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
@@ -377,7 +377,7 @@ mod test {
     #[test]
     fn test_broadcast_ledger() {
         morgan_logger::setup();
-        let ledger_path = get_tmp_ledger_path("test_broadcast_ledger");
+        let ledger_path = fetch_interim_ledger_location("test_broadcast_ledger");
 
         {
             // Create the leader scheduler

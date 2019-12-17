@@ -468,7 +468,7 @@ impl WaterClockRecorder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::test_tx::test_tx;
     use morgan_interface::hash::hash;
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_waterclock_recorder_no_zero_tick() {
         let prev_hash = Hash::default();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -505,7 +505,7 @@ mod tests {
     #[test]
     fn test_waterclock_recorder_tick_height_is_last_tick() {
         let prev_hash = Hash::default();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_reset_clears_cache() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_clear() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -591,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_tick_sent_after_min() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -637,7 +637,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_tick_sent_upto_and_including_max() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -681,7 +681,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_record_to_early() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_record_bad_slot() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_record_at_min_passes() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -806,7 +806,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_record_at_max_fails() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_cache_on_disconnect() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -888,7 +888,7 @@ mod tests {
 
     #[test]
     fn test_reset_current() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_reset_with_cached() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn test_reset_to_new_value() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -983,7 +983,7 @@ mod tests {
 
     #[test]
     fn test_reset_clear_treasury() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1015,7 +1015,7 @@ mod tests {
 
     #[test]
     pub fn test_clear_signal() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1043,7 +1043,7 @@ mod tests {
 
     #[test]
     fn test_waterclock_recorder_reset_start_slot() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1094,7 +1094,7 @@ mod tests {
 
     #[test]
     fn test_reached_leader_tick() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1256,7 +1256,7 @@ mod tests {
 
     #[test]
     fn test_would_be_leader_soon() {
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");

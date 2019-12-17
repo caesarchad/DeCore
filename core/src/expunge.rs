@@ -234,7 +234,7 @@ impl Default for CodingGenerator {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::packet::{index_blobs, SharedBlob, BLOB_DATA_SIZE, BLOB_HEADER_SIZE};
     use morgan_interface::pubkey::Pubkey;
@@ -456,7 +456,7 @@ pub mod test {
         ];
 
         for (num_data, num_coding, num_slots, num_sets_per_slot) in cases {
-            let ledger_path = get_tmp_ledger_path!();
+            let ledger_path = fetch_interim_ledger_location!();
 
             let specs = (0..num_slots)
                 .map(|slot| {

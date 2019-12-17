@@ -415,7 +415,7 @@ mod test {
     use crate::block_buffer_pool::tests::{
         make_chaining_slot_entries, make_many_slot_entries, make_slot_entries,
     };
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::Node;
     use rand::seq::SliceRandom;
     use rand::{thread_rng, Rng};
@@ -425,7 +425,7 @@ mod test {
 
     #[test]
     pub fn test_repair_orphan() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -449,7 +449,7 @@ mod test {
 
     #[test]
     pub fn test_repair_empty_slot() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -470,7 +470,7 @@ mod test {
 
     #[test]
     pub fn test_generate_repairs() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -514,7 +514,7 @@ mod test {
 
     #[test]
     pub fn test_generate_highest_repair() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -541,7 +541,7 @@ mod test {
 
     #[test]
     pub fn test_repair_range() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -588,7 +588,7 @@ mod test {
 
     #[test]
     pub fn test_repair_range_highest() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -631,7 +631,7 @@ mod test {
 
     #[test]
     pub fn test_get_completed_slots_past_root() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
             let num_entries_per_slot = 10;
@@ -694,7 +694,7 @@ mod test {
 
     #[test]
     pub fn test_update_epoch_slots() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         {
             // Create block_buffer_pool
             let (block_buffer_pool, _, completed_slots_receiver) =

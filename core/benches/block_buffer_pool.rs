@@ -8,7 +8,7 @@ extern crate morgan;
 
 use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
-use morgan::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
 use morgan::entry_info::{make_large_test_entries, make_tiny_test_entries, EntrySlice};
 use morgan::packet::{Blob, BLOB_HEADER_SIZE};
 use test::Bencher;
@@ -65,7 +65,7 @@ fn setup_read_bench(
 #[bench]
 #[ignore]
 fn bench_write_small(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let num_entries = 32 * 1024;
     let entries = make_tiny_test_entries(num_entries);
     let mut blobs = entries.to_blobs();
@@ -79,7 +79,7 @@ fn bench_write_small(bench: &mut Bencher) {
 #[bench]
 #[ignore]
 fn bench_write_big(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let num_entries = 32 * 1024;
     let entries = make_large_test_entries(num_entries);
     let mut blobs = entries.to_blobs();
@@ -93,7 +93,7 @@ fn bench_write_big(bench: &mut Bencher) {
 #[bench]
 #[ignore]
 fn bench_read_sequential(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let mut block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
 
@@ -120,7 +120,7 @@ fn bench_read_sequential(bench: &mut Bencher) {
 #[bench]
 #[ignore]
 fn bench_read_random(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let mut block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
 
@@ -151,7 +151,7 @@ fn bench_read_random(bench: &mut Bencher) {
 #[bench]
 #[ignore]
 fn bench_insert_data_blob_small(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
     let num_entries = 32 * 1024;
@@ -174,7 +174,7 @@ fn bench_insert_data_blob_small(bench: &mut Bencher) {
 #[bench]
 #[ignore]
 fn bench_insert_data_blob_big(bench: &mut Bencher) {
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
     let num_entries = 32 * 1024;

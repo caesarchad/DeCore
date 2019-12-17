@@ -853,13 +853,13 @@ pub fn create_test_recorder(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::node_group_info::Node;
     use crate::entry_info::EntrySlice;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::packet::to_packets;
     use crate::water_clock_recorder::WorkingTreasury;
-    use crate::{get_tmp_ledger_path, tmp_ledger_name};
+    use crate::{fetch_interim_ledger_location, tmp_ledger_name};
     use itertools::Itertools;
     use morgan_interface::instruction::InstructionError;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -874,7 +874,7 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -909,7 +909,7 @@ mod tests {
         let start_hash = treasury.last_transaction_seal();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -958,7 +958,7 @@ mod tests {
         let start_hash = treasury.last_transaction_seal();
         let (verified_sender, verified_receiver) = channel();
         let (vote_sender, vote_receiver) = channel();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -1098,7 +1098,7 @@ mod tests {
         verified_sender.send(packets).unwrap();
 
         let (vote_sender, vote_receiver) = channel();
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let entry_receiver = {
                 // start a treasury_phase to eat verified receiver
@@ -1166,7 +1166,7 @@ mod tests {
             min_tick_height: treasury.tick_height(),
             max_tick_height: std::u64::MAX,
         };
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1482,7 +1482,7 @@ mod tests {
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,
         };
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
@@ -1570,7 +1570,7 @@ mod tests {
             min_tick_height: treasury.tick_height(),
             max_tick_height: treasury.tick_height() + 1,
         };
-        let ledger_path = get_tmp_ledger_path!();
+        let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");

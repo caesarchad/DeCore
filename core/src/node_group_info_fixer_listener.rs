@@ -477,7 +477,7 @@ impl Service for NodeGroupInfoFixListener {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::tests::make_many_slot_entries;
     use crate::node_group_info::Node;
     use crate::packet::{Blob, SharedBlob};
@@ -617,7 +617,7 @@ mod tests {
 
     #[test]
     fn test_serve_repairs_to_repairee() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         let blobs_per_slot = 5;
         let num_slots = 10;
@@ -692,7 +692,7 @@ mod tests {
 
     #[test]
     fn test_no_repair_past_confirmed_epoch() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         let stakers_slot_offset = 16;
         let slots_per_epoch = stakers_slot_offset * 2;
