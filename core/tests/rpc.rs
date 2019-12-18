@@ -76,7 +76,7 @@ fn test_rpc_send_tx() {
        "params": [signature],
     });
 
-    for _ in 0..morgan_interface::timing::DEFAULT_TICKS_PER_SLOT {
+    for _ in 0..morgan_interface::timing::DEFAULT_DROPS_PER_SLOT {
         let mut response = client
             .post(&rpc_string)
             .header(CONTENT_TYPE, "application/json")

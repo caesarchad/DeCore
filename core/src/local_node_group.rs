@@ -17,7 +17,7 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::system_transaction;
 use morgan_interface::timing::DEFAULT_SLOTS_PER_EPOCH;
-use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use morgan_interface::transaction::Transaction;
 use morgan_stake_api::stake_instruction;
 use morgan_storage_api::storage_instruction;
@@ -56,7 +56,7 @@ pub struct NodeGroupConfig {
     /// The fullnode config that should be applied to every node in the node group
     pub validator_config: ValidatorConfig,
     /// Number of miners in the node group
-    /// Note- miners will timeout if ticks_per_slot is much larger than the default 8
+    /// Note- miners will timeout if drops_per_slot is much larger than the default 8
     pub miner_amnt: usize,
     /// Number of nodes that are unstaked and not voting (a.k.a listening)
     pub observer_amnt: u64,
@@ -64,7 +64,7 @@ pub struct NodeGroupConfig {
     pub node_stakes: Vec<u64>,
     /// The total difs available to the node group
     pub node_group_difs: u64,
-    pub ticks_per_slot: u64,
+    pub drops_per_slot: u64,
     pub slots_per_epoch: u64,
     pub stakers_slot_offset: u64,
     pub native_instruction_processors: Vec<(String, Pubkey)>,
@@ -79,7 +79,7 @@ impl Default for NodeGroupConfig {
             observer_amnt: 0,
             node_stakes: vec![],
             node_group_difs: 0,
-            ticks_per_slot: DEFAULT_TICKS_PER_SLOT,
+            drops_per_slot: DEFAULT_DROPS_PER_SLOT,
             slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
             stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
             native_instruction_processors: vec![],
@@ -133,7 +133,7 @@ impl LocalNodeGroup {
         );
         let storage_keypair = Keypair::new();
         genesis_block.add_storage_controller(&storage_keypair.pubkey());
-        genesis_block.ticks_per_slot = config.ticks_per_slot;
+        genesis_block.drops_per_slot = config.drops_per_slot;
         genesis_block.slots_per_epoch = config.slots_per_epoch;
         genesis_block.stakers_slot_offset = config.stakers_slot_offset;
         genesis_block.waterclock_config = config.waterclock_config.clone();
@@ -614,7 +614,7 @@ mod test {
             miner_amnt,
             node_stakes: vec![3; NUM_NODES],
             node_group_difs: 100,
-            ticks_per_slot: 8,
+            drops_per_slot: 8,
             slots_per_epoch: MINIMUM_SLOT_LENGTH as u64,
             ..NodeGroupConfig::default()
         };

@@ -236,17 +236,17 @@ impl BlockBufferPool {
     pub fn update_entries<I>(
         &self,
         start_slot: u64,
-        num_ticks_in_start_slot: u64,
+        num_drops_in_start_slot: u64,
         start_index: u64,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
         entries: I,
     ) -> Result<()>
     where
         I: IntoIterator,
         I::Item: Borrow<Entry>,
     {
-        assert!(num_ticks_in_start_slot < ticks_per_slot);
-        let mut remaining_ticks_in_slot = ticks_per_slot - num_ticks_in_start_slot;
+        assert!(num_drops_in_start_slot < drops_per_slot);
+        let mut remaining_drops_in_slot = drops_per_slot - num_drops_in_start_slot;
 
         let mut blobs = vec![];
         let mut current_index = start_index;
@@ -260,18 +260,18 @@ impl BlockBufferPool {
         };
         // Find all the entries for start_slot
         for entry in entries {
-            if remaining_ticks_in_slot == 0 {
+            if remaining_drops_in_slot == 0 {
                 current_slot += 1;
                 current_index = 0;
                 parent_slot = current_slot - 1;
-                remaining_ticks_in_slot = ticks_per_slot;
+                remaining_drops_in_slot = drops_per_slot;
             }
 
             let mut b = entry.borrow().to_blob();
 
-            if entry.borrow().is_tick() {
-                remaining_ticks_in_slot -= 1;
-                if remaining_ticks_in_slot == 0 {
+            if entry.borrow().is_drop() {
+                remaining_drops_in_slot -= 1;
+                if remaining_drops_in_slot == 0 {
                     b.set_is_last_in_slot();
                 }
             }
@@ -855,7 +855,7 @@ impl BlockBufferPool {
     }
 
     // Handle special case of writing genesis blobs. For instance, the first two entries
-    // don't count as ticks, even if they're empty entries
+    // don't count as drops, even if they're empty entries
     fn update_genesis_blobs(&self, blobs: &[Blob]) -> Result<()> {
         // TODO: change bootstrap height to number of slots
         let mut bootstrap_meta = MetaInfoCol::new(0, 1);
@@ -1132,7 +1132,7 @@ fn find_slot_meta_in_cached_state<'a>(
     }
 }
 
-/// Returns the next consumed index and the number of ticks in the new consumed
+/// Returns the next consumed index and the number of drops in the new consumed
 /// range
 fn fetch_slot_continuous_blobs<'a>(
     slot: u64,
@@ -1526,18 +1526,18 @@ fn renewal_on_slot(slot_meta: &MetaInfoCol, slot_meta_backup: &Option<MetaInfoCo
         (slot_meta_backup.is_some() && slot_meta_backup.as_ref().unwrap().consumed != slot_meta.consumed))
 }
 
-// Creates a new ledger with slot 0 full of ticks (and only ticks).
+// Creates a new ledger with slot 0 full of drops (and only drops).
 //
 // Returns the transaction_seal that can be used to append entries with.
 pub fn make_new_ledger_file(ledger_path: &str, genesis_block: &GenesisBlock) -> Result<Hash> {
-    let ticks_per_slot = genesis_block.ticks_per_slot;
+    let drops_per_slot = genesis_block.drops_per_slot;
     BlockBufferPool::remove_ledger_file(ledger_path)?;
     genesis_block.write(&ledger_path)?;
 
-    // Fill slot 0 with ticks that link back to the genesis_block to bootstrap the ledger.
+    // Fill slot 0 with drops that link back to the genesis_block to bootstrap the ledger.
     let block_buffer_pool = BlockBufferPool::open_ledger_file(ledger_path)?;
-    let entries = crate::entry_info::create_ticks(ticks_per_slot, genesis_block.hash());
-    block_buffer_pool.update_entries(0, 0, 0, ticks_per_slot, &entries)?;
+    let entries = crate::entry_info::create_drops(drops_per_slot, genesis_block.hash());
+    block_buffer_pool.update_entries(0, 0, 0, drops_per_slot, &entries)?;
 
     Ok(entries.last().unwrap().hash)
 }
@@ -1601,8 +1601,8 @@ macro_rules! create_new_tmp_ledger {
 
 // Same as `make_new_ledger_file()` but use a temporary ledger name based on the provided `name`
 //
-// Note: like `make_new_ledger_file` the returned ledger will have slot 0 full of ticks (and only
-// ticks)
+// Note: like `make_new_ledger_file` the returned ledger will have slot 0 full of drops (and only
+// drops)
 pub fn create_new_tmp_ledger(name: &str, genesis_block: &GenesisBlock) -> (String, Hash) {
     let ledger_path = fetch_interim_ledger_location(name);
     let transaction_seal = make_new_ledger_file(&ledger_path, genesis_block).unwrap();
@@ -1635,7 +1635,7 @@ pub fn tmp_copy_block_buffer(from: &str, name: &str) -> String {
 pub mod tests {
     use super::*;
     use crate::entry_info::{
-        create_ticks, make_tiny_test_entries, make_tiny_test_entries_from_hash, Entry, EntrySlice,
+        create_drops, make_tiny_test_entries, make_tiny_test_entries_from_hash, Entry, EntrySlice,
     };
     use crate::expunge::{CodingGenerator, NUM_CODING, NUM_DATA};
     use crate::packet;
@@ -1655,21 +1655,21 @@ pub mod tests {
         morgan_logger::setup();
         let ledger_path = fetch_interim_ledger_location!();
         {
-            let ticks_per_slot = 10;
+            let drops_per_slot = 10;
             let num_slots = 10;
-            let num_ticks = ticks_per_slot * num_slots;
+            let num_drops = drops_per_slot * num_slots;
             let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
-            let ticks = create_ticks(num_ticks, Hash::default());
+            let drops = create_drops(num_drops, Hash::default());
             ledger
-                .update_entries(0, 0, 0, ticks_per_slot, ticks.clone())
+                .update_entries(0, 0, 0, drops_per_slot, drops.clone())
                 .unwrap();
 
             for i in 0..num_slots {
                 let meta = ledger.meta(i).unwrap().unwrap();
-                assert_eq!(meta.consumed, ticks_per_slot);
-                assert_eq!(meta.received, ticks_per_slot);
-                assert_eq!(meta.last_index, ticks_per_slot - 1);
+                assert_eq!(meta.consumed, drops_per_slot);
+                assert_eq!(meta.received, drops_per_slot);
+                assert_eq!(meta.last_index, drops_per_slot - 1);
                 if i == num_slots - 1 {
                     assert!(meta.next_slots.is_empty());
                 } else {
@@ -1682,35 +1682,35 @@ pub mod tests {
                 }
 
                 assert_eq!(
-                    &ticks[(i * ticks_per_slot) as usize..((i + 1) * ticks_per_slot) as usize],
+                    &drops[(i * drops_per_slot) as usize..((i + 1) * drops_per_slot) as usize],
                     &ledger.fetch_slot_entries(i, 0, None).unwrap()[..]
                 );
             }
 
-            // Simulate writing to the end of a slot with existing ticks
+            // Simulate writing to the end of a slot with existing drops
             ledger
                 .update_entries(
                     num_slots,
-                    ticks_per_slot - 1,
-                    ticks_per_slot - 2,
-                    ticks_per_slot,
-                    &ticks[0..2],
+                    drops_per_slot - 1,
+                    drops_per_slot - 2,
+                    drops_per_slot,
+                    &drops[0..2],
                 )
                 .unwrap();
 
             let meta = ledger.meta(num_slots).unwrap().unwrap();
             assert_eq!(meta.consumed, 0);
-            // received blob was ticks_per_slot - 2, so received should be ticks_per_slot - 2 + 1
-            assert_eq!(meta.received, ticks_per_slot - 1);
-            // last blob index ticks_per_slot - 2 because that's the blob that made tick_height == ticks_per_slot
+            // received blob was drops_per_slot - 2, so received should be drops_per_slot - 2 + 1
+            assert_eq!(meta.received, drops_per_slot - 1);
+            // last blob index drops_per_slot - 2 because that's the blob that made drop_height == drops_per_slot
             // for the slot
-            assert_eq!(meta.last_index, ticks_per_slot - 2);
+            assert_eq!(meta.last_index, drops_per_slot - 2);
             assert_eq!(meta.parent_slot, num_slots - 1);
             assert_eq!(meta.next_slots, vec![num_slots + 1]);
             assert_eq!(
-                &ticks[0..1],
+                &drops[0..1],
                 &ledger
-                    .fetch_slot_entries(num_slots, ticks_per_slot - 2, None)
+                    .fetch_slot_entries(num_slots, drops_per_slot - 2, None)
                     .unwrap()[..]
             );
 
@@ -1723,7 +1723,7 @@ pub mod tests {
             assert!(meta.next_slots.is_empty());
 
             assert_eq!(
-                &ticks[1..2],
+                &drops[1..2],
                 &ledger.fetch_slot_entries(num_slots + 1, 0, None).unwrap()[..]
             );
         }
@@ -2238,7 +2238,7 @@ pub mod tests {
         // Wait to get notified of update, should only be one update
         assert!(recvr.recv_timeout(timer).is_ok());
         assert!(recvr.try_recv().is_err());
-        // Insert the rest of the ticks
+        // Insert the rest of the drops
         ledger
             .insert_data_blobs(&blobs[1..entries_per_slot as usize])
             .unwrap();
@@ -2246,8 +2246,8 @@ pub mod tests {
         assert!(recvr.recv_timeout(timer).is_ok());
         assert!(recvr.try_recv().is_err());
 
-        // Create some other slots, and send batches of ticks for each slot such that each slot
-        // is missing the tick at blob index == slot index - 1. Thus, no consecutive blocks
+        // Create some other slots, and send batches of drops for each slot such that each slot
+        // is missing the drop at blob index == slot index - 1. Thus, no consecutive blocks
         // will be formed
         let num_slots = entries_per_slot;
         let mut blobs: Vec<Blob> = vec![];
@@ -2545,14 +2545,14 @@ pub mod tests {
             let (blobs, _) = make_many_slot_entries(0, num_slots, entries_per_slot);
 
             // Write the blobs such that every 3rd slot has a gap in the beginning
-            for (slot, slot_ticks) in blobs.chunks(entries_per_slot as usize).enumerate() {
+            for (slot, slot_drops) in blobs.chunks(entries_per_slot as usize).enumerate() {
                 if slot % 3 == 0 {
                     block_buffer_pool
-                        .update_blobs(&slot_ticks[1..entries_per_slot as usize])
+                        .update_blobs(&slot_drops[1..entries_per_slot as usize])
                         .unwrap();
                 } else {
                     block_buffer_pool
-                        .update_blobs(&slot_ticks[..entries_per_slot as usize])
+                        .update_blobs(&slot_drops[..entries_per_slot as usize])
                         .unwrap();
                 }
             }
@@ -2585,9 +2585,9 @@ pub mod tests {
 
             // Iteratively finish every 3rd slot, and check that all slots up to and including
             // slot_index + 3 become part of the trunk
-            for (slot_index, slot_ticks) in blobs.chunks(entries_per_slot as usize).enumerate() {
+            for (slot_index, slot_drops) in blobs.chunks(entries_per_slot as usize).enumerate() {
                 if slot_index % 3 == 0 {
-                    block_buffer_pool.update_blobs(&slot_ticks[0..1]).unwrap();
+                    block_buffer_pool.update_blobs(&slot_drops[0..1]).unwrap();
 
                     for i in 0..num_slots {
                         let s = block_buffer_pool.meta(i as u64).unwrap().unwrap();

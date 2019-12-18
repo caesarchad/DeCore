@@ -60,7 +60,7 @@ pub fn entrypoint(
     program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     ix_data: &[u8],
-    tick_height: u64,
+    drop_height: u64,
     symbol_cache: &SymbolCache,
 ) -> Result<(), InstructionError> {
     if keyed_accounts[0].account.executable {
@@ -69,7 +69,7 @@ pub fn entrypoint(
         let name_vec = &names[0].account.data;
         if let Some(entrypoint) = symbol_cache.read().unwrap().get(name_vec) {
             unsafe {
-                return entrypoint(program_id, params, ix_data, tick_height);
+                return entrypoint(program_id, params, ix_data, drop_height);
             }
         }
         let name = match str::from_utf8(name_vec) {
@@ -105,7 +105,7 @@ pub fn entrypoint(
                             return Err(InstructionError::GenericError);
                         }
                     };
-                let ret = entrypoint(program_id, params, ix_data, tick_height);
+                let ret = entrypoint(program_id, params, ix_data, drop_height);
                 symbol_cache
                     .write()
                     .unwrap()

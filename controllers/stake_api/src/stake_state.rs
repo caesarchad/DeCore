@@ -27,17 +27,17 @@ impl Default for StakeState {
     }
 }
 //  TODO: trusted values of network parameters come from where?
-const TICKS_PER_SECOND: f64 = 10f64;
-const TICKS_PER_SLOT: f64 = 8f64;
+const DROPS_PER_SECOND: f64 = 10f64;
+const DROPS_PER_SLOT: f64 = 8f64;
 
-// credits/yr or slots/yr  is        seconds/year        *   ticks/second   * slots/tick
-const CREDITS_PER_YEAR: f64 = (365f64 * 24f64 * 3600f64) * TICKS_PER_SECOND / TICKS_PER_SLOT;
+// credits/yr or slots/yr  is        seconds/year        *   drops/second   * slots/_drop
+const CREDITS_PER_YEAR: f64 = (365f64 * 24f64 * 3600f64) * DROPS_PER_SECOND / DROPS_PER_SLOT;
 
 // TODO: 20% is a niiice rate...  TODO: make this a member of MiningPool?
 const STAKE_REWARD_TARGET_RATE: f64 = 0.20;
 
 #[cfg(test)]
-const STAKE_GETS_PAID_EVERY_VOTE: u64 = 200_000_000; // if numbers above (TICKS_YEAR) move, fix this
+const STAKE_GETS_PAID_EVERY_VOTE: u64 = 200_000_000; // if numbers above (DROPS_YEAR) move, fix this
 
 impl StakeState {
     // utility function, used by Stakes, tests

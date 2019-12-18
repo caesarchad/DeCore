@@ -22,7 +22,7 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::system_transaction;
 use morgan_interface::timing::{
-    duration_as_ms, timestamp, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
+    duration_as_ms, timestamp, DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
 };
 use std::iter;
 use std::sync::atomic::Ordering;
@@ -97,9 +97,9 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
         ..
     } = create_genesis_block(mint_total);
 
-    // Set a high ticks_per_slot so we don't run out of ticks
+    // Set a high drops_per_slot so we don't run out of drops
     // during the benchmark
-    genesis_block.ticks_per_slot = 10_000;
+    genesis_block.drops_per_slot = 10_000;
 
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
@@ -294,9 +294,9 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let mut id = genesis_block.hash();
-        for _ in 0..(MAX_RECENT_TRANSACTION_SEALS * DEFAULT_TICKS_PER_SLOT as usize) {
+        for _ in 0..(MAX_RECENT_TRANSACTION_SEALS * DEFAULT_DROPS_PER_SLOT as usize) {
             id = hash(&id.as_ref());
-            treasury.register_tick(&id);
+            treasury.register_drop(&id);
         }
 
         let half_len = verified.len() / 2;
@@ -305,7 +305,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         let signal_receiver2 = signal_receiver.clone();
         bencher.iter(move || {
             // make sure the transactions are still valid
-            treasury.register_tick(&genesis_block.hash());
+            treasury.register_drop(&genesis_block.hash());
             for v in verified[start..start + half_len].chunks(verified.len() / num_threads) {
                 verified_sender.send(v.to_vec()).unwrap();
             }

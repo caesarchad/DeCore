@@ -318,7 +318,7 @@ impl<'a> StorageAccount<'a> {
             reward_validations,
         } = &mut storage_contract
         {
-            // if current tick height is a full segment away, allow reward collection
+            // if current _drop height is a full segment away, allow reward collection
             let claim_index = get_segment_from_slot(current_slot);
             let claim_segment = get_segment_from_slot(slot);
             // Todo this might might always be true

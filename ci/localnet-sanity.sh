@@ -294,7 +294,7 @@ flag_error() {
 }
 
 if ! $skipSetup; then
-  multinode-demo/setup.sh --hashes-per-tick auto
+  multinode-demo/setup.sh --hashes-per-_drop auto
 else
   verifyLedger
 fi

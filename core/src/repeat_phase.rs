@@ -98,7 +98,7 @@ impl RepeatPhase {
         let treasury_forks = treasury_forks.clone();
         let waterclock_recorder = waterclock_recorder.clone();
         let my_pubkey = *my_pubkey;
-        let mut ticks_per_slot = 0;
+        let mut drops_per_slot = 0;
         let mut locktower = Locktower::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
         // Start the replay phase loop
         let leader_schedule_cache = leader_schedule_cache.clone();
@@ -128,15 +128,15 @@ impl RepeatPhase {
                         &block_buffer_pool,
                         &treasury_forks,
                         &my_pubkey,
-                        &mut ticks_per_slot,
+                        &mut drops_per_slot,
                         &mut progress,
                         &slot_full_sender,
                     )?;
 
-                    if ticks_per_slot == 0 {
+                    if drops_per_slot == 0 {
                         let frozen_treasuries = treasury_forks.read().unwrap().frozen_treasuries();
                         let treasury = frozen_treasuries.values().next().unwrap();
-                        ticks_per_slot = treasury.ticks_per_slot();
+                        drops_per_slot = treasury.drops_per_slot();
                     }
 
                     let votable =
@@ -163,26 +163,26 @@ impl RepeatPhase {
                             &block_buffer_pool,
                             &treasury,
                             &waterclock_recorder,
-                            ticks_per_slot,
+                            drops_per_slot,
                             &leader_schedule_cache,
                         );
 
                         is_transaction_digesting_module_treasury_active = false;
                     }
 
-                    let (reached_leader_tick, grace_ticks) = if !is_transaction_digesting_module_treasury_active {
+                    let (reached_leader_drop, grace_drops) = if !is_transaction_digesting_module_treasury_active {
                         let waterclock = waterclock_recorder.lock().unwrap();
-                        waterclock.reached_leader_tick()
+                        waterclock.reached_leader_drop()
                     } else {
                         (false, 0)
                     };
 
                     if !is_transaction_digesting_module_treasury_active {
-                        assert!(ticks_per_slot > 0);
-                        let waterclock_tick_height = waterclock_recorder.lock().unwrap().tick_height();
-                        let waterclock_slot = leader_arrange_utils::tick_height_to_slot(
-                            ticks_per_slot,
-                            waterclock_tick_height + 1,
+                        assert!(drops_per_slot > 0);
+                        let waterclock_drop_height = waterclock_recorder.lock().unwrap().drop_height();
+                        let waterclock_slot = leader_arrange_utils::drop_height_to_slot(
+                            drops_per_slot,
+                            waterclock_drop_height + 1,
                         );
                         Self::start_leader(
                             &my_pubkey,
@@ -190,8 +190,8 @@ impl RepeatPhase {
                             &waterclock_recorder,
                             &node_group_info,
                             waterclock_slot,
-                            reached_leader_tick,
-                            grace_ticks,
+                            reached_leader_drop,
+                            grace_drops,
                             &leader_schedule_cache,
                         );
                     }
@@ -219,8 +219,8 @@ impl RepeatPhase {
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         waterclock_slot: u64,
-        reached_leader_tick: bool,
-        grace_ticks: u64,
+        reached_leader_drop: bool,
+        grace_drops: u64,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         trace!("{} checking waterclock slot {}", my_pubkey, waterclock_slot);
@@ -241,12 +241,12 @@ impl RepeatPhase {
                         my_pubkey, next_leader, waterclock_slot
                     );
                     node_group_info.write().unwrap().set_leader(&next_leader);
-                    if next_leader == *my_pubkey && reached_leader_tick {
+                    if next_leader == *my_pubkey && reached_leader_drop {
                         debug!("{} starting transaction_digesting_module for slot {}", my_pubkey, waterclock_slot);
                         datapoint_warn!(
                             "replay_phase-new_leader",
                             ("count", waterclock_slot, i64),
-                            ("grace", grace_ticks, i64));
+                            ("grace", grace_drops, i64));
                         let transaction_digesting_module_treasury = Treasury::new_from_parent(&parent, my_pubkey, waterclock_slot);
                         treasury_forks.write().unwrap().insert(transaction_digesting_module_treasury);
                         if let Some(transaction_digesting_module_treasury) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
@@ -370,22 +370,22 @@ impl RepeatPhase {
         block_buffer_pool: &BlockBufferPool,
         treasury: &Arc<Treasury>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
     ) {
         let next_leader_slot =
             leader_schedule_cache.next_leader_slot(&my_pubkey, treasury.slot(), &treasury, Some(block_buffer_pool));
         waterclock_recorder.lock().unwrap().reset(
-            treasury.tick_height(),
+            treasury.drop_height(),
             treasury.last_transaction_seal(),
             treasury.slot(),
             next_leader_slot,
-            ticks_per_slot,
+            drops_per_slot,
         );
         debug!(
             "{:?} voted and reset waterclock at {}. next leader slot {:?}",
             my_pubkey,
-            treasury.tick_height(),
+            treasury.drop_height(),
             next_leader_slot
         );
     }
@@ -394,7 +394,7 @@ impl RepeatPhase {
         block_buffer_pool: &Arc<BlockBufferPool>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
         my_pubkey: &Pubkey,
-        ticks_per_slot: &mut u64,
+        drops_per_slot: &mut u64,
         progress: &mut HashMap<u64, ForkProgress>,
         slot_full_sender: &Sender<(u64, Pubkey)>,
     ) -> Result<()> {
@@ -403,12 +403,12 @@ impl RepeatPhase {
 
         for treasury_slot in &active_treasuries {
             let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();
-            *ticks_per_slot = treasury.ticks_per_slot();
+            *drops_per_slot = treasury.drops_per_slot();
             if treasury.collector_id() != *my_pubkey {
                 Self::replay_block_buffer_into_treasury(&treasury, &block_buffer_pool, progress)?;
             }
-            let max_tick_height = (*treasury_slot + 1) * treasury.ticks_per_slot() - 1;
-            if treasury.tick_height() == max_tick_height {
+            let max_drop_height = (*treasury_slot + 1) * treasury.drops_per_slot() - 1;
+            if treasury.drop_height() == max_drop_height {
                 Self::process_completed_treasury(my_pubkey, treasury, slot_full_sender);
             }
         }
@@ -583,7 +583,7 @@ impl RepeatPhase {
             trace!(
                 "entry verification failed {} {} {} {}",
                 entries.len(),
-                treasury.tick_height(),
+                treasury.drop_height(),
                 last_entry,
                 treasury.last_transaction_seal()
             );

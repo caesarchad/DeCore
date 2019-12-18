@@ -124,7 +124,7 @@ impl MessageProcessor {
         instruction: &CompiledInstruction,
         executable_accounts: &mut [(Pubkey, Account)],
         program_accounts: &mut [&mut Account],
-        tick_height: u64,
+        drop_height: u64,
     ) -> Result<(), InstructionError> {
         let program_id = instruction.program_id(&message.account_keys);
         let mut keyed_accounts = create_keyed_accounts(executable_accounts);
@@ -147,7 +147,7 @@ impl MessageProcessor {
                     &program_id,
                     &mut keyed_accounts[1..],
                     &instruction.data,
-                    tick_height,
+                    drop_height,
                 );
             }
         }
@@ -156,7 +156,7 @@ impl MessageProcessor {
             &program_id,
             &mut keyed_accounts,
             &instruction.data,
-            tick_height,
+            drop_height,
             &self.symbol_cache,
         )
     }
@@ -171,7 +171,7 @@ impl MessageProcessor {
         instruction: &CompiledInstruction,
         executable_accounts: &mut [(Pubkey, Account)],
         program_accounts: &mut [&mut Account],
-        tick_height: u64,
+        drop_height: u64,
     ) -> Result<(), InstructionError> {
         let program_id = instruction.program_id(&message.account_keys);
         // TODO: the runtime should be checking read/write access to memory
@@ -187,7 +187,7 @@ impl MessageProcessor {
             instruction,
             executable_accounts,
             program_accounts,
-            tick_height,
+            drop_height,
         )?;
 
         // Verify the instruction
@@ -218,7 +218,7 @@ impl MessageProcessor {
         message: &Message,
         loaders: &mut [Vec<(Pubkey, Account)>],
         accounts: &mut [Account],
-        tick_height: u64,
+        drop_height: u64,
     ) -> Result<(), TransactionError> {
         for (instruction_index, instruction) in message.instructions.iter().enumerate() {
             let executable_index = message
@@ -235,7 +235,7 @@ impl MessageProcessor {
                 instruction,
                 executable_accounts,
                 &mut program_accounts,
-                tick_height,
+                drop_height,
             )
             .map_err(|err| TransactionError::InstructionError(instruction_index as u8, err))?;
         }

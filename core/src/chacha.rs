@@ -219,13 +219,13 @@ mod tests {
         morgan_logger::setup();
         let ledger_dir = "chacha_test_encrypt_file";
         let ledger_path = fetch_interim_ledger_location(ledger_dir);
-        let ticks_per_slot = 16;
+        let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let out_path = Path::new("test_chacha_encrypt_file_output.txt.enc");
 
         let entries = make_tiny_deterministic_test_entries(32);
         block_buffer_pool
-            .update_entries(0, 0, 0, ticks_per_slot, &entries)
+            .update_entries(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let mut key = hex!(

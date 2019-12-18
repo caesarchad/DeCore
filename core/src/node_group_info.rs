@@ -723,7 +723,7 @@ impl NodeGroupInfo {
     /// # Remarks
     pub fn broadcast(
         id: &Pubkey,
-        contains_last_tick: bool,
+        contains_last_drop: bool,
         broadcast_table: &[ContactInfo],
         s: &UdpSocket,
         blobs: &[SharedBlob],
@@ -734,7 +734,7 @@ impl NodeGroupInfo {
             Err(NodeGroupInfoError::NoPeers)?;
         }
 
-        let orders = Self::create_broadcast_orders(contains_last_tick, blobs, broadcast_table);
+        let orders = Self::create_broadcast_orders(contains_last_drop, blobs, broadcast_table);
 
         trace!("broadcast orders table {}", orders.len());
 
@@ -857,7 +857,7 @@ impl NodeGroupInfo {
     }
 
     pub fn create_broadcast_orders<'a, T>(
-        contains_last_tick: bool,
+        contains_last_drop: bool,
         blobs: &[T],
         broadcast_table: &'a [ContactInfo],
     ) -> Vec<(T, Vec<&'a ContactInfo>)>
@@ -880,13 +880,13 @@ impl NodeGroupInfo {
             orders.push((blob.clone(), vec![&broadcast_table[br_idx]]));
         }
 
-        if contains_last_tick {
-            // Broadcast the last tick to everyone on the network so it doesn't get dropped
-            // (Need to maximize probability the next leader in line sees this handoff tick
+        if contains_last_drop {
+            // Broadcast the last _drop to everyone on the network so it doesn't get dropped
+            // (Need to maximize probability the next leader in line sees this handoff _drop
             // despite packet drops)
-            // If we had a tick at max_tick_height, then we know it must be the last
+            // If we had a _drop at max_drop_height, then we know it must be the last
             // Blob in the broadcast, There cannot be an entry that got sent after the
-            // last tick, guaranteed by the WaterClockService).
+            // last _drop, guaranteed by the WaterClockService).
             orders.push((
                 blobs.last().unwrap().clone(),
                 broadcast_table.iter().collect(),

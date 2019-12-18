@@ -69,19 +69,19 @@ fn par_execute_entries(
 }
 
 /// Process an ordered list of entries in parallel
-/// 1. In order lock accounts for each entry while the lock succeeds, up to a Tick entry
+/// 1. In order lock accounts for each entry while the lock succeeds, up to a Drop entry
 /// 2. Process the locked group in parallel
-/// 3. Register the `Tick` if it's available
+/// 3. Register the `Drop` if it's available
 /// 4. Update the leader scheduler, goto 1
 pub fn process_entries(treasury: &Treasury, entries: &[Entry]) -> Result<()> {
     // accumulator for entries that can be processed in parallel
     let mut mt_group = vec![];
     for entry in entries {
-        if entry.is_tick() {
-            // if its a tick, execute the group and register the tick
+        if entry.is_drop() {
+            // if its a _drop, execute the group and register the _drop
             par_execute_entries(treasury, &mt_group)?;
             mt_group = vec![];
-            treasury.register_tick(&entry.hash);
+            treasury.register_drop(&entry.hash);
             continue;
         }
         // else loop on processing the entry
@@ -215,8 +215,8 @@ pub fn process_block_buffer_pool(
         })?;
 
         if slot == 0 {
-            // The first entry in the ledger is a pseudo-tick used only to ensure the number of ticks
-            // in slot 0 is the same as the number of ticks in all subsequent slots.  It is not
+            // The first entry in the ledger is a pseudo-_drop used only to ensure the number of drops
+            // in slot 0 is the same as the number of drops in all subsequent slots.  It is not
             // processed by the treasury, skip over it.
             if entries.is_empty() {
                 // warn!("entry0 not present");
@@ -230,7 +230,7 @@ pub fn process_block_buffer_pool(
                 return Err(BlocktreeProcessorError::LedgerVerificationFailed);
             }
             let entry0 = entries.remove(0);
-            if !(entry0.is_tick() && entry0.verify(&last_entry_hash)) {
+            if !(entry0.is_drop() && entry0.verify(&last_entry_hash)) {
                 // warn!("Ledger proof of history failed at entry0");
                 println!(
                     "{}",
@@ -408,7 +408,7 @@ pub mod tests {
     use super::*;
     use crate::block_buffer_pool::create_new_tmp_ledger;
     use crate::block_buffer_pool::tests::entries_to_blobs;
-    use crate::entry_info::{create_ticks, next_entry, next_entry_mut, Entry};
+    use crate::entry_info::{create_drops, next_entry, next_entry_mut, Entry};
     use crate::genesis_utils::{
         create_genesis_block, create_genesis_block_with_leader, GenesisBlockInfo,
     };
@@ -420,14 +420,14 @@ pub mod tests {
     use morgan_interface::system_transaction;
     use morgan_interface::transaction::TransactionError;
 
-    pub fn fill_block_buffer_pool_slot_with_ticks(
+    pub fn fill_block_buffer_pool_slot_with_drops(
         block_buffer_pool: &BlockBufferPool,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
         slot: u64,
         parent_slot: u64,
         last_entry_hash: Hash,
     ) -> Hash {
-        let entries = create_ticks(ticks_per_slot, last_entry_hash);
+        let entries = create_drops(drops_per_slot, last_entry_hash);
         let last_entry_hash = entries.last().unwrap().hash;
 
         let blobs = entries_to_blobs(&entries, slot, parent_slot, true);
@@ -441,21 +441,21 @@ pub mod tests {
         morgan_logger::setup();
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
+        let drops_per_slot = genesis_block.drops_per_slot;
 
         /*
           Build a block_buffer_pool in the ledger with the following fork structure:
 
-               slot 0 (all ticks)
+               slot 0 (all drops)
                  |
-               slot 1 (all ticks but one)
+               slot 1 (all drops but one)
                  |
-               slot 2 (all ticks)
+               slot 2 (all drops)
 
-           where slot 1 is incomplete (missing 1 tick at the end)
+           where slot 1 is incomplete (missing 1 _drop at the end)
         */
 
-        // Create a new ledger with slot 0 full of ticks
+        // Create a new ledger with slot 0 full of drops
         let (ledger_path, mut transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
 
@@ -463,11 +463,11 @@ pub mod tests {
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to successfully open database ledger");
 
         // Write slot 1
-        // slot 1, points at slot 0.  Missing one tick
+        // slot 1, points at slot 0.  Missing one _drop
         {
             let parent_slot = 0;
             let slot = 1;
-            let mut entries = create_ticks(ticks_per_slot, transaction_seal);
+            let mut entries = create_drops(drops_per_slot, transaction_seal);
             transaction_seal = entries.last().unwrap().hash;
 
             // throw away last one
@@ -478,7 +478,7 @@ pub mod tests {
         }
 
         // slot 2, points at slot 1
-        fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, transaction_seal);
+        fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 2, 1, transaction_seal);
 
         let (mut _treasury_forks, treasury_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
@@ -488,7 +488,7 @@ pub mod tests {
             treasury_forks_info[0],
             TreasuryForksInfo {
                 treasury_slot: 0, // slot 1 isn't "full", we stop at slot zero
-                entry_height: ticks_per_slot,
+                entry_height: drops_per_slot,
             }
         );
     }
@@ -498,9 +498,9 @@ pub mod tests {
         morgan_logger::setup();
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
+        let drops_per_slot = genesis_block.drops_per_slot;
 
-        // Create a new ledger with slot 0 full of ticks
+        // Create a new ledger with slot 0 full of drops
         let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
         let mut last_entry_hash = transaction_seal;
@@ -524,15 +524,15 @@ pub mod tests {
 
         // Fork 1, ending at slot 3
         let last_slot1_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 1, 0, last_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 1, 0, last_entry_hash);
         last_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, last_slot1_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 2, 1, last_slot1_entry_hash);
         let last_fork1_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 3, 2, last_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 3, 2, last_entry_hash);
 
         // Fork 2, ending at slot 4
         let last_fork2_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 4, 1, last_slot1_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 4, 1, last_slot1_entry_hash);
 
         // info!("{}", Info(format!("last_fork1_entry.hash: {:?}", last_fork1_entry_hash).to_string()));
         // info!("{}", Info(format!("last_fork2_entry.hash: {:?}", last_fork2_entry_hash).to_string()));
@@ -561,7 +561,7 @@ pub mod tests {
             treasury_forks_info[0],
             TreasuryForksInfo {
                 treasury_slot: 4, // Fork 2's head is slot 4
-                entry_height: ticks_per_slot * 3,
+                entry_height: drops_per_slot * 3,
             }
         );
         assert!(&treasury_forks[4]
@@ -585,9 +585,9 @@ pub mod tests {
         morgan_logger::setup();
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
+        let drops_per_slot = genesis_block.drops_per_slot;
 
-        // Create a new ledger with slot 0 full of ticks
+        // Create a new ledger with slot 0 full of drops
         let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
         let mut last_entry_hash = transaction_seal;
@@ -611,15 +611,15 @@ pub mod tests {
 
         // Fork 1, ending at slot 3
         let last_slot1_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 1, 0, last_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 1, 0, last_entry_hash);
         last_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 2, 1, last_slot1_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 2, 1, last_slot1_entry_hash);
         let last_fork1_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 3, 2, last_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 3, 2, last_entry_hash);
 
         // Fork 2, ending at slot 4
         let last_fork2_entry_hash =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 4, 1, last_slot1_entry_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 4, 1, last_slot1_entry_hash);
 
         // info!("{}", Info(format!("last_fork1_entry.hash: {:?}", last_fork1_entry_hash).to_string()));
         // info!("{}", Info(format!("last_fork2_entry.hash: {:?}", last_fork2_entry_hash).to_string()));
@@ -648,7 +648,7 @@ pub mod tests {
             treasury_forks_info[0],
             TreasuryForksInfo {
                 treasury_slot: 3, // Fork 1's head is slot 3
-                entry_height: ticks_per_slot * 4,
+                entry_height: drops_per_slot * 4,
             }
         );
         assert_eq!(
@@ -663,7 +663,7 @@ pub mod tests {
             treasury_forks_info[1],
             TreasuryForksInfo {
                 treasury_slot: 4, // Fork 2's head is slot 4
-                entry_height: ticks_per_slot * 3,
+                entry_height: drops_per_slot * 3,
             }
         );
         assert_eq!(
@@ -689,9 +689,9 @@ pub mod tests {
         morgan_logger::setup();
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
+        let drops_per_slot = genesis_block.drops_per_slot;
 
-        // Create a new ledger with slot 0 full of ticks
+        // Create a new ledger with slot 0 full of drops
         let (ledger_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let mut last_entry_hash = transaction_seal;
 
@@ -704,9 +704,9 @@ pub mod tests {
 
         // Create a single chain of slots with all indexes in the range [0, last_slot + 1]
         for i in 1..=last_slot + 1 {
-            last_entry_hash = fill_block_buffer_pool_slot_with_ticks(
+            last_entry_hash = fill_block_buffer_pool_slot_with_drops(
                 &block_buffer_pool,
-                ticks_per_slot,
+                drops_per_slot,
                 i,
                 i - 1,
                 last_entry_hash,
@@ -728,7 +728,7 @@ pub mod tests {
             treasury_forks_info[0],
             TreasuryForksInfo {
                 treasury_slot: last_slot + 1, // Head is last_slot + 1
-                entry_height: ticks_per_slot * (last_slot + 2),
+                entry_height: drops_per_slot * (last_slot + 2),
             }
         );
 
@@ -785,7 +785,7 @@ pub mod tests {
         } = create_genesis_block(2);
         let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
-        let slot_entries = create_ticks(genesis_block.ticks_per_slot - 1, genesis_block.hash());
+        let slot_entries = create_drops(genesis_block.drops_per_slot - 1, genesis_block.hash());
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair.pubkey(),
@@ -847,15 +847,15 @@ pub mod tests {
             entries.push(entry);
         }
 
-        // Fill up the rest of slot 1 with ticks
-        entries.extend(create_ticks(genesis_block.ticks_per_slot, last_entry_hash));
+        // Fill up the rest of slot 1 with drops
+        entries.extend(create_drops(genesis_block.drops_per_slot, last_entry_hash));
 
         let block_buffer_pool =
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to successfully open database ledger");
         block_buffer_pool
-            .update_entries(1, 0, 0, genesis_block.ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, genesis_block.drops_per_slot, &entries)
             .unwrap();
-        let entry_height = genesis_block.ticks_per_slot + entries.len() as u64;
+        let entry_height = genesis_block.drops_per_slot + entries.len() as u64;
         let (treasury_forks, treasury_forks_info, _) =
             process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
 
@@ -874,16 +874,16 @@ pub mod tests {
             treasury.get_balance(&mint_keypair.pubkey()),
             mint - deducted_from_mint
         );
-        assert_eq!(treasury.tick_height(), 2 * genesis_block.ticks_per_slot - 1);
+        assert_eq!(treasury.drop_height(), 2 * genesis_block.drops_per_slot - 1);
         assert_eq!(treasury.last_transaction_seal(), entries.last().unwrap().hash);
     }
 
     #[test]
-    fn test_process_ledger_with_one_tick_per_slot() {
+    fn test_process_ledger_with_one_drop_per_slot() {
         let GenesisBlockInfo {
             mut genesis_block, ..
         } = create_genesis_block(123);
-        genesis_block.ticks_per_slot = 1;
+        genesis_block.drops_per_slot = 1;
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
@@ -899,19 +899,19 @@ pub mod tests {
             }
         );
         let treasury = treasury_forks[0].clone();
-        assert_eq!(treasury.tick_height(), 0);
+        assert_eq!(treasury.drop_height(), 0);
     }
 
     #[test]
-    fn test_process_entries_tick() {
+    fn test_process_entries_drop() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let treasury = Treasury::new(&genesis_block);
 
-        // ensure treasury can process a tick
-        assert_eq!(treasury.tick_height(), 0);
-        let tick = next_entry(&genesis_block.hash(), 1, vec![]);
-        assert_eq!(process_entries(&treasury, &[tick.clone()]), Ok(()));
-        assert_eq!(treasury.tick_height(), 1);
+        // ensure treasury can process a _drop
+        assert_eq!(treasury.drop_height(), 0);
+        let _drop = next_entry(&genesis_block.hash(), 1, vec![]);
+        assert_eq!(process_entries(&treasury, &[_drop.clone()]), Ok(()));
+        assert_eq!(treasury.drop_height(), 1);
     }
 
     #[test]
@@ -927,7 +927,7 @@ pub mod tests {
 
         let transaction_seal = treasury.last_transaction_seal();
 
-        // ensure treasury can process 2 entries that have a common account and no tick is registered
+        // ensure treasury can process 2 entries that have a common account and no _drop is registered
         let tx = system_transaction::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
@@ -1212,7 +1212,7 @@ pub mod tests {
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
 
-        // ensure treasury can process 2 entries that do not have a common account and no tick is registered
+        // ensure treasury can process 2 entries that do not have a common account and no _drop is registered
         let transaction_seal = treasury.last_transaction_seal();
         let tx = system_transaction::create_user_account(
             &keypair1,
@@ -1235,7 +1235,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_process_entries_2_entries_tick() {
+    fn test_process_entries_2_entries_drop() {
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -1265,23 +1265,23 @@ pub mod tests {
 
         let transaction_seal = treasury.last_transaction_seal();
         while transaction_seal == treasury.last_transaction_seal() {
-            treasury.register_tick(&Hash::default());
+            treasury.register_drop(&Hash::default());
         }
 
-        // ensure treasury can process 2 entries that do not have a common account and tick is registered
+        // ensure treasury can process 2 entries that do not have a common account and _drop is registered
         let tx =
             system_transaction::create_user_account(&keypair2, &keypair3.pubkey(), 1, transaction_seal);
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
-        let tick = next_entry(&entry_1.hash, 1, vec![]);
+        let _drop = next_entry(&entry_1.hash, 1, vec![]);
         let tx = system_transaction::create_user_account(
             &keypair1,
             &keypair4.pubkey(),
             1,
             treasury.last_transaction_seal(),
         );
-        let entry_2 = next_entry(&tick.hash, 1, vec![tx]);
+        let entry_2 = next_entry(&_drop.hash, 1, vec![tx]);
         assert_eq!(
-            process_entries(&treasury, &[entry_1.clone(), tick.clone(), entry_2.clone()]),
+            process_entries(&treasury, &[entry_1.clone(), _drop.clone(), entry_2.clone()]),
             Ok(())
         );
         assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
@@ -1462,11 +1462,11 @@ pub mod tests {
             // advance to next block
             process_entries(
                 &treasury,
-                &(0..treasury.ticks_per_slot())
+                &(0..treasury.drops_per_slot())
                     .map(|_| next_entry_mut(&mut hash, 1, vec![]))
                     .collect::<Vec<_>>(),
             )
-            .expect("process ticks failed");
+            .expect("process drops failed");
 
             i += 1;
             treasury = Treasury::new_from_parent(&Arc::new(treasury), &Pubkey::default(), i as u64);

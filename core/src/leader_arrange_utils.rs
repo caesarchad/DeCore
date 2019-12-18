@@ -31,14 +31,14 @@ pub fn slot_leader_at(slot: u64, treasury: &Treasury) -> Option<Pubkey> {
     leader_schedule(epoch, treasury).map(|leader_schedule| leader_schedule[slot_index])
 }
 
-// Returns the number of ticks remaining from the specified tick_height to the end of the
-// slot implied by the tick_height
-pub fn num_ticks_left_in_slot(treasury: &Treasury, tick_height: u64) -> u64 {
-    treasury.ticks_per_slot() - tick_height % treasury.ticks_per_slot() - 1
+// Returns the number of drops remaining from the specified drop_height to the end of the
+// slot implied by the drop_height
+pub fn num_drops_left_in_slot(treasury: &Treasury, drop_height: u64) -> u64 {
+    treasury.drops_per_slot() - drop_height % treasury.drops_per_slot() - 1
 }
 
-pub fn tick_height_to_slot(ticks_per_slot: u64, tick_height: u64) -> u64 {
-    tick_height / ticks_per_slot
+pub fn drop_height_to_slot(drops_per_slot: u64, drop_height: u64) -> u64 {
+    drop_height / drops_per_slot
 }
 
 /// Context for generating single values out of strategies.

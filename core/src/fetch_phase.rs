@@ -5,7 +5,7 @@ use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::streamer::{self, PacketReceiver, PacketSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info};
-use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, RecvTimeoutError};
@@ -90,7 +90,7 @@ impl FetchPhase {
         if waterclock_recorder
             .lock()
             .unwrap()
-            .would_be_leader(DEFAULT_TICKS_PER_SLOT * 2)
+            .would_be_leader(DEFAULT_DROPS_PER_SLOT * 2)
         {
             inc_new_counter_debug!("fetch_phase-honor_forwards", len);
             for packets in batch {

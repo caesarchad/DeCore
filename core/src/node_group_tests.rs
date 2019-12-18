@@ -16,7 +16,7 @@ use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::system_transaction;
 use morgan_interface::timing::{
-    duration_as_ms, DEFAULT_NUM_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT,
+    duration_as_ms, DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT,
     NUM_CONSECUTIVE_LEADER_SLOTS,
 };
 use morgan_interface::transport::TransportError;
@@ -31,7 +31,7 @@ use futures::{
 use std::{fmt::Debug, io};
 use std::{borrow::Cow, convert, ffi::OsStr, path::Path, str};
 
-const DEFAULT_SLOT_MILLIS: u64 = (DEFAULT_TICKS_PER_SLOT * 1000) / DEFAULT_NUM_TICKS_PER_SECOND;
+const DEFAULT_SLOT_MILLIS: u64 = (DEFAULT_DROPS_PER_SLOT * 1000) / DEFAULT_NUM_DROPS_PER_SECOND;
 
 /// Spend and verify from every node in the network
 pub fn spend_and_verify_all_nodes(
@@ -93,7 +93,7 @@ pub fn fullnode_exit(entry_point_info: &ContactInfo, nodes: usize) {
     }
 }
 
-pub fn verify_ledger_ticks(ledger_path: &str, ticks_per_slot: usize) {
+pub fn verify_ledger_drops(ledger_path: &str, drops_per_slot: usize) {
     let ledger = BlockBufferPool::open_ledger_file(ledger_path).unwrap();
     let zeroth_slot = ledger.fetch_slot_entries(0, 0, None).unwrap();
     let last_id = zeroth_slot.last().unwrap().hash;
@@ -110,14 +110,14 @@ pub fn verify_ledger_ticks(ledger_path: &str, ticks_per_slot: usize) {
             .remove(&slot)
             .unwrap();
 
-        // If you're not the last slot, you should have a full set of ticks
-        let should_verify_ticks = if !next_slots.is_empty() {
-            Some((slot - parent_slot) as usize * ticks_per_slot)
+        // If you're not the last slot, you should have a full set of drops
+        let should_verify_drops = if !next_slots.is_empty() {
+            Some((slot - parent_slot) as usize * drops_per_slot)
         } else {
             None
         };
 
-        let last_id = verify_slot_ticks(&ledger, slot, &last_id, should_verify_ticks);
+        let last_id = verify_slot_drops(&ledger, slot, &last_id, should_verify_drops);
         pending_slots.extend(
             next_slots
                 .into_iter()
@@ -166,12 +166,12 @@ pub trait StreamMultiplexer: Debug + Send + Sync {
 pub fn sleep_n_epochs(
     num_epochs: f64,
     config: &WaterClockConfig,
-    ticks_per_slot: u64,
+    drops_per_slot: u64,
     slots_per_epoch: u64,
 ) {
-    let num_ticks_per_second = (1000 / duration_as_ms(&config.target_tick_duration)) as f64;
-    let num_ticks_to_sleep = num_epochs * ticks_per_slot as f64 * slots_per_epoch as f64;
-    let secs = ((num_ticks_to_sleep + num_ticks_per_second - 1.0) / num_ticks_per_second) as u64;
+    let num_drops_per_second = (1000 / duration_as_ms(&config.target_drop_duration)) as f64;
+    let num_drops_to_sleep = num_epochs * drops_per_slot as f64 * slots_per_epoch as f64;
+    let secs = ((num_drops_to_sleep + num_drops_per_second - 1.0) / num_drops_per_second) as u64;
     // warn!("sleep_n_epochs: {} seconds", secs);
     println!(
         "{}",
@@ -327,16 +327,16 @@ fn get_and_verify_slot_entries(block_buffer_pool: &BlockBufferPool, slot: u64, l
     entries
 }
 
-fn verify_slot_ticks(
+fn verify_slot_drops(
     block_buffer_pool: &BlockBufferPool,
     slot: u64,
     last_entry: &Hash,
-    expected_num_ticks: Option<usize>,
+    expected_num_drops: Option<usize>,
 ) -> Hash {
     let entries = get_and_verify_slot_entries(block_buffer_pool, slot, last_entry);
-    let num_ticks: usize = entries.iter().map(|entry| entry.is_tick() as usize).sum();
-    if let Some(expected_num_ticks) = expected_num_ticks {
-        assert_eq!(num_ticks, expected_num_ticks);
+    let num_drops: usize = entries.iter().map(|entry| entry.is_drop() as usize).sum();
+    if let Some(expected_num_drops) = expected_num_drops {
+        assert_eq!(num_drops, expected_num_drops);
     }
     entries.last().unwrap().hash
 }

@@ -45,14 +45,14 @@ impl<'a> Iterator for RootedSlotIterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool_processor::tests::fill_block_buffer_pool_slot_with_ticks;
+    use crate::block_buffer_pool_processor::tests::fill_block_buffer_pool_slot_with_drops;
 
     #[test]
     fn test_rooted_slot_iterator() {
         let block_buffer_pool_path = fetch_interim_ledger_location("test_rooted_slot_iterator");
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
         block_buffer_pool.set_genesis(0, 0).unwrap();
-        let ticks_per_slot = 5;
+        let drops_per_slot = 5;
         /*
             Build a block_buffer_pool in the ledger with the following fork structure:
 
@@ -80,9 +80,9 @@ mod tests {
                     slot - 1
                 }
             };
-            let last_entry_hash = fill_block_buffer_pool_slot_with_ticks(
+            let last_entry_hash = fill_block_buffer_pool_slot_with_drops(
                 &block_buffer_pool,
-                ticks_per_slot,
+                drops_per_slot,
                 slot,
                 parent,
                 last_entry_hash,
@@ -95,7 +95,7 @@ mod tests {
 
         // Fork 2, ending at slot 4
         let _ =
-            fill_block_buffer_pool_slot_with_ticks(&block_buffer_pool, ticks_per_slot, 4, fork_point, fork_hash);
+            fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 4, fork_point, fork_hash);
 
         // Set a root
         block_buffer_pool.set_genesis(3, 0).unwrap();

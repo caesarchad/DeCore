@@ -23,7 +23,7 @@ bootDiskType=""
 blockstreamer=false
 deployUpdateManifest=true
 fetchLogs=true
-maybeHashesPerTick=
+maybeHashesPerDrop=
 
 usage() {
   exitcode=0
@@ -65,8 +65,8 @@ Deploys a CD testnet
    -w                   - Skip time-consuming "bells and whistles" that are
                           unnecessary for a high-node count demo testnet
 
-   --hashes-per-tick NUM_HASHES|sleep|auto
-                        - Override the default --hashes-per-tick for the cluster
+   --hashes-per-_drop NUM_HASHES|sleep|auto
+                        - Override the default --hashes-per-_drop for the cluster
 
    Note: the SOLANA_METRICS_CONFIG environment variable is used to configure
          metrics
@@ -79,8 +79,8 @@ zone=()
 shortArgs=()
 while [[ -n $1 ]]; do
   if [[ ${1:0:2} = -- ]]; then
-    if [[ $1 = --hashes-per-tick ]]; then
-      maybeHashesPerTick="$1 $2"
+    if [[ $1 = --hashes-per-_drop ]]; then
+      maybeHashesPerDrop="$1 $2"
       shift 2
     else
       usage "Unknown long option: $1"
@@ -314,9 +314,9 @@ if ! $skipStart; then
     if [[ -n $NO_INSTALL_CHECK ]]; then
       args+=(-o noInstallCheck)
     fi
-    if [[ -n $maybeHashesPerTick ]]; then
-      # shellcheck disable=SC2206 # Do not want to quote $maybeHashesPerTick
-      args+=($maybeHashesPerTick)
+    if [[ -n $maybeHashesPerDrop ]]; then
+      # shellcheck disable=SC2206 # Do not want to quote $maybeHashesPerDrop
+      args+=($maybeHashesPerDrop)
     fi
 
     if $reuseLedger; then

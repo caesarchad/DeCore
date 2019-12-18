@@ -1,14 +1,14 @@
 //! The `waterclock_recorder` module provides an object for synchronizing with Proof of History.
-//! It synchronizes Water Clock, treasury's register_tick and the ledger
+//! It synchronizes Water Clock, treasury's register_drop and the ledger
 //!
-//! WaterClockRecorder will send ticks or entries to a WorkingTreasury, if the current range of ticks is
+//! WaterClockRecorder will send drops or entries to a WorkingTreasury, if the current range of drops is
 //! within the specified WorkingTreasury range.
 //!
-//! For Ticks:
-//! * tick must be > WorkingTreasury::min_tick_height && tick must be <= WorkingTreasury::max_tick_height
+//! For Drops:
+//! * _drop must be > WorkingTreasury::min_drop_height && _drop must be <= WorkingTreasury::max_drop_height
 //!
 //! For Entries:
-//! * recorded entry must be >= WorkingTreasury::min_tick_height && entry must be < WorkingTreasury::max_tick_height
+//! * recorded entry must be >= WorkingTreasury::min_drop_height && entry must be < WorkingTreasury::max_drop_height
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::Entry;
@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use morgan_helper::logHelper::*;
 
-const MAX_LAST_LEADER_GRACE_TICKS_FACTOR: u64 = 2;
+const MAX_LAST_LEADER_GRACE_DROPS_FACTOR: u64 = 2;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum WaterClockRecorderErr {
@@ -41,27 +41,27 @@ pub type WorkingTreasuryEntries = (Arc<Treasury>, Vec<(Entry, u64)>);
 #[derive(Clone)]
 pub struct WorkingTreasury {
     pub treasury: Arc<Treasury>,
-    pub min_tick_height: u64,
-    pub max_tick_height: u64,
+    pub min_drop_height: u64,
+    pub max_drop_height: u64,
 }
 
 pub struct WaterClockRecorder {
     pub waterclock: Arc<Mutex<WaterClock>>,
-    tick_height: u64,
+    drop_height: u64,
     clear_treasury_signal: Option<SyncSender<bool>>,
     start_slot: u64,
-    start_tick: u64,
-    tick_cache: Vec<(Entry, u64)>,
+    start_drop: u64,
+    drop_cache: Vec<(Entry, u64)>,
     working_treasury: Option<WorkingTreasury>,
     sender: Sender<WorkingTreasuryEntries>,
-    start_leader_at_tick: Option<u64>,
-    last_leader_tick: Option<u64>,
-    max_last_leader_grace_ticks: u64,
+    start_leader_at_drop: Option<u64>,
+    last_leader_drop: Option<u64>,
+     max_last_leader_grace_drops: u64,
     id: Pubkey,
     block_buffer_pool: Arc<BlockBufferPool>,
     leader_schedule_cache: Arc<LeaderScheduleCache>,
     waterclock_config: Arc<WaterClockConfig>,
-    ticks_per_slot: u64,
+    drops_per_slot: u64,
 }
 
 impl WaterClockRecorder {
@@ -74,35 +74,35 @@ impl WaterClockRecorder {
                 &treasury,
                 Some(&self.block_buffer_pool),
             );
-            let (start_leader_at_tick, last_leader_tick) = Self::compute_leader_slot_ticks(
+            let (start_leader_at_drop, last_leader_drop) = Self::compute_leader_slot_drops(
                 &next_leader_slot,
-                treasury.ticks_per_slot(),
-                self.max_last_leader_grace_ticks,
+                treasury.drops_per_slot(),
+                self. max_last_leader_grace_drops,
             );
-            self.start_leader_at_tick = start_leader_at_tick;
-            self.last_leader_tick = last_leader_tick;
+            self.start_leader_at_drop = start_leader_at_drop;
+            self.last_leader_drop = last_leader_drop;
         }
         if let Some(ref signal) = self.clear_treasury_signal {
             let _ = signal.try_send(true);
         }
     }
 
-    pub fn would_be_leader(&self, within_next_n_ticks: u64) -> bool {
-        let close_to_leader_tick = self.start_leader_at_tick.map_or(false, |leader_tick| {
-            let leader_pubkeyeal_start_tick =
-                leader_tick.saturating_sub(self.max_last_leader_grace_ticks);
+    pub fn would_be_leader(&self, within_next_n_drops: u64) -> bool {
+        let close_to_leader_drop = self.start_leader_at_drop.map_or(false, |leader_drop| {
+            let leader_pubkeyeal_start_drop =
+                leader_drop.saturating_sub(self. max_last_leader_grace_drops);
 
-            self.tick_height() <= self.last_leader_tick.unwrap_or(0)
-                && self.tick_height()
-                    >= leader_pubkeyeal_start_tick.saturating_sub(within_next_n_ticks)
+            self.drop_height() <= self.last_leader_drop.unwrap_or(0)
+                && self.drop_height()
+                    >= leader_pubkeyeal_start_drop.saturating_sub(within_next_n_drops)
         });
 
-        self.working_treasury.is_some() || close_to_leader_tick
+        self.working_treasury.is_some() || close_to_leader_drop
     }
 
     pub fn next_slot_leader(&self) -> Option<Pubkey> {
         let slot =
-            leader_arrange_utils::tick_height_to_slot(self.ticks_per_slot, self.tick_height());
+            leader_arrange_utils::drop_height_to_slot(self.drops_per_slot, self.drop_height());
         self.leader_schedule_cache.slot_leader_at(slot + 1, None)
     }
 
@@ -114,36 +114,36 @@ impl WaterClockRecorder {
         self.working_treasury.clone().map(|w| w.treasury)
     }
 
-    pub fn tick_height(&self) -> u64 {
-        self.tick_height
+    pub fn drop_height(&self) -> u64 {
+        self.drop_height
     }
 
-    // returns if leader tick has reached, and how many grace ticks were afforded
-    pub fn reached_leader_tick(&self) -> (bool, u64) {
-        self.start_leader_at_tick
-            .map(|target_tick| {
+    // returns if leader _drop has reached, and how many grace drops were afforded
+    pub fn reached_leader_drop(&self) -> (bool, u64) {
+        self.start_leader_at_drop
+            .map(|target_drop| {
                 debug!(
-                    "Current tick {}, start tick {} target {}, grace {}",
-                    self.tick_height(),
-                    self.start_tick,
-                    target_tick,
-                    self.max_last_leader_grace_ticks
+                    "Current _drop {}, start _drop {} target {}, grace {}",
+                    self.drop_height(),
+                    self.start_drop,
+                    target_drop,
+                    self. max_last_leader_grace_drops
                 );
 
-                let leader_pubkeyeal_start_tick =
-                    target_tick.saturating_sub(self.max_last_leader_grace_ticks);
-                // Is the current tick in the same slot as the target tick?
+                let leader_pubkeyeal_start_drop =
+                    target_drop.saturating_sub(self. max_last_leader_grace_drops);
+                // Is the current _drop in the same slot as the target _drop?
                 // Check if either grace period has expired,
-                // or target tick is = grace period (i.e. waterclock recorder was just reset)
-                if self.tick_height() <= self.last_leader_tick.unwrap_or(0)
-                    && (self.tick_height() >= target_tick
-                        || self.max_last_leader_grace_ticks
-                            >= target_tick.saturating_sub(self.start_tick))
+                // or target _drop is = grace period (i.e. waterclock recorder was just reset)
+                if self.drop_height() <= self.last_leader_drop.unwrap_or(0)
+                    && (self.drop_height() >= target_drop
+                        || self. max_last_leader_grace_drops
+                            >= target_drop.saturating_sub(self.start_drop))
                 {
                     return (
                         true,
-                        self.tick_height()
-                            .saturating_sub(leader_pubkeyeal_start_tick),
+                        self.drop_height()
+                            .saturating_sub(leader_pubkeyeal_start_drop),
                     );
                 }
 
@@ -152,16 +152,16 @@ impl WaterClockRecorder {
             .unwrap_or((false, 0))
     }
 
-    fn compute_leader_slot_ticks(
+    fn compute_leader_slot_drops(
         next_leader_slot: &Option<u64>,
-        ticks_per_slot: u64,
-        grace_ticks: u64,
+        drops_per_slot: u64,
+        grace_drops: u64,
     ) -> (Option<u64>, Option<u64>) {
         next_leader_slot
             .map(|slot| {
                 (
-                    Some(slot * ticks_per_slot + grace_ticks),
-                    Some((slot + 1) * ticks_per_slot - 1),
+                    Some(slot * drops_per_slot + grace_drops),
+                    Some((slot + 1) * drops_per_slot - 1),
                 )
             })
             .unwrap_or((None, None))
@@ -170,11 +170,11 @@ impl WaterClockRecorder {
     // synchronize Water Clock with a treasury
     pub fn reset(
         &mut self,
-        tick_height: u64,
+        drop_height: u64,
         transaction_seal: Hash,
         start_slot: u64,
         my_next_leader_slot: Option<u64>,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
     ) {
         self.clear_treasury();
         let mut cache = vec![];
@@ -183,33 +183,33 @@ impl WaterClockRecorder {
             // info!(
             //     "{}",
             //     Info(format!("reset waterclock from: {},{} to: {},{}",
-            //     waterclock.hash, self.tick_height, transaction_seal, tick_height,).to_string())
+            //     waterclock.hash, self.drop_height, transaction_seal, drop_height,).to_string())
             // );
             let info:String = format!(
                 "reset water clock from: {},{} to: {},{}",
                 waterclock.hash,
-                self.tick_height,
+                self.drop_height,
                 transaction_seal,
-                tick_height
+                drop_height
             ).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
 
-            waterclock.reset(transaction_seal, self.waterclock_config.hashes_per_tick);
+            waterclock.reset(transaction_seal, self.waterclock_config.hashes_per_drop);
         }
 
-        std::mem::swap(&mut cache, &mut self.tick_cache);
+        std::mem::swap(&mut cache, &mut self.drop_cache);
         self.start_slot = start_slot;
-        self.start_tick = tick_height + 1;
-        self.tick_height = tick_height;
-        self.max_last_leader_grace_ticks = ticks_per_slot / MAX_LAST_LEADER_GRACE_TICKS_FACTOR;
-        let (start_leader_at_tick, last_leader_tick) = Self::compute_leader_slot_ticks(
+        self.start_drop = drop_height + 1;
+        self.drop_height = drop_height;
+        self. max_last_leader_grace_drops = drops_per_slot / MAX_LAST_LEADER_GRACE_DROPS_FACTOR;
+        let (start_leader_at_drop, last_leader_drop) = Self::compute_leader_slot_drops(
             &my_next_leader_slot,
-            ticks_per_slot,
-            self.max_last_leader_grace_ticks,
+            drops_per_slot,
+            self. max_last_leader_grace_drops,
         );
-        self.start_leader_at_tick = start_leader_at_tick;
-        self.last_leader_tick = last_leader_tick;
-        self.ticks_per_slot = ticks_per_slot;
+        self.start_leader_at_drop = start_leader_at_drop;
+        self.last_leader_drop = last_leader_drop;
+        self.drops_per_slot = drops_per_slot;
     }
 
     pub fn set_working_treasury(&mut self, working_treasury: WorkingTreasury) {
@@ -217,64 +217,64 @@ impl WaterClockRecorder {
         self.working_treasury = Some(working_treasury);
     }
     pub fn set_treasury(&mut self, treasury: &Arc<Treasury>) {
-        let max_tick_height = (treasury.slot() + 1) * treasury.ticks_per_slot() - 1;
+        let max_drop_height = (treasury.slot() + 1) * treasury.drops_per_slot() - 1;
         let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
-            min_tick_height: treasury.tick_height(),
-            max_tick_height,
+            min_drop_height: treasury.drop_height(),
+            max_drop_height,
         };
-        self.ticks_per_slot = treasury.ticks_per_slot();
+        self.drops_per_slot = treasury.drops_per_slot();
         self.set_working_treasury(working_treasury);
     }
 
-    // Flush cache will delay flushing the cache for a treasury until it past the WorkingTreasury::min_tick_height
-    // On a record flush will flush the cache at the WorkingTreasury::min_tick_height, since a record
-    // occurs after the min_tick_height was generated
-    fn flush_cache(&mut self, tick: bool) -> Result<()> {
-        // check_tick_height is called before flush cache, so it cannot overrun the treasury
+    // Flush cache will delay flushing the cache for a treasury until it past the WorkingTreasury::min_drop_height
+    // On a record flush will flush the cache at the WorkingTreasury::min_drop_height, since a record
+    // occurs after the min_drop_height was generated
+    fn flush_cache(&mut self, _drop: bool) -> Result<()> {
+        // check_drop_height is called before flush cache, so it cannot overrun the treasury
         // so a treasury that is so late that it's slot fully generated before it starts recording
-        // will fail instead of broadcasting any ticks
+        // will fail instead of broadcasting any drops
         let working_treasury = self
             .working_treasury
             .as_ref()
             .ok_or(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))?;
-        if self.tick_height < working_treasury.min_tick_height {
+        if self.drop_height < working_treasury.min_drop_height {
             return Err(Error::WaterClockRecorderErr(
                 WaterClockRecorderErr::MinHeightNotReached,
             ));
         }
-        if tick && self.tick_height == working_treasury.min_tick_height {
+        if _drop && self.drop_height == working_treasury.min_drop_height {
             return Err(Error::WaterClockRecorderErr(
                 WaterClockRecorderErr::MinHeightNotReached,
             ));
         }
 
         let entry_count = self
-            .tick_cache
+            .drop_cache
             .iter()
-            .take_while(|x| x.1 <= working_treasury.max_tick_height)
+            .take_while(|x| x.1 <= working_treasury.max_drop_height)
             .count();
         let send_result = if entry_count > 0 {
             debug!(
-                "flush_cache: treasury_slot: {} tick_height: {} max: {} sending: {}",
+                "flush_cache: treasury_slot: {} drop_height: {} max: {} sending: {}",
                 working_treasury.treasury.slot(),
-                working_treasury.treasury.tick_height(),
-                working_treasury.max_tick_height,
+                working_treasury.treasury.drop_height(),
+                working_treasury.max_drop_height,
                 entry_count,
             );
-            let cache = &self.tick_cache[..entry_count];
+            let cache = &self.drop_cache[..entry_count];
             for t in cache {
-                working_treasury.treasury.register_tick(&t.0.hash);
+                working_treasury.treasury.register_drop(&t.0.hash);
             }
             self.sender
                 .send((working_treasury.treasury.clone(), cache.to_vec()))
         } else {
             Ok(())
         };
-        if self.tick_height >= working_treasury.max_tick_height {
+        if self.drop_height >= working_treasury.max_drop_height {
             // info!(
             //     "{}",
-            //     Info(format!("waterclock_record: max_tick_height reached, setting working treasury {} to None",
+            //     Info(format!("waterclock_record: max_drop_height reached, setting working treasury {} to None",
             //     working_treasury.treasury.slot()).to_string())
             // );
             let info:String = format!(
@@ -283,8 +283,8 @@ impl WaterClockRecorder {
             ).to_string();
             println!("{}", printLn(info, module_path!().to_string()));
 
-            self.start_slot = working_treasury.max_tick_height / working_treasury.treasury.ticks_per_slot();
-            self.start_tick = (self.start_slot + 1) * working_treasury.treasury.ticks_per_slot();
+            self.start_slot = working_treasury.max_drop_height / working_treasury.treasury.drops_per_slot();
+            self.start_drop = (self.start_slot + 1) * working_treasury.treasury.drops_per_slot();
             self.clear_treasury();
         }
         if send_result.is_err() {
@@ -299,29 +299,29 @@ impl WaterClockRecorder {
             self.clear_treasury();
         } else {
             // commit the flush
-            let _ = self.tick_cache.drain(..entry_count);
+            let _ = self.drop_cache.drain(..entry_count);
         }
 
         Ok(())
     }
 
-    pub fn tick(&mut self) {
+    pub fn _drop(&mut self) {
         let now = Instant::now();
-        let waterclock_entry = self.waterclock.lock().unwrap().tick();
+        let waterclock_entry = self.waterclock.lock().unwrap()._drop();
         inc_new_counter_warn!(
-            "waterclock_recorder-tick_lock_contention",
+            "waterclock_recorder-drop_lock_contention",
             timing::duration_as_ms(&now.elapsed()) as usize,
             0,
             1000
         );
         let now = Instant::now();
         if let Some(waterclock_entry) = waterclock_entry {
-            self.tick_height += 1;
-            trace!("tick {}", self.tick_height);
+            self.drop_height += 1;
+            trace!("_drop {}", self.drop_height);
 
-            if self.start_leader_at_tick.is_none() {
+            if self.start_leader_at_drop.is_none() {
                 inc_new_counter_warn!(
-                    "waterclock_recorder-tick_overhead",
+                    "waterclock_recorder-drop_overhead",
                     timing::duration_as_ms(&now.elapsed()) as usize,
                     0,
                     1000
@@ -335,11 +335,11 @@ impl WaterClockRecorder {
                 transactions: vec![],
             };
 
-            self.tick_cache.push((entry, self.tick_height));
+            self.drop_cache.push((entry, self.drop_height));
             let _ = self.flush_cache(true);
         }
         inc_new_counter_warn!(
-            "waterclock_recorder-tick_overhead",
+            "waterclock_recorder-drop_overhead",
             timing::duration_as_ms(&now.elapsed()) as usize,
             0,
             1000
@@ -380,22 +380,22 @@ impl WaterClockRecorder {
                     transactions,
                 };
                 self.sender
-                    .send((working_treasury.treasury.clone(), vec![(entry, self.tick_height)]))?;
+                    .send((working_treasury.treasury.clone(), vec![(entry, self.drop_height)]))?;
                 return Ok(());
             }
-            // record() might fail if the next Water Clock hash needs to be a tick.  But that's ok, tick()
+            // record() might fail if the next Water Clock hash needs to be a _drop.  But that's ok, _drop()
             // and re-record()
-            self.tick();
+            self._drop();
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_clear_signal(
-        tick_height: u64,
+        drop_height: u64,
         last_entry_hash: Hash,
         start_slot: u64,
         my_leader_slot_index: Option<u64>,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
         id: &Pubkey,
         block_buffer_pool: &Arc<BlockBufferPool>,
         clear_treasury_signal: Option<SyncSender<bool>>,
@@ -404,32 +404,32 @@ impl WaterClockRecorder {
     ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         let waterclock = Arc::new(Mutex::new(WaterClock::new(
             last_entry_hash,
-            waterclock_config.hashes_per_tick,
+            waterclock_config.hashes_per_drop,
         )));
         let (sender, receiver) = channel();
-        let max_last_leader_grace_ticks = ticks_per_slot / MAX_LAST_LEADER_GRACE_TICKS_FACTOR;
-        let (start_leader_at_tick, last_leader_tick) = Self::compute_leader_slot_ticks(
+        let  max_last_leader_grace_drops = drops_per_slot / MAX_LAST_LEADER_GRACE_DROPS_FACTOR;
+        let (start_leader_at_drop, last_leader_drop) = Self::compute_leader_slot_drops(
             &my_leader_slot_index,
-            ticks_per_slot,
-            max_last_leader_grace_ticks,
+            drops_per_slot,
+             max_last_leader_grace_drops,
         );
         (
             Self {
                 waterclock,
-                tick_height,
-                tick_cache: vec![],
+                drop_height,
+                drop_cache: vec![],
                 working_treasury: None,
                 sender,
                 clear_treasury_signal,
                 start_slot,
-                start_tick: tick_height + 1,
-                start_leader_at_tick,
-                last_leader_tick,
-                max_last_leader_grace_ticks,
+                start_drop: drop_height + 1,
+                start_leader_at_drop,
+                last_leader_drop,
+                 max_last_leader_grace_drops,
                 id: *id,
                 block_buffer_pool: block_buffer_pool.clone(),
                 leader_schedule_cache: leader_schedule_cache.clone(),
-                ticks_per_slot,
+                drops_per_slot,
                 waterclock_config: waterclock_config.clone(),
             },
             receiver,
@@ -437,25 +437,25 @@ impl WaterClockRecorder {
     }
 
     /// A recorder to synchronize Water Clock with the following data structures
-    /// * treasury - the LastId's queue is updated on `tick` and `record` events
+    /// * treasury - the LastId's queue is updated on `_drop` and `record` events
     /// * sender - the Entry channel that outputs to the ledger
     pub fn new(
-        tick_height: u64,
+        drop_height: u64,
         last_entry_hash: Hash,
         start_slot: u64,
         my_leader_slot_index: Option<u64>,
-        ticks_per_slot: u64,
+        drops_per_slot: u64,
         id: &Pubkey,
         block_buffer_pool: &Arc<BlockBufferPool>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         waterclock_config: &Arc<WaterClockConfig>,
     ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         Self::new_with_clear_signal(
-            tick_height,
+            drop_height,
             last_entry_hash,
             start_slot,
             my_leader_slot_index,
-            ticks_per_slot,
+            drops_per_slot,
             id,
             block_buffer_pool,
             None,
@@ -472,11 +472,11 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::test_tx::test_tx;
     use morgan_interface::hash::hash;
-    use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+    use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
     use std::sync::mpsc::sync_channel;
 
     #[test]
-    fn test_waterclock_recorder_no_zero_tick() {
+    fn test_waterclock_recorder_no_zero_drop() {
         let prev_hash = Hash::default();
         let ledger_path = fetch_interim_ledger_location!();
         {
@@ -488,22 +488,22 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 1);
-            assert_eq!(waterclock_recorder.tick_cache[0].1, 1);
-            assert_eq!(waterclock_recorder.tick_height, 1);
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 1);
+            assert_eq!(waterclock_recorder.drop_cache[0].1, 1);
+            assert_eq!(waterclock_recorder.drop_height, 1);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
 
     #[test]
-    fn test_waterclock_recorder_tick_height_is_last_tick() {
+    fn test_waterclock_recorder_drop_height_is_last_drop() {
         let prev_hash = Hash::default();
         let ledger_path = fetch_interim_ledger_location!();
         {
@@ -515,17 +515,17 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 2);
-            assert_eq!(waterclock_recorder.tick_cache[1].1, 2);
-            assert_eq!(waterclock_recorder.tick_height, 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 2);
+            assert_eq!(waterclock_recorder.drop_cache[1].1, 2);
+            assert_eq!(waterclock_recorder.drop_height, 2);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -541,16 +541,16 @@ mod tests {
                 Hash::default(),
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 1);
-            waterclock_recorder.reset(0, Hash::default(), 0, Some(4), DEFAULT_TICKS_PER_SLOT);
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 1);
+            waterclock_recorder.reset(0, Hash::default(), 0, Some(4), DEFAULT_DROPS_PER_SLOT);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -569,7 +569,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -578,8 +578,8 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury,
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
             assert!(waterclock_recorder.working_treasury.is_some());
@@ -590,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn test_waterclock_recorder_tick_sent_after_min() {
+    fn test_waterclock_recorder_drop_sent_after_min() {
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
@@ -603,7 +603,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -612,21 +612,21 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            //tick height equal to min_tick_height
-            //no tick has been sent
-            assert_eq!(waterclock_recorder.tick_cache.last().unwrap().1, 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            //_drop height equal to min_drop_height
+            //no _drop has been sent
+            assert_eq!(waterclock_recorder.drop_cache.last().unwrap().1, 2);
             assert!(entry_receiver.try_recv().is_err());
 
-            // all ticks are sent after height > min
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_height, 3);
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
+            // all drops are sent after height > min
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_height, 3);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
             let (treasury_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
             assert_eq!(treasury_.slot(), treasury.slot());
@@ -636,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    fn test_waterclock_recorder_tick_sent_upto_and_including_max() {
+    fn test_waterclock_recorder_drop_sent_upto_and_including_max() {
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
@@ -649,29 +649,29 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.last().unwrap().1, 4);
-            assert_eq!(waterclock_recorder.tick_height, 4);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.last().unwrap().1, 4);
+            assert_eq!(waterclock_recorder.drop_height, 4);
 
             let working_treasury = WorkingTreasury {
                 treasury,
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
+            waterclock_recorder._drop();
 
-            assert_eq!(waterclock_recorder.tick_height, 5);
+            assert_eq!(waterclock_recorder.drop_height, 5);
             assert!(waterclock_recorder.working_treasury.is_none());
             let (_, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 3);
@@ -693,7 +693,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -702,11 +702,11 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
+            waterclock_recorder._drop();
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
@@ -731,7 +731,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -740,13 +740,13 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 1,
-                max_tick_height: 2,
+                min_drop_height: 1,
+                max_drop_height: 2,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 1);
-            assert_eq!(waterclock_recorder.tick_height, 1);
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 1);
+            assert_eq!(waterclock_recorder.drop_height, 1);
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert_matches!(
@@ -771,7 +771,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -780,26 +780,26 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 1,
-                max_tick_height: 2,
+                min_drop_height: 1,
+                max_drop_height: 2,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 1);
-            assert_eq!(waterclock_recorder.tick_height, 1);
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 1);
+            assert_eq!(waterclock_recorder.drop_height, 1);
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
                 .record(treasury.slot(), h1, vec![tx.clone()])
                 .is_ok());
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
 
-            //tick in the cache + entry
+            //_drop in the cache + entry
             let (_b, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 1);
-            assert!(e[0].0.is_tick());
+            assert!(e[0].0.is_drop());
             let (_b, e) = entry_receiver.recv().expect("recv 2");
-            assert!(!e[0].0.is_tick());
+            assert!(!e[0].0.is_drop());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -818,7 +818,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -827,13 +827,13 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 1,
-                max_tick_height: 2,
+                min_drop_height: 1,
+                max_drop_height: 2,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_height, 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_height, 2);
             let tx = test_tx();
             let h1 = hash(b"hello world!");
             assert!(waterclock_recorder
@@ -842,8 +842,8 @@ mod tests {
 
             let (_treasury, e) = entry_receiver.recv().expect("recv 1");
             assert_eq!(e.len(), 2);
-            assert!(e[0].0.is_tick());
-            assert!(e[1].0.is_tick());
+            assert!(e[0].0.is_drop());
+            assert!(e[1].0.is_drop());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -862,7 +862,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -871,17 +871,17 @@ mod tests {
 
             let working_treasury = WorkingTreasury {
                 treasury,
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_height, 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_height, 2);
             drop(entry_receiver);
-            waterclock_recorder.tick();
+            waterclock_recorder._drop();
             assert!(waterclock_recorder.working_treasury.is_none());
-            assert_eq!(waterclock_recorder.tick_cache.len(), 3);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 3);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -897,24 +897,24 @@ mod tests {
                 Hash::default(),
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 2);
             let hash = waterclock_recorder.waterclock.lock().unwrap().hash;
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height,
+                waterclock_recorder.drop_height,
                 hash,
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
             );
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -930,23 +930,23 @@ mod tests {
                 Hash::default(),
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 2);
             waterclock_recorder.reset(
-                waterclock_recorder.tick_cache[0].1,
-                waterclock_recorder.tick_cache[0].0.hash,
+                waterclock_recorder.drop_cache[0].1,
+                waterclock_recorder.drop_cache[0].0.hash,
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
             );
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -962,21 +962,21 @@ mod tests {
                 Hash::default(),
                 0,
                 Some(4),
-                DEFAULT_TICKS_PER_SLOT,
+                DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_cache.len(), 3);
-            assert_eq!(waterclock_recorder.tick_height, 3);
-            waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), DEFAULT_TICKS_PER_SLOT);
-            assert_eq!(waterclock_recorder.tick_cache.len(), 0);
-            waterclock_recorder.tick();
-            assert_eq!(waterclock_recorder.tick_height, 2);
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_cache.len(), 3);
+            assert_eq!(waterclock_recorder.drop_height, 3);
+            waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), DEFAULT_DROPS_PER_SLOT);
+            assert_eq!(waterclock_recorder.drop_cache.len(), 0);
+            waterclock_recorder._drop();
+            assert_eq!(waterclock_recorder.drop_height, 2);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -994,20 +994,20 @@ mod tests {
                 Hash::default(),
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
-            let ticks_per_slot = treasury.ticks_per_slot();
+            let drops_per_slot = treasury.drops_per_slot();
             let working_treasury = WorkingTreasury {
                 treasury,
-                min_tick_height: 2,
-                max_tick_height: 3,
+                min_drop_height: 2,
+                max_drop_height: 3,
             };
             waterclock_recorder.set_working_treasury(working_treasury);
-            waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), ticks_per_slot);
+            waterclock_recorder.reset(1, hash(b"hello"), 0, Some(4), drops_per_slot);
             assert!(waterclock_recorder.working_treasury.is_none());
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
@@ -1027,7 +1027,7 @@ mod tests {
                 Hash::default(),
                 0,
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 Some(sender),
@@ -1047,11 +1047,11 @@ mod tests {
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
-            let ticks_per_slot = 5;
+            let drops_per_slot = 5;
             let GenesisBlockInfo {
                 mut genesis_block, ..
             } = create_genesis_block(2);
-            genesis_block.ticks_per_slot = ticks_per_slot;
+            genesis_block.drops_per_slot = drops_per_slot;
             let treasury = Arc::new(Treasury::new(&genesis_block));
 
             let prev_hash = treasury.last_transaction_seal();
@@ -1060,7 +1060,7 @@ mod tests {
                 prev_hash,
                 0,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -1068,16 +1068,16 @@ mod tests {
             );
 
             let end_slot = 3;
-            let max_tick_height = (end_slot + 1) * ticks_per_slot - 1;
+            let max_drop_height = (end_slot + 1) * drops_per_slot - 1;
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: 1,
-                max_tick_height,
+                min_drop_height: 1,
+                max_drop_height,
             };
 
             waterclock_recorder.set_working_treasury(working_treasury);
-            for _ in 0..max_tick_height {
-                waterclock_recorder.tick();
+            for _ in 0..max_drop_height {
+                waterclock_recorder._drop();
             }
 
             let tx = test_tx();
@@ -1093,7 +1093,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reached_leader_tick() {
+    fn test_reached_leader_drop() {
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
@@ -1106,150 +1106,150 @@ mod tests {
                 prev_hash,
                 0,
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            // Test that with no leader slot, we don't reach the leader tick
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            // Test that with no leader slot, we don't reach the leader _drop
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
 
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 0,
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
-            // Test that with no leader slot in reset(), we don't reach the leader tick
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            // Test that with no leader slot in reset(), we don't reach the leader _drop
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
 
             // Provide a leader slot 1 slot down
             waterclock_recorder.reset(
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 treasury.last_transaction_seal(),
                 0,
                 Some(2),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
-            let init_ticks = waterclock_recorder.tick_height();
+            let init_drops = waterclock_recorder.drop_height();
 
-            // Send one slot worth of ticks
-            for _ in 0..treasury.ticks_per_slot() {
-                waterclock_recorder.tick();
+            // Send one slot worth of drops
+            for _ in 0..treasury.drops_per_slot() {
+                waterclock_recorder._drop();
             }
 
-            // Tick should be recorded
+            // Drop should be recorded
             assert_eq!(
-                waterclock_recorder.tick_height(),
-                init_ticks + treasury.ticks_per_slot()
+                waterclock_recorder.drop_height(),
+                init_drops + treasury.drops_per_slot()
             );
 
-            // Test that we don't reach the leader tick because of grace ticks
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            // Test that we don't reach the leader _drop because of grace drops
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
 
-            // reset waterclock now. it should discard the grace ticks wait
+            // reset waterclock now. it should discard the grace drops wait
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 1,
                 Some(2),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
-            // without sending more ticks, we should be leader now
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
-            assert_eq!(waterclock_recorder.reached_leader_tick().1, 0);
+            // without sending more drops, we should be leader now
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, true);
+            assert_eq!(waterclock_recorder.reached_leader_drop().1, 0);
 
-            // Now test that with grace ticks we can reach leader ticks
+            // Now test that with grace drops we can reach leader drops
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 2,
                 Some(3),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
-            // Send one slot worth of ticks
-            for _ in 0..treasury.ticks_per_slot() {
-                waterclock_recorder.tick();
+            // Send one slot worth of drops
+            for _ in 0..treasury.drops_per_slot() {
+                waterclock_recorder._drop();
             }
 
             // We are not the leader yet, as expected
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
 
-            // Send 1 less tick than the grace ticks
-            for _ in 0..treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR - 1 {
-                waterclock_recorder.tick();
+            // Send 1 less _drop than the grace drops
+            for _ in 0..treasury.drops_per_slot() / MAX_LAST_LEADER_GRACE_DROPS_FACTOR - 1 {
+                waterclock_recorder._drop();
             }
             // We are still not the leader
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
 
-            // Send one more tick
-            waterclock_recorder.tick();
+            // Send one more _drop
+            waterclock_recorder._drop();
 
             // We should be the leader now
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, true);
             assert_eq!(
-                waterclock_recorder.reached_leader_tick().1,
-                treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR
+                waterclock_recorder.reached_leader_drop().1,
+                treasury.drops_per_slot() / MAX_LAST_LEADER_GRACE_DROPS_FACTOR
             );
 
-            // Let's test that correct grace ticks are reported
+            // Let's test that correct grace drops are reported
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 3,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
-            // Send remaining ticks for the slot (remember we sent extra ticks in the previous part of the test)
+            // Send remaining drops for the slot (remember we sent extra drops in the previous part of the test)
             for _ in
-                treasury.ticks_per_slot() / MAX_LAST_LEADER_GRACE_TICKS_FACTOR..treasury.ticks_per_slot()
+                treasury.drops_per_slot() / MAX_LAST_LEADER_GRACE_DROPS_FACTOR..treasury.drops_per_slot()
             {
-                waterclock_recorder.tick();
+                waterclock_recorder._drop();
             }
 
-            // Send one extra tick before resetting (so that there's one grace tick)
-            waterclock_recorder.tick();
+            // Send one extra _drop before resetting (so that there's one grace _drop)
+            waterclock_recorder._drop();
 
             // We are not the leader yet, as expected
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 3,
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
-            // without sending more ticks, we should be leader now
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, true);
-            assert_eq!(waterclock_recorder.reached_leader_tick().1, 1);
+            // without sending more drops, we should be leader now
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, true);
+            assert_eq!(waterclock_recorder.reached_leader_drop().1, 1);
 
-            // Let's test that if a node overshoots the ticks for its target
-            // leader slot, reached_leader_tick() will return false
+            // Let's test that if a node overshoots the drops for its target
+            // leader slot, reached_leader_drop() will return false
             // Set the leader slot 1 slot down
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 4,
                 Some(5),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
-            // Send remaining ticks for the slot (remember we sent extra ticks in the previous part of the test)
-            for _ in 0..4 * treasury.ticks_per_slot() {
-                waterclock_recorder.tick();
+            // Send remaining drops for the slot (remember we sent extra drops in the previous part of the test)
+            for _ in 0..4 * treasury.drops_per_slot() {
+                waterclock_recorder._drop();
             }
 
             // We are not the leader, as expected
-            assert_eq!(waterclock_recorder.reached_leader_tick().0, false);
+            assert_eq!(waterclock_recorder.reached_leader_drop().0, false);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1268,62 +1268,62 @@ mod tests {
                 prev_hash,
                 0,
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
-            // Test that with no leader slot, we don't reach the leader tick
+            // Test that with no leader slot, we don't reach the leader _drop
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.drops_per_slot()),
                 false
             );
 
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 0,
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.drops_per_slot()),
                 false
             );
 
             // We reset with leader slot after 3 slots
             waterclock_recorder.reset(
-                waterclock_recorder.tick_height(),
+                waterclock_recorder.drop_height(),
                 treasury.last_transaction_seal(),
                 0,
                 Some(treasury.slot() + 3),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
             );
 
             // Test that the node won't be leader in next 2 slots
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.drops_per_slot()),
                 false
             );
 
             // Test that the node will be leader in next 3 slots
             assert_eq!(
-                waterclock_recorder.would_be_leader(3 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(3 * treasury.drops_per_slot()),
                 true
             );
 
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.drops_per_slot()),
                 false
             );
 
             // If we set the working treasury, the node should be leader within next 2 slots
             waterclock_recorder.set_treasury(&treasury);
             assert_eq!(
-                waterclock_recorder.would_be_leader(2 * treasury.ticks_per_slot()),
+                waterclock_recorder.would_be_leader(2 * treasury.drops_per_slot()),
                 true
             );
         }

@@ -6,7 +6,7 @@ use std::io::Result;
 pub struct WaterClock {
     pub hash: Hash,
     num_hashes: u64,
-    hashes_per_tick: u64,
+    hashes_per_drop: u64,
     remaining_hashes: u64,
 }
 
@@ -17,19 +17,19 @@ pub struct WaterClockEntry {
 }
 
 impl WaterClock {
-    pub fn new(hash: Hash, hashes_per_tick: Option<u64>) -> Self {
-        let hashes_per_tick = hashes_per_tick.unwrap_or(std::u64::MAX);
-        assert!(hashes_per_tick > 1);
+    pub fn new(hash: Hash, hashes_per_drop: Option<u64>) -> Self {
+        let hashes_per_drop = hashes_per_drop.unwrap_or(std::u64::MAX);
+        assert!(hashes_per_drop > 1);
         WaterClock {
             hash,
             num_hashes: 0,
-            hashes_per_tick,
-            remaining_hashes: hashes_per_tick,
+            hashes_per_drop,
+            remaining_hashes: hashes_per_drop,
         }
     }
 
-    pub fn reset(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
-        let mut waterclock = WaterClock::new(hash, hashes_per_tick);
+    pub fn reset(&mut self, hash: Hash, hashes_per_drop: Option<u64>) {
+        let mut waterclock = WaterClock::new(hash, hashes_per_drop);
         std::mem::swap(&mut waterclock, self);
     }
 
@@ -42,12 +42,12 @@ impl WaterClock {
         self.remaining_hashes -= num_hashes;
 
         assert!(self.remaining_hashes > 0);
-        self.remaining_hashes == 1 // Return `true` if caller needs to `tick()` next
+        self.remaining_hashes == 1 // Return `true` if caller needs to `_drop()` next
     }
 
     pub fn record(&mut self, mixin: Hash) -> Option<WaterClockEntry> {
         if self.remaining_hashes == 1 {
-            return None; // Caller needs to `tick()` first
+            return None; // Caller needs to `_drop()` first
         }
 
         self.hash = hashv(&[&self.hash.as_ref(), &mixin.as_ref()]);
@@ -61,19 +61,19 @@ impl WaterClock {
         })
     }
 
-    pub fn tick(&mut self) -> Option<WaterClockEntry> {
+    pub fn _drop(&mut self) -> Option<WaterClockEntry> {
         self.hash = hash(&self.hash.as_ref());
         self.num_hashes += 1;
         self.remaining_hashes -= 1;
 
-        // If the hashes_per_tick is variable (std::u64::MAX) then always generate a tick.
-        // Otherwise only tick if there are no remaining hashes
-        if self.hashes_per_tick < std::u64::MAX && self.remaining_hashes != 0 {
+        // If the hashes_per_drop is variable (std::u64::MAX) then always generate a _drop.
+        // Otherwise only _drop if there are no remaining hashes
+        if self.hashes_per_drop < std::u64::MAX && self.remaining_hashes != 0 {
             return None;
         }
 
         let num_hashes = self.num_hashes;
-        self.remaining_hashes = self.hashes_per_tick;
+        self.remaining_hashes = self.hashes_per_drop;
         self.num_hashes = 0;
         Some(WaterClockEntry {
             num_hashes,
@@ -143,10 +143,10 @@ mod tests {
             verify(
                 zero,
                 &[
-                    (waterclock.tick().unwrap(), None),
+                    (waterclock._drop().unwrap(), None),
                     (waterclock.record(zero).unwrap(), Some(zero)),
                     (waterclock.record(zero).unwrap(), Some(zero)),
-                    (waterclock.tick().unwrap(), None),
+                    (waterclock._drop().unwrap(), None),
                 ],
             ),
             true
@@ -246,32 +246,32 @@ mod tests {
     }
 
     #[test]
-    fn test_waterclock_tick() {
+    fn test_waterclock_drop() {
         let mut waterclock = WaterClock::new(Hash::default(), Some(2));
         assert_eq!(waterclock.remaining_hashes, 2);
-        assert!(waterclock.tick().is_none());
+        assert!(waterclock._drop().is_none());
         assert_eq!(waterclock.remaining_hashes, 1);
-        assert_matches!(waterclock.tick(), Some(WaterClockEntry { num_hashes: 2, .. }));
-        assert_eq!(waterclock.remaining_hashes, 2); // Ready for the next tick
+        assert_matches!(waterclock._drop(), Some(WaterClockEntry { num_hashes: 2, .. }));
+        assert_eq!(waterclock.remaining_hashes, 2); // Ready for the next _drop
     }
 
     #[test]
-    fn test_waterclock_tick_large_batch() {
+    fn test_waterclock_drop_large_batch() {
         let mut waterclock = WaterClock::new(Hash::default(), Some(2));
         assert_eq!(waterclock.remaining_hashes, 2);
-        assert!(waterclock.hash(1_000_000)); // Stop hashing before the next tick
+        assert!(waterclock.hash(1_000_000)); // Stop hashing before the next _drop
         assert_eq!(waterclock.remaining_hashes, 1);
         assert!(waterclock.hash(1_000_000)); // Does nothing...
         assert_eq!(waterclock.remaining_hashes, 1);
-        waterclock.tick();
-        assert_eq!(waterclock.remaining_hashes, 2); // Ready for the next tick
+        waterclock._drop();
+        assert_eq!(waterclock.remaining_hashes, 2); // Ready for the next _drop
     }
 
     #[test]
-    fn test_waterclock_tick_too_soon() {
+    fn test_waterclock_drop_too_soon() {
         let mut waterclock = WaterClock::new(Hash::default(), Some(2));
         assert_eq!(waterclock.remaining_hashes, 2);
-        assert!(waterclock.tick().is_none());
+        assert!(waterclock._drop().is_none());
     }
 
     #[test]
@@ -279,8 +279,8 @@ mod tests {
         let mut waterclock = WaterClock::new(Hash::default(), Some(10));
         assert!(waterclock.hash(9));
         assert_eq!(waterclock.remaining_hashes, 1);
-        assert!(waterclock.record(Hash::default()).is_none()); // <-- record() rejected to avoid exceeding hashes_per_tick
-        assert_matches!(waterclock.tick(), Some(WaterClockEntry { num_hashes: 10, .. }));
+        assert!(waterclock.record(Hash::default()).is_none()); // <-- record() rejected to avoid exceeding hashes_per_drop
+        assert_matches!(waterclock._drop(), Some(WaterClockEntry { num_hashes: 10, .. }));
         assert_matches!(
             waterclock.record(Hash::default()),
             Some(WaterClockEntry { num_hashes: 1, .. }) // <-- record() ok

@@ -67,14 +67,14 @@ pub trait BlockstreamEvents {
     fn emit_entry_event(
         &self,
         slot: u64,
-        tick_height: u64,
+        drop_height: u64,
         leader_pubkey: &Pubkey,
         entries: &Entry,
     ) -> Result<()>;
     fn emit_block_event(
         &self,
         slot: u64,
-        tick_height: u64,
+        drop_height: u64,
         leader_pubkey: &Pubkey,
         transaction_seal: Hash,
     ) -> Result<()>;
@@ -125,7 +125,7 @@ where
     fn emit_entry_event(
         &self,
         slot: u64,
-        tick_height: u64,
+        drop_height: u64,
         leader_pubkey: &Pubkey,
         entry: &Entry,
     ) -> Result<()> {
@@ -153,7 +153,7 @@ where
                     r#"{{"dt":"{}","t":"entry","s":{},"h":{},"l":"{:?}","entry":{}}}"#,
                     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
                     slot,
-                    tick_height,
+                    drop_height,
                     leader_pubkey,
                     json_entry,
                 );
@@ -175,7 +175,7 @@ where
     fn emit_block_event(
         &self,
         slot: u64,
-        tick_height: u64,
+        drop_height: u64,
         leader_pubkey: &Pubkey,
         transaction_seal: Hash,
     ) -> Result<()> {
@@ -183,7 +183,7 @@ where
             r#"{{"dt":"{}","t":"block","s":{},"h":{},"l":"{:?}","hash":"{:?}"}}"#,
             Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
             slot,
-            tick_height,
+            drop_height,
             leader_pubkey,
             transaction_seal,
         );
@@ -265,28 +265,28 @@ mod test {
     #[test]
     fn test_blockstream() -> () {
         let blockstream = MockBlockstream::new("test_stream".to_string());
-        let ticks_per_slot = 5;
+        let drops_per_slot = 5;
 
         let mut transaction_seal = Hash::default();
         let mut entries = Vec::new();
         let mut expected_entries = Vec::new();
 
-        let tick_height_initial = 0;
-        let tick_height_final = tick_height_initial + ticks_per_slot + 2;
+        let drop_height_initial = 0;
+        let drop_height_final = drop_height_initial + drops_per_slot + 2;
         let mut curr_slot = 0;
         let leader_pubkey = Pubkey::new_rand();
 
-        for tick_height in tick_height_initial..=tick_height_final {
-            if tick_height == 5 {
+        for drop_height in drop_height_initial..=drop_height_final {
+            if drop_height == 5 {
                 blockstream
-                    .emit_block_event(curr_slot, tick_height - 1, &leader_pubkey, transaction_seal)
+                    .emit_block_event(curr_slot, drop_height - 1, &leader_pubkey, transaction_seal)
                     .unwrap();
                 curr_slot += 1;
             }
-            let entry = Entry::new(&mut transaction_seal, 1, vec![]); // just ticks
+            let entry = Entry::new(&mut transaction_seal, 1, vec![]); // just drops
             transaction_seal = entry.hash;
             blockstream
-                .emit_entry_event(curr_slot, tick_height, &leader_pubkey, &entry)
+                .emit_entry_event(curr_slot, drop_height, &leader_pubkey, &entry)
                 .unwrap();
             expected_entries.push(entry.clone());
             entries.push(entry);
@@ -294,8 +294,8 @@ mod test {
 
         assert_eq!(
             blockstream.entries().len() as u64,
-            // one entry per tick (0..=N+2) is +3, plus one block
-            ticks_per_slot + 3 + 1
+            // one entry per drop (0..=N+2) is +3, plus one block
+            drops_per_slot + 3 + 1
         );
 
         let mut j = 0;

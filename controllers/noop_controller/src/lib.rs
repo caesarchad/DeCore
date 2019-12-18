@@ -9,12 +9,12 @@ fn entrypoint(
     program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    tick_height: u64,
+    drop_height: u64,
 ) -> Result<(), InstructionError> {
     morgan_logger::setup();
     trace!("noop: program_id: {:?}", program_id);
     trace!("noop: keyed_accounts: {:#?}", keyed_accounts);
     trace!("noop: data: {:?}", data);
-    trace!("noop: tick_height: {:?}", tick_height);
+    trace!("noop: drop_height: {:?}", drop_height);
     Ok(())
 }

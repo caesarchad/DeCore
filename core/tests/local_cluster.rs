@@ -109,15 +109,15 @@ fn test_leader_failure_4() {
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
-        config.ticks_per_slot * config.waterclock_config.target_tick_duration.as_millis() as u64,
+        config.drops_per_slot * config.waterclock_config.target_drop_duration.as_millis() as u64,
     );
 }
 #[test]
 fn test_two_unbalanced_stakes() {
     morgan_logger::setup();
     let mut validator_config = ValidatorConfig::default();
-    let num_ticks_per_second = 100;
-    let num_ticks_per_slot = 10;
+    let num_drops_per_second = 100;
+    let num_drops_per_slot = 10;
     let num_slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
 
     validator_config.rpc_config.enable_fullnode_exit = true;
@@ -125,22 +125,22 @@ fn test_two_unbalanced_stakes() {
         node_stakes: vec![999_990, 3],
         node_group_difs: 1_000_000,
         validator_config: validator_config.clone(),
-        ticks_per_slot: num_ticks_per_slot,
+        drops_per_slot: num_drops_per_slot,
         slots_per_epoch: num_slots_per_epoch,
-        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_ticks_per_second)),
+        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_drops_per_second)),
         ..NodeGroupConfig::default()
     });
 
     node_group_tests::sleep_n_epochs(
         10.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
     node_group.close_preserve_ledgers();
     let leader_pubkey = node_group.entry_point_info.id;
     let leader_ledger = node_group.fullnode_infos[&leader_pubkey].ledger_path.clone();
-    node_group_tests::verify_ledger_ticks(&leader_ledger, num_ticks_per_slot as usize);
+    node_group_tests::verify_ledger_drops(&leader_ledger, num_drops_per_slot as usize);
 }
 
 #[test]
@@ -173,12 +173,12 @@ fn test_forwarding() {
 fn test_restart_node() {
     let validator_config = ValidatorConfig::default();
     let slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
-    let ticks_per_slot = 16;
+    let drops_per_slot = 16;
     let mut node_group = LocalNodeGroup::new(&NodeGroupConfig {
         node_stakes: vec![3],
         node_group_difs: 100,
         validator_config: validator_config.clone(),
-        ticks_per_slot,
+        drops_per_slot,
         slots_per_epoch,
         ..NodeGroupConfig::default()
     });
@@ -186,14 +186,14 @@ fn test_restart_node() {
     node_group_tests::sleep_n_epochs(
         1.0,
         &node_group.genesis_block.waterclock_config,
-        timing::DEFAULT_TICKS_PER_SLOT,
+        timing::DEFAULT_DROPS_PER_SLOT,
         slots_per_epoch,
     );
     node_group.restart_node(nodes[0]);
     node_group_tests::sleep_n_epochs(
         0.5,
         &node_group.genesis_block.waterclock_config,
-        timing::DEFAULT_TICKS_PER_SLOT,
+        timing::DEFAULT_DROPS_PER_SLOT,
         slots_per_epoch,
     );
     node_group_tests::send_many_transactions(&node_group.entry_point_info, &node_group.funding_keypair, 1);
@@ -220,8 +220,8 @@ fn test_repairman_catchup() {
 
 fn run_repairman_catchup(num_repairmen: u64) {
     let mut validator_config = ValidatorConfig::default();
-    let num_ticks_per_second = 100;
-    let num_ticks_per_slot = 40;
+    let num_drops_per_second = 100;
+    let num_drops_per_slot = 40;
     let num_slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
     let num_root_buffer_slots = 10;
     // Calculate the leader schedule num_root_buffer slots ahead. Otherwise, if stakers_slot_offset ==
@@ -258,10 +258,10 @@ fn run_repairman_catchup(num_repairmen: u64) {
         node_stakes,
         node_group_difs,
         validator_config: validator_config.clone(),
-        ticks_per_slot: num_ticks_per_slot,
+        drops_per_slot: num_drops_per_slot,
         slots_per_epoch: num_slots_per_epoch,
         stakers_slot_offset,
-        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_ticks_per_second)),
+        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_drops_per_second)),
         ..NodeGroupConfig::default()
     });
 
@@ -273,7 +273,7 @@ fn run_repairman_catchup(num_repairmen: u64) {
     node_group_tests::sleep_n_epochs(
         num_warmup_epochs + 1.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
 
@@ -293,7 +293,7 @@ fn run_repairman_catchup(num_repairmen: u64) {
     node_group_tests::sleep_n_epochs(
         num_warmup_epochs + 1.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
 

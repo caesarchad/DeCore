@@ -1,29 +1,29 @@
-use crate::timing::DEFAULT_NUM_TICKS_PER_SECOND;
+use crate::timing::DEFAULT_NUM_DROPS_PER_SECOND;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WaterClockConfig {
-    /// The target tick rate of the cluster.
-    pub target_tick_duration: Duration,
+    /// The target _drop rate of the cluster.
+    pub target_drop_duration: Duration,
 
-    /// How many hashes to roll before emitting the next tick entry.
+    /// How many hashes to roll before emitting the next _drop entry.
     /// None enables "Low power mode", which implies:
-    /// * sleep for `target_tick_duration` instead of hashing
-    /// * the number of hashes per tick will be variable
-    pub hashes_per_tick: Option<u64>,
+    /// * sleep for `target_drop_duration` instead of hashing
+    /// * the number of hashes per _drop will be variable
+    pub hashes_per_drop: Option<u64>,
 }
 
 impl WaterClockConfig {
-    pub fn new_sleep(target_tick_duration: Duration) -> Self {
+    pub fn new_sleep(target_drop_duration: Duration) -> Self {
         Self {
-            target_tick_duration,
-            hashes_per_tick: None,
+            target_drop_duration,
+            hashes_per_drop: None,
         }
     }
 }
 
 impl Default for WaterClockConfig {
     fn default() -> Self {
-        Self::new_sleep(Duration::from_millis(1000 / DEFAULT_NUM_TICKS_PER_SECOND))
+        Self::new_sleep(Duration::from_millis(1000 / DEFAULT_NUM_DROPS_PER_SECOND))
     }
 }

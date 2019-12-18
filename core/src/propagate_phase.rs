@@ -54,16 +54,16 @@ impl Broadcast {
     ) -> Result<()> {
         let timer = Duration::new(1, 0);
         let (mut treasury, entries) = receiver.recv_timeout(timer)?;
-        let mut max_tick_height = treasury.max_tick_height();
+        let mut max_drop_height = treasury.max_drop_height();
 
         let run_start = Instant::now();
         let mut num_entries = entries.len();
         let mut ventries = Vec::new();
-        let mut last_tick = entries.last().map(|v| v.1).unwrap_or(0);
+        let mut last_drop = entries.last().map(|v| v.1).unwrap_or(0);
         ventries.push(entries);
 
-        assert!(last_tick <= max_tick_height);
-        if last_tick != max_tick_height {
+        assert!(last_drop <= max_drop_height);
+        if last_drop != max_drop_height {
             while let Ok((same_treasury, entries)) = receiver.try_recv() {
                 // If the treasury changed, that implies the previous slot was interrupted and we do not have to
                 // broadcast its entries.
@@ -71,13 +71,13 @@ impl Broadcast {
                     num_entries = 0;
                     ventries.clear();
                     treasury = same_treasury.clone();
-                    max_tick_height = treasury.max_tick_height();
+                    max_drop_height = treasury.max_drop_height();
                 }
                 num_entries += entries.len();
-                last_tick = entries.last().map(|v| v.1).unwrap_or(0);
+                last_drop = entries.last().map(|v| v.1).unwrap_or(0);
                 ventries.push(entries);
-                assert!(last_tick <= max_tick_height,);
-                if last_tick == max_tick_height {
+                assert!(last_drop <= max_drop_height,);
+                if last_drop == max_drop_height {
                     break;
                 }
             }
@@ -121,9 +121,9 @@ impl Broadcast {
             treasury.parent().map_or(0, |parent| parent.slot()),
         );
 
-        let contains_last_tick = last_tick == max_tick_height;
+        let contains_last_drop = last_drop == max_drop_height;
 
-        if contains_last_tick {
+        if contains_last_drop {
             blobs.last().unwrap().write().unwrap().set_is_last_in_slot();
         }
 
@@ -136,7 +136,7 @@ impl Broadcast {
         let broadcast_start = Instant::now();
 
         // Send out data
-        NodeGroupInfo::broadcast(&self.id, contains_last_tick, &broadcast_table, sock, &blobs)?;
+        NodeGroupInfo::broadcast(&self.id, contains_last_drop, &broadcast_table, sock, &blobs)?;
 
         inc_new_counter_debug!("streamer-broadcast-sent", blobs.len());
 
@@ -314,7 +314,7 @@ mod test {
     use super::*;
     use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
-    use crate::entry_info::create_ticks;
+    use crate::entry_info::create_drops;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
     use morgan_runtime::treasury::Treasury;
@@ -390,30 +390,30 @@ mod test {
                 entry_receiver,
             );
             let treasury = broadcast_service.treasury.clone();
-            let start_tick_height = treasury.tick_height();
-            let max_tick_height = treasury.max_tick_height();
-            let ticks_per_slot = treasury.ticks_per_slot();
+            let start_drop_height = treasury.drop_height();
+            let max_drop_height = treasury.max_drop_height();
+            let drops_per_slot = treasury.drops_per_slot();
 
-            let ticks = create_ticks(max_tick_height - start_tick_height, Hash::default());
-            for (i, tick) in ticks.into_iter().enumerate() {
+            let drops = create_drops(max_drop_height - start_drop_height, Hash::default());
+            for (i, _drop) in drops.into_iter().enumerate() {
                 entry_sender
-                    .send((treasury.clone(), vec![(tick, i as u64 + 1)]))
+                    .send((treasury.clone(), vec![(_drop, i as u64 + 1)]))
                     .expect("Expect successful send to broadcast service");
             }
 
             sleep(Duration::from_millis(2000));
 
             trace!(
-                "[broadcast_ledger] max_tick_height: {}, start_tick_height: {}, ticks_per_slot: {}",
-                max_tick_height,
-                start_tick_height,
-                ticks_per_slot,
+                "[broadcast_ledger] max_drop_height: {}, start_drop_height: {}, drops_per_slot: {}",
+                max_drop_height,
+                start_drop_height,
+                drops_per_slot,
             );
 
             let block_buffer_pool = broadcast_service.block_buffer_pool;
             let mut blob_index = 0;
-            for i in 0..max_tick_height - start_tick_height {
-                let slot = (start_tick_height + i + 1) / ticks_per_slot;
+            for i in 0..max_drop_height - start_drop_height {
+                let slot = (start_drop_height + i + 1) / drops_per_slot;
 
                 let result = block_buffer_pool.fetch_data_blob(slot, blob_index).unwrap();
 

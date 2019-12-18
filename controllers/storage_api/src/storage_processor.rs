@@ -6,14 +6,14 @@ use crate::storage_instruction::StorageInstruction;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::instruction::InstructionError;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use morgan_helper::logHelper::*;
 
 pub fn process_instruction(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    tick_height: u64,
+    drop_height: u64,
 ) -> Result<(), InstructionError> {
     morgan_logger::setup();
 
@@ -53,7 +53,7 @@ pub fn process_instruction(
                 sha_state,
                 slot,
                 signature,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
         StorageInstruction::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
@@ -64,7 +64,7 @@ pub fn process_instruction(
             storage_account.advertise_storage_recent_transaction_seal(
                 hash,
                 slot,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
         StorageInstruction::ClaimStorageReward { slot } => {
@@ -74,7 +74,7 @@ pub fn process_instruction(
             storage_account.claim_storage_reward(
                 &mut rest[0],
                 slot,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
         StorageInstruction::ProofValidation { segment, proofs } => {
@@ -117,12 +117,12 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    const TICKS_IN_SEGMENT: u64 = SLOTS_PER_SEGMENT * DEFAULT_TICKS_PER_SLOT;
+    const DROPS_IN_SEGMENT: u64 = SLOTS_PER_SEGMENT * DEFAULT_DROPS_PER_SLOT;
 
     fn test_instruction(
         ix: &Instruction,
         program_accounts: &mut [Account],
-        tick_height: u64,
+        drop_height: u64,
     ) -> Result<(), InstructionError> {
         let mut keyed_accounts: Vec<_> = ix
             .accounts
@@ -133,7 +133,7 @@ mod tests {
             })
             .collect();
 
-        let ret = process_instruction(&id(), &mut keyed_accounts, &ix.data, tick_height);
+        let ret = process_instruction(&id(), &mut keyed_accounts, &ix.data, drop_height);
         // info!("{}", Info(format!("ret: {:?}", ret).to_string()));
         let info:String = format!("ret: {:?}", ret).to_string();
         println!("{}",
@@ -163,11 +163,11 @@ mod tests {
             SLOTS_PER_SEGMENT,
             Signature::default(),
         );
-        // the proof is for slot 16, which is in segment 0, need to move the tick height into segment 2
-        let ticks_till_next_segment = TICKS_IN_SEGMENT * 2;
+        // the proof is for slot 16, which is in segment 0, need to move the _drop height into segment 2
+        let drops_till_next_segment = DROPS_IN_SEGMENT * 2;
 
         assert_eq!(
-            test_instruction(&ix, &mut [account], ticks_till_next_segment),
+            test_instruction(&ix, &mut [account], drops_till_next_segment),
             Ok(())
         );
     }
@@ -206,14 +206,14 @@ mod tests {
 
         let ix =
             storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
-        // move tick height into segment 1
-        let ticks_till_next_segment = TICKS_IN_SEGMENT + 1;
+        // move _drop height into segment 1
+        let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
-        assert!(test_instruction(&ix, &mut accounts, ticks_till_next_segment).is_err());
+        assert!(test_instruction(&ix, &mut accounts, drops_till_next_segment).is_err());
 
         let mut accounts = [Account::default(), Account::default(), Account::default()];
 
-        assert!(test_instruction(&ix, &mut accounts, ticks_till_next_segment).is_err());
+        assert!(test_instruction(&ix, &mut accounts, drops_till_next_segment).is_err());
     }
 
     #[test]
@@ -244,11 +244,11 @@ mod tests {
 
         let ix =
             storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
-        // move tick height into segment 1
-        let ticks_till_next_segment = TICKS_IN_SEGMENT + 1;
+        // move _drop height into segment 1
+        let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
         assert_matches!(
-            test_instruction(&ix, &mut accounts, ticks_till_next_segment),
+            test_instruction(&ix, &mut accounts, drops_till_next_segment),
             Ok(_)
         );
     }
@@ -291,10 +291,10 @@ mod tests {
         ));
         treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
-        // tick the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
-        for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_transaction_seal());
+        // _drop the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         // advertise for storage segment 1
@@ -342,9 +342,9 @@ mod tests {
             Some(&mint_pubkey),
         );
 
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
-        for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_transaction_seal());
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
@@ -375,9 +375,9 @@ mod tests {
             Some(&mint_pubkey),
         );
 
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
-        for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_transaction_seal());
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
@@ -401,9 +401,9 @@ mod tests {
             10 + (TOTAL_VALIDATOR_REWARDS * 10)
         );
 
-        // tick the treasury into the next storage epoch so that rewards can be claimed
-        for _ in 0..=TICKS_IN_SEGMENT {
-            treasury.register_tick(&treasury.last_transaction_seal());
+        // _drop the treasury into the next storage epoch so that rewards can be claimed
+        for _ in 0..=DROPS_IN_SEGMENT {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_eq!(
@@ -560,10 +560,10 @@ mod tests {
 
         let mut treasury = Treasury::new(&genesis_block);
         treasury.add_instruction_processor(id(), process_instruction);
-        // tick the treasury up until it's moved into storage segment 2
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
-        for _ in 0..next_storage_segment_tick_height {
-            treasury.register_tick(&treasury.last_transaction_seal());
+        // _drop the treasury up until it's moved into storage segment 2
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
         let treasury_client = TreasuryClient::new(treasury);
 

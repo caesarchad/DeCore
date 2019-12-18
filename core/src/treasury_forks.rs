@@ -216,10 +216,10 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
         let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
-        child_treasury.register_tick(&Hash::default());
+        child_treasury.register_drop(&Hash::default());
         treasury_forks.insert(child_treasury);
-        assert_eq!(treasury_forks[1u64].tick_height(), 1);
-        assert_eq!(treasury_forks.working_treasury().tick_height(), 1);
+        assert_eq!(treasury_forks[1u64].drop_height(), 1);
+        assert_eq!(treasury_forks.working_treasury().drop_height(), 1);
     }
 
     #[test]

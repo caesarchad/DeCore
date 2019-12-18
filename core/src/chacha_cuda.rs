@@ -163,11 +163,11 @@ mod tests {
         let entries = make_tiny_test_entries(32);
         let ledger_dir = "test_encrypt_file_many_keys_single";
         let ledger_path = fetch_interim_ledger_location(ledger_dir);
-        let ticks_per_slot = 16;
+        let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
 
         block_buffer_pool
-            .update_entries(0, 0, 0, ticks_per_slot, &entries)
+            .update_entries(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let out_path = Path::new("test_chacha_encrypt_file_many_keys_single_output.txt.enc");
@@ -199,10 +199,10 @@ mod tests {
         let entries = make_tiny_test_entries(32);
         let ledger_dir = "test_encrypt_file_many_keys_multiple";
         let ledger_path = fetch_interim_ledger_location(ledger_dir);
-        let ticks_per_slot = 16;
+        let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .update_entries(0, 0, 0, ticks_per_slot, &entries)
+            .update_entries(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let out_path = Path::new("test_chacha_encrypt_file_many_keys_multiple_output.txt.enc");

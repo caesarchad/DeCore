@@ -641,7 +641,7 @@ mod tests {
         let exit = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
+        let drops_per_slot = genesis_block.drops_per_slot;
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(64);
@@ -650,7 +650,7 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         block_buffer_pool
-            .update_entries(slot, 0, 0, ticks_per_slot, &entries)
+            .update_entries(slot, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
@@ -679,7 +679,7 @@ mod tests {
         let rooted_slots = (slot..slot + SLOTS_PER_SEGMENT + 1)
             .map(|i| {
                 block_buffer_pool
-                    .update_entries(i, 0, 0, ticks_per_slot, &entries)
+                    .update_entries(i, 0, 0, drops_per_slot, &entries)
                     .unwrap();
                 i
             })
@@ -734,13 +734,13 @@ mod tests {
         let exit = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;;
+        let drops_per_slot = genesis_block.drops_per_slot;;
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(128);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .update_entries(1, 0, 0, ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
@@ -780,7 +780,7 @@ mod tests {
 
         let proof_entries = vec![Entry::new(&Hash::default(), 1, mining_txs)];
         block_buffer_pool
-            .update_entries(2, 0, 0, ticks_per_slot, &proof_entries)
+            .update_entries(2, 0, 0, drops_per_slot, &proof_entries)
             .unwrap();
         slot_sender.send(vec![2]).unwrap();
 

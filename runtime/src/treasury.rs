@@ -64,14 +64,14 @@ pub struct Treasury {
     /// The number of transactions processed without error
     transaction_count: AtomicUsize, // TODO: Use AtomicU64 if/when available
 
-    /// Treasury tick height
-    tick_height: AtomicUsize, // TODO: Use AtomicU64 if/when available
+    /// Treasury _drop height
+    drop_height: AtomicUsize, // TODO: Use AtomicU64 if/when available
 
-    // Treasury max_tick_height
-    max_tick_height: u64,
+    // Treasury max_drop_height
+    max_drop_height: u64,
 
-    /// The number of ticks in each slot.
-    ticks_per_slot: u64,
+    /// The number of drops in each slot.
+    drops_per_slot: u64,
 
     /// Treasury fork (i.e. slot, i.e. block)
     slot: u64,
@@ -145,13 +145,13 @@ impl Treasury {
             .store(parent.transaction_count() as usize, Ordering::Relaxed);
         treasury.stakes = RwLock::new(parent.stakes.read().unwrap().clone());
 
-        treasury.tick_height
-            .store(parent.tick_height.load(Ordering::SeqCst), Ordering::SeqCst);
-        treasury.ticks_per_slot = parent.ticks_per_slot;
+        treasury.drop_height
+            .store(parent.drop_height.load(Ordering::SeqCst), Ordering::SeqCst);
+        treasury.drops_per_slot = parent.drops_per_slot;
         treasury.epoch_schedule = parent.epoch_schedule;
 
         treasury.slot = slot;
-        treasury.max_tick_height = (treasury.slot + 1) * treasury.ticks_per_slot - 1;
+        treasury.max_drop_height = (treasury.slot + 1) * treasury.drops_per_slot - 1;
 
         datapoint_info!(
             "treasury-new_from_parent-heights",
@@ -285,8 +285,8 @@ impl Treasury {
             .unwrap()
             .genesis_hash(&genesis_block.hash());
 
-        self.ticks_per_slot = genesis_block.ticks_per_slot;
-        self.max_tick_height = (self.slot + 1) * self.ticks_per_slot - 1;
+        self.drops_per_slot = genesis_block.drops_per_slot;
+        self.max_drop_height = (self.slot + 1) * self.drops_per_slot - 1;
 
         // make treasury 0 votable
         self.is_delta.store(true, Ordering::Relaxed);
@@ -368,8 +368,8 @@ impl Treasury {
         }
     }
 
-    /// Looks through a list of tick heights and stakes, and finds the latest
-    /// tick that has achieved confirmation
+    /// Looks through a list of _drop heights and stakes, and finds the latest
+    /// _drop that has achieved confirmation
     pub fn get_confirmation_timestamp(
         &self,
         mut slots_and_stakes: Vec<(u64, u64)>,
@@ -402,23 +402,23 @@ impl Treasury {
     /// assumes subsequent calls correspond to later entries, and will boot
     /// the oldest ones once its internal cache is full. Once boot, the
     /// treasury will reject transactions using that `hash`.
-    pub fn register_tick(&self, hash: &Hash) {
+    pub fn register_drop(&self, hash: &Hash) {
         if self.is_frozen() {
-            // warn!("{}", Warn(format!("=========== FIXME: register_tick() working on a frozen treasury! ================").to_string()));
-            println!("{}",Warn(format!("=========== FIXME: register_tick() working on a frozen treasury! ================").to_string(),module_path!().to_string()));
+            // warn!("{}", Warn(format!("=========== FIXME: register_drop() working on a frozen treasury! ================").to_string()));
+            println!("{}",Warn(format!("=========== FIXME: register_drop() working on a frozen treasury! ================").to_string(),module_path!().to_string()));
         }
 
         // TODO: put this assert back in
         // assert!(!self.is_frozen());
 
-        let current_tick_height = {
-            self.tick_height.fetch_add(1, Ordering::SeqCst);
-            self.tick_height.load(Ordering::SeqCst) as u64
+        let current_drop_height = {
+            self.drop_height.fetch_add(1, Ordering::SeqCst);
+            self.drop_height.load(Ordering::SeqCst) as u64
         };
-        inc_new_counter_debug!("treasury-register_tick-registered", 1);
+        inc_new_counter_debug!("treasury-register_drop-registered", 1);
 
-        // Register a new block hash if at the last tick in the slot
-        if current_tick_height % self.ticks_per_slot == self.ticks_per_slot - 1 {
+        // Register a new block hash if at the last _drop in the slot
+        if current_drop_height % self.drops_per_slot == self.drops_per_slot - 1 {
             self.transaction_seal_queue.write().unwrap().register_hash(hash);
         }
     }
@@ -656,7 +656,7 @@ impl Treasury {
             &mut error_counters,
         );
         let mut loaded_accounts = self.load_accounts(txs, sig_results, &mut error_counters);
-        let tick_height = self.tick_height();
+        let drop_height = self.drop_height();
         let load_elapsed = now.elapsed();
         let now = Instant::now();
         let executed: Vec<Result<()>> =
@@ -667,7 +667,7 @@ impl Treasury {
                     Err(e) => Err(e.clone()),
                     Ok((ref mut accounts, ref mut loaders)) => self
                         .message_processor
-                        .process_message(tx.message(), loaders, accounts, tick_height),
+                        .process_message(tx.message(), loaders, accounts, drop_height),
                 })
                 .collect();
 
@@ -925,22 +925,22 @@ impl Treasury {
         extend_and_hash(&self.parent_hash, &serialize(&accounts_delta_hash).unwrap())
     }
 
-    /// Return the number of ticks per slot
-    pub fn ticks_per_slot(&self) -> u64 {
-        self.ticks_per_slot
+    /// Return the number of drops per slot
+    pub fn drops_per_slot(&self) -> u64 {
+        self.drops_per_slot
     }
 
-    /// Return the number of ticks since genesis.
-    pub fn tick_height(&self) -> u64 {
-        // tick_height is using an AtomicUSize because AtomicU64 is not yet a stable API.
+    /// Return the number of drops since genesis.
+    pub fn drop_height(&self) -> u64 {
+        // drop_height is using an AtomicUSize because AtomicU64 is not yet a stable API.
         // Until we can switch to AtomicU64, fail if usize is not the same as u64
         assert_eq!(std::usize::MAX, 0xFFFF_FFFF_FFFF_FFFF);
-        self.tick_height.load(Ordering::SeqCst) as u64
+        self.drop_height.load(Ordering::SeqCst) as u64
     }
 
-    /// Return this treasury's max_tick_height
-    pub fn max_tick_height(&self) -> u64 {
-        self.max_tick_height
+    /// Return this treasury's max_drop_height
+    pub fn max_drop_height(&self) -> u64 {
+        self.max_drop_height
     }
 
     /// Return the number of slots per epoch for the given epoch
@@ -1002,8 +1002,8 @@ impl Treasury {
     }
 
     pub fn is_votable(&self) -> bool {
-        let max_tick_height = (self.slot + 1) * self.ticks_per_slot - 1;
-        self.is_delta.load(Ordering::Relaxed) && self.tick_height() == max_tick_height
+        let max_drop_height = (self.slot + 1) * self.drops_per_slot - 1;
+        self.is_delta.load(Ordering::Relaxed) && self.drop_height() == max_drop_height
     }
 
     /// Add an instruction processor to intercept instructions before the dynamic loader.
@@ -1753,7 +1753,7 @@ mod tests {
 
     #[test]
     fn test_epoch_schedule() {
-        // one week of slots at 8 ticks/slot, 10 ticks/sec is
+        // one week of slots at 8 drops/slot, 10 drops/sec is
         // (1 * 7 * 24 * 4500u64).next_power_of_two();
 
         // test values between MINIMUM_SLOT_LEN and MINIMUM_SLOT_LEN * 16, should cover a good mix
@@ -1835,9 +1835,9 @@ mod tests {
         assert_eq!(treasury.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         assert_eq!(treasury.is_votable(), false);
 
-        // Register enough ticks to hit max tick height
-        for i in 0..genesis_block.ticks_per_slot - 1 {
-            treasury.register_tick(&hash::hash(format!("hello world {}", i).as_bytes()));
+        // Register enough drops to hit max _drop height
+        for i in 0..genesis_block.drops_per_slot - 1 {
+            treasury.register_drop(&hash::hash(format!("hello world {}", i).as_bytes()));
         }
 
         assert_eq!(treasury.is_votable(), true);
@@ -1941,9 +1941,9 @@ mod tests {
     fn test_treasury_0_votable() {
         let (genesis_block, _) = create_genesis_block(500);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        //set tick height to max
-        let max_tick_height = ((treasury.slot + 1) * treasury.ticks_per_slot - 1) as usize;
-        treasury.tick_height.store(max_tick_height, Ordering::Relaxed);
+        //set _drop height to max
+        let max_drop_height = ((treasury.slot + 1) * treasury.drops_per_slot - 1) as usize;
+        treasury.drop_height.store(max_drop_height, Ordering::Relaxed);
         assert!(treasury.is_votable());
     }
 

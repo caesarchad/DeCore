@@ -33,10 +33,10 @@ fn bad_arguments() {
 #[test]
 fn nominal() {
     let genesis_block = create_genesis_block(100).genesis_block;
-    let ticks_per_slot = genesis_block.ticks_per_slot;
+    let drops_per_slot = genesis_block.drops_per_slot;
 
     let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
-    let ticks = ticks_per_slot as usize;
+    let drops = drops_per_slot as usize;
 
     // Basic validation
     let output = run_ledgerbot(&["-l", &ledger_path, "verify"]);
@@ -45,7 +45,7 @@ fn nominal() {
     // Print everything
     let output = run_ledgerbot(&["-l", &ledger_path, "print"]);
     assert!(output.status.success());
-    assert_eq!(count_newlines(&output.stdout), ticks);
+    assert_eq!(count_newlines(&output.stdout), drops);
 
     // Only print the first 5 items
     let output = run_ledgerbot(&["-l", &ledger_path, "-n", "5", "print"]);
@@ -55,7 +55,7 @@ fn nominal() {
     // Skip entries with no hashes
     let output = run_ledgerbot(&["-l", &ledger_path, "-h", "1", "print"]);
     assert!(output.status.success());
-    assert_eq!(count_newlines(&output.stdout), ticks);
+    assert_eq!(count_newlines(&output.stdout), drops);
 
     // Skip entries with fewer than 2 hashes (skip everything)
     let output = run_ledgerbot(&["-l", &ledger_path, "-h", "2", "print"]);

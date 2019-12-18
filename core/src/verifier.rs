@@ -115,13 +115,13 @@ impl Validator {
         // info!(
         //     "{}",
         //     Info(format!("starting Water Clock... {} {}",
-        //     treasury.tick_height(),
+        //     treasury.drop_height(),
         //     treasury.last_transaction_seal()).to_string())
         // );
         println!("{}",
             printLn(
                 format!("starting water clock... {} {}",
-                    treasury.tick_height(),
+                    treasury.drop_height(),
                     treasury.last_transaction_seal()).to_string(),
                 module_path!().to_string()
             )
@@ -130,11 +130,11 @@ impl Validator {
 
         let waterclock_config = Arc::new(waterclock_config);
         let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new_with_clear_signal(
-            treasury.tick_height(),
+            treasury.drop_height(),
             treasury.last_transaction_seal(),
             treasury.slot(),
             leader_schedule_cache.next_leader_slot(&id, treasury.slot(), &treasury, Some(&block_buffer_pool)),
-            treasury.ticks_per_slot(),
+            treasury.drops_per_slot(),
             &id,
             &block_buffer_pool,
             block_buffer_pool.new_blobs_signals.first().cloned(),

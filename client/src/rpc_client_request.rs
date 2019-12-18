@@ -3,7 +3,7 @@ use crate::rpc_request::{RpcError, RpcRequest};
 use log::*;
 use reqwest;
 use reqwest::header::CONTENT_TYPE;
-use morgan_interface::timing::{DEFAULT_NUM_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT};
+use morgan_interface::timing::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
 use std::thread::sleep;
 use std::time::Duration;
 use ansi_term::Color::{Green};
@@ -163,7 +163,7 @@ impl GenericRpcClientRequest for RpcClientRequest {
 
                     // Sleep for approximately half a slot
                     sleep(Duration::from_millis(
-                        500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                        500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
                     ));
                 }
             }

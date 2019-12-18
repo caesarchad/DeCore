@@ -22,7 +22,7 @@ use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::{
-    self, duration_as_us, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
+    self, duration_as_us, DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
     MAX_TRANSACTION_FORWARDING_DELAY,
 };
 use morgan_interface::transaction::{self, Transaction, TransactionError};
@@ -258,7 +258,7 @@ impl TreasuryPhase {
                 Self::consume_or_forward_packets(
                     next_leader,
                     waterclock.treasury().is_some(),
-                    waterclock.would_be_leader(DEFAULT_TICKS_PER_SLOT * 2),
+                    waterclock.would_be_leader(DEFAULT_DROPS_PER_SLOT * 2),
                     &r_node_group_info.id(),
                 ),
                 next_leader,
@@ -526,11 +526,11 @@ impl TreasuryPhase {
                 //     "{}",
                 //     Info(format!("process transactions: max height reached slot: {} height: {}",
                 //     treasury.slot(),
-                //     treasury.tick_height()).to_string())
+                //     treasury.drop_height()).to_string())
                 // );
                 let loginfo: String = format!("process transactions: max height reached slot: {} height: {}",
                     treasury.slot(),
-                    treasury.tick_height()).to_string();
+                    treasury.drop_height()).to_string();
                 println!("{}",
                     printLn(
                         loginfo,
@@ -832,11 +832,11 @@ pub fn create_test_recorder(
     let exit = Arc::new(AtomicBool::new(false));
     let waterclock_config = Arc::new(WaterClockConfig::default());
     let (mut waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-        treasury.tick_height(),
+        treasury.drop_height(),
         treasury.last_transaction_seal(),
         treasury.slot(),
         Some(4),
-        treasury.ticks_per_slot(),
+        treasury.drops_per_slot(),
         &Pubkey::default(),
         block_buffer_pool,
         &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -899,12 +899,12 @@ mod tests {
     }
 
     #[test]
-    fn test_treasury_phase_tick() {
+    fn test_treasury_phase_drop() {
         morgan_logger::setup();
         let GenesisBlockInfo {
             mut genesis_block, ..
         } = create_genesis_block(2);
-        genesis_block.ticks_per_slot = 4;
+        genesis_block.drops_per_slot = 4;
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let start_hash = treasury.last_transaction_seal();
         let (verified_sender, verified_receiver) = channel();
@@ -938,7 +938,7 @@ mod tests {
                 .flat_map(|x| x.1.into_iter().map(|e| e.0))
                 .collect();
             trace!("done");
-            assert_eq!(entries.len(), genesis_block.ticks_per_slot as usize - 1);
+            assert_eq!(entries.len(), genesis_block.drops_per_slot as usize - 1);
             assert!(entries.verify(&start_hash));
             assert_eq!(entries[entries.len() - 1].hash, treasury.last_transaction_seal());
             treasury_phase.join().unwrap();
@@ -1021,7 +1021,7 @@ mod tests {
             let mut transaction_seal = start_hash;
             let treasury = Treasury::new(&genesis_block);
             treasury.process_transaction(&fund_tx).unwrap();
-            //receive entries + ticks
+            //receive entries + drops
             for _ in 0..10 {
                 let ventries: Vec<Vec<Entry>> = entry_receiver
                     .iter()
@@ -1163,19 +1163,19 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
-            min_tick_height: treasury.tick_height(),
-            max_tick_height: std::u64::MAX,
+            min_drop_height: treasury.drop_height(),
+            max_drop_height: std::u64::MAX,
         };
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                treasury.tick_height(),
+                treasury.drop_height(),
                 treasury.last_transaction_seal(),
                 treasury.slot(),
                 None,
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -1479,19 +1479,19 @@ mod tests {
 
         let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
-            min_tick_height: treasury.tick_height(),
-            max_tick_height: treasury.tick_height() + 1,
+            min_drop_height: treasury.drop_height(),
+            max_drop_height: treasury.drop_height() + 1,
         };
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                treasury.tick_height(),
+                treasury.drop_height(),
                 treasury.last_transaction_seal(),
                 treasury.slot(),
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -1504,13 +1504,13 @@ mod tests {
             TreasuryPhase::process_and_record_transactions(&treasury, &transactions, &waterclock_recorder, 0)
                 .0
                 .unwrap();
-            waterclock_recorder.lock().unwrap().tick();
+            waterclock_recorder.lock().unwrap()._drop();
 
             let mut done = false;
-            // read entries until I find mine, might be ticks...
+            // read entries until I find mine, might be drops...
             while let Ok((_, entries)) = entry_receiver.recv() {
                 for (entry, _) in entries {
-                    if !entry.is_tick() {
+                    if !entry.is_drop() {
                         trace!("got entry");
                         assert_eq!(entry.transactions.len(), transactions.len());
                         assert_eq!(treasury.get_balance(&pubkey), 1);
@@ -1521,7 +1521,7 @@ mod tests {
                     break;
                 }
             }
-            trace!("done ticking");
+            trace!("done dropping");
 
             assert_eq!(done, true);
 
@@ -1567,19 +1567,19 @@ mod tests {
 
         let working_treasury = WorkingTreasury {
             treasury: treasury.clone(),
-            min_tick_height: treasury.tick_height(),
-            max_tick_height: treasury.tick_height() + 1,
+            min_drop_height: treasury.drop_height(),
+            max_drop_height: treasury.drop_height() + 1,
         };
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let (waterclock_recorder, _entry_receiver) = WaterClockRecorder::new(
-                treasury.tick_height(),
+                treasury.drop_height(),
                 treasury.last_transaction_seal(),
                 treasury.slot(),
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &pubkey,
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),

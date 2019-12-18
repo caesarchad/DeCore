@@ -11,7 +11,7 @@ pub type Entrypoint = unsafe extern "C" fn(
     program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    tick_height: u64,
+    drop_height: u64,
 ) -> Result<(), InstructionError>;
 
 // Convenience macro to define the native program entrypoint.  Supply a fn to this macro that
@@ -24,9 +24,9 @@ macro_rules! morgan_entrypoint(
             program_id: &morgan_interface::pubkey::Pubkey,
             keyed_accounts: &mut [morgan_interface::account::KeyedAccount],
             data: &[u8],
-            tick_height: u64
+            drop_height: u64
         ) -> Result<(), morgan_interface::instruction::InstructionError> {
-            $entrypoint(program_id, keyed_accounts, data, tick_height)
+            $entrypoint(program_id, keyed_accounts, data, drop_height)
         }
     )
 );

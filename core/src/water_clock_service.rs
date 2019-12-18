@@ -10,7 +10,7 @@ use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use std::io::Result;
 
 pub struct WaterClockService {
-    tick_producer: JoinHandle<()>,
+    drop_producer: JoinHandle<()>,
 }
 
 
@@ -24,40 +24,40 @@ impl WaterClockService {
     ) -> Self {
         let waterclock_exit_ = waterclock_exit.clone();
         let waterclock_config = waterclock_config.clone();
-        let tick_producer = Builder::new()
-            .name("morgan-waterclock-service-tick_producer".to_string())
+        let drop_producer = Builder::new()
+            .name("morgan-waterclock-service-drop_producer".to_string())
             .spawn(move || {
-                if waterclock_config.hashes_per_tick.is_none() {
-                    Self::sleepy_tick_producer(waterclock_recorder, &waterclock_config, &waterclock_exit_);
+                if waterclock_config.hashes_per_drop.is_none() {
+                    Self::sleepy_drop_producer(waterclock_recorder, &waterclock_config, &waterclock_exit_);
                 } else {
                     if let Some(cores) = core_affinity::get_core_ids() {
                         core_affinity::set_for_current(cores[0]);
                     }
-                    Self::tick_producer(waterclock_recorder, &waterclock_exit_);
+                    Self::drop_producer(waterclock_recorder, &waterclock_exit_);
                 }
                 waterclock_exit_.store(true, Ordering::Relaxed);
             })
             .unwrap();
 
-        Self { tick_producer }
+        Self { drop_producer }
     }
 
-    fn sleepy_tick_producer(
+    fn sleepy_drop_producer(
         waterclock_recorder: Arc<Mutex<WaterClockRecorder>>,
         waterclock_config: &WaterClockConfig,
         waterclock_exit: &AtomicBool,
     ) {
         while !waterclock_exit.load(Ordering::Relaxed) {
-            sleep(waterclock_config.target_tick_duration);
-            waterclock_recorder.lock().unwrap().tick();
+            sleep(waterclock_config.target_drop_duration);
+            waterclock_recorder.lock().unwrap()._drop();
         }
     }
 
-    fn tick_producer(waterclock_recorder: Arc<Mutex<WaterClockRecorder>>, waterclock_exit: &AtomicBool) {
+    fn drop_producer(waterclock_recorder: Arc<Mutex<WaterClockRecorder>>, waterclock_exit: &AtomicBool) {
         let waterclock = waterclock_recorder.lock().unwrap().waterclock.clone();
         loop {
             if waterclock.lock().unwrap().hash(NUM_HASHES_PER_BATCH) {
-                waterclock_recorder.lock().unwrap().tick();
+                waterclock_recorder.lock().unwrap()._drop();
                 if waterclock_exit.load(Ordering::Relaxed) {
                     break;
                 }
@@ -71,7 +71,7 @@ impl Service for WaterClockService {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
-        self.tick_producer.join()
+        self.drop_producer.join()
     }
 }
 
@@ -122,15 +122,15 @@ mod tests {
             let block_buffer_pool =
                 BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
             let waterclock_config = Arc::new(WaterClockConfig {
-                hashes_per_tick: Some(2),
-                target_tick_duration: Duration::from_millis(42),
+                hashes_per_drop: Some(2),
+                target_drop_duration: Duration::from_millis(42),
             });
             let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new(
-                treasury.tick_height(),
+                treasury.drop_height(),
                 prev_hash,
                 treasury.slot(),
                 Some(4),
-                treasury.ticks_per_slot(),
+                treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
@@ -140,8 +140,8 @@ mod tests {
             let exit = Arc::new(AtomicBool::new(false));
             let working_treasury = WorkingTreasury {
                 treasury: treasury.clone(),
-                min_tick_height: treasury.tick_height(),
-                max_tick_height: std::u64::MAX,
+                min_drop_height: treasury.drop_height(),
+                max_drop_height: std::u64::MAX,
             };
 
             let entry_producer: JoinHandle<Result<()>> = {
@@ -173,32 +173,32 @@ mod tests {
 
             // get some events
             let mut hashes = 0;
-            let mut need_tick = true;
+            let mut need_drop = true;
             let mut need_entry = true;
             let mut need_partial = true;
 
-            while need_tick || need_entry || need_partial {
+            while need_drop || need_entry || need_partial {
                 for entry in entry_receiver.recv().unwrap().1 {
                     let entry = &entry.0;
-                    if entry.is_tick() {
+                    if entry.is_drop() {
                         assert!(
-                            entry.num_hashes <= waterclock_config.hashes_per_tick.unwrap(),
+                            entry.num_hashes <= waterclock_config.hashes_per_drop.unwrap(),
                             format!(
                                 "{} <= {}",
                                 entry.num_hashes,
-                                waterclock_config.hashes_per_tick.unwrap()
+                                waterclock_config.hashes_per_drop.unwrap()
                             )
                         );
 
-                        if entry.num_hashes == waterclock_config.hashes_per_tick.unwrap() {
-                            need_tick = false;
+                        if entry.num_hashes == waterclock_config.hashes_per_drop.unwrap() {
+                            need_drop = false;
                         } else {
                             need_partial = false;
                         }
 
                         hashes += entry.num_hashes;
 
-                        assert_eq!(hashes, waterclock_config.hashes_per_tick.unwrap());
+                        assert_eq!(hashes, waterclock_config.hashes_per_drop.unwrap());
 
                         hashes = 0;
                     } else {

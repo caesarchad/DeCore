@@ -11,7 +11,7 @@ use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{KeypairUtil, Signature};
-use morgan_interface::timing::{DEFAULT_NUM_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT};
+use morgan_interface::timing::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
 use morgan_interface::transaction::{self, Transaction, TransactionError};
 use std::error;
 use std::io;
@@ -99,7 +99,7 @@ impl RpcClient {
                 if cfg!(not(test)) {
                     // Retry ~twice during a slot
                     sleep(Duration::from_millis(
-                        500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                        500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
                     ));
                 }
             };
@@ -142,10 +142,10 @@ impl RpcClient {
             let mut transactions_signatures = vec![];
             for transaction in transactions {
                 if cfg!(not(test)) {
-                    // Delay ~1 tick between write transactions in an attempt to reduce AccountInUse errors
+                    // Delay ~1 _drop between write transactions in an attempt to reduce AccountInUse errors
                     // when all the write transactions modify the same program account (eg, deploying a
                     // new program)
-                    sleep(Duration::from_millis(1000 / DEFAULT_NUM_TICKS_PER_SECOND));
+                    sleep(Duration::from_millis(1000 / DEFAULT_NUM_DROPS_PER_SECOND));
                 }
 
                 let signature = self.send_transaction(&transaction).ok();
@@ -159,7 +159,7 @@ impl RpcClient {
                 if cfg!(not(test)) {
                     // Retry ~twice during a slot
                     sleep(Duration::from_millis(
-                        500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                        500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
                     ));
                 }
 
@@ -318,7 +318,7 @@ impl RpcClient {
 
             // Retry ~twice during a slot
             sleep(Duration::from_millis(
-                500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
             ));
             num_retries -= 1;
         }

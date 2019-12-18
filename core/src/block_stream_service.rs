@@ -113,28 +113,28 @@ impl BlockstreamService {
         } else {
             Some(block_buffer_meta.parent_slot)
         };
-        let ticks_per_slot = entries
+        let drops_per_slot = entries
             .iter()
-            .filter(|entry| entry.is_tick())
+            .filter(|entry| entry.is_drop())
             .fold(0, |acc, _| acc + 1);
-        let mut tick_height = if slot > 0 {
-            ticks_per_slot * slot - 1
+        let mut drop_height = if slot > 0 {
+            drops_per_slot * slot - 1
         } else {
             0
         };
 
         for (i, entry) in entries.iter().enumerate() {
-            if entry.is_tick() {
-                tick_height += 1;
+            if entry.is_drop() {
+                drop_height += 1;
             }
             blockstream
-                .emit_entry_event(slot, tick_height, &slot_leader, &entry)
+                .emit_entry_event(slot, drop_height, &slot_leader, &entry)
                 .unwrap_or_else(|e| {
                     debug!("Blockstream error: {:?}, {:?}", e, blockstream.output);
                 });
             if i == entries.len() - 1 {
                 blockstream
-                    .emit_block_event(slot, tick_height, &slot_leader, entry.hash)
+                    .emit_block_event(slot, drop_height, &slot_leader, entry.hash)
                     .unwrap_or_else(|e| {
                         debug!("Blockstream error: {:?}, {:?}", e, blockstream.output);
                     });
@@ -156,7 +156,7 @@ impl Service for BlockstreamService {
 mod test {
     use super::*;
     use crate::block_buffer_pool::create_new_tmp_ledger;
-    use crate::entry_info::{create_ticks, Entry};
+    use crate::entry_info::{create_drops, Entry};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use bincode::{deserialize, serialize};
     use chrono::{DateTime, FixedOffset};
@@ -168,14 +168,14 @@ mod test {
 
     #[test]
     fn test_blockstream_service_process_entries() {
-        let ticks_per_slot = 5;
+        let drops_per_slot = 5;
         let leader_pubkey = Pubkey::new_rand();
 
         // Set up genesis block and block_buffer_pool
         let GenesisBlockInfo {
             mut genesis_block, ..
         } = create_genesis_block(1000);
-        genesis_block.ticks_per_slot = ticks_per_slot;
+        genesis_block.drops_per_slot = drops_per_slot;
 
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
@@ -186,8 +186,8 @@ mod test {
         // Set up dummy channel to receive a full-slot notification
         let (slot_full_sender, slot_full_receiver) = channel();
 
-        // Create entries - 4 ticks + 1 populated entry + 1 tick
-        let mut entries = create_ticks(4, Hash::default());
+        // Create entries - 4 drops + 1 populated entry + 1 drop
+        let mut entries = create_drops(4, Hash::default());
 
         let keypair = Keypair::new();
         let mut transaction_seal = entries[3].hash;
@@ -200,14 +200,14 @@ mod test {
         let entry = Entry::new(&mut transaction_seal, 1, vec![tx]);
         transaction_seal = entry.hash;
         entries.push(entry);
-        let final_tick = create_ticks(1, transaction_seal);
-        entries.extend_from_slice(&final_tick);
+        let final_drop = create_drops(1, transaction_seal);
+        entries.extend_from_slice(&final_drop);
 
         let expected_entries = entries.clone();
-        let expected_tick_heights = [5, 6, 7, 8, 8, 9];
+        let expected_drop_heights = [5, 6, 7, 8, 8, 9];
 
         block_buffer_pool
-            .update_entries(1, 0, 0, ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         slot_full_sender.send((1, leader_pubkey)).unwrap();
@@ -235,7 +235,7 @@ mod test {
             });
         for (i, json) in entry_events.iter().enumerate() {
             let height = json["h"].as_u64().unwrap();
-            assert_eq!(height, expected_tick_heights[i]);
+            assert_eq!(height, expected_drop_heights[i]);
             let entry_obj = json["entry"].clone();
             let tx = entry_obj["transactions"].as_array().unwrap();
             let entry: Entry;
@@ -271,7 +271,7 @@ mod test {
             let slot = json["s"].as_u64().unwrap();
             assert_eq!(1, slot);
             let height = json["h"].as_u64().unwrap();
-            assert_eq!(2 * ticks_per_slot - 1, height);
+            assert_eq!(2 * drops_per_slot - 1, height);
         }
     }
 }
