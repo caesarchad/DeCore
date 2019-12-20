@@ -10,7 +10,7 @@ use hashbrown::{HashMap, HashSet};
 use log::*;
 use morgan_metricbot::inc_new_counter_error;
 use morgan_interface::account::Account;
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::native_loader;
 use morgan_interface::pubkey::Pubkey;

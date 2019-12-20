@@ -9,7 +9,7 @@ use std::time::Duration;
 use ansi_term::Color::{Green};
 use morgan_helper::logHelper::*;
 use serde_json::{Number, Value};
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::transaction::{self, TransactionError};
 
 pub(crate) trait GenericRpcClientRequest {

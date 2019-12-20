@@ -12,7 +12,7 @@ use jsonrpc_derive::rpc;
 use morgan_tokenbot::drone::{request_airdrop_transaction, request_reputation_airdrop_transaction};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::transaction::{self, Transaction};

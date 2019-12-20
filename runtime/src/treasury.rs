@@ -18,7 +18,7 @@ use morgan_metricbot::{
     datapoint_info, inc_new_counter_debug, inc_new_counter_error, inc_new_counter_info,
 };
 use morgan_interface::account::Account;
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{extend_and_hash, Hash};
 use morgan_interface::native_loader;

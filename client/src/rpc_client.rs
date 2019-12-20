@@ -7,7 +7,7 @@ use bincode::serialize;
 use log::*;
 use serde_json::{json, Value};
 use morgan_interface::account::Account;
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{KeypairUtil, Signature};

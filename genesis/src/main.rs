@@ -15,7 +15,7 @@ extern crate morgan_exchange_controller;
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
 use morgan::block_buffer_pool::make_new_ledger_file;
 use morgan_interface::account::Account;
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{hash, Hash};
 use morgan_interface::waterclock_config::WaterClockConfig;

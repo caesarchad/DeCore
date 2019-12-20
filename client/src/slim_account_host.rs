@@ -7,7 +7,7 @@ use crate::rpc_client::RpcClient;
 use bincode::{serialize_into, serialized_size};
 use log::*;
 use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount};
-use morgan_interface::fee_calculator::FeeCalculator;
+use morgan_interface::gas_cost::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;
 use morgan_interface::message::Message;
