@@ -15,7 +15,7 @@ extern crate morgan_exchange_controller;
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
 use morgan::block_buffer_pool::make_new_ledger_file;
 use morgan_interface::account::Account;
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{hash, Hash};
 use morgan_interface::waterclock_config::WaterClockConfig;
@@ -33,7 +33,7 @@ pub const BOOTSTRAP_LEADER_DIFS: u64 = 42;
 fn main() -> Result<(), Box<dyn error::Error>> {
     let default_bootstrap_leader_difs = &BOOTSTRAP_LEADER_DIFS.to_string();
     let default_difs_per_signature =
-        &FeeCalculator::default().difs_per_signature.to_string();
+        &GasCost::default().difs_per_signature.to_string();
     let default_target_drop_duration =
         &timing::duration_as_ms(&WaterClockConfig::default().target_drop_duration).to_string();
     let default_drops_per_slot = &timing::DEFAULT_DROPS_PER_SLOT.to_string();

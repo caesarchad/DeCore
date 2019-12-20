@@ -1,6 +1,6 @@
 use crate::treasury::Treasury;
 use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount};
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;
 use morgan_interface::message::Message;
@@ -106,7 +106,7 @@ impl OnlineAccount for TreasuryClient {
         Ok(self.treasury.get_signature_status(signature))
     }
 
-    fn get_recent_transaction_seal(&self) -> Result<(Hash, FeeCalculator)> {
+    fn get_recent_transaction_seal(&self) -> Result<(Hash, GasCost)> {
         let last_transaction_seal = self.treasury.last_transaction_seal();
         let fee_calculator = self.treasury.fee_calculator.clone();
         Ok((last_transaction_seal, fee_calculator))
@@ -169,7 +169,7 @@ impl OnlineAccount for TreasuryClient {
         Ok(())
     }
 
-    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, FeeCalculator)> {
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, GasCost)> {
         let (last_transaction_seal, fee_calculator) = self.get_recent_transaction_seal()?;
         if last_transaction_seal != *transaction_seal {
             Ok((last_transaction_seal, fee_calculator))

@@ -7,7 +7,7 @@ use bincode::serialize;
 use log::*;
 use serde_json::{json, Value};
 use morgan_interface::account::Account;
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{KeypairUtil, Signature};
@@ -278,7 +278,7 @@ impl RpcClient {
         })
     }
 
-    pub fn get_recent_transaction_seal(&self) -> io::Result<(Hash, FeeCalculator)> {
+    pub fn get_recent_transaction_seal(&self) -> io::Result<(Hash, GasCost)> {
         let response = self
             .client
             .send(&RpcRequest::GetRecentTransactionSeal, None, 0)
@@ -290,7 +290,7 @@ impl RpcClient {
             })?;
 
         let (transaction_seal, fee_calculator) =
-            serde_json::from_value::<(String, FeeCalculator)>(response).map_err(|err| {
+            serde_json::from_value::<(String, GasCost)>(response).map_err(|err| {
                 io::Error::new(
                     io::ErrorKind::Other,
                     format!("GetRecentTransactionSeal parse failure: {:?}", err),
@@ -306,7 +306,7 @@ impl RpcClient {
         Ok((transaction_seal, fee_calculator))
     }
 
-    pub fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> io::Result<(Hash, FeeCalculator)> {
+    pub fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> io::Result<(Hash, GasCost)> {
         let mut num_retries = 10;
         while num_retries > 0 {
             if let Ok((new_transaction_seal, fee_calculator)) = self.get_recent_transaction_seal() {

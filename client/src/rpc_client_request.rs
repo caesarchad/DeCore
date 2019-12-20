@@ -9,7 +9,7 @@ use std::time::Duration;
 use ansi_term::Color::{Green};
 use morgan_helper::logHelper::*;
 use serde_json::{Number, Value};
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::transaction::{self, TransactionError};
 
 pub(crate) trait GenericRpcClientRequest {
@@ -88,7 +88,7 @@ impl GenericRpcClientRequest for MockRpcClientRequest {
             }
             RpcRequest::GetRecentTransactionSeal => Value::Array(vec![
                 Value::String(PUBKEY.to_string()),
-                serde_json::to_value(FeeCalculator::default()).unwrap(),
+                serde_json::to_value(GasCost::default()).unwrap(),
             ]),
             RpcRequest::GetSignatureStatus => {
                 let response: Option<transaction::Result<()>> = if self.url == "account_in_use" {

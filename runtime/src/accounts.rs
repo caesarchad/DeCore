@@ -10,7 +10,7 @@ use hashbrown::{HashMap, HashSet};
 use log::*;
 use morgan_metricbot::inc_new_counter_error;
 use morgan_interface::account::Account;
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::native_loader;
 use morgan_interface::pubkey::Pubkey;
@@ -282,7 +282,7 @@ impl Accounts {
         ancestors: &HashMap<Fork, usize>,
         txs: &[Transaction],
         lock_results: Vec<Result<()>>,
-        fee_calculator: &FeeCalculator,
+        fee_calculator: &GasCost,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(InstructionAccounts, InstructionLoaders)>> {
         //PERF: hold the lock to scan for the references, but not to clone the accounts
@@ -541,7 +541,7 @@ impl Accounts {
         ancestors: &HashMap<Fork, usize>,
         txs: &[Transaction],
         results: Vec<Result<()>>,
-        fee_calculator: &FeeCalculator,
+        fee_calculator: &GasCost,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(InstructionAccounts, InstructionLoaders)>> {
         self.load_accounts_internal(ancestors, txs, results, fee_calculator, error_counters)
@@ -597,7 +597,7 @@ mod tests {
     fn load_accounts_with_fee(
         tx: Transaction,
         ka: &Vec<(Pubkey, Account)>,
-        fee_calculator: &FeeCalculator,
+        fee_calculator: &GasCost,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(InstructionAccounts, InstructionLoaders)>> {
         let accounts = Accounts::new(None);
@@ -621,7 +621,7 @@ mod tests {
         ka: &Vec<(Pubkey, Account)>,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(InstructionAccounts, InstructionLoaders)>> {
-        let fee_calculator = FeeCalculator::default();
+        let fee_calculator = GasCost::default();
         load_accounts_with_fee(tx, ka, &fee_calculator, error_counters)
     }
 
@@ -723,7 +723,7 @@ mod tests {
             instructions,
         );
 
-        let fee_calculator = FeeCalculator::new(10);
+        let fee_calculator = GasCost::new(10);
         assert_eq!(fee_calculator.calculate_fee(tx.message()), 10);
 
         let loaded_accounts =

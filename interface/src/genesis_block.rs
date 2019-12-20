@@ -1,7 +1,7 @@
 //! The `genesis_block` module is a library for generating the chain's genesis block.
 
 use crate::account::Account;
-use crate::fee_calculator::FeeCalculator;
+use crate::gas_cost::GasCost;
 use crate::hash::{hash, Hash};
 use crate::waterclock_config::WaterClockConfig;
 use crate::pubkey::Pubkey;
@@ -17,7 +17,7 @@ pub struct GenesisBlock {
     pub accounts: Vec<(Pubkey, Account)>,
     pub bootstrap_leader_pubkey: Pubkey,
     pub epoch_warmup: bool,
-    pub fee_calculator: FeeCalculator,
+    pub fee_calculator: GasCost,
     pub native_instruction_processors: Vec<(String, Pubkey)>,
     pub slots_per_epoch: u64,
     pub stakers_slot_offset: u64,
@@ -51,7 +51,7 @@ impl GenesisBlock {
             accounts: accounts.to_vec(),
             bootstrap_leader_pubkey: *bootstrap_leader_pubkey, // TODO: leader_schedule to derive from actual stakes, instead ;)
             epoch_warmup: true,
-            fee_calculator: FeeCalculator::default(),
+            fee_calculator: GasCost::default(),
             native_instruction_processors: native_instruction_processors.to_vec(),
             slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
             stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,

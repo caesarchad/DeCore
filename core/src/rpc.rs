@@ -12,7 +12,7 @@ use jsonrpc_derive::rpc;
 use morgan_tokenbot::drone::{request_airdrop_transaction, request_reputation_airdrop_transaction};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::transaction::{self, Transaction};
@@ -80,7 +80,7 @@ impl JsonRpcRequestProcessor {
         self.treasury().get_reputation(&pubkey)
     }
 
-    fn get_recent_transaction_seal(&self) -> (String, FeeCalculator) {
+    fn get_recent_transaction_seal(&self) -> (String, GasCost) {
         (
             self.treasury().confirmed_last_transaction_seal().to_string(),
             self.treasury().fee_calculator.clone(),
@@ -201,7 +201,7 @@ pub trait RpcSol {
     fn get_cluster_nodes(&self, _: Self::Metadata) -> Result<Vec<RpcContactInfo>>;
 
     #[rpc(meta, name = "getLatestTransactionSeal")]
-    fn get_recent_transaction_seal(&self, _: Self::Metadata) -> Result<(String, FeeCalculator)>;
+    fn get_recent_transaction_seal(&self, _: Self::Metadata) -> Result<(String, GasCost)>;
 
     #[rpc(meta, name = "getSignatureState")]
     fn get_signature_status(
@@ -317,7 +317,7 @@ impl RpcSol for RpcSolImpl {
             .collect())
     }
 
-    fn get_recent_transaction_seal(&self, meta: Self::Metadata) -> Result<(String, FeeCalculator)> {
+    fn get_recent_transaction_seal(&self, meta: Self::Metadata) -> Result<(String, GasCost)> {
         debug!("get_recent_transaction_seal rpc request received");
         Ok(meta
             .request_processor

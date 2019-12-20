@@ -7,7 +7,7 @@ use crate::rpc_client::RpcClient;
 use bincode::{serialize_into, serialized_size};
 use log::*;
 use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount};
-use morgan_interface::gas_cost::FeeCalculator;
+use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;
 use morgan_interface::message::Message;
@@ -220,7 +220,7 @@ impl OnlineAccount for SlimAccountHost {
         Ok(status)
     }
 
-    fn get_recent_transaction_seal(&self) -> TransportResult<(Hash, FeeCalculator)> {
+    fn get_recent_transaction_seal(&self) -> TransportResult<(Hash, GasCost)> {
         Ok(self.rpc_client.get_recent_transaction_seal()?)
     }
 
@@ -244,7 +244,7 @@ impl OnlineAccount for SlimAccountHost {
         Ok(self.rpc_client.poll_for_signature(signature)?)
     }
 
-    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> TransportResult<(Hash, FeeCalculator)> {
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> TransportResult<(Hash, GasCost)> {
         Ok(self.rpc_client.get_new_transaction_seal(transaction_seal)?)
     }
 }
