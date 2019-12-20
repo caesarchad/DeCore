@@ -2,7 +2,7 @@ pub mod account;
 pub mod account_utils;
 pub mod bvm_controller;
 pub mod account_host;
-pub mod fee_calculator;
+pub mod gas_cost;
 pub mod genesis_block;
 pub mod hash;
 pub mod instruction;
