@@ -7,7 +7,7 @@ use serde_json::json;
 use morgan_budget_api;
 use morgan_budget_api::budget_instruction;
 use morgan_budget_api::budget_state::BudgetError;
-use morgan_client::client_error::ClientError;
+use morgan_client::account_host_err::ClientError;
 use morgan_client::rpc_client::RpcClient;
 #[cfg(not(test))]
 use morgan_tokenbot::drone::request_airdrop_transaction;

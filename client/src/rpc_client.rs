@@ -1,4 +1,4 @@
-use crate::client_error::ClientError;
+use crate::account_host_err::ClientError;
 use crate::rpc_client_request::GenericRpcClientRequest;
 use crate::rpc_client_request::MockRpcClientRequest;
 use crate::rpc_client_request::RpcClientRequest;
