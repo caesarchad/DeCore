@@ -170,7 +170,7 @@ mod tests {
     use crate::treasury_client::TreasuryClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::instruction::{AccountMeta, Instruction, InstructionError};
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -442,7 +442,7 @@ mod tests {
         );
         assert_eq!(
             treasury_client
-                .send_instruction(&mallory_keypair, malicious_instruction)
+                .snd_online_instruction(&mallory_keypair, malicious_instruction)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)

@@ -8,8 +8,8 @@ use crate::cloner::StorageMiner;
 use crate::service::Service;
 use crate::verifier::{Validator, ValidatorConfig};
 use morgan_client::slim_account_host::create_client;
-use morgan_client::slim_account_host::ThinClient;
-use morgan_interface::client::SyncClient;
+use morgan_client::slim_account_host::SlimAccountHost;
+use morgan_interface::client::OnlineAccount;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::message::Message;
 use morgan_interface::waterclock_config::WaterClockConfig;
@@ -382,7 +382,7 @@ impl LocalNodeGroup {
     }
 
     fn transfer_with_client(
-        client: &ThinClient,
+        client: &SlimAccountHost,
         source_keypair: &Keypair,
         dest_pubkey: &Pubkey,
         difs: u64,
@@ -421,7 +421,7 @@ impl LocalNodeGroup {
     }
 
     fn setup_vote_and_stake_accounts(
-        client: &ThinClient,
+        client: &SlimAccountHost,
         vote_account: &Keypair,
         from_account: &Arc<Keypair>,
         amount: u64,
@@ -518,7 +518,7 @@ impl LocalNodeGroup {
     }
 
     fn setup_storage_account(
-        client: &ThinClient,
+        client: &SlimAccountHost,
         storage_keypair: &Keypair,
         from_keypair: &Arc<Keypair>,
         storage_miner: bool,

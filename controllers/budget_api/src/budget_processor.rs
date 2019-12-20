@@ -155,7 +155,7 @@ mod tests {
     use crate::id;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::instruction::InstructionError;
     use morgan_interface::message::Message;
@@ -178,7 +178,7 @@ mod tests {
         let instructions = budget_instruction::payment(&alice_pubkey, &bob_pubkey, 100);
         let message = Message::new(instructions);
         treasury_client
-            .send_message(&[&alice_keypair], message)
+            .send_online_msg(&[&alice_keypair], message)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 100);
     }
@@ -203,7 +203,7 @@ mod tests {
         );
         let message = Message::new(instructions);
         treasury_client
-            .send_message(&[&alice_keypair], message)
+            .send_online_msg(&[&alice_keypair], message)
             .unwrap();
 
         // Attack! Part 1: Sign a witness transaction with a random key.
@@ -224,7 +224,7 @@ mod tests {
         // Ensure the transaction fails because of the unsigned key.
         assert_eq!(
             treasury_client
-                .send_message(&[&mallory_keypair], message)
+                .send_online_msg(&[&mallory_keypair], message)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
@@ -252,7 +252,7 @@ mod tests {
         );
         let message = Message::new(instructions);
         treasury_client
-            .send_message(&[&alice_keypair], message)
+            .send_online_msg(&[&alice_keypair], message)
             .unwrap();
 
         // Attack! Part 1: Sign a timestamp transaction with a random key.
@@ -273,7 +273,7 @@ mod tests {
         // Ensure the transaction fails because of the unsigned key.
         assert_eq!(
             treasury_client
-                .send_message(&[&mallory_keypair], message)
+                .send_online_msg(&[&mallory_keypair], message)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
@@ -300,7 +300,7 @@ mod tests {
         );
         let message = Message::new(instructions);
         treasury_client
-            .send_message(&[&alice_keypair], message)
+            .send_online_msg(&[&alice_keypair], message)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
         assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
@@ -317,7 +317,7 @@ mod tests {
             budget_instruction::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
         assert_eq!(
             treasury_client
-                .send_instruction(&alice_keypair, instruction)
+                .snd_online_instruction(&alice_keypair, instruction)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(
@@ -341,7 +341,7 @@ mod tests {
         let instruction =
             budget_instruction::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
         treasury_client
-            .send_instruction(&alice_keypair, instruction)
+            .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
         assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 0);
@@ -369,7 +369,7 @@ mod tests {
         );
         let message = Message::new(instructions);
         treasury_client
-            .send_message(&[&alice_keypair], message)
+            .send_online_msg(&[&alice_keypair], message)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 2);
         assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
@@ -392,7 +392,7 @@ mod tests {
         let instruction =
             budget_instruction::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
         treasury_client
-            .send_instruction(&mallory_keypair, instruction)
+            .snd_online_instruction(&mallory_keypair, instruction)
             .unwrap();
         // nothing should be changed because apply witness didn't finalize a payment
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
@@ -403,7 +403,7 @@ mod tests {
         let instruction =
             budget_instruction::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
         treasury_client
-            .send_instruction(&alice_keypair, instruction)
+            .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 2);
         assert_eq!(treasury_client.get_account_data(&budget_pubkey).unwrap(), None);

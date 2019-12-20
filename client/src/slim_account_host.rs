@@ -1,12 +1,12 @@
 //! The `slim_account_host` module is a client-side object that interfaces with
-//! a server-side transaction digesting module.  Client code should use this object instead of writing
+//! a server-side transaction digesting module.  AccountHost code should use this object instead of writing
 //! messages to the network directly. The binary encoding of its messages are
 //! unstable and may change in future releases.
 
 use crate::rpc_client::RpcClient;
 use bincode::{serialize_into, serialized_size};
 use log::*;
-use morgan_interface::client::{AsyncClient, Client, SyncClient};
+use morgan_interface::client::{OfflineAccount, AccountHost, OnlineAccount};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;
@@ -23,46 +23,46 @@ use std::time::Duration;
 use morgan_helper::logHelper::*;
 
 /// An object for querying and sending transactions to the network.
-pub struct ThinClient {
-    transactions_addr: SocketAddr,
-    transactions_socket: UdpSocket,
+pub struct SlimAccountHost {
+    account_host_url: SocketAddr,
+    account_host_socket: UdpSocket,
     rpc_client: RpcClient,
 }
 
-impl ThinClient {
-    /// Create a new ThinClient that will interface with the Rpc at `rpc_addr` using TCP
-    /// and the TransactionDigestingModule at `transactions_addr` over `transactions_socket` using UDP.
+impl SlimAccountHost {
+    /// Create a new SlimAccountHost that will interface with the Rpc at `rpc_addr` using TCP
+    /// and the TransactionDigestingModule at `account_host_url` over `account_host_socket` using UDP.
     pub fn new(
         rpc_addr: SocketAddr,
-        transactions_addr: SocketAddr,
-        transactions_socket: UdpSocket,
+        account_host_url: SocketAddr,
+        account_host_socket: UdpSocket,
     ) -> Self {
         Self::new_from_client(
-            transactions_addr,
-            transactions_socket,
+            account_host_url,
+            account_host_socket,
             RpcClient::new_socket(rpc_addr),
         )
     }
 
     pub fn new_socket_with_timeout(
         rpc_addr: SocketAddr,
-        transactions_addr: SocketAddr,
-        transactions_socket: UdpSocket,
+        account_host_url: SocketAddr,
+        account_host_socket: UdpSocket,
         timeout: Duration,
     ) -> Self {
         let rpc_client = RpcClient::new_socket_with_timeout(rpc_addr, timeout);
-        Self::new_from_client(transactions_addr, transactions_socket, rpc_client)
+        Self::new_from_client(account_host_url, account_host_socket, rpc_client)
     }
 
     fn new_from_client(
-        transactions_addr: SocketAddr,
-        transactions_socket: UdpSocket,
+        account_host_url: SocketAddr,
+        account_host_socket: UdpSocket,
         rpc_client: RpcClient,
     ) -> Self {
         Self {
             rpc_client,
-            transactions_addr,
-            transactions_socket,
+            account_host_url,
+            account_host_socket,
         }
     }
 
@@ -100,16 +100,16 @@ impl ThinClient {
             let mut wr = std::io::Cursor::new(&mut buf[..]);
             serialize_into(&mut wr, &transaction)
                 .expect("serialize Transaction in pub fn transfer_signed");
-            self.transactions_socket
-                .send_to(&buf[..], &self.transactions_addr)?;
+            self.account_host_socket
+                .send_to(&buf[..], &self.account_host_url)?;
             if self
                 .poll_for_signature_confirmation(&transaction.signatures[0], min_confirmed_blocks)
                 .is_ok()
             {
                 return Ok(transaction.signatures[0]);
             }
-            // info!("{}", Info(format!("{} tries failed transfer to {}", x, self.transactions_addr).to_string()));
-            let info:String = format!("{} tries failed transfer to {}", x, self.transactions_addr).to_string();
+            // info!("{}", Info(format!("{} tries failed transfer to {}", x, self.account_host_url).to_string()));
+            let info:String = format!("{} tries failed transfer to {}", x, self.account_host_url).to_string();
             println!("{}",
                 printLn(
                     info,
@@ -161,30 +161,30 @@ impl ThinClient {
     }
 }
 
-impl Client for ThinClient {
-    fn transactions_addr(&self) -> String {
-        self.transactions_addr.to_string()
+impl AccountHost for SlimAccountHost {
+    fn account_host_url(&self) -> String {
+        self.account_host_url.to_string()
     }
 }
 
-impl SyncClient for ThinClient {
-    fn send_message(&self, keypairs: &[&Keypair], message: Message) -> TransportResult<Signature> {
+impl OnlineAccount for SlimAccountHost {
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> TransportResult<Signature> {
         let (transaction_seal, _fee_calculator) = self.get_recent_transaction_seal()?;
         let mut transaction = Transaction::new(&keypairs, message, transaction_seal);
         let signature = self.send_and_confirm_transaction(keypairs, &mut transaction, 5, 0)?;
         Ok(signature)
     }
 
-    fn send_instruction(
+    fn snd_online_instruction(
         &self,
         keypair: &Keypair,
         instruction: Instruction,
     ) -> TransportResult<Signature> {
         let message = Message::new(vec![instruction]);
-        self.send_message(&[keypair], message)
+        self.send_online_msg(&[keypair], message)
     }
 
-    fn transfer(
+    fn online_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
@@ -192,7 +192,7 @@ impl SyncClient for ThinClient {
     ) -> TransportResult<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.send_instruction(keypair, transfer_instruction)
+        self.snd_online_instruction(keypair, transfer_instruction)
     }
 
     fn get_account_data(&self, pubkey: &Pubkey) -> TransportResult<Option<Vec<u8>>> {
@@ -249,36 +249,36 @@ impl SyncClient for ThinClient {
     }
 }
 
-impl AsyncClient for ThinClient {
-    fn async_send_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
+impl OfflineAccount for SlimAccountHost {
+    fn send_offline_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
         let mut buf = vec![0; serialized_size(&transaction).unwrap() as usize];
         let mut wr = std::io::Cursor::new(&mut buf[..]);
         serialize_into(&mut wr, &transaction)
             .expect("serialize Transaction in pub fn transfer_signed");
         assert!(buf.len() < PACKET_DATA_SIZE);
-        self.transactions_socket
-            .send_to(&buf[..], &self.transactions_addr)?;
+        self.account_host_socket
+            .send_to(&buf[..], &self.account_host_url)?;
         Ok(transaction.signatures[0])
     }
-    fn async_send_message(
+    fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
         message: Message,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
-        self.async_send_transaction(transaction)
+        self.send_offline_transaction(transaction)
     }
-    fn async_send_instruction(
+    fn send_offline_instruction(
         &self,
         keypair: &Keypair,
         instruction: Instruction,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.async_send_message(&[keypair], message, recent_transaction_seal)
+        self.send_offline_message(&[keypair], message, recent_transaction_seal)
     }
-    fn async_transfer(
+    fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
@@ -287,20 +287,20 @@ impl AsyncClient for ThinClient {
     ) -> io::Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.async_send_instruction(keypair, transfer_instruction, recent_transaction_seal)
+        self.send_offline_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
 
-pub fn create_client((rpc, transaction_digesting_module): (SocketAddr, SocketAddr), range: (u16, u16)) -> ThinClient {
-    let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new(rpc, transaction_digesting_module, transactions_socket)
+pub fn create_client((rpc, transaction_digesting_module): (SocketAddr, SocketAddr), range: (u16, u16)) -> SlimAccountHost {
+    let (_, account_host_socket) = morgan_netutil::bind_in_range(range).unwrap();
+    SlimAccountHost::new(rpc, transaction_digesting_module, account_host_socket)
 }
 
 pub fn create_client_with_timeout(
     (rpc, transaction_digesting_module): (SocketAddr, SocketAddr),
     range: (u16, u16),
     timeout: Duration,
-) -> ThinClient {
-    let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new_socket_with_timeout(rpc, transaction_digesting_module, transactions_socket, timeout)
+) -> SlimAccountHost {
+    let (_, account_host_socket) = morgan_netutil::bind_in_range(range).unwrap();
+    SlimAccountHost::new_socket_with_timeout(rpc, transaction_digesting_module, account_host_socket, timeout)
 }

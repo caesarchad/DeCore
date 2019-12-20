@@ -16,10 +16,10 @@ use rand::thread_rng;
 use rand::Rng;
 use morgan_client::rpc_client::RpcClient;
 use morgan_client::rpc_request::RpcRequest;
-use morgan_client::slim_account_host::ThinClient;
+use morgan_client::slim_account_host::SlimAccountHost;
 use solana_ed25519_dalek as ed25519_dalek;
 use morgan_runtime::treasury::Treasury;
-use morgan_interface::client::{AsyncClient, SyncClient};
+use morgan_interface::client::{OfflineAccount, OnlineAccount};
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::message::Message;
@@ -485,7 +485,7 @@ impl StorageMiner {
     }
 
     fn setup_mining_account(
-        client: &ThinClient,
+        client: &SlimAccountHost,
         keypair: &Keypair,
         storage_keypair: &Keypair,
     ) -> Result<()> {
@@ -508,7 +508,7 @@ impl StorageMiner {
                 1,
             );
             let tx = Transaction::new_signed_instructions(&[keypair], ix, transaction_seal);
-            let signature = client.async_send_transaction(tx)?;
+            let signature = client.send_offline_transaction(tx)?;
             client
                 .poll_for_signature(&signature)
                 .map_err(|err| match err {

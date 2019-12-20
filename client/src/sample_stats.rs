@@ -1,5 +1,5 @@
 use log::*;
-use morgan_interface::client::Client;
+use morgan_interface::client::AccountHost;
 use morgan_interface::timing::duration_as_s;
 use morgan_helper::logHelper::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,7 +25,7 @@ pub fn sample_txs<T>(
     sample_period: u64,
     client: &Arc<T>,
 ) where
-    T: Client,
+    T: AccountHost,
 {
     let mut max_tps = 0.0;
     let mut total_elapsed;
@@ -84,7 +84,7 @@ pub fn sample_txs<T>(
             sample_stats
                 .write()
                 .unwrap()
-                .push((client.transactions_addr(), stats));
+                .push((client.account_host_url(), stats));
             return;
         }
         sleep(Duration::from_secs(sample_period));

@@ -1,5 +1,5 @@
 use crate::treasury::Treasury;
-use morgan_interface::client::{AsyncClient, Client, SyncClient};
+use morgan_interface::client::{OfflineAccount, AccountHost, OnlineAccount};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;
@@ -22,42 +22,42 @@ pub struct TreasuryClient {
     transaction_sender: Mutex<Sender<Transaction>>,
 }
 
-impl Client for TreasuryClient {
-    fn transactions_addr(&self) -> String {
+impl AccountHost for TreasuryClient {
+    fn account_host_url(&self) -> String {
         "Local TreasuryClient".to_string()
     }
 }
 
-impl AsyncClient for TreasuryClient {
-    fn async_send_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
+impl OfflineAccount for TreasuryClient {
+    fn send_offline_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
         let signature = transaction.signatures.get(0).cloned().unwrap_or_default();
         let transaction_sender = self.transaction_sender.lock().unwrap();
         transaction_sender.send(transaction).unwrap();
         Ok(signature)
     }
 
-    fn async_send_message(
+    fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
         message: Message,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
-        self.async_send_transaction(transaction)
+        self.send_offline_transaction(transaction)
     }
 
-    fn async_send_instruction(
+    fn send_offline_instruction(
         &self,
         keypair: &Keypair,
         instruction: Instruction,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.async_send_message(&[keypair], message, recent_transaction_seal)
+        self.send_offline_message(&[keypair], message, recent_transaction_seal)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
-    fn async_transfer(
+    fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
@@ -66,12 +66,12 @@ impl AsyncClient for TreasuryClient {
     ) -> io::Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.async_send_instruction(keypair, transfer_instruction, recent_transaction_seal)
+        self.send_offline_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
 
-impl SyncClient for TreasuryClient {
-    fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
+impl OnlineAccount for TreasuryClient {
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
         let transaction_seal = self.treasury.last_transaction_seal();
         let transaction = Transaction::new(&keypairs, message, transaction_seal);
         self.treasury.process_transaction(&transaction)?;
@@ -79,16 +79,16 @@ impl SyncClient for TreasuryClient {
     }
 
     /// Create and process a transaction from a single instruction.
-    fn send_instruction(&self, keypair: &Keypair, instruction: Instruction) -> Result<Signature> {
+    fn snd_online_instruction(&self, keypair: &Keypair, instruction: Instruction) -> Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.send_message(&[keypair], message)
+        self.send_online_msg(&[keypair], message)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
-    fn transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature> {
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.send_instruction(keypair, transfer_instruction)
+        self.snd_online_instruction(keypair, transfer_instruction)
     }
 
     fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>> {
@@ -237,7 +237,7 @@ mod tests {
             .push(AccountMeta::new(jane_pubkey, true));
 
         let message = Message::new(vec![transfer_instruction]);
-        treasury_client.send_message(&doe_keypairs, message).unwrap();
+        treasury_client.send_online_msg(&doe_keypairs, message).unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }
 }

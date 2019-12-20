@@ -201,7 +201,7 @@ impl StoragePhase {
             Builder::new()
                 .name("morgan-storage-create-accounts".to_string())
                 .spawn(move || {
-                    let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+                    let account_host_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
                     {
                         let working_treasury = treasury_forks.read().unwrap().working_treasury();
@@ -227,7 +227,7 @@ impl StoragePhase {
                                     instruction,
                                     &keypair,
                                     &storage_keypair,
-                                    &transactions_socket,
+                                    &account_host_socket,
                                 )
                                 .unwrap_or_else(|err| {
                                     // info!("{}", Info(format!("failed to send storage transaction: {:?}", err).to_string()))
@@ -266,7 +266,7 @@ impl StoragePhase {
         instruction: Instruction,
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
-        transactions_socket: &UdpSocket,
+        account_host_socket: &UdpSocket,
     ) -> io::Result<()> {
         let working_treasury = treasury_forks.read().unwrap().working_treasury();
         let transaction_seal = working_treasury.confirmed_last_transaction_seal();
@@ -310,7 +310,7 @@ impl StoragePhase {
         let message = Message::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
         let transaction = Transaction::new(&signer_keys, message, transaction_seal);
 
-        transactions_socket.send_to(
+        account_host_socket.send_to(
             &bincode::serialize(&transaction).unwrap(),
             node_group_info.read().unwrap().my_data().transaction_digesting_module,
         )?;

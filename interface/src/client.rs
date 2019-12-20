@@ -17,22 +17,22 @@ use crate::transaction;
 use crate::transport::Result;
 use std::io;
 
-pub trait Client: SyncClient + AsyncClient {
-    fn transactions_addr(&self) -> String;
+pub trait AccountHost: OnlineAccount + OfflineAccount {
+    fn account_host_url(&self) -> String;
 }
 
-pub trait SyncClient {
+pub trait OnlineAccount {
     /// Create a transaction from the given message, and send it to the
     /// server, retrying as-needed.
-    fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature>;
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature>;
 
     /// Create a transaction from a single instruction that only requires
     /// a single signer. Then send it to the server, retrying as-needed.
-    fn send_instruction(&self, keypair: &Keypair, instruction: Instruction) -> Result<Signature>;
+    fn snd_online_instruction(&self, keypair: &Keypair, instruction: Instruction) -> Result<Signature>;
 
     /// Transfer difs from `keypair` to `pubkey`, retrying until the
     /// transfer completes or produces and error.
-    fn transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature>;
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature>;
 
     /// Get an account or None if not found.
     fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>>;
@@ -65,16 +65,16 @@ pub trait SyncClient {
     fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, FeeCalculator)>;
 }
 
-pub trait AsyncClient {
+pub trait OfflineAccount {
     /// Send a signed transaction, but don't wait to see if the server accepted it.
-    fn async_send_transaction(
+    fn send_offline_transaction(
         &self,
         transaction: transaction::Transaction,
     ) -> io::Result<Signature>;
 
     /// Create a transaction from the given message, and send it to the
     /// server, but don't wait for to see if the server accepted it.
-    fn async_send_message(
+    fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
         message: Message,
@@ -83,7 +83,7 @@ pub trait AsyncClient {
 
     /// Create a transaction from a single instruction that only requires
     /// a single signer. Then send it to the server, but don't wait for a reply.
-    fn async_send_instruction(
+    fn send_offline_instruction(
         &self,
         keypair: &Keypair,
         instruction: Instruction,
@@ -91,7 +91,7 @@ pub trait AsyncClient {
     ) -> io::Result<Signature>;
 
     /// Attempt to transfer difs from `keypair` to `pubkey`, but don't wait to confirm.
-    fn async_transfer(
+    fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,

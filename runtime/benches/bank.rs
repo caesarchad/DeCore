@@ -7,8 +7,8 @@ use morgan_runtime::treasury::*;
 use morgan_runtime::treasury_client::TreasuryClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::client::AsyncClient;
-use morgan_interface::client::SyncClient;
+use morgan_interface::client::OfflineAccount;
+use morgan_interface::client::OnlineAccount;
 use morgan_interface::genesis_block::create_genesis_block;
 use morgan_interface::instruction::InstructionError;
 use morgan_interface::native_loader;
@@ -87,7 +87,7 @@ fn sync_bencher(treasury: &Arc<Treasury>, _treasury_client: &TreasuryClient, tra
 
 fn async_bencher(treasury: &Arc<Treasury>, treasury_client: &TreasuryClient, transactions: &Vec<Transaction>) {
     for transaction in transactions.clone() {
-        treasury_client.async_send_transaction(transaction).unwrap();
+        treasury_client.send_offline_transaction(transaction).unwrap();
     }
     for _ in 0..1_000_000_000_u64 {
         if treasury

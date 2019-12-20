@@ -407,10 +407,10 @@ impl RpcSol for RpcSolImpl {
             Error::internal_error()
         })?;
 
-        let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
-        transactions_socket
-            .send_to(&data, transactions_addr)
+        let account_host_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+        let account_host_url = get_transaction_digesting_module_addr(&meta.node_group_info)?;
+        account_host_socket
+            .send_to(&data, account_host_url)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_airdrop: send_to error: {:?}", err).to_string()));
                 println!("{}",
@@ -496,10 +496,10 @@ impl RpcSol for RpcSolImpl {
             Error::internal_error()
         })?;
 
-        let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
-        transactions_socket
-            .send_to(&data, transactions_addr)
+        let account_host_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+        let account_host_url = get_transaction_digesting_module_addr(&meta.node_group_info)?;
+        account_host_socket
+            .send_to(&data, account_host_url)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_airdrop: send_to error: {:?}", err).to_string()));
                 println!("{}",
@@ -572,11 +572,11 @@ impl RpcSol for RpcSolImpl {
             );
             return Err(Error::invalid_request());
         }
-        let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let transactions_addr = get_transaction_digesting_module_addr(&meta.node_group_info)?;
-        trace!("send_transaction: leader is {:?}", &transactions_addr);
-        transactions_socket
-            .send_to(&data, transactions_addr)
+        let account_host_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+        let account_host_url = get_transaction_digesting_module_addr(&meta.node_group_info)?;
+        trace!("send_transaction: leader is {:?}", &account_host_url);
+        account_host_socket
+            .send_to(&data, account_host_url)
             .map_err(|err| {
                 // info!("{}", Info(format!("send_transaction: send_to error: {:?}", err).to_string()));
                 println!("{}",

@@ -48,7 +48,7 @@ mod tests {
     use serde_derive::{Deserialize, Serialize};
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::message::Message;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -86,7 +86,7 @@ mod tests {
 
         let treasury_client = TreasuryClient::new(treasury);
         treasury_client
-            .send_instruction(
+            .snd_online_instruction(
                 mint_keypair,
                 config_instruction::create_account::<MyConfig>(
                     &mint_keypair.pubkey(),
@@ -126,7 +126,7 @@ mod tests {
         let instruction = config_instruction::store(&config_pubkey, &my_config);
         let message = Message::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
         treasury_client
-            .send_message(&[&mint_keypair, &config_keypair], message)
+            .send_online_msg(&[&mint_keypair, &config_keypair], message)
             .unwrap();
 
         let config_account_data = treasury_client
@@ -152,7 +152,7 @@ mod tests {
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let message = Message::new(vec![instruction]);
         treasury_client
-            .send_message(&[&config_keypair], message)
+            .send_online_msg(&[&config_keypair], message)
             .unwrap_err();
     }
 
@@ -175,7 +175,7 @@ mod tests {
 
         let message = Message::new(vec![transfer_instruction, store_instruction]);
         treasury_client
-            .send_message(&[&system_keypair], message)
+            .send_online_msg(&[&system_keypair], message)
             .unwrap_err();
     }
 }

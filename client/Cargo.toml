@@ -1,7 +1,7 @@
 [package]
 name = "morgan-client"
 version = "0.15.3"
-description = "Morgan Client"
+description = "Morgan AccountHost"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]
 repository = "https://github.com/morgan-labs/morgan"
 homepage = "https://morgan.com/"

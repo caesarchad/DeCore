@@ -6,7 +6,7 @@ use morgan::create_keys::GenKeys;
 use morgan_client::sample_stats::{sample_txs, SampleStats};
 use morgan_tokenbot::drone::request_airdrop_transaction;
 use morgan_metricbot::datapoint_info;
-use morgan_interface::client::Client;
+use morgan_interface::client::AccountHost;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::system_instruction;
@@ -62,7 +62,7 @@ pub fn do_bench_tps<T>(
     keypair0_balance: u64,
 ) -> u64
 where
-    T: 'static + Client + Send + Sync,
+    T: 'static + AccountHost + Send + Sync,
 {
     let Config {
         id,
@@ -271,7 +271,7 @@ fn generate_txs(
     }
 }
 
-fn do_tx_transfers<T: Client>(
+fn do_tx_transfers<T: AccountHost>(
     exit_signal: &Arc<AtomicBool>,
     shared_txs: &SharedTransactions,
     shared_tx_thread_count: &Arc<AtomicIsize>,
@@ -293,7 +293,7 @@ fn do_tx_transfers<T: Client>(
             println!(
                 "Transferring 1 unit {} times... to {}",
                 txs0.len(),
-                client.as_ref().transactions_addr(),
+                client.as_ref().account_host_url(),
             );
             let tx_len = txs0.len();
             let transfer_start = Instant::now();
@@ -303,8 +303,8 @@ fn do_tx_transfers<T: Client>(
                     continue;
                 }
                 client
-                    .async_send_transaction(tx.0)
-                    .expect("async_send_transaction in do_tx_transfers");
+                    .send_offline_transaction(tx.0)
+                    .expect("send_offline_transaction in do_tx_transfers");
             }
             shared_tx_thread_count.fetch_add(-1, Ordering::Relaxed);
             total_tx_sent_count.fetch_add(tx_len, Ordering::Relaxed);
@@ -325,7 +325,7 @@ fn do_tx_transfers<T: Client>(
     }
 }
 
-fn verify_funding_transfer<T: Client>(client: &T, tx: &Transaction, amount: u64) -> bool {
+fn verify_funding_transfer<T: AccountHost>(client: &T, tx: &Transaction, amount: u64) -> bool {
     for a in &tx.message().account_keys[1..] {
         if client.get_balance(a).unwrap_or(0) >= amount {
             return true;
@@ -338,7 +338,7 @@ fn verify_funding_transfer<T: Client>(client: &T, tx: &Transaction, amount: u64)
 /// fund the dests keys by spending all of the genesis keys into MAX_SPENDS_PER_TX
 /// on every iteration.  This allows us to replay the transfers because the genesis is either empty,
 /// or full
-pub fn fund_keys<T: Client>(client: &T, genesis: &Keypair, dests: &[Keypair], difs: u64) {
+pub fn fund_keys<T: AccountHost>(client: &T, genesis: &Keypair, dests: &[Keypair], difs: u64) {
     let total = difs * dests.len() as u64;
     let mut funded: Vec<(&Keypair, u64)> = vec![(genesis, total)];
     let mut notfunded: Vec<&Keypair> = dests.iter().collect();
@@ -417,7 +417,7 @@ pub fn fund_keys<T: Client>(client: &T, genesis: &Keypair, dests: &[Keypair], di
                 });
 
                 to_fund_txs.iter().for_each(|(_, tx)| {
-                    client.async_send_transaction(tx.clone()).expect("transfer");
+                    client.send_offline_transaction(tx.clone()).expect("transfer");
                 });
 
                 // retry anything that seems to have dropped through cracks
@@ -440,7 +440,7 @@ pub fn fund_keys<T: Client>(client: &T, genesis: &Keypair, dests: &[Keypair], di
     }
 }
 
-pub fn airdrop_difs<T: Client>(
+pub fn airdrop_difs<T: AccountHost>(
     client: &T,
     drone_addr: &SocketAddr,
     id: &Keypair,
@@ -462,7 +462,7 @@ pub fn airdrop_difs<T: Client>(
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         match request_airdrop_transaction(&drone_addr, &id.pubkey(), airdrop_amount, transaction_seal) {
             Ok(transaction) => {
-                let signature = client.async_send_transaction(transaction).unwrap();
+                let signature = client.send_offline_transaction(transaction).unwrap();
                 client
                     .poll_for_signature_confirmation(&signature, 1)
                     .unwrap_or_else(|_| {
@@ -588,7 +588,7 @@ pub fn generate_keypairs(seed_keypair: &Keypair, count: usize) -> Vec<Keypair> {
     rnd.gen_n_keypairs(total_keys as u64)
 }
 
-pub fn generate_and_fund_keypairs<T: Client>(
+pub fn generate_and_fund_keypairs<T: AccountHost>(
     client: &T,
     drone_addr: Option<SocketAddr>,
     funding_pubkey: &Keypair,
@@ -664,7 +664,7 @@ mod tests {
     use morgan_tokenbot::drone::run_local_drone;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use std::sync::mpsc::channel;
 

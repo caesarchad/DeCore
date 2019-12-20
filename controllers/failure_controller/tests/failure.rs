@@ -1,7 +1,7 @@
 use morgan_runtime::treasury::Treasury;
 use morgan_runtime::treasury_client::TreasuryClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
-use morgan_interface::client::SyncClient;
+use morgan_interface::client::OnlineAccount;
 use morgan_interface::genesis_block::create_genesis_block;
 use morgan_interface::instruction::InstructionError;
 use morgan_interface::native_loader;
@@ -21,7 +21,7 @@ fn test_program_native_failure() {
     let instruction = create_invoke_instruction(alice_keypair.pubkey(), program_id, &1u8);
     assert_eq!(
         treasury_client
-            .send_instruction(&alice_keypair, instruction)
+            .snd_online_instruction(&alice_keypair, instruction)
             .unwrap_err()
             .unwrap(),
         TransactionError::InstructionError(0, InstructionError::GenericError)

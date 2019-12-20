@@ -107,7 +107,7 @@ mod tests {
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::hash::{hash, Hash};
     use morgan_interface::instruction::Instruction;
@@ -289,7 +289,7 @@ mod tests {
             &mining_pool_pubkey,
             100,
         ));
-        treasury_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
         // _drop the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
         let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
@@ -307,7 +307,7 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -348,7 +348,7 @@ mod tests {
         }
 
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -362,7 +362,7 @@ mod tests {
         );
 
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -381,7 +381,7 @@ mod tests {
         }
 
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -395,7 +395,7 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
         assert_eq!(
             treasury_client.get_balance(&validator_storage_id).unwrap(),
             10 + (TOTAL_VALIDATOR_REWARDS * 10)
@@ -419,7 +419,7 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
 
         let message = Message::new_with_payer(
             vec![storage_instruction::claim_reward(
@@ -429,7 +429,7 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
 
         // TODO enable when rewards are working
         assert_eq!(
@@ -465,10 +465,10 @@ mod tests {
                 ))
             });
         let message = Message::new(ixs);
-        client.send_message(&[mint], message).unwrap();
+        client.send_online_msg(&[mint], message).unwrap();
     }
 
-    fn get_storage_slot<C: SyncClient>(client: &C, account: &Pubkey) -> u64 {
+    fn get_storage_slot<C: OnlineAccount>(client: &C, account: &Pubkey) -> u64 {
         match client.get_account_data(&account).unwrap() {
             Some(storage_system_account_data) => {
                 let contract = deserialize(&storage_system_account_data);
@@ -522,7 +522,7 @@ mod tests {
         );
 
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &storage_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &storage_keypair], message),
             Ok(_)
         );
         CheckedProof {
@@ -534,7 +534,7 @@ mod tests {
         }
     }
 
-    fn get_storage_transaction_seal<C: SyncClient>(client: &C, account: &Pubkey) -> Hash {
+    fn get_storage_transaction_seal<C: OnlineAccount>(client: &C, account: &Pubkey) -> Hash {
         if let Some(storage_system_account_data) = client.get_account_data(&account).unwrap() {
             let contract = deserialize(&storage_system_account_data);
             if let Ok(contract) = contract {
@@ -580,14 +580,14 @@ mod tests {
             &miner_pubkey,
             1,
         ));
-        treasury_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
         let message = Message::new(storage_instruction::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
         ));
-        treasury_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
         let message = Message::new_with_payer(
             vec![storage_instruction::advertise_recent_transaction_seal(
@@ -599,7 +599,7 @@ mod tests {
         );
 
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &validator_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &validator_keypair], message),
             Ok(_)
         );
 
@@ -614,7 +614,7 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            treasury_client.send_message(&[&mint_keypair, &miner_keypair], message),
+            treasury_client.send_online_msg(&[&mint_keypair, &miner_keypair], message),
             Ok(_)
         );
 

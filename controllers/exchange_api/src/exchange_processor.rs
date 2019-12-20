@@ -677,7 +677,7 @@ mod test {
     use crate::{exchange_instruction, id};
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::SyncClient;
+    use morgan_interface::client::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_instruction;
@@ -787,7 +787,7 @@ mod test {
             &id(),
         );
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
         new
     }
@@ -796,7 +796,7 @@ mod test {
         let new = create_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
         client
-            .send_instruction(owner, instruction)
+            .snd_online_instruction(owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
         new
     }
@@ -810,7 +810,7 @@ mod test {
             tokens,
         );
         client
-            .send_instruction(owner, instruction)
+            .snd_online_instruction(owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
     }
 
@@ -838,7 +838,7 @@ mod test {
             &src,
         );
         client
-            .send_instruction(owner, instruction)
+            .snd_online_instruction(owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
         (trade, src)
     }
@@ -871,7 +871,7 @@ mod test {
         let new = create_token_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect_err(&format!("{}:{}", line!(), file!()));
     }
 
@@ -891,7 +891,7 @@ mod test {
             42,
         );
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
 
         let new_account_data = client.get_account_data(&new).unwrap().unwrap();
@@ -978,7 +978,7 @@ mod test {
         let instruction =
             exchange_instruction::swap_request(&owner.pubkey(), &to_trade, &from_trade, &profit);
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
 
         let to_trade_account_data = client.get_account_data(&to_trade).unwrap().unwrap();
@@ -1045,7 +1045,7 @@ mod test {
         let instruction =
             exchange_instruction::swap_request(&owner.pubkey(), &to_trade, &from_trade, &profit);
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
 
         let new = create_token_account(&client, &owner);
@@ -1053,13 +1053,13 @@ mod test {
         let instruction =
             exchange_instruction::transfer_request(&owner.pubkey(), &new, &to_trade, Token::B, 1);
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
 
         let instruction =
             exchange_instruction::transfer_request(&owner.pubkey(), &new, &from_trade, Token::A, 1);
         client
-            .send_instruction(&owner, instruction)
+            .snd_online_instruction(&owner, instruction)
             .expect(&format!("{}:{}", line!(), file!()));
 
         let new_account_data = client.get_account_data(&new).unwrap().unwrap();

@@ -9,7 +9,7 @@ use crate::connection_info::ContactInfo;
 use crate::service::Service;
 use crate::streamer;
 use rand::{thread_rng, Rng};
-use morgan_client::slim_account_host::{create_client, ThinClient};
+use morgan_client::slim_account_host::{create_client, SlimAccountHost};
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use std::net::SocketAddr;
@@ -233,8 +233,8 @@ impl std::convert::AsRef<Path> for TempPath {
     }
 }
 
-/// Creates a ThinClient per valid node
-pub fn get_clients(nodes: &[ContactInfo]) -> Vec<ThinClient> {
+/// Creates a SlimAccountHost per valid node
+pub fn get_clients(nodes: &[ContactInfo]) -> Vec<SlimAccountHost> {
     nodes
         .iter()
         .filter_map(ContactInfo::valid_client_facing_addr)
@@ -242,8 +242,8 @@ pub fn get_clients(nodes: &[ContactInfo]) -> Vec<ThinClient> {
         .collect()
 }
 
-/// Creates a ThinClient by selecting a valid node at random
-pub fn get_client(nodes: &[ContactInfo]) -> ThinClient {
+/// Creates a SlimAccountHost by selecting a valid node at random
+pub fn get_client(nodes: &[ContactInfo]) -> SlimAccountHost {
     let nodes: Vec<_> = nodes
         .iter()
         .filter_map(ContactInfo::valid_client_facing_addr)

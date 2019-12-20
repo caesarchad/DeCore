@@ -10,7 +10,7 @@ use crate::gossip_service::find_node_group_host;
 use crate::fork_selection::VOTE_THRESHOLD_DEPTH;
 use morgan_client::slim_account_host::create_client;
 use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
-use morgan_interface::client::SyncClient;
+use morgan_interface::client::OnlineAccount;
 use morgan_interface::hash::Hash;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};

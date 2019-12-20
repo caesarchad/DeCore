@@ -1,6 +1,6 @@
 use crate::treasury_client::TreasuryClient;
 use serde::Serialize;
-use morgan_interface::client::SyncClient;
+use morgan_interface::client::OnlineAccount;
 use morgan_interface::instruction::{AccountMeta, Instruction};
 use morgan_interface::loader_instruction;
 use morgan_interface::message::Message;
@@ -25,7 +25,7 @@ pub fn load_program(
         loader_pubkey,
     );
     treasury_client
-        .send_instruction(&from_keypair, instruction)
+        .snd_online_instruction(&from_keypair, instruction)
         .unwrap();
 
     let chunk_size = 256; // Size of chunk just needs to fit into tx
@@ -35,7 +35,7 @@ pub fn load_program(
             loader_instruction::write(&program_pubkey, loader_pubkey, offset, chunk.to_vec());
         let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
         treasury_client
-            .send_message(&[from_keypair, &program_keypair], message)
+            .send_online_msg(&[from_keypair, &program_keypair], message)
             .unwrap();
         offset += chunk_size as u32;
     }
@@ -43,7 +43,7 @@ pub fn load_program(
     let instruction = loader_instruction::finalize(&program_pubkey, loader_pubkey);
     let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
     treasury_client
-        .send_message(&[from_keypair, &program_keypair], message)
+        .send_online_msg(&[from_keypair, &program_keypair], message)
         .unwrap();
 
     program_pubkey
