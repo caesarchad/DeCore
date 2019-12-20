@@ -9,7 +9,7 @@ use crate::connection_info::ContactInfo;
 use crate::service::Service;
 use crate::streamer;
 use rand::{thread_rng, Rng};
-use morgan_client::thin_client::{create_client, ThinClient};
+use morgan_client::slim_account_host::{create_client, ThinClient};
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use std::net::SocketAddr;

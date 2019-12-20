@@ -1,4 +1,4 @@
-//! The `thin_client` module is a client-side object that interfaces with
+//! The `slim_account_host` module is a client-side object that interfaces with
 //! a server-side transaction digesting module.  Client code should use this object instead of writing
 //! messages to the network directly. The binary encoding of its messages are
 //! unstable and may change in future releases.

@@ -660,7 +660,7 @@ mod tests {
     use morgan::node_group_info::FULLNODE_PORT_RANGE;
     use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
     use morgan::verifier::ValidatorConfig;
-    use morgan_client::thin_client::create_client;
+    use morgan_client::slim_account_host::create_client;
     use morgan_tokenbot::drone::run_local_drone;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;

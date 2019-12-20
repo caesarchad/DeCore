@@ -16,7 +16,7 @@ use rand::thread_rng;
 use rand::Rng;
 use morgan_client::rpc_client::RpcClient;
 use morgan_client::rpc_request::RpcRequest;
-use morgan_client::thin_client::ThinClient;
+use morgan_client::slim_account_host::ThinClient;
 use solana_ed25519_dalek as ed25519_dalek;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::client::{AsyncClient, SyncClient};
