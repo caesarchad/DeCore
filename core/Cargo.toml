@@ -94,7 +94,7 @@ matches = "0.1.6"
 
 
 [[bench]]
-name = "banking_stage"
+name = "treasury_phase"
 
 [[bench]]
 name = "block_buffer_pool"
@@ -109,7 +109,7 @@ name = "gen_keys"
 name = "sigverify"
 
 [[bench]]
-name = "sigverify_stage"
+name = "sigverify_phase"
 
 [[bench]]
 name = "water_clock"

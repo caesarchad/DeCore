@@ -1,11 +1,11 @@
-//! The `fetch_stage` batches input from a UDP socket and sends it to a channel.
+//! The `fetch_phase` batches input from a UDP socket and sends it to a channel.
 
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::streamer::{self, PacketReceiver, PacketSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info};
-use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, RecvTimeoutError};
@@ -38,36 +38,36 @@ impl Default for DebugInterfaceConfig {
     }
 }
 
-pub struct FetchStage {
+pub struct FetchPhase {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-impl FetchStage {
+impl FetchPhase {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         sockets: Vec<UdpSocket>,
-        tpu_via_blobs_sockets: Vec<UdpSocket>,
+        transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> (Self, PacketReceiver) {
         let (sender, receiver) = channel();
         (
-            Self::new_with_sender(sockets, tpu_via_blobs_sockets, exit, &sender, &waterclock_recorder),
+            Self::new_with_sender(sockets, transaction_digesting_module_via_blobs_sockets, exit, &sender, &waterclock_recorder),
             receiver,
         )
     }
     pub fn new_with_sender(
         sockets: Vec<UdpSocket>,
-        tpu_via_blobs_sockets: Vec<UdpSocket>,
+        transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
         sender: &PacketSender,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
         let tx_sockets = sockets.into_iter().map(Arc::new).collect();
-        let tpu_via_blobs_sockets = tpu_via_blobs_sockets.into_iter().map(Arc::new).collect();
+        let transaction_digesting_module_via_blobs_sockets = transaction_digesting_module_via_blobs_sockets.into_iter().map(Arc::new).collect();
         Self::new_multi_socket(
             tx_sockets,
-            tpu_via_blobs_sockets,
+            transaction_digesting_module_via_blobs_sockets,
             exit,
             &sender,
             &waterclock_recorder,
@@ -90,16 +90,16 @@ impl FetchStage {
         if waterclock_recorder
             .lock()
             .unwrap()
-            .would_be_leader(DEFAULT_TICKS_PER_SLOT * 2)
+            .would_be_leader(DEFAULT_DROPS_PER_SLOT * 2)
         {
-            inc_new_counter_debug!("fetch_stage-honor_forwards", len);
+            inc_new_counter_debug!("fetch_phase-honor_forwards", len);
             for packets in batch {
                 if sendr.send(packets).is_err() {
                     return Err(Error::SendError);
                 }
             }
         } else {
-            inc_new_counter_info!("fetch_stage-discard_forwards", len);
+            inc_new_counter_info!("fetch_phase-discard_forwards", len);
         }
 
         Ok(())
@@ -107,17 +107,17 @@ impl FetchStage {
 
     fn new_multi_socket(
         sockets: Vec<Arc<UdpSocket>>,
-        tpu_via_blobs_sockets: Vec<Arc<UdpSocket>>,
+        transaction_digesting_module_via_blobs_sockets: Vec<Arc<UdpSocket>>,
         exit: &Arc<AtomicBool>,
         sender: &PacketSender,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
-        let tpu_threads = sockets
+        let transaction_digesting_module_threads = sockets
             .into_iter()
             .map(|socket| streamer::receiver(socket, &exit, sender.clone()));
 
         let (forward_sender, forward_receiver) = channel();
-        let tpu_via_blobs_threads = tpu_via_blobs_sockets
+        let transaction_digesting_module_via_blobs_threads = transaction_digesting_module_via_blobs_sockets
             .into_iter()
             .map(|socket| streamer::blob_packet_receiver(socket, &exit, forward_sender.clone()));
 
@@ -125,7 +125,7 @@ impl FetchStage {
         let waterclock_recorder = waterclock_recorder.clone();
 
         let fwd_thread_hdl = Builder::new()
-            .name("morgan-fetch-stage-fwd-rcvr".to_string())
+            .name("morgan-fetch-phase-fwd-rcvr".to_string())
             .spawn(move || loop {
                 if let Err(e) =
                     Self::handle_forwarded_packets(&forward_receiver, &sender, &waterclock_recorder)
@@ -150,13 +150,13 @@ impl FetchStage {
             })
             .unwrap();
 
-        let mut thread_hdls: Vec<_> = tpu_threads.chain(tpu_via_blobs_threads).collect();
+        let mut thread_hdls: Vec<_> = transaction_digesting_module_threads.chain(transaction_digesting_module_via_blobs_threads).collect();
         thread_hdls.push(fwd_thread_hdl);
         Self { thread_hdls }
     }
 }
 
-impl Service for FetchStage {
+impl Service for FetchPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

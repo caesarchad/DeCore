@@ -442,11 +442,11 @@ impl Blob {
         self.data[FORWARDED_RANGE][0] = u8::from(forward)
     }
 
-    pub fn set_genesis_blockhash(&mut self, blockhash: &Hash) {
-        self.data[GENESIS_RANGE].copy_from_slice(blockhash.as_ref())
+    pub fn set_genesis_transaction_seal(&mut self, transaction_seal: &Hash) {
+        self.data[GENESIS_RANGE].copy_from_slice(transaction_seal.as_ref())
     }
 
-    pub fn genesis_blockhash(&self) -> Hash {
+    pub fn genesis_transaction_seal(&self) -> Hash {
         Hash::new(&self.data[GENESIS_RANGE])
     }
 
@@ -619,7 +619,7 @@ pub fn index_blobs_with_genesis(
         let mut blob = blob.write().unwrap();
 
         blob.set_index(blob_index);
-        blob.set_genesis_blockhash(genesis);
+        blob.set_genesis_transaction_seal(genesis);
         blob.set_slot(slot);
         blob.set_parent(parent);
         blob.set_id(id);
@@ -879,13 +879,13 @@ mod tests {
     }
 
     #[test]
-    fn test_blob_genesis_blockhash() {
+    fn test_blob_genesis_transaction_seal() {
         let mut blob = Blob::default();
-        assert_eq!(blob.genesis_blockhash(), Hash::default());
+        assert_eq!(blob.genesis_transaction_seal(), Hash::default());
 
         let hash = Hash::new(&Pubkey::new_rand().as_ref());
-        blob.set_genesis_blockhash(&hash);
-        assert_eq!(blob.genesis_blockhash(), hash);
+        blob.set_genesis_transaction_seal(&hash);
+        assert_eq!(blob.genesis_transaction_seal(), hash);
     }
 
 }

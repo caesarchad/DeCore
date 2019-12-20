@@ -22,7 +22,7 @@ default_arg --bootstrap-storage-keypair "$MORGAN_CONFIG_DIR"/bootstrap-leader-st
 default_arg --ledger "$MORGAN_RSYNC_CONFIG_DIR"/ledger
 default_arg --mint "$MORGAN_CONFIG_DIR"/mint-keypair.json
 default_arg --difs 100000000000000
-default_arg --hashes-per-tick sleep
+default_arg --hashes-per-_drop sleep
 
 $morgan_genesis "${args[@]}"
 

@@ -50,8 +50,8 @@ Operate a configured testnet
                                         This will start 2 bench-tps clients, and supply "--tx_count 25000"
                                         to the bench-tps client.
 
-   --hashes-per-tick NUM_HASHES|sleep|auto
-                                      - Override the default --hashes-per-tick for the cluster
+   --hashes-per-_drop NUM_HASHES|sleep|auto
+                                      - Override the default --hashes-per-_drop for the cluster
    -n NUM_FULL_NODES                  - Number of fullnodes to apply command to.
 
  sanity/start/update-specific options:
@@ -97,7 +97,7 @@ shift
 shortArgs=()
 while [[ -n $1 ]]; do
   if [[ ${1:0:2} = -- ]]; then
-    if [[ $1 = --hashes-per-tick ]]; then
+    if [[ $1 = --hashes-per-_drop ]]; then
       genesisOptions="$genesisOptions $1 $2"
       shift 2
     else

@@ -48,7 +48,7 @@ pub enum StorageContract {
     ValidatorStorage {
         // Most recently advertised slot
         slot: u64,
-        // Most recently advertised blockhash
+        // Most recently advertised transaction_seal
         hash: Hash,
         lockout_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
         reward_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
@@ -64,7 +64,7 @@ pub enum StorageContract {
     MiningPool,
 }
 
-// utility function, used by Bank, tests, genesis
+// utility function, used by Treasury, tests, genesis
 pub fn create_validator_storage_account(difs: u64) -> Account {
     let mut storage_account = Account::new(difs, 0, STORAGE_ACCOUNT_SPACE as usize, &crate::id());
 
@@ -168,7 +168,7 @@ impl<'a> StorageAccount<'a> {
         }
     }
 
-    pub fn advertise_storage_recent_blockhash(
+    pub fn advertise_storage_recent_transaction_seal(
         &mut self,
         hash: Hash,
         slot: u64,
@@ -318,7 +318,7 @@ impl<'a> StorageAccount<'a> {
             reward_validations,
         } = &mut storage_contract
         {
-            // if current tick height is a full segment away, allow reward collection
+            // if current _drop height is a full segment away, allow reward collection
             let claim_index = get_segment_from_slot(current_slot);
             let claim_segment = get_segment_from_slot(slot);
             // Todo this might might always be true

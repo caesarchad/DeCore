@@ -4,7 +4,7 @@ use crate::morgan::block_buffer_pool::BlockBufferPool;
 use hashbrown::HashSet;
 use log::*;
 use morgan::node_group::NodeGroup;
-use morgan::cluster_tests;
+use morgan::node_group_tests;
 use morgan::gossip_service::find_node_group_host;
 use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
 use morgan::verifier::ValidatorConfig;
@@ -19,7 +19,7 @@ fn test_spend_and_verify_all_nodes_1() {
     morgan_logger::setup();
     let num_nodes = 1;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    cluster_tests::spend_and_verify_all_nodes(
+    node_group_tests::spend_and_verify_all_nodes(
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
@@ -31,7 +31,7 @@ fn test_spend_and_verify_all_nodes_2() {
     morgan_logger::setup();
     let num_nodes = 2;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    cluster_tests::spend_and_verify_all_nodes(
+    node_group_tests::spend_and_verify_all_nodes(
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
@@ -43,7 +43,7 @@ fn test_spend_and_verify_all_nodes_3() {
     morgan_logger::setup();
     let num_nodes = 3;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    cluster_tests::spend_and_verify_all_nodes(
+    node_group_tests::spend_and_verify_all_nodes(
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
@@ -59,7 +59,7 @@ fn test_spend_and_verify_all_nodes_env_num_nodes() {
         .parse()
         .expect("could not parse NUM_NODES as a number");
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    cluster_tests::spend_and_verify_all_nodes(
+    node_group_tests::spend_and_verify_all_nodes(
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
@@ -72,7 +72,7 @@ fn test_fullnode_exit_default_config_should_panic() {
     morgan_logger::setup();
     let num_nodes = 2;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    cluster_tests::fullnode_exit(&local.entry_point_info, num_nodes);
+    node_group_tests::fullnode_exit(&local.entry_point_info, num_nodes);
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn test_fullnode_exit_2() {
         ..NodeGroupConfig::default()
     };
     let local = LocalNodeGroup::new(&config);
-    cluster_tests::fullnode_exit(&local.entry_point_info, num_nodes);
+    node_group_tests::fullnode_exit(&local.entry_point_info, num_nodes);
 }
 
 // NodeGroup needs a supermajority to remain, so the minimum size for this test is 4
@@ -105,19 +105,19 @@ fn test_leader_failure_4() {
         ..NodeGroupConfig::default()
     };
     let local = LocalNodeGroup::new(&config);
-    cluster_tests::kill_entry_and_spend_and_verify_rest(
+    node_group_tests::kill_entry_and_spend_and_verify_rest(
         &local.entry_point_info,
         &local.funding_keypair,
         num_nodes,
-        config.ticks_per_slot * config.waterclock_config.target_tick_duration.as_millis() as u64,
+        config.drops_per_slot * config.waterclock_config.target_drop_duration.as_millis() as u64,
     );
 }
 #[test]
 fn test_two_unbalanced_stakes() {
     morgan_logger::setup();
     let mut validator_config = ValidatorConfig::default();
-    let num_ticks_per_second = 100;
-    let num_ticks_per_slot = 10;
+    let num_drops_per_second = 100;
+    let num_drops_per_slot = 10;
     let num_slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
 
     validator_config.rpc_config.enable_fullnode_exit = true;
@@ -125,22 +125,22 @@ fn test_two_unbalanced_stakes() {
         node_stakes: vec![999_990, 3],
         node_group_difs: 1_000_000,
         validator_config: validator_config.clone(),
-        ticks_per_slot: num_ticks_per_slot,
+        drops_per_slot: num_drops_per_slot,
         slots_per_epoch: num_slots_per_epoch,
-        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_ticks_per_second)),
+        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_drops_per_second)),
         ..NodeGroupConfig::default()
     });
 
-    cluster_tests::sleep_n_epochs(
+    node_group_tests::sleep_n_epochs(
         10.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
     node_group.close_preserve_ledgers();
     let leader_pubkey = node_group.entry_point_info.id;
     let leader_ledger = node_group.fullnode_infos[&leader_pubkey].ledger_path.clone();
-    cluster_tests::verify_ledger_ticks(&leader_ledger, num_ticks_per_slot as usize);
+    node_group_tests::verify_ledger_drops(&leader_ledger, num_drops_per_slot as usize);
 }
 
 #[test]
@@ -166,37 +166,37 @@ fn test_forwarding() {
         .unwrap();
 
     // Confirm that transactions were forwarded to and processed by the leader.
-    cluster_tests::send_many_transactions(&validator_info, &node_group.funding_keypair, 20);
+    node_group_tests::send_many_transactions(&validator_info, &node_group.funding_keypair, 20);
 }
 
 #[test]
 fn test_restart_node() {
     let validator_config = ValidatorConfig::default();
     let slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
-    let ticks_per_slot = 16;
+    let drops_per_slot = 16;
     let mut node_group = LocalNodeGroup::new(&NodeGroupConfig {
         node_stakes: vec![3],
         node_group_difs: 100,
         validator_config: validator_config.clone(),
-        ticks_per_slot,
+        drops_per_slot,
         slots_per_epoch,
         ..NodeGroupConfig::default()
     });
     let nodes = node_group.get_node_pubkeys();
-    cluster_tests::sleep_n_epochs(
+    node_group_tests::sleep_n_epochs(
         1.0,
         &node_group.genesis_block.waterclock_config,
-        timing::DEFAULT_TICKS_PER_SLOT,
+        timing::DEFAULT_DROPS_PER_SLOT,
         slots_per_epoch,
     );
     node_group.restart_node(nodes[0]);
-    cluster_tests::sleep_n_epochs(
+    node_group_tests::sleep_n_epochs(
         0.5,
         &node_group.genesis_block.waterclock_config,
-        timing::DEFAULT_TICKS_PER_SLOT,
+        timing::DEFAULT_DROPS_PER_SLOT,
         slots_per_epoch,
     );
-    cluster_tests::send_many_transactions(&node_group.entry_point_info, &node_group.funding_keypair, 1);
+    node_group_tests::send_many_transactions(&node_group.entry_point_info, &node_group.funding_keypair, 1);
 }
 
 #[test]
@@ -220,8 +220,8 @@ fn test_repairman_catchup() {
 
 fn run_repairman_catchup(num_repairmen: u64) {
     let mut validator_config = ValidatorConfig::default();
-    let num_ticks_per_second = 100;
-    let num_ticks_per_slot = 40;
+    let num_drops_per_second = 100;
+    let num_drops_per_slot = 40;
     let num_slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
     let num_root_buffer_slots = 10;
     // Calculate the leader schedule num_root_buffer slots ahead. Otherwise, if stakers_slot_offset ==
@@ -258,10 +258,10 @@ fn run_repairman_catchup(num_repairmen: u64) {
         node_stakes,
         node_group_difs,
         validator_config: validator_config.clone(),
-        ticks_per_slot: num_ticks_per_slot,
+        drops_per_slot: num_drops_per_slot,
         slots_per_epoch: num_slots_per_epoch,
         stakers_slot_offset,
-        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_ticks_per_second)),
+        waterclock_config: WaterClockConfig::new_sleep(Duration::from_millis(1000 / num_drops_per_second)),
         ..NodeGroupConfig::default()
     });
 
@@ -270,10 +270,10 @@ fn run_repairman_catchup(num_repairmen: u64) {
     let num_warmup_epochs = (epoch_schedule.get_stakers_epoch(0) + 1) as f64;
 
     // Sleep for longer than the first N warmup epochs, with a one epoch buffer for timing issues
-    cluster_tests::sleep_n_epochs(
+    node_group_tests::sleep_n_epochs(
         num_warmup_epochs + 1.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
 
@@ -290,10 +290,10 @@ fn run_repairman_catchup(num_repairmen: u64) {
         .unwrap();
 
     // Wait for repairman protocol to catch this validator up
-    cluster_tests::sleep_n_epochs(
+    node_group_tests::sleep_n_epochs(
         num_warmup_epochs + 1.0,
         &node_group.genesis_block.waterclock_config,
-        num_ticks_per_slot,
+        num_drops_per_slot,
         num_slots_per_epoch,
     );
 

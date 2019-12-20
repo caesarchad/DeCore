@@ -1,7 +1,7 @@
-//! The `retransmit_stage` retransmits blobs between validators
+//! The `retransmit_phase` retransmits blobs between validators
 
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
 use crate::leader_arrange_cache::LeaderScheduleCache;
@@ -23,7 +23,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::Duration;
 
 fn retransmit(
-    bank_forks: &Arc<RwLock<BankForks>>,
+    treasury_forks: &Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     r: &BlobReceiver,
@@ -35,18 +35,18 @@ fn retransmit(
         blobs.append(&mut nq);
     }
 
-    datapoint_info!("retransmit-stage", ("count", blobs.len(), i64));
+    datapoint_info!("retransmit-phase", ("count", blobs.len(), i64));
 
-    let r_bank = bank_forks.read().unwrap().working_bank();
-    let bank_epoch = r_bank.get_stakers_epoch(r_bank.slot());
+    let r_treasury = treasury_forks.read().unwrap().working_treasury();
+    let treasury_epoch = r_treasury.get_stakers_epoch(r_treasury.slot());
     let (neighbors, children) = compute_retransmit_peers(
-        staking_utils::staked_nodes_at_epoch(&r_bank, bank_epoch).as_ref(),
+        staking_utils::staked_nodes_at_epoch(&r_treasury, treasury_epoch).as_ref(),
         node_group_info,
         DATA_PLANE_FANOUT,
     );
     for blob in &blobs {
         let leader = leader_schedule_cache
-            .slot_leader_at(blob.read().unwrap().slot(), Some(r_bank.as_ref()));
+            .slot_leader_at(blob.read().unwrap().slot(), Some(r_treasury.as_ref()));
         if blob.read().unwrap().meta.forward {
             NodeGroupInfo::retransmit_to(&node_group_info, &neighbors, blob, leader, sock, true)?;
             NodeGroupInfo::retransmit_to(&node_group_info, &children, blob, leader, sock, false)?;
@@ -62,17 +62,17 @@ fn retransmit(
 /// # Arguments
 /// * `sock` - Socket to read from.  Read timeout is set to 1.
 /// * `exit` - Boolean to signal system exit.
-/// * `node_group_info` - This structure needs to be updated and populated by the bank and via gossip.
+/// * `node_group_info` - This structure needs to be updated and populated by the treasury and via gossip.
 /// * `recycler` - Blob recycler.
 /// * `r` - Receive channel for blobs to be retransmitted to all the layer 1 nodes.
 fn retransmitter(
     sock: Arc<UdpSocket>,
-    bank_forks: Arc<RwLock<BankForks>>,
+    treasury_forks: Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     node_group_info: Arc<RwLock<NodeGroupInfo>>,
     r: BlobReceiver,
 ) -> JoinHandle<()> {
-    let bank_forks = bank_forks.clone();
+    let treasury_forks = treasury_forks.clone();
     let leader_schedule_cache = leader_schedule_cache.clone();
     Builder::new()
         .name("morgan-retransmitter".to_string())
@@ -80,7 +80,7 @@ fn retransmitter(
             trace!("retransmitter started");
             loop {
                 if let Err(e) = retransmit(
-                    &bank_forks,
+                    &treasury_forks,
                     &leader_schedule_cache,
                     &node_group_info,
                     &r,
@@ -164,24 +164,24 @@ impl KVCategorizer for ErrorCategorizer {
     }
 }
 
-pub struct RetransmitStage {
+pub struct RetransmitPhase {
     thread_hdls: Vec<JoinHandle<()>>,
     window_service: WindowService,
 }
 
-impl RetransmitStage {
+impl RetransmitPhase {
     #[allow(clippy::new_ret_no_self)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         retransmit_socket: Arc<UdpSocket>,
         repair_socket: Arc<UdpSocket>,
-        fetch_stage_receiver: BlobReceiver,
+        fetch_phase_receiver: BlobReceiver,
         exit: &Arc<AtomicBool>,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
         epoch_schedule: EpochSchedule,
     ) -> Self {
@@ -189,14 +189,14 @@ impl RetransmitStage {
 
         let t_retransmit = retransmitter(
             retransmit_socket,
-            bank_forks.clone(),
+            treasury_forks.clone(),
             leader_schedule_cache,
             node_group_info.clone(),
             retransmit_receiver,
         );
 
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks,
+            treasury_forks,
             completed_slots_receiver,
             epoch_schedule,
         };
@@ -204,14 +204,14 @@ impl RetransmitStage {
         let window_service = WindowService::new(
             block_buffer_pool,
             node_group_info.clone(),
-            fetch_stage_receiver,
+            fetch_phase_receiver,
             retransmit_sender,
             repair_socket,
             exit,
             repair_strategy,
-            genesis_blockhash,
-            move |id, blob, working_bank| {
-                should_retransmit_and_persist(blob, working_bank, &leader_schedule_cache, id)
+            genesis_transaction_seal,
+            move |id, blob, working_treasury| {
+                should_retransmit_and_persist(blob, working_treasury, &leader_schedule_cache, id)
             },
         );
 
@@ -223,7 +223,7 @@ impl RetransmitStage {
     }
 }
 
-impl Service for RetransmitStage {
+impl Service for RetransmitPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

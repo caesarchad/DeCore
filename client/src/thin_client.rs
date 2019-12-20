@@ -1,5 +1,5 @@
 //! The `thin_client` module is a client-side object that interfaces with
-//! a server-side TPU.  Client code should use this object instead of writing
+//! a server-side transaction digesting module.  Client code should use this object instead of writing
 //! messages to the network directly. The binary encoding of its messages are
 //! unstable and may change in future releases.
 
@@ -31,7 +31,7 @@ pub struct ThinClient {
 
 impl ThinClient {
     /// Create a new ThinClient that will interface with the Rpc at `rpc_addr` using TCP
-    /// and the Tpu at `transactions_addr` over `transactions_socket` using UDP.
+    /// and the TransactionDigestingModule at `transactions_addr` over `transactions_socket` using UDP.
     pub fn new(
         rpc_addr: SocketAddr,
         transactions_addr: SocketAddr,
@@ -116,8 +116,8 @@ impl ThinClient {
                     module_path!().to_string()
                 )
             );
-            let (blockhash, _fee_calculator) = self.rpc_client.get_recent_blockhash()?;
-            transaction.sign(keypairs, blockhash);
+            let (transaction_seal, _fee_calculator) = self.rpc_client.get_recent_transaction_seal()?;
+            transaction.sign(keypairs, transaction_seal);
         }
         Err(io::Error::new(
             io::ErrorKind::Other,
@@ -143,7 +143,7 @@ impl ThinClient {
         self.rpc_client.wait_for_balance(pubkey, expected_balance)
     }
 
-    /// Check a signature in the bank. This method blocks
+    /// Check a signature in the treasury. This method blocks
     /// until the server sends a response.
     pub fn check_signature(&self, signature: &Signature) -> bool {
         self.rpc_client.check_signature(signature)
@@ -169,8 +169,8 @@ impl Client for ThinClient {
 
 impl SyncClient for ThinClient {
     fn send_message(&self, keypairs: &[&Keypair], message: Message) -> TransportResult<Signature> {
-        let (blockhash, _fee_calculator) = self.get_recent_blockhash()?;
-        let mut transaction = Transaction::new(&keypairs, message, blockhash);
+        let (transaction_seal, _fee_calculator) = self.get_recent_transaction_seal()?;
+        let mut transaction = Transaction::new(&keypairs, message, transaction_seal);
         let signature = self.send_and_confirm_transaction(keypairs, &mut transaction, 5, 0)?;
         Ok(signature)
     }
@@ -220,8 +220,8 @@ impl SyncClient for ThinClient {
         Ok(status)
     }
 
-    fn get_recent_blockhash(&self) -> TransportResult<(Hash, FeeCalculator)> {
-        Ok(self.rpc_client.get_recent_blockhash()?)
+    fn get_recent_transaction_seal(&self) -> TransportResult<(Hash, FeeCalculator)> {
+        Ok(self.rpc_client.get_recent_transaction_seal()?)
     }
 
     fn get_transaction_count(&self) -> TransportResult<u64> {
@@ -244,8 +244,8 @@ impl SyncClient for ThinClient {
         Ok(self.rpc_client.poll_for_signature(signature)?)
     }
 
-    fn get_new_blockhash(&self, blockhash: &Hash) -> TransportResult<(Hash, FeeCalculator)> {
-        Ok(self.rpc_client.get_new_blockhash(blockhash)?)
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> TransportResult<(Hash, FeeCalculator)> {
+        Ok(self.rpc_client.get_new_transaction_seal(transaction_seal)?)
     }
 }
 
@@ -264,43 +264,43 @@ impl AsyncClient for ThinClient {
         &self,
         keypairs: &[&Keypair],
         message: Message,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let transaction = Transaction::new(&keypairs, message, recent_blockhash);
+        let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
         self.async_send_transaction(transaction)
     }
     fn async_send_instruction(
         &self,
         keypair: &Keypair,
         instruction: Instruction,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.async_send_message(&[keypair], message, recent_blockhash)
+        self.async_send_message(&[keypair], message, recent_transaction_seal)
     }
     fn async_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
         pubkey: &Pubkey,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.async_send_instruction(keypair, transfer_instruction, recent_blockhash)
+        self.async_send_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
 
-pub fn create_client((rpc, tpu): (SocketAddr, SocketAddr), range: (u16, u16)) -> ThinClient {
+pub fn create_client((rpc, transaction_digesting_module): (SocketAddr, SocketAddr), range: (u16, u16)) -> ThinClient {
     let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new(rpc, tpu, transactions_socket)
+    ThinClient::new(rpc, transaction_digesting_module, transactions_socket)
 }
 
 pub fn create_client_with_timeout(
-    (rpc, tpu): (SocketAddr, SocketAddr),
+    (rpc, transaction_digesting_module): (SocketAddr, SocketAddr),
     range: (u16, u16),
     timeout: Duration,
 ) -> ThinClient {
     let (_, transactions_socket) = morgan_netutil::bind_in_range(range).unwrap();
-    ThinClient::new_socket_with_timeout(rpc, tpu, transactions_socket, timeout)
+    ThinClient::new_socket_with_timeout(rpc, transaction_digesting_module, transactions_socket, timeout)
 }

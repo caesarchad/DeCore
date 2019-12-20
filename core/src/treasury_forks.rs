@@ -1,135 +1,135 @@
-//! The `bank_forks` module implments BankForks a DAG of checkpointed Banks
+//! The `treasury_forks` module implments TreasuryForks a DAG of checkpointed Treasuries
 
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::inc_new_counter_info;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::timing;
 use std::ops::Index;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{borrow::Cow, convert, ffi::OsStr, path::Path, str};
 
-pub struct BankForks {
-    banks: HashMap<u64, Arc<Bank>>,
-    working_bank: Arc<Bank>,
+pub struct TreasuryForks {
+    treasuries: HashMap<u64, Arc<Treasury>>,
+    working_treasury: Arc<Treasury>,
     root: u64,
 }
 
-impl Index<u64> for BankForks {
-    type Output = Arc<Bank>;
-    fn index(&self, bank_slot: u64) -> &Arc<Bank> {
-        &self.banks[&bank_slot]
+impl Index<u64> for TreasuryForks {
+    type Output = Arc<Treasury>;
+    fn index(&self, treasury_slot: u64) -> &Arc<Treasury> {
+        &self.treasuries[&treasury_slot]
     }
 }
 
-impl BankForks {
-    pub fn new(bank_slot: u64, bank: Bank) -> Self {
-        let mut banks = HashMap::new();
-        let working_bank = Arc::new(bank);
-        banks.insert(bank_slot, working_bank.clone());
+impl TreasuryForks {
+    pub fn new(treasury_slot: u64, treasury: Treasury) -> Self {
+        let mut treasuries = HashMap::new();
+        let working_treasury = Arc::new(treasury);
+        treasuries.insert(treasury_slot, working_treasury.clone());
         Self {
-            banks,
-            working_bank,
+            treasuries,
+            working_treasury,
             root: 0,
         }
     }
 
-    /// Create a map of bank slot id to the set of ancestors for the bank slot.
+    /// Create a map of treasury slot id to the set of ancestors for the treasury slot.
     pub fn ancestors(&self) -> HashMap<u64, HashSet<u64>> {
         let mut ancestors = HashMap::new();
-        for bank in self.banks.values() {
-            let mut set: HashSet<u64> = bank.ancestors.keys().cloned().collect();
-            set.remove(&bank.slot());
-            ancestors.insert(bank.slot(), set);
+        for treasury in self.treasuries.values() {
+            let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
+            set.remove(&treasury.slot());
+            ancestors.insert(treasury.slot(), set);
         }
         ancestors
     }
 
-    /// Create a map of bank slot id to the set of all of its descendants
+    /// Create a map of treasury slot id to the set of all of its descendants
     pub fn descendants(&self) -> HashMap<u64, HashSet<u64>> {
         let mut descendants = HashMap::new();
-        for bank in self.banks.values() {
-            let _ = descendants.entry(bank.slot()).or_insert(HashSet::new());
-            let mut set: HashSet<u64> = bank.ancestors.keys().cloned().collect();
-            set.remove(&bank.slot());
+        for treasury in self.treasuries.values() {
+            let _ = descendants.entry(treasury.slot()).or_insert(HashSet::new());
+            let mut set: HashSet<u64> = treasury.ancestors.keys().cloned().collect();
+            set.remove(&treasury.slot());
             for parent in set {
                 descendants
                     .entry(parent)
                     .or_insert(HashSet::new())
-                    .insert(bank.slot());
+                    .insert(treasury.slot());
             }
         }
         descendants
     }
 
-    pub fn frozen_banks(&self) -> HashMap<u64, Arc<Bank>> {
-        self.banks
+    pub fn frozen_treasuries(&self) -> HashMap<u64, Arc<Treasury>> {
+        self.treasuries
             .iter()
             .filter(|(_, b)| b.is_frozen())
             .map(|(k, b)| (*k, b.clone()))
             .collect()
     }
 
-    pub fn active_banks(&self) -> Vec<u64> {
-        self.banks
+    pub fn active_treasuries(&self) -> Vec<u64> {
+        self.treasuries
             .iter()
             .filter(|(_, v)| !v.is_frozen())
             .map(|(k, _v)| *k)
             .collect()
     }
 
-    pub fn get(&self, bank_slot: u64) -> Option<&Arc<Bank>> {
-        self.banks.get(&bank_slot)
+    pub fn get(&self, treasury_slot: u64) -> Option<&Arc<Treasury>> {
+        self.treasuries.get(&treasury_slot)
     }
 
-    pub fn new_from_banks(initial_banks: &[Arc<Bank>], root: u64) -> Self {
-        let mut banks = HashMap::new();
-        let working_bank = initial_banks[0].clone();
-        for bank in initial_banks {
-            banks.insert(bank.slot(), bank.clone());
+    pub fn new_from_treasuries(initial_treasuries: &[Arc<Treasury>], root: u64) -> Self {
+        let mut treasuries = HashMap::new();
+        let working_treasury = initial_treasuries[0].clone();
+        for treasury in initial_treasuries {
+            treasuries.insert(treasury.slot(), treasury.clone());
         }
         Self {
             root,
-            banks,
-            working_bank,
+            treasuries,
+            working_treasury,
         }
     }
 
-    pub fn insert(&mut self, bank: Bank) {
-        let bank = Arc::new(bank);
-        let prev = self.banks.insert(bank.slot(), bank.clone());
+    pub fn insert(&mut self, treasury: Treasury) {
+        let treasury = Arc::new(treasury);
+        let prev = self.treasuries.insert(treasury.slot(), treasury.clone());
         assert!(prev.is_none());
 
-        self.working_bank = bank.clone();
+        self.working_treasury = treasury.clone();
     }
 
     // TODO: really want to kill this...
-    pub fn working_bank(&self) -> Arc<Bank> {
-        self.working_bank.clone()
+    pub fn working_treasury(&self) -> Arc<Treasury> {
+        self.working_treasury.clone()
     }
 
-    pub fn config_base(&mut self, root: u64) {
+    pub fn set_genesis(&mut self, root: u64) {
         self.root = root;
         let set_root_start = Instant::now();
-        let root_bank = self
-            .banks
+        let root_treasury = self
+            .treasuries
             .get(&root)
-            .expect("root bank didn't exist in bank_forks");
-        let root_tx_count = root_bank
+            .expect("root treasury didn't exist in treasury_forks");
+        let root_tx_count = root_treasury
             .parents()
             .last()
-            .map(|bank| bank.transaction_count())
+            .map(|treasury| treasury.transaction_count())
             .unwrap_or(0);
-        root_bank.squash();
-        let new_tx_count = root_bank.transaction_count();
+        root_treasury.squash();
+        let new_tx_count = root_treasury.transaction_count();
         self.prune_non_root(root);
 
         inc_new_counter_info!(
-            "bank-forks_set_root_ms",
+            "treasury-forks_set_root_ms",
             timing::duration_as_ms(&set_root_start.elapsed()) as usize
         );
         inc_new_counter_info!(
-            "bank-forks_set_root_tx_count",
+            "treasury-forks_set_root_tx_count",
             (new_tx_count - root_tx_count) as usize
         );
     }
@@ -140,7 +140,7 @@ impl BankForks {
 
     fn prune_non_root(&mut self, root: u64) {
         let descendants = self.descendants();
-        self.banks
+        self.treasuries
             .retain(|slot, _| descendants[&root].contains(slot))
     }
 
@@ -211,28 +211,28 @@ mod tests {
     use morgan_interface::pubkey::Pubkey;
 
     #[test]
-    fn test_bank_forks() {
+    fn test_treasury_forks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
-        let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
-        child_bank.register_tick(&Hash::default());
-        bank_forks.insert(child_bank);
-        assert_eq!(bank_forks[1u64].tick_height(), 1);
-        assert_eq!(bank_forks.working_bank().tick_height(), 1);
+        let treasury = Treasury::new(&genesis_block);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        child_treasury.register_drop(&Hash::default());
+        treasury_forks.insert(child_treasury);
+        assert_eq!(treasury_forks[1u64].drop_height(), 1);
+        assert_eq!(treasury_forks.working_treasury().drop_height(), 1);
     }
 
     #[test]
-    fn test_bank_forks_descendants() {
+    fn test_treasury_forks_descendants() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
-        let bank0 = bank_forks[0].clone();
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
-        bank_forks.insert(bank);
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
-        bank_forks.insert(bank);
-        let descendants = bank_forks.descendants();
+        let treasury = Treasury::new(&genesis_block);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
+        let treasury0 = treasury_forks[0].clone();
+        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        treasury_forks.insert(treasury);
+        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 2);
+        treasury_forks.insert(treasury);
+        let descendants = treasury_forks.descendants();
         let children: Vec<u64> = descendants[&0].iter().cloned().collect();
         assert_eq!(children, vec![1, 2]);
         assert!(descendants[&1].is_empty());
@@ -240,16 +240,16 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_ancestors() {
+    fn test_treasury_forks_ancestors() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
-        let bank0 = bank_forks[0].clone();
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
-        bank_forks.insert(bank);
-        let bank = Bank::new_from_parent(&bank0, &Pubkey::default(), 2);
-        bank_forks.insert(bank);
-        let ancestors = bank_forks.ancestors();
+        let treasury = Treasury::new(&genesis_block);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
+        let treasury0 = treasury_forks[0].clone();
+        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        treasury_forks.insert(treasury);
+        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 2);
+        treasury_forks.insert(treasury);
+        let ancestors = treasury_forks.ancestors();
         assert!(ancestors[&0].is_empty());
         let parents: Vec<u64> = ancestors[&1].iter().cloned().collect();
         assert_eq!(parents, vec![0]);
@@ -258,24 +258,24 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_forks_frozen_banks() {
+    fn test_treasury_forks_frozen_treasuries() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
-        let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
-        bank_forks.insert(child_bank);
-        assert!(bank_forks.frozen_banks().get(&0).is_some());
-        assert!(bank_forks.frozen_banks().get(&1).is_none());
+        let treasury = Treasury::new(&genesis_block);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        treasury_forks.insert(child_treasury);
+        assert!(treasury_forks.frozen_treasuries().get(&0).is_some());
+        assert!(treasury_forks.frozen_treasuries().get(&1).is_none());
     }
 
     #[test]
-    fn test_bank_forks_active_banks() {
+    fn test_treasury_forks_active_treasuries() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let mut bank_forks = BankForks::new(0, bank);
-        let child_bank = Bank::new_from_parent(&bank_forks[0u64], &Pubkey::default(), 1);
-        bank_forks.insert(child_bank);
-        assert_eq!(bank_forks.active_banks(), vec![1]);
+        let treasury = Treasury::new(&genesis_block);
+        let mut treasury_forks = TreasuryForks::new(0, treasury);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        treasury_forks.insert(child_treasury);
+        assert_eq!(treasury_forks.active_treasuries(), vec![1]);
     }
 
 }

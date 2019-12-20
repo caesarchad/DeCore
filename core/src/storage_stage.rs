@@ -1,9 +1,9 @@
-// A stage that handles generating the keys used to encrypt the ledger and sample it
+// A phase that handles generating the keys used to encrypt the ledger and sample it
 // for storage mining. miners submit storage proofs, validator then bundles them
 // to submit its proof for mining to be rewarded.
 
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 #[cfg(all(feature = "chacha", feature = "cuda"))]
 use crate::chacha_cuda::chacha_cbc_encrypt_file_many_keys;
@@ -44,7 +44,7 @@ pub struct StorageStateInner {
     storage_results: StorageResults,
     storage_keys: StorageKeys,
     storage_miner_map: StorageMinerMap,
-    storage_blockhash: Hash,
+    storage_transaction_seal: Hash,
     slot: u64,
 }
 
@@ -53,7 +53,7 @@ pub struct StorageState {
     state: Arc<RwLock<StorageStateInner>>,
 }
 
-pub struct StorageStage {
+pub struct StoragePhase {
     t_storage_mining_verifier: JoinHandle<()>,
     t_storage_create_accounts: JoinHandle<()>,
 }
@@ -87,7 +87,7 @@ impl StorageState {
             storage_results,
             storage_miner_map,
             slot: 0,
-            storage_blockhash: Hash::default(),
+            storage_transaction_seal: Hash::default(),
         };
 
         StorageState {
@@ -105,8 +105,8 @@ impl StorageState {
         self.state.read().unwrap().storage_results[idx]
     }
 
-    pub fn get_storage_blockhash(&self) -> Hash {
-        self.state.read().unwrap().storage_blockhash
+    pub fn get_storage_transaction_seal(&self) -> Hash {
+        self.state.read().unwrap().storage_transaction_seal
     }
 
     pub fn get_slot(&self) -> u64 {
@@ -129,7 +129,7 @@ impl StorageState {
     }
 }
 
-impl StorageStage {
+impl StoragePhase {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage_state: &StorageState,
@@ -138,7 +138,7 @@ impl StorageStage {
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         exit: &Arc<AtomicBool>,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         storage_rotate_count: u64,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     ) -> Self {
@@ -149,7 +149,7 @@ impl StorageStage {
             let exit = exit.clone();
             let storage_keypair = storage_keypair.clone();
             Builder::new()
-                .name("morgan-storage-mining-verify-stage".to_string())
+                .name("morgan-storage-mining-verify-phase".to_string())
                 .spawn(move || {
                     let mut current_key = 0;
                     let mut slot_count = 0;
@@ -197,15 +197,15 @@ impl StorageStage {
             let exit = exit.clone();
             let keypair = keypair.clone();
             let storage_keypair = storage_keypair.clone();
-            let bank_forks = bank_forks.clone();
+            let treasury_forks = treasury_forks.clone();
             Builder::new()
                 .name("morgan-storage-create-accounts".to_string())
                 .spawn(move || {
                     let transactions_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
                     {
-                        let working_bank = bank_forks.read().unwrap().working_bank();
-                        let storage_account = working_bank.get_account(&storage_keypair.pubkey());
+                        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+                        let storage_account = working_treasury.get_account(&storage_keypair.pubkey());
                         if storage_account.is_none() {
                             // warn!("Storage account not found: {}", storage_keypair.pubkey());
                             println!(
@@ -222,7 +222,7 @@ impl StorageStage {
                         match instruction_receiver.recv_timeout(Duration::from_secs(1)) {
                             Ok(instruction) => {
                                 Self::send_transaction(
-                                    &bank_forks,
+                                    &treasury_forks,
                                     &node_group_info,
                                     instruction,
                                     &keypair,
@@ -254,23 +254,23 @@ impl StorageStage {
                 .unwrap()
         };
 
-        StorageStage {
+        StoragePhase {
             t_storage_mining_verifier,
             t_storage_create_accounts,
         }
     }
 
     fn send_transaction(
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         instruction: Instruction,
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         transactions_socket: &UdpSocket,
     ) -> io::Result<()> {
-        let working_bank = bank_forks.read().unwrap().working_bank();
-        let blockhash = working_bank.confirmed_last_blockhash();
-        let keypair_balance = working_bank.get_balance(&keypair.pubkey());
+        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+        let transaction_seal = working_treasury.confirmed_last_transaction_seal();
+        let keypair_balance = working_treasury.get_balance(&keypair.pubkey());
 
         if keypair_balance == 0 {
             // warn!("keypair account balance empty: {}", keypair.pubkey(),);
@@ -288,7 +288,7 @@ impl StorageStage {
                 keypair_balance
             );
         }
-        if working_bank
+        if working_treasury
             .get_account(&storage_keypair.pubkey())
             .is_none()
         {
@@ -308,11 +308,11 @@ impl StorageStage {
 
         let signer_keys = vec![keypair.as_ref(), storage_keypair.as_ref()];
         let message = Message::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
-        let transaction = Transaction::new(&signer_keys, message, blockhash);
+        let transaction = Transaction::new(&signer_keys, message, transaction_seal);
 
         transactions_socket.send_to(
             &bincode::serialize(&transaction).unwrap(),
-            node_group_info.read().unwrap().my_data().tpu,
+            node_group_info.read().unwrap().my_data().transaction_digesting_module,
         )?;
         Ok(())
     }
@@ -328,7 +328,7 @@ impl StorageStage {
         let mut seed = [0u8; 32];
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
-        let ix = storage_instruction::advertise_recent_blockhash(
+        let ix = storage_instruction::advertise_recent_transaction_seal(
             &storage_keypair.pubkey(),
             entry_id,
             slot,
@@ -482,7 +482,7 @@ impl StorageStage {
                 *slot_count += 1;
                 *last_root = slot;
 
-                if let Ok(entries) = block_buffer_pool.fetch_slit_items(slot, 0, None) {
+                if let Ok(entries) = block_buffer_pool.fetch_slot_entries(slot, 0, None) {
                     for entry in &entries {
                         // Go through the transactions, find proofs, and use them to update
                         // the storage_keys with their signatures
@@ -505,7 +505,7 @@ impl StorageStage {
                         }
                     }
                     if *slot_count % storage_rotate_count == 0 {
-                        // assume the last entry in the slot is the blockhash for that slot
+                        // assume the last entry in the slot is the transaction_seal for that slot
                         let entry_hash = entries.last().unwrap().hash;
                         debug!(
                             "crosses sending at root slot: {}! with last entry's hash {}",
@@ -568,7 +568,7 @@ impl StorageStage {
     }
 }
 
-impl Service for StorageStage {
+impl Service for StoragePhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -587,7 +587,7 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
     use rayon::prelude::*;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::hash::{Hash, Hasher};
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -601,25 +601,25 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn test_storage_stage_none_ledger() {
+    fn test_storage_phase_none_ledger() {
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
         let exit = Arc::new(AtomicBool::new(false));
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         let (_slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             None,
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
@@ -634,37 +634,37 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_stage_process_entries() {
+    fn test_storage_phase_process_entries() {
         morgan_logger::setup();
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
         let exit = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let drops_per_slot = genesis_block.drops_per_slot;
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(64);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let slot = 1;
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         block_buffer_pool
-            .record_items(slot, 0, 0, ticks_per_slot, &entries)
+            .update_entries(slot, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
@@ -679,7 +679,7 @@ mod tests {
         let rooted_slots = (slot..slot + SLOTS_PER_SEGMENT + 1)
             .map(|i| {
                 block_buffer_pool
-                    .record_items(i, 0, 0, ticks_per_slot, &entries)
+                    .update_entries(i, 0, 0, drops_per_slot, &entries)
                     .unwrap();
                 i
             })
@@ -727,35 +727,35 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_stage_process_proof_entries() {
+    fn test_storage_phase_process_proof_entries() {
         morgan_logger::setup();
         let keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
         let exit = Arc::new(AtomicBool::new(false));
 
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
-        let ticks_per_slot = genesis_block.ticks_per_slot;;
-        let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let drops_per_slot = genesis_block.drops_per_slot;;
+        let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let entries = make_tiny_test_entries(128);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .record_items(1, 0, 0, ticks_per_slot, &entries)
+            .update_entries(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
-        let bank = Arc::new(Bank::new(&genesis_block));
-        let bank_forks = Arc::new(RwLock::new(BankForks::new_from_banks(&[bank], 0)));
+        let treasury = Arc::new(Treasury::new(&genesis_block));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
         let (slot_sender, slot_receiver) = channel();
         let storage_state = StorageState::new();
-        let storage_stage = StorageStage::new(
+        let storage_stage = StoragePhase::new(
             &storage_state,
             slot_receiver,
             Some(block_buffer_pool.clone()),
             &keypair,
             &storage_keypair,
             &exit.clone(),
-            &bank_forks,
+            &treasury_forks,
             STORAGE_ROTATE_TEST_COUNT,
             &node_group_info,
         );
@@ -780,7 +780,7 @@ mod tests {
 
         let proof_entries = vec![Entry::new(&Hash::default(), 1, mining_txs)];
         block_buffer_pool
-            .record_items(2, 0, 0, ticks_per_slot, &proof_entries)
+            .update_entries(2, 0, 0, drops_per_slot, &proof_entries)
             .unwrap();
         slot_sender.send(vec![2]).unwrap();
 

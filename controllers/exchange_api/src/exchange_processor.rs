@@ -636,7 +636,7 @@ pub fn process_instruction(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    _tick_height: u64,
+    _drop_height: u64,
 ) -> Result<(), InstructionError> {
     morgan_logger::setup();
 
@@ -675,8 +675,8 @@ pub fn process_instruction(
 mod test {
     use super::*;
     use crate::{exchange_instruction, id};
-    use morgan_runtime::bank::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury::Treasury;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -760,24 +760,24 @@ mod test {
         try_calc(1000,   50,  100,   50,  101,  0,45,  5,   49, Tokens::new(   1, 0, 0, 0)).unwrap();
     }
 
-    fn create_bank(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        (bank, mint_keypair)
+        let mut treasury = Treasury::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        (treasury, mint_keypair)
     }
 
-    fn create_client(bank: Bank, mint_keypair: Keypair) -> (BankClient, Keypair) {
+    fn create_client(treasury: Treasury, mint_keypair: Keypair) -> (TreasuryClient, Keypair) {
         let owner = Keypair::new();
-        let bank_client = BankClient::new(bank);
-        bank_client
+        let treasury_client = TreasuryClient::new(treasury);
+        treasury_client
             .transfer(42, &mint_keypair, &owner.pubkey())
             .unwrap();
 
-        (bank_client, owner)
+        (treasury_client, owner)
     }
 
-    fn create_account(client: &BankClient, owner: &Keypair) -> Pubkey {
+    fn create_account(client: &TreasuryClient, owner: &Keypair) -> Pubkey {
         let new = Pubkey::new_rand();
         let instruction = system_instruction::create_account(
             &owner.pubkey(),
@@ -792,7 +792,7 @@ mod test {
         new
     }
 
-    fn create_token_account(client: &BankClient, owner: &Keypair) -> Pubkey {
+    fn create_token_account(client: &TreasuryClient, owner: &Keypair) -> Pubkey {
         let new = create_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
         client
@@ -801,7 +801,7 @@ mod test {
         new
     }
 
-    fn transfer(client: &BankClient, owner: &Keypair, to: &Pubkey, token: Token, tokens: u64) {
+    fn transfer(client: &TreasuryClient, owner: &Keypair, to: &Pubkey, token: Token, tokens: u64) {
         let instruction = exchange_instruction::transfer_request(
             &owner.pubkey(),
             to,
@@ -815,7 +815,7 @@ mod test {
     }
 
     fn trade(
-        client: &BankClient,
+        client: &TreasuryClient,
         owner: &Keypair,
         direction: Direction,
         pair: TokenPair,
@@ -846,8 +846,8 @@ mod test {
     #[test]
     fn test_exchange_new_account() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
         let new_account_data = client.get_account_data(&new).unwrap().unwrap();
@@ -865,8 +865,8 @@ mod test {
     #[test]
     fn test_exchange_new_account_not_unallocated() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
         let instruction = exchange_instruction::account_request(&owner.pubkey(), &new);
@@ -878,8 +878,8 @@ mod test {
     #[test]
     fn test_exchange_new_transfer_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let new = create_token_account(&client, &owner);
 
@@ -909,8 +909,8 @@ mod test {
     #[test]
     fn test_exchange_new_trade_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let (trade, src) = trade(
             &client,
@@ -950,8 +950,8 @@ mod test {
     #[test]
     fn test_exchange_new_swap_request() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);
         let (to_trade, _) = trade(
@@ -1017,8 +1017,8 @@ mod test {
     #[test]
     fn test_exchange_trade_to_token_account() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (client, owner) = create_client(bank, mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (client, owner) = create_client(treasury, mint_keypair);
 
         let profit = create_token_account(&client, &owner);
         let (to_trade, _) = trade(

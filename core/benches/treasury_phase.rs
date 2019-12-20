@@ -7,22 +7,22 @@ extern crate morgan;
 use log::*;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-use morgan::treasury_stage::{create_test_recorder, BankingStage};
-use morgan::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+use morgan::treasury_phase::{create_test_recorder, TreasuryPhase};
+use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
 use morgan::node_group_info::NodeGroupInfo;
 use morgan::node_group_info::Node;
 use morgan::genesis_utils::{create_genesis_block, GenesisBlockInfo};
 use morgan::packet::to_packets_chunked;
-use morgan::water_clock_recorder::WorkingBankEntries;
+use morgan::water_clock_recorder::WorkingTreasuryEntries;
 use morgan::service::Service;
 use morgan::test_tx::test_tx;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::system_transaction;
 use morgan_interface::timing::{
-    duration_as_ms, timestamp, DEFAULT_TICKS_PER_SLOT, MAX_RECENT_BLOCKHASHES,
+    duration_as_ms, timestamp, DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
 };
 use std::iter;
 use std::sync::atomic::Ordering;
@@ -31,7 +31,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use test::Bencher;
 
-fn check_txs(receiver: &Arc<Receiver<WorkingBankEntries>>, ref_tx_count: usize) {
+fn check_txs(receiver: &Arc<Receiver<WorkingTreasuryEntries>>, ref_tx_count: usize) {
     let mut total = 0;
     loop {
         let entries = receiver.recv_timeout(Duration::new(1, 0));
@@ -52,15 +52,15 @@ fn check_txs(receiver: &Arc<Receiver<WorkingBankEntries>>, ref_tx_count: usize) 
 #[bench]
 fn bench_consume_buffered(bencher: &mut Bencher) {
     let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(100_000);
-    let bank = Arc::new(Bank::new(&genesis_block));
-    let ledger_path = get_tmp_ledger_path!();
+    let treasury = Arc::new(Treasury::new(&genesis_block));
+    let ledger_path = fetch_interim_ledger_location!();
     let my_pubkey = Pubkey::new_rand();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
         );
         let (exit, waterclock_recorder, waterclock_service, _signal_receiver) =
-            create_test_recorder(&bank, &block_buffer_pool);
+            create_test_recorder(&treasury, &block_buffer_pool);
 
         let tx = test_tx();
         let len = 4096;
@@ -75,7 +75,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
         // If the packet buffers are copied, performance will be poor.
         bencher.iter(move || {
             let _ignored =
-                BankingStage::consume_buffered_packets(&my_pubkey, &waterclock_recorder, &mut packets);
+                TreasuryPhase::consume_buffered_packets(&my_pubkey, &waterclock_recorder, &mut packets);
         });
 
         exit.store(true, Ordering::Relaxed);
@@ -85,9 +85,9 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
+fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
     morgan_logger::setup();
-    let num_threads = BankingStage::num_threads() as usize;
+    let num_threads = TreasuryPhase::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races
     let txes = 192 * num_threads * 2;
     let mint_total = 1_000_000_000_000;
@@ -97,13 +97,13 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
         ..
     } = create_genesis_block(mint_total);
 
-    // Set a high ticks_per_slot so we don't run out of ticks
+    // Set a high drops_per_slot so we don't run out of drops
     // during the benchmark
-    genesis_block.ticks_per_slot = 10_000;
+    genesis_block.drops_per_slot = 10_000;
 
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
-    let bank = Arc::new(Bank::new(&genesis_block));
+    let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
     let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     trace!("txs: {}", txes);
@@ -128,21 +128,21 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
             mint_total / txes as u64,
             genesis_block.hash(),
         );
-        let x = bank.process_transaction(&fund);
+        let x = treasury.process_transaction(&fund);
         x.unwrap();
     });
     //sanity check, make sure all the transactions can execute sequentially
     transactions.iter().for_each(|tx| {
-        let res = bank.process_transaction(&tx);
+        let res = treasury.process_transaction(&tx);
         assert!(res.is_ok(), "sanity test transactions");
     });
-    bank.clear_signatures();
+    treasury.clear_signatures();
     //sanity check, make sure all the transactions can execute in parallel
-    let res = bank.process_transactions(&transactions);
+    let res = treasury.process_transactions(&transactions);
     for r in res {
         assert!(r.is_ok(), "sanity parallel execution");
     }
-    bank.clear_signatures();
+    treasury.clear_signatures();
     let verified: Vec<_> = to_packets_chunked(&transactions.clone(), 192)
         .into_iter()
         .map(|x| {
@@ -150,22 +150,22 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
             (x, iter::repeat(1).take(len).collect())
         })
         .collect();
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
         );
         let (exit, waterclock_recorder, waterclock_service, signal_receiver) =
-            create_test_recorder(&bank, &block_buffer_pool);
+            create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _banking_stage = BankingStage::new(
+        let _treasury_phase = TreasuryPhase::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,
             vote_receiver,
         );
-        waterclock_recorder.lock().unwrap().set_bank(&bank);
+        waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let half_len = verified.len() / 2;
         let mut start = 0;
@@ -187,7 +187,7 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
                 duration_as_ms(&now.elapsed()),
                 txes / 2
             );
-            bank.clear_signatures();
+            treasury.clear_signatures();
             start += half_len;
             start %= verified.len();
         });
@@ -200,9 +200,9 @@ fn bench_banking_stage_multi_accounts(bencher: &mut Bencher) {
 
 #[bench]
 #[ignore]
-fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
+fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let progs = 4;
-    let num_threads = BankingStage::num_threads() as usize;
+    let num_threads = TreasuryPhase::num_threads() as usize;
     //   a multiple of packet chunk  2X duplicates to avoid races
     let txes = 96 * 100 * num_threads * 2;
     let mint_total = 1_000_000_000_000;
@@ -214,7 +214,7 @@ fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
 
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
-    let bank = Arc::new(Bank::new(&genesis_block));
+    let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
     let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     let transactions: Vec<_> = (0..txes)
@@ -254,20 +254,20 @@ fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
             mint_total / txes as u64,
             genesis_block.hash(),
         );
-        bank.process_transaction(&fund).unwrap();
+        treasury.process_transaction(&fund).unwrap();
     });
     //sanity check, make sure all the transactions can execute sequentially
     transactions.iter().for_each(|tx| {
-        let res = bank.process_transaction(&tx);
+        let res = treasury.process_transaction(&tx);
         assert!(res.is_ok(), "sanity test transactions");
     });
-    bank.clear_signatures();
+    treasury.clear_signatures();
     //sanity check, make sure all the transactions can execute in parallel
-    let res = bank.process_transactions(&transactions);
+    let res = treasury.process_transactions(&transactions);
     for r in res {
         assert!(r.is_ok(), "sanity parallel execution");
     }
-    bank.clear_signatures();
+    treasury.clear_signatures();
     let verified: Vec<_> = to_packets_chunked(&transactions.clone(), 96)
         .into_iter()
         .map(|x| {
@@ -276,27 +276,27 @@ fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
         })
         .collect();
 
-    let ledger_path = get_tmp_ledger_path!();
+    let ledger_path = fetch_interim_ledger_location!();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
         );
         let (exit, waterclock_recorder, waterclock_service, signal_receiver) =
-            create_test_recorder(&bank, &block_buffer_pool);
+            create_test_recorder(&treasury, &block_buffer_pool);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(Node::new_localhost().info);
         let node_group_info = Arc::new(RwLock::new(node_group_info));
-        let _banking_stage = BankingStage::new(
+        let _treasury_phase = TreasuryPhase::new(
             &node_group_info,
             &waterclock_recorder,
             verified_receiver,
             vote_receiver,
         );
-        waterclock_recorder.lock().unwrap().set_bank(&bank);
+        waterclock_recorder.lock().unwrap().set_treasury(&treasury);
 
         let mut id = genesis_block.hash();
-        for _ in 0..(MAX_RECENT_BLOCKHASHES * DEFAULT_TICKS_PER_SLOT as usize) {
+        for _ in 0..(MAX_RECENT_TRANSACTION_SEALS * DEFAULT_DROPS_PER_SLOT as usize) {
             id = hash(&id.as_ref());
-            bank.register_tick(&id);
+            treasury.register_drop(&id);
         }
 
         let half_len = verified.len() / 2;
@@ -305,12 +305,12 @@ fn bench_banking_stage_multi_programs(bencher: &mut Bencher) {
         let signal_receiver2 = signal_receiver.clone();
         bencher.iter(move || {
             // make sure the transactions are still valid
-            bank.register_tick(&genesis_block.hash());
+            treasury.register_drop(&genesis_block.hash());
             for v in verified[start..start + half_len].chunks(verified.len() / num_threads) {
                 verified_sender.send(v.to_vec()).unwrap();
             }
             check_txs(&signal_receiver2, txes / 2);
-            bank.clear_signatures();
+            treasury.clear_signatures();
             start += half_len;
             start %= verified.len();
         });

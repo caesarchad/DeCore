@@ -1,13 +1,13 @@
 //! The `pubsub` module implements a threaded subscription service on client RPC request
 
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use core::hash::Hash;
 use jsonrpc_core::futures::Future;
 use jsonrpc_pubsub::typed::Sink;
 use jsonrpc_pubsub::SubscriptionId;
 use serde::Serialize;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
@@ -76,17 +76,17 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
     subscriptions: &HashMap<K, HashMap<SubscriptionId, (Sink<S>, Confirmations)>>,
     hashmap_key: &K,
     current_slot: u64,
-    bank_forks: &Arc<RwLock<BankForks>>,
-    bank_method: F,
+    treasury_forks: &Arc<RwLock<TreasuryForks>>,
+    treasury_method: F,
     notify: N,
 ) where
     K: Eq + Hash + Clone + Copy,
     S: Clone + Serialize,
-    F: Fn(&Bank, &K) -> X,
+    F: Fn(&Treasury, &K) -> X,
     N: Fn(X, &Sink<S>, u64),
     X: Clone + Serialize,
 {
-    let current_ancestors = bank_forks
+    let current_ancestors = treasury_forks
         .read()
         .unwrap()
         .get(current_slot)
@@ -94,7 +94,7 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
         .ancestors
         .clone();
     if let Some(hashmap) = subscriptions.get(hashmap_key) {
-        for (_bank_sub_id, (sink, confirmations)) in hashmap.iter() {
+        for (_treasury_sub_id, (sink, confirmations)) in hashmap.iter() {
             let desired_slot: Vec<u64> = current_ancestors
                 .iter()
                 .filter(|(_, &v)| v == *confirmations)
@@ -109,13 +109,13 @@ fn check_confirmations_and_notify<K, S, F, N, X>(
                 .collect();
             let root = if root.len() == 1 { root[0] } else { 0 };
             if desired_slot.len() == 1 {
-                let desired_bank = bank_forks
+                let desired_treasury = treasury_forks
                     .read()
                     .unwrap()
                     .get(desired_slot[0])
                     .unwrap()
                     .clone();
-                let result = bank_method(&desired_bank, hashmap_key);
+                let result = treasury_method(&desired_treasury, hashmap_key);
                 notify(result, &sink, root);
             }
         }
@@ -171,15 +171,15 @@ impl RpcSubscriptions {
         &self,
         pubkey: &Pubkey,
         current_slot: u64,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let subscriptions = self.account_subscriptions.read().unwrap();
         check_confirmations_and_notify(
             &subscriptions,
             pubkey,
             current_slot,
-            bank_forks,
-            Bank::get_account_modified_since_parent,
+            treasury_forks,
+            Treasury::get_account_modified_since_parent,
             notify_account,
         );
     }
@@ -188,15 +188,15 @@ impl RpcSubscriptions {
         &self,
         program_id: &Pubkey,
         current_slot: u64,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let subscriptions = self.program_subscriptions.write().unwrap();
         check_confirmations_and_notify(
             &subscriptions,
             program_id,
             current_slot,
-            bank_forks,
-            Bank::get_program_accounts_modified_since_parent,
+            treasury_forks,
+            Treasury::get_program_accounts_modified_since_parent,
             notify_program,
         );
     }
@@ -205,15 +205,15 @@ impl RpcSubscriptions {
         &self,
         signature: &Signature,
         current_slot: u64,
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let mut subscriptions = self.signature_subscriptions.write().unwrap();
         check_confirmations_and_notify(
             &subscriptions,
             signature,
             current_slot,
-            bank_forks,
-            Bank::get_signature_status,
+            treasury_forks,
+            Treasury::get_signature_status,
             notify_signature,
         );
         subscriptions.remove(&signature);
@@ -268,14 +268,14 @@ impl RpcSubscriptions {
     }
 
     /// Notify subscribers of changes to any accounts or new signatures since
-    /// the bank's last checkpoint.
-    pub fn notify_subscribers(&self, current_slot: u64, bank_forks: &Arc<RwLock<BankForks>>) {
+    /// the treasury's last checkpoint.
+    pub fn notify_subscribers(&self, current_slot: u64, treasury_forks: &Arc<RwLock<TreasuryForks>>) {
         let pubkeys: Vec<_> = {
             let subs = self.account_subscriptions.read().unwrap();
             subs.keys().cloned().collect()
         };
         for pubkey in &pubkeys {
-            self.check_account(pubkey, current_slot, bank_forks);
+            self.check_account(pubkey, current_slot, treasury_forks);
         }
 
         let programs: Vec<_> = {
@@ -283,7 +283,7 @@ impl RpcSubscriptions {
             subs.keys().cloned().collect()
         };
         for program_id in &programs {
-            self.check_program(program_id, current_slot, bank_forks);
+            self.check_program(program_id, current_slot, treasury_forks);
         }
 
         let signatures: Vec<_> = {
@@ -291,7 +291,7 @@ impl RpcSubscriptions {
             subs.keys().cloned().collect()
         };
         for signature in &signatures {
-            self.check_signature(signature, current_slot, bank_forks);
+            self.check_signature(signature, current_slot, treasury_forks);
         }
     }
 }
@@ -313,19 +313,19 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
             &alice.pubkey(),
-            blockhash,
+            transaction_seal,
             1,
             16,
             &morgan_budget_api::id(),
         );
-        bank_forks
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
@@ -346,7 +346,7 @@ pub mod tests {
             .unwrap()
             .contains_key(&alice.pubkey()));
 
-        subscriptions.check_account(&alice.pubkey(), 0, &bank_forks);
+        subscriptions.check_account(&alice.pubkey(), 0, &treasury_forks);
         let string = transport_receiver.poll();
         println!("response : {:?}", string);
         if let Async::Ready(Some(response)) = string.unwrap() {
@@ -369,19 +369,19 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
         let tx = system_transaction::create_account(
             &mint_keypair,
             &alice.pubkey(),
-            blockhash,
+            transaction_seal,
             1,
             16,
             &morgan_budget_api::id(),
         );
-        bank_forks
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
@@ -402,7 +402,7 @@ pub mod tests {
             .unwrap()
             .contains_key(&morgan_budget_api::id()));
 
-        subscriptions.check_program(&morgan_budget_api::id(), 0, &bank_forks);
+        subscriptions.check_program(&morgan_budget_api::id(), 0, &treasury_forks);
         let string = transport_receiver.poll();
         if let Async::Ready(Some(response)) = string.unwrap() {
             let expected = format!(r#"{{"jsonrpc":"2.0","method":"programNotification","params":{{"result":["{:?}",{{"data":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"difs":1,"executable":false,"owner":[2,203,81,223,225,24,34,35,203,214,138,130,144,208,35,77,63,16,87,51,47,198,115,123,98,188,19,160,0,0,0,0],"reputations":0}}],"subscription":0}}}}"#, alice.pubkey());
@@ -423,13 +423,13 @@ pub mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(100);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, blockhash);
+        let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, transaction_seal);
         let signature = tx.signatures[0];
-        bank_forks
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
@@ -450,7 +450,7 @@ pub mod tests {
             .unwrap()
             .contains_key(&signature));
 
-        subscriptions.check_signature(&signature, 0, &bank_forks);
+        subscriptions.check_signature(&signature, 0, &treasury_forks);
         let string = transport_receiver.poll();
         if let Async::Ready(Some(response)) = string.unwrap() {
             let expected_res: Option<transaction::Result<()>> = Some(Ok(()));

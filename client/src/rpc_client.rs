@@ -11,7 +11,7 @@ use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{KeypairUtil, Signature};
-use morgan_interface::timing::{DEFAULT_NUM_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT};
+use morgan_interface::timing::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
 use morgan_interface::transaction::{self, Transaction, TransactionError};
 use std::error;
 use std::io;
@@ -99,7 +99,7 @@ impl RpcClient {
                 if cfg!(not(test)) {
                     // Retry ~twice during a slot
                     sleep(Duration::from_millis(
-                        500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                        500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
                     ));
                 }
             };
@@ -107,7 +107,7 @@ impl RpcClient {
                 match result {
                     Ok(_) => return Ok(signature_str),
                     Err(TransactionError::AccountInUse) => {
-                        // Fetch a new blockhash and re-sign the transaction before sending it again
+                        // Fetch a new transaction_seal and re-sign the transaction before sending it again
                         self.resign_transaction(transaction, signer_keys)?;
                         send_retries - 1
                     }
@@ -142,10 +142,10 @@ impl RpcClient {
             let mut transactions_signatures = vec![];
             for transaction in transactions {
                 if cfg!(not(test)) {
-                    // Delay ~1 tick between write transactions in an attempt to reduce AccountInUse errors
+                    // Delay ~1 _drop between write transactions in an attempt to reduce AccountInUse errors
                     // when all the write transactions modify the same program account (eg, deploying a
                     // new program)
-                    sleep(Duration::from_millis(1000 / DEFAULT_NUM_TICKS_PER_SECOND));
+                    sleep(Duration::from_millis(1000 / DEFAULT_NUM_DROPS_PER_SECOND));
                 }
 
                 let signature = self.send_transaction(&transaction).ok();
@@ -159,7 +159,7 @@ impl RpcClient {
                 if cfg!(not(test)) {
                     // Retry ~twice during a slot
                     sleep(Duration::from_millis(
-                        500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                        500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
                     ));
                 }
 
@@ -188,13 +188,13 @@ impl RpcClient {
             }
             send_retries -= 1;
 
-            // Re-sign any failed transactions with a new blockhash and retry
-            let (blockhash, _fee_calculator) =
-                self.get_new_blockhash(&transactions_signatures[0].0.message().recent_blockhash)?;
+            // Re-sign any failed transactions with a new transaction_seal and retry
+            let (transaction_seal, _fee_calculator) =
+                self.get_new_transaction_seal(&transactions_signatures[0].0.message().recent_transaction_seal)?;
             transactions = transactions_signatures
                 .into_iter()
                 .map(|(mut transaction, _)| {
-                    transaction.sign(signer_keys, blockhash);
+                    transaction.sign(signer_keys, transaction_seal);
                     transaction
                 })
                 .collect();
@@ -206,9 +206,9 @@ impl RpcClient {
         tx: &mut Transaction,
         signer_keys: &[&T],
     ) -> Result<(), ClientError> {
-        let (blockhash, _fee_calculator) =
-            self.get_new_blockhash(&tx.message().recent_blockhash)?;
-        tx.sign(signer_keys, blockhash);
+        let (transaction_seal, _fee_calculator) =
+            self.get_new_transaction_seal(&tx.message().recent_transaction_seal)?;
+        tx.sign(signer_keys, transaction_seal);
         Ok(())
     }
 
@@ -278,53 +278,53 @@ impl RpcClient {
         })
     }
 
-    pub fn get_recent_blockhash(&self) -> io::Result<(Hash, FeeCalculator)> {
+    pub fn get_recent_transaction_seal(&self) -> io::Result<(Hash, FeeCalculator)> {
         let response = self
             .client
-            .send(&RpcRequest::GetRecentBlockhash, None, 0)
+            .send(&RpcRequest::GetRecentTransactionSeal, None, 0)
             .map_err(|err| {
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("GetRecentBlockhash request failure: {:?}", err),
+                    format!("GetRecentTransactionSeal request failure: {:?}", err),
                 )
             })?;
 
-        let (blockhash, fee_calculator) =
+        let (transaction_seal, fee_calculator) =
             serde_json::from_value::<(String, FeeCalculator)>(response).map_err(|err| {
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("GetRecentBlockhash parse failure: {:?}", err),
+                    format!("GetRecentTransactionSeal parse failure: {:?}", err),
                 )
             })?;
 
-        let blockhash = blockhash.parse().map_err(|err| {
+        let transaction_seal = transaction_seal.parse().map_err(|err| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("GetRecentBlockhash parse failure: {:?}", err),
+                format!("GetRecentTransactionSeal parse failure: {:?}", err),
             )
         })?;
-        Ok((blockhash, fee_calculator))
+        Ok((transaction_seal, fee_calculator))
     }
 
-    pub fn get_new_blockhash(&self, blockhash: &Hash) -> io::Result<(Hash, FeeCalculator)> {
+    pub fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> io::Result<(Hash, FeeCalculator)> {
         let mut num_retries = 10;
         while num_retries > 0 {
-            if let Ok((new_blockhash, fee_calculator)) = self.get_recent_blockhash() {
-                if new_blockhash != *blockhash {
-                    return Ok((new_blockhash, fee_calculator));
+            if let Ok((new_transaction_seal, fee_calculator)) = self.get_recent_transaction_seal() {
+                if new_transaction_seal != *transaction_seal {
+                    return Ok((new_transaction_seal, fee_calculator));
                 }
             }
-            debug!("Got same blockhash ({:?}), will retry...", blockhash);
+            debug!("Got same transaction_seal ({:?}), will retry...", transaction_seal);
 
             // Retry ~twice during a slot
             sleep(Duration::from_millis(
-                500 * DEFAULT_TICKS_PER_SLOT / DEFAULT_NUM_TICKS_PER_SECOND,
+                500 * DEFAULT_DROPS_PER_SLOT / DEFAULT_NUM_DROPS_PER_SECOND,
             ));
             num_retries -= 1;
         }
         Err(io::Error::new(
             io::ErrorKind::Other,
-            "Unable to get new blockhash, too many retries",
+            "Unable to get new transaction_seal, too many retries",
         ))
     }
 
@@ -390,7 +390,7 @@ impl RpcClient {
         Ok(())
     }
 
-    /// Check a signature in the bank.
+    /// Check a signature in the treasury.
     pub fn check_signature(&self, signature: &Signature) -> bool {
         trace!("check_signature: {:?}", signature);
         let params = json!([format!("{}", signature)]);
@@ -565,7 +565,7 @@ mod tests {
                 Ok(Value::Number(Number::from(50)))
             });
             // Failed request
-            io.add_method("getLatestBlockhash", |params: Params| {
+            io.add_method("getLatestTransactionSeal", |params: Params| {
                 if params != Params::None {
                     Err(Error::invalid_request())
                 } else {
@@ -596,19 +596,19 @@ mod tests {
         );
         assert_eq!(balance.unwrap().as_u64().unwrap(), 50);
 
-        let blockhash = rpc_client.retry_make_rpc_request(&RpcRequest::GetRecentBlockhash, None, 0);
+        let transaction_seal = rpc_client.retry_make_rpc_request(&RpcRequest::GetRecentTransactionSeal, None, 0);
         assert_eq!(
-            blockhash.unwrap().as_str().unwrap(),
+            transaction_seal.unwrap().as_str().unwrap(),
             "deadbeefXjn8o3yroDHxUtKsZZgoy4GPkPPXfouKNHhx"
         );
 
         // Send erroneous parameter
-        let blockhash = rpc_client.retry_make_rpc_request(
-            &RpcRequest::GetRecentBlockhash,
+        let transaction_seal = rpc_client.retry_make_rpc_request(
+            &RpcRequest::GetRecentTransactionSeal,
             Some(json!("parameter")),
             0,
         );
-        assert_eq!(blockhash.is_err(), true);
+        assert_eq!(transaction_seal.is_err(), true);
     }
 
     #[test]
@@ -655,8 +655,8 @@ mod tests {
 
         let key = Keypair::new();
         let to = Pubkey::new_rand();
-        let blockhash = Hash::default();
-        let tx = system_transaction::create_user_account(&key, &to, 50, blockhash);
+        let transaction_seal = Hash::default();
+        let tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
 
         let signature = rpc_client.send_transaction(&tx);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -667,17 +667,17 @@ mod tests {
         assert!(signature.is_err());
     }
     #[test]
-    fn test_get_recent_blockhash() {
+    fn test_get_recent_transaction_seal() {
         let rpc_client = RpcClient::new_mock("succeeds".to_string());
 
-        let expected_blockhash: Hash = PUBKEY.parse().unwrap();
+        let expected_transaction_seal: Hash = PUBKEY.parse().unwrap();
 
-        let (blockhash, _fee_calculator) = rpc_client.get_recent_blockhash().expect("blockhash ok");
-        assert_eq!(blockhash, expected_blockhash);
+        let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal().expect("transaction_seal ok");
+        assert_eq!(transaction_seal, expected_transaction_seal);
 
         let rpc_client = RpcClient::new_mock("fails".to_string());
 
-        assert!(rpc_client.get_recent_blockhash().is_err());
+        assert!(rpc_client.get_recent_transaction_seal().is_err());
     }
 
     #[test]
@@ -704,8 +704,8 @@ mod tests {
 
         let key = Keypair::new();
         let to = Pubkey::new_rand();
-        let blockhash = Hash::default();
-        let mut tx = system_transaction::create_user_account(&key, &to, 50, blockhash);
+        let transaction_seal = Hash::default();
+        let mut tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
 
         let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&key]);
         result.unwrap();
@@ -725,19 +725,19 @@ mod tests {
 
         let key = Keypair::new();
         let to = Pubkey::new_rand();
-        let blockhash: Hash = "HUu3LwEzGRsUkuJS121jzkPJW39Kq62pXCTmTa1F9jDL"
+        let transaction_seal: Hash = "HUu3LwEzGRsUkuJS121jzkPJW39Kq62pXCTmTa1F9jDL"
             .parse()
             .unwrap();
-        let prev_tx = system_transaction::create_user_account(&key, &to, 50, blockhash);
-        let mut tx = system_transaction::create_user_account(&key, &to, 50, blockhash);
+        let prev_tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
+        let mut tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
 
         rpc_client.resign_transaction(&mut tx, &[&key]).unwrap();
 
         assert_ne!(prev_tx, tx);
         assert_ne!(prev_tx.signatures, tx.signatures);
         assert_ne!(
-            prev_tx.message().recent_blockhash,
-            tx.message().recent_blockhash
+            prev_tx.message().recent_transaction_seal,
+            tx.message().recent_transaction_seal
         );
     }
 

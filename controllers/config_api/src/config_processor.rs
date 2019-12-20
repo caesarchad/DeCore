@@ -10,7 +10,7 @@ pub fn process_instruction(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    _tick_height: u64,
+    _drop_height: u64,
 ) -> Result<(), InstructionError> {
     if keyed_accounts[0].signer_key().is_none() {
         // error!("{}", Error(format!("account[0].signer_key().is_none()").to_string()));
@@ -46,8 +46,8 @@ mod tests {
     use crate::{config_instruction, id, ConfigState};
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
-    use morgan_runtime::bank::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury::Treasury;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::message::Message;
@@ -73,19 +73,19 @@ mod tests {
         }
     }
 
-    fn create_bank(difs: u64) -> (Bank, Keypair) {
+    fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        (bank, mint_keypair)
+        let mut treasury = Treasury::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        (treasury, mint_keypair)
     }
 
-    fn create_config_account(bank: Bank, mint_keypair: &Keypair) -> (BankClient, Keypair) {
+    fn create_config_account(treasury: Treasury, mint_keypair: &Keypair) -> (TreasuryClient, Keypair) {
         let config_keypair = Keypair::new();
         let config_pubkey = config_keypair.pubkey();
 
-        let bank_client = BankClient::new(bank);
-        bank_client
+        let treasury_client = TreasuryClient::new(treasury);
+        treasury_client
             .send_instruction(
                 mint_keypair,
                 config_instruction::create_account::<MyConfig>(
@@ -96,15 +96,15 @@ mod tests {
             )
             .expect("new_account");
 
-        (bank_client, config_keypair)
+        (treasury_client, config_keypair)
     }
 
     #[test]
     fn test_process_create_ok() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
-        let config_account_data = bank_client
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
+        let config_account_data = treasury_client
             .get_account_data(&config_keypair.pubkey())
             .unwrap()
             .unwrap();
@@ -117,19 +117,19 @@ mod tests {
     #[test]
     fn test_process_store_ok() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
 
         let instruction = config_instruction::store(&config_pubkey, &my_config);
         let message = Message::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
-        bank_client
+        treasury_client
             .send_message(&[&mint_keypair, &config_keypair], message)
             .unwrap();
 
-        let config_account_data = bank_client
+        let config_account_data = treasury_client
             .get_account_data(&config_pubkey)
             .unwrap()
             .unwrap();
@@ -142,8 +142,8 @@ mod tests {
     #[test]
     fn test_process_store_fail_instruction_data_too_large() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        let (treasury, mint_keypair) = create_treasury(10_000);
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let my_config = MyConfig::new(42);
@@ -151,7 +151,7 @@ mod tests {
         let mut instruction = config_instruction::store(&config_pubkey, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let message = Message::new(vec![instruction]);
-        bank_client
+        treasury_client
             .send_message(&[&config_keypair], message)
             .unwrap_err();
     }
@@ -159,12 +159,12 @@ mod tests {
     #[test]
     fn test_process_store_fail_account0_not_signer() {
         morgan_logger::setup();
-        let (bank, mint_keypair) = create_bank(10_000);
+        let (treasury, mint_keypair) = create_treasury(10_000);
         let system_keypair = Keypair::new();
         let system_pubkey = system_keypair.pubkey();
 
-        bank.transfer(42, &mint_keypair, &system_pubkey).unwrap();
-        let (bank_client, config_keypair) = create_config_account(bank, &mint_keypair);
+        treasury.transfer(42, &mint_keypair, &system_pubkey).unwrap();
+        let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_pubkey = config_keypair.pubkey();
 
         let transfer_instruction =
@@ -174,7 +174,7 @@ mod tests {
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
         let message = Message::new(vec![transfer_instruction, store_instruction]);
-        bank_client
+        treasury_client
             .send_message(&[&system_keypair], message)
             .unwrap_err();
     }

@@ -1,7 +1,7 @@
 //! The `rpc_service` module implements the Morgan JSON RPC service.
 
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::rpc::*;
 use crate::service::Service;
@@ -28,7 +28,7 @@ impl JsonRpcService {
         rpc_addr: SocketAddr,
         storage_state: StorageState,
         config: JsonRpcConfig,
-        bank_forks: Arc<RwLock<BankForks>>,
+        treasury_forks: Arc<RwLock<TreasuryForks>>,
         exit: &Arc<AtomicBool>,
     ) -> Self {
         // info!("{}", Info(format!("rpc bound to {:?}", rpc_addr).to_string()));
@@ -48,7 +48,7 @@ impl JsonRpcService {
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
             storage_state,
             config,
-            bank_forks,
+            treasury_forks,
             exit,
         )));
         let request_processor_ = request_processor.clone();
@@ -168,7 +168,7 @@ mod tests {
     use super::*;
     use crate::connection_info::ContactInfo;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::signature::KeypairUtil;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -180,7 +180,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let exit = Arc::new(AtomicBool::new(false));
-        let bank = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             ContactInfo::default(),
         )));
@@ -188,13 +188,13 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             morgan_netutil::find_available_port_in_range((10000, 65535)).unwrap(),
         );
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(bank.slot(), bank)));
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(treasury.slot(), treasury)));
         let rpc_service = JsonRpcService::new(
             &node_group_info,
             rpc_addr,
             StorageState::default(),
             JsonRpcConfig::default(),
-            bank_forks,
+            treasury_forks,
             &exit,
         );
         let thread = rpc_service.thread_hdl.thread();

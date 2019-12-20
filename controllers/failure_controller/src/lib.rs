@@ -8,7 +8,7 @@ fn entrypoint(
     _program_id: &Pubkey,
     _keyed_accounts: &mut [KeyedAccount],
     _data: &[u8],
-    _tick_height: u64,
+    _drop_height: u64,
 ) -> Result<(), InstructionError> {
     Err(InstructionError::GenericError)
 }

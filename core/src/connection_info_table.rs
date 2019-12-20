@@ -73,7 +73,7 @@ impl PartialOrd for VersionedCrdsValue {
 #[serde(default)]
 pub struct MempoolConfig {
     pub broadcast_transactions: bool,
-    pub shared_mempool_tick_interval_ms: u64,
+    pub shared_mempool_drop_interval_ms: u64,
     pub shared_mempool_batch_size: usize,
     pub shared_mempool_max_concurrent_inbound_syncs: usize,
     pub capacity: usize,
@@ -89,7 +89,7 @@ impl Default for MempoolConfig {
     fn default() -> MempoolConfig {
         MempoolConfig {
             broadcast_transactions: true,
-            shared_mempool_tick_interval_ms: 50,
+            shared_mempool_drop_interval_ms: 50,
             shared_mempool_batch_size: 100,
             shared_mempool_max_concurrent_inbound_syncs: 100,
             capacity: 1_000_000,

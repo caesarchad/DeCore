@@ -2,7 +2,7 @@
 extern crate morgan;
 
 use log::*;
-use morgan::treasury_stage::create_test_recorder;
+use morgan::treasury_phase::create_test_recorder;
 use morgan::block_buffer_pool::{create_new_tmp_ledger, BlockBufferPool};
 use morgan::node_group_info::{NodeGroupInfo, Node};
 use morgan::entry_info::next_entry_mut;
@@ -81,30 +81,30 @@ fn test_replay() {
         mint_keypair,
         ..
     } = create_genesis_block_with_leader(mint_balance, &leader.info.id, leader_balance);
-    genesis_block.ticks_per_slot = 160;
+    genesis_block.drops_per_slot = 160;
     genesis_block.slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
-    let (block_buffer_pool_path, blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (block_buffer_pool_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     let tvu_addr = target1.info.tvu;
 
     let (
-        bank_forks,
-        _bank_forks_info,
+        treasury_forks,
+        _treasury_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,
         completed_slots_receiver,
         leader_schedule_cache,
         _,
-    ) = verifier::new_banks_from_block_buffer(&block_buffer_pool_path, None);
-    let working_bank = bank_forks.working_bank();
+    ) = verifier::new_treasuries_from_block_buffer(&block_buffer_pool_path, None);
+    let working_treasury = treasury_forks.working_treasury();
     assert_eq!(
-        working_bank.get_balance(&mint_keypair.pubkey()),
+        working_treasury.get_balance(&mint_keypair.pubkey()),
         mint_balance
     );
 
     let leader_schedule_cache = Arc::new(leader_schedule_cache);
     // start cluster_info1
-    let bank_forks = Arc::new(RwLock::new(bank_forks));
+    let treasury_forks = Arc::new(RwLock::new(treasury_forks));
     let mut cluster_info1 = NodeGroupInfo::new_with_invalid_keypair(target1.info.clone());
     cluster_info1.insert_info(leader.info.clone());
     let cref1 = Arc::new(RwLock::new(cluster_info1));
@@ -115,12 +115,12 @@ fn test_replay() {
     let block_buffer_pool = Arc::new(block_buffer_pool);
     {
         let (waterclock_service_exit, waterclock_recorder, waterclock_service, _entry_receiver) =
-            create_test_recorder(&working_bank, &block_buffer_pool);
+            create_test_recorder(&working_treasury, &block_buffer_pool);
         let tvu = Tvu::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
-            &bank_forks,
+            &treasury_forks,
             &cref1,
             {
                 Sockets {
@@ -148,25 +148,25 @@ fn test_replay() {
         let num_transfers = 10;
         let mut transfer_amount = 501;
         let bob_keypair = Keypair::new();
-        let mut cur_hash = blockhash;
+        let mut cur_hash = transaction_seal;
         for i in 0..num_transfers {
             let entry0 = next_entry_mut(&mut cur_hash, i, vec![]);
-            let entry_tick0 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
+            let entry_drop0 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
 
             let tx0 = system_transaction::create_user_account(
                 &mint_keypair,
                 &bob_keypair.pubkey(),
                 transfer_amount,
-                blockhash,
+                transaction_seal,
             );
-            let entry_tick1 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
+            let entry_drop1 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
             let entry1 = next_entry_mut(&mut cur_hash, i + num_transfers, vec![tx0]);
-            let entry_tick2 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
+            let entry_drop2 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
 
             mint_ref_balance -= transfer_amount;
             transfer_amount -= 1; // Sneaky: change transfer_amount slightly to avoid DuplicateSignature errors
 
-            let entries = vec![entry0, entry_tick0, entry_tick1, entry1, entry_tick2];
+            let entries = vec![entry0, entry_drop0, entry_drop1, entry1, entry_drop2];
             let blobs = entries.to_shared_blobs();
             index_blobs(&blobs, &leader.info.id, blob_idx, 1, 0);
             blob_idx += blobs.len() as u64;
@@ -192,11 +192,11 @@ fn test_replay() {
             );
         }
 
-        let working_bank = bank_forks.read().unwrap().working_bank();
-        let final_mint_balance = working_bank.get_balance(&mint_keypair.pubkey());
+        let working_treasury = treasury_forks.read().unwrap().working_treasury();
+        let final_mint_balance = working_treasury.get_balance(&mint_keypair.pubkey());
         assert_eq!(final_mint_balance, mint_ref_balance);
 
-        let bob_balance = working_bank.get_balance(&bob_keypair.pubkey());
+        let bob_balance = working_treasury.get_balance(&bob_keypair.pubkey());
         assert_eq!(bob_balance, mint_balance - mint_ref_balance);
 
         exit.store(true, Ordering::Relaxed);

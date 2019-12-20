@@ -1,9 +1,9 @@
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::staking_utils;
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::datapoint_info;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
@@ -63,21 +63,21 @@ impl EpochStakes {
         let stakes = accounts.iter().map(|(k, (v, _))| (*k, *v)).collect();
         Self::new(epoch, stakes, &accounts[0].0)
     }
-    pub fn new_from_bank(bank: &Bank, my_pubkey: &Pubkey) -> Self {
-        let bank_epoch = bank.get_epoch_and_slot_index(bank.slot()).0;
-        let stakes = staking_utils::vote_account_stakes_at_epoch(bank, bank_epoch)
-            .expect("voting require a bank with stakes");
-        Self::new(bank_epoch, stakes, my_pubkey)
+    pub fn new_from_treasury(treasury: &Treasury, my_pubkey: &Pubkey) -> Self {
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_epoch)
+            .expect("voting require a treasury with stakes");
+        Self::new(treasury_epoch, stakes, my_pubkey)
     }
 }
 
 impl Locktower {
-    pub fn new_from_forks(bank_forks: &BankForks, my_pubkey: &Pubkey) -> Self {
-        let mut frozen_banks: Vec<_> = bank_forks.frozen_banks().values().cloned().collect();
-        frozen_banks.sort_by_key(|b| (b.parents().len(), b.slot()));
+    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_pubkey: &Pubkey) -> Self {
+        let mut frozen_treasuries: Vec<_> = treasury_forks.frozen_treasuries().values().cloned().collect();
+        frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
-            if let Some(bank) = frozen_banks.last() {
-                EpochStakes::new_from_bank(bank, my_pubkey)
+            if let Some(treasury) = frozen_treasuries.last() {
+                EpochStakes::new_from_treasury(treasury, my_pubkey)
             } else {
                 return Self::default();
             }
@@ -91,9 +91,9 @@ impl Locktower {
             recent_votes: VecDeque::default(),
         };
 
-        let bank = locktower.find_heaviest_bank(bank_forks).unwrap();
+        let treasury = locktower.find_heaviest_treasury(treasury_forks).unwrap();
         locktower.lockouts =
-            Self::initialize_lockouts_from_bank(&bank, locktower.epoch_stakes.epoch);
+            Self::initialize_lockouts_from_treasury(&treasury, locktower.epoch_stakes.epoch);
         locktower
     }
     pub fn new(epoch_stakes: EpochStakes, threshold_depth: usize, threshold_size: f64) -> Self {
@@ -107,7 +107,7 @@ impl Locktower {
     }
     pub fn collect_vote_lockouts<F>(
         &self,
-        bank_slot: u64,
+        treasury_slot: u64,
         vote_accounts: F,
         ancestors: &HashMap<u64, HashSet<u64>>,
     ) -> HashMap<u64, StakeLockout>
@@ -155,7 +155,7 @@ impl Locktower {
             }
             let start_root = vote_state.root_slot;
 
-            vote_state.process_slot_vote_unchecked(bank_slot);
+            vote_state.process_slot_vote_unchecked(treasury_slot);
 
             for vote in &vote_state.votes {
                 Self::update_ancestor_lockouts(&mut stake_lockouts, &vote, ancestors);
@@ -178,18 +178,18 @@ impl Locktower {
                 Self::update_ancestor_lockouts(&mut stake_lockouts, &vote, ancestors);
             }
 
-            // The last vote in the vote stack is a simulated vote on bank_slot, which
+            // The last vote in the vote stack is a simulated vote on treasury_slot, which
             // we added to the vote stack earlier in this function by calling process_vote().
             // We don't want to update the ancestors stakes of this vote b/c it does not
             // represent an actual vote by the validator.
 
-            // Note: It should not be possible for any vote state in this bank to have
-            // a vote for a slot >= bank_slot, so we are guaranteed that the last vote in
+            // Note: It should not be possible for any vote state in this treasury to have
+            // a vote for a slot >= treasury_slot, so we are guaranteed that the last vote in
             // this vote stack is the simulated vote, so this fetch should be sufficient
             // to find the last unsimulated vote.
             assert_eq!(
                 vote_state.nth_recent_vote(0).map(|l| l.slot),
-                Some(bank_slot)
+                Some(treasury_slot)
             );
             if let Some(vote) = vote_state.nth_recent_vote(1) {
                 // Update all the parents of this last vote with the stake of this vote account
@@ -208,40 +208,40 @@ impl Locktower {
             .unwrap_or(false)
     }
 
-    pub fn is_recent_epoch(&self, bank: &Bank) -> bool {
-        let bank_epoch = bank.get_epoch_and_slot_index(bank.slot()).0;
-        bank_epoch >= self.epoch_stakes.epoch
+    pub fn is_recent_epoch(&self, treasury: &Treasury) -> bool {
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        treasury_epoch >= self.epoch_stakes.epoch
     }
 
-    pub fn update_epoch(&mut self, bank: &Bank) {
+    pub fn update_epoch(&mut self, treasury: &Treasury) {
         trace!(
-            "updating bank epoch slot: {} epoch: {}",
-            bank.slot(),
+            "updating treasury epoch slot: {} epoch: {}",
+            treasury.slot(),
             self.epoch_stakes.epoch
         );
-        let bank_epoch = bank.get_epoch_and_slot_index(bank.slot()).0;
-        if bank_epoch != self.epoch_stakes.epoch {
+        let treasury_epoch = treasury.get_epoch_and_slot_index(treasury.slot()).0;
+        if treasury_epoch != self.epoch_stakes.epoch {
             assert!(
-                self.is_recent_epoch(bank),
+                self.is_recent_epoch(treasury),
                 "epoch_stakes cannot move backwards"
             );
             // info!(
             //     "{}",
-            //     Info(format!("Locktower updated epoch bank slot: {} epoch: {}",
-            //     bank.slot(),
+            //     Info(format!("Locktower updated epoch treasury slot: {} epoch: {}",
+            //     treasury.slot(),
             //     self.epoch_stakes.epoch).to_string())
             // );
             println!("{}",
                 printLn(
-                    format!("Locktower updated epoch bank slot: {} epoch: {}",
-                        bank.slot(),
+                    format!("Locktower updated epoch treasury slot: {} epoch: {}",
+                        treasury.slot(),
                         self.epoch_stakes.epoch
                     ).to_string(),
                     module_path!().to_string()
                 )
             );
             self.epoch_stakes =
-                EpochStakes::new_from_bank(bank, &self.epoch_stakes.delegate_pubkey);
+                EpochStakes::new_from_treasury(treasury, &self.epoch_stakes.delegate_pubkey);
             datapoint_info!(
                 "locktower-epoch",
                 ("epoch", self.epoch_stakes.epoch, i64),
@@ -377,34 +377,34 @@ impl Locktower {
         }
     }
 
-    fn bank_weight(&self, bank: &Bank, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
+    fn treasury_weight(&self, treasury: &Treasury, ancestors: &HashMap<u64, HashSet<u64>>) -> u128 {
         let stake_lockouts =
-            self.collect_vote_lockouts(bank.slot(), bank.vote_accounts().into_iter(), ancestors);
+            self.collect_vote_lockouts(treasury.slot(), treasury.vote_accounts().into_iter(), ancestors);
         self.calculate_weight(&stake_lockouts)
     }
 
-    fn find_heaviest_bank(&self, bank_forks: &BankForks) -> Option<Arc<Bank>> {
-        let ancestors = bank_forks.ancestors();
-        let mut bank_weights: Vec<_> = bank_forks
-            .frozen_banks()
+    fn find_heaviest_treasury(&self, treasury_forks: &TreasuryForks) -> Option<Arc<Treasury>> {
+        let ancestors = treasury_forks.ancestors();
+        let mut treasury_weights: Vec<_> = treasury_forks
+            .frozen_treasuries()
             .values()
             .map(|b| {
                 (
-                    self.bank_weight(b, &ancestors),
+                    self.treasury_weight(b, &ancestors),
                     b.parents().len(),
                     b.clone(),
                 )
             })
             .collect();
-        bank_weights.sort_by_key(|b| (b.0, b.1));
-        bank_weights.pop().map(|b| b.2)
+        treasury_weights.sort_by_key(|b| (b.0, b.1));
+        treasury_weights.pop().map(|b| b.2)
     }
 
-    fn initialize_lockouts_from_bank(bank: &Bank, current_epoch: u64) -> VoteState {
+    fn initialize_lockouts_from_treasury(treasury: &Treasury, current_epoch: u64) -> VoteState {
         let mut lockouts = VoteState::default();
-        if let Some(iter) = bank.epoch_vote_accounts(current_epoch) {
+        if let Some(iter) = treasury.epoch_vote_accounts(current_epoch) {
             for (delegate_pubkey, (_, account)) in iter {
-                if *delegate_pubkey == bank.collector_id() {
+                if *delegate_pubkey == treasury.collector_id() {
                     let state = VoteState::deserialize(&account.data).expect("votes");
                     if lockouts.votes.len() < state.votes.len() {
                         lockouts = state;

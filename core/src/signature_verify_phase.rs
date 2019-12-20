@@ -1,6 +1,6 @@
-//! The `sigverify_stage` implements the signature verification stage of the TPU. It
+//! The `sigverify_phase` implements the signature verification phase of the transaction digesting module. It
 //! receives a list of lists of packets and outputs the same list, but tags each
-//! top-level list with a list of booleans, telling the next stage whether the
+//! top-level list with a list of booleans, telling the next phase whether the
 //! signature in that packet is valid. It assumes each packet contains one
 //! transaction. All processing is done on the CPU by default and on a GPU
 //! if the `cuda` feature is enabled with `--features=cuda`.
@@ -30,11 +30,11 @@ const RECV_BATCH_MAX: usize = 1000;
 
 pub type VerifiedPackets = Vec<(Packets, Vec<u8>)>;
 
-pub struct SigVerifyStage {
+pub struct SigVerifyPhase {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-impl SigVerifyStage {
+impl SigVerifyPhase {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         packet_receiver: Receiver<Packets>,
@@ -66,7 +66,7 @@ impl SigVerifyStage {
             &recvr.lock().expect("'recvr' lock in fn verifier"),
             RECV_BATCH_MAX,
         )?;
-        inc_new_counter_info!("sigverify_stage-packets_received", len);
+        inc_new_counter_info!("sigverify_phase-packets_received", len);
 
         let now = Instant::now();
         let batch_len = batch.len();
@@ -78,7 +78,7 @@ impl SigVerifyStage {
         );
 
         let verified_batch = Self::verify_batch(batch, sigverify_disabled);
-        inc_new_counter_info!("sigverify_stage-verified_packets_send", len);
+        inc_new_counter_info!("sigverify_phase-verified_packets_send", len);
 
         if sendr.send(verified_batch).is_err() {
             return Err(Error::SendError);
@@ -87,7 +87,7 @@ impl SigVerifyStage {
         let total_time_ms = timing::duration_as_ms(&now.elapsed());
         let total_time_s = timing::duration_as_s(&now.elapsed());
         inc_new_counter_info!(
-            "sigverify_stage-time_ms",
+            "sigverify_phase-time_ms",
             (total_time_ms + recv_time) as usize
         );
         debug!(
@@ -101,7 +101,7 @@ impl SigVerifyStage {
         );
 
         datapoint_info!(
-            "sigverify_stage-total_verify_time",
+            "sigverify_phase-total_verify_time",
             ("batch_len", batch_len, i64),
             ("len", len, i64),
             ("total_time_ms", total_time_ms, i64)
@@ -163,7 +163,7 @@ impl SigVerifyStage {
     }
 }
 
-impl Service for SigVerifyStage {
+impl Service for SigVerifyPhase {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {

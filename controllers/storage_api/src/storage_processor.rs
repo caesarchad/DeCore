@@ -6,14 +6,14 @@ use crate::storage_instruction::StorageInstruction;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::instruction::InstructionError;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::timing::DEFAULT_TICKS_PER_SLOT;
+use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use morgan_helper::logHelper::*;
 
 pub fn process_instruction(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    tick_height: u64,
+    drop_height: u64,
 ) -> Result<(), InstructionError> {
     morgan_logger::setup();
 
@@ -53,18 +53,18 @@ pub fn process_instruction(
                 sha_state,
                 slot,
                 signature,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageInstruction::AdvertiseStorageRecentBlockhash { hash, slot } => {
+        StorageInstruction::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
             if me_unsigned || !rest.is_empty() {
                 // This instruction must be signed by `me`
                 Err(InstructionError::InvalidArgument)?;
             }
-            storage_account.advertise_storage_recent_blockhash(
+            storage_account.advertise_storage_recent_transaction_seal(
                 hash,
                 slot,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
         StorageInstruction::ClaimStorageReward { slot } => {
@@ -74,7 +74,7 @@ pub fn process_instruction(
             storage_account.claim_storage_reward(
                 &mut rest[0],
                 slot,
-                tick_height / DEFAULT_TICKS_PER_SLOT,
+                drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
         StorageInstruction::ProofValidation { segment, proofs } => {
@@ -104,8 +104,8 @@ mod tests {
     use assert_matches::assert_matches;
     use bincode::deserialize;
     use log::*;
-    use morgan_runtime::bank::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury::Treasury;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::account::{create_keyed_accounts, Account};
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
@@ -117,12 +117,12 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    const TICKS_IN_SEGMENT: u64 = SLOTS_PER_SEGMENT * DEFAULT_TICKS_PER_SLOT;
+    const DROPS_IN_SEGMENT: u64 = SLOTS_PER_SEGMENT * DEFAULT_DROPS_PER_SLOT;
 
     fn test_instruction(
         ix: &Instruction,
         program_accounts: &mut [Account],
-        tick_height: u64,
+        drop_height: u64,
     ) -> Result<(), InstructionError> {
         let mut keyed_accounts: Vec<_> = ix
             .accounts
@@ -133,7 +133,7 @@ mod tests {
             })
             .collect();
 
-        let ret = process_instruction(&id(), &mut keyed_accounts, &ix.data, tick_height);
+        let ret = process_instruction(&id(), &mut keyed_accounts, &ix.data, drop_height);
         // info!("{}", Info(format!("ret: {:?}", ret).to_string()));
         let info:String = format!("ret: {:?}", ret).to_string();
         println!("{}",
@@ -163,11 +163,11 @@ mod tests {
             SLOTS_PER_SEGMENT,
             Signature::default(),
         );
-        // the proof is for slot 16, which is in segment 0, need to move the tick height into segment 2
-        let ticks_till_next_segment = TICKS_IN_SEGMENT * 2;
+        // the proof is for slot 16, which is in segment 0, need to move the _drop height into segment 2
+        let drops_till_next_segment = DROPS_IN_SEGMENT * 2;
 
         assert_eq!(
-            test_instruction(&ix, &mut [account], ticks_till_next_segment),
+            test_instruction(&ix, &mut [account], drops_till_next_segment),
             Ok(())
         );
     }
@@ -187,7 +187,7 @@ mod tests {
         let mut user_account = Account::default();
         keyed_accounts.push(KeyedAccount::new(&pubkey, true, &mut user_account));
 
-        let ix = storage_instruction::advertise_recent_blockhash(
+        let ix = storage_instruction::advertise_recent_transaction_seal(
             &pubkey,
             Hash::default(),
             SLOTS_PER_SEGMENT,
@@ -206,14 +206,14 @@ mod tests {
 
         let ix =
             storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
-        // move tick height into segment 1
-        let ticks_till_next_segment = TICKS_IN_SEGMENT + 1;
+        // move _drop height into segment 1
+        let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
-        assert!(test_instruction(&ix, &mut accounts, ticks_till_next_segment).is_err());
+        assert!(test_instruction(&ix, &mut accounts, drops_till_next_segment).is_err());
 
         let mut accounts = [Account::default(), Account::default(), Account::default()];
 
-        assert!(test_instruction(&ix, &mut accounts, ticks_till_next_segment).is_err());
+        assert!(test_instruction(&ix, &mut accounts, drops_till_next_segment).is_err());
     }
 
     #[test]
@@ -244,11 +244,11 @@ mod tests {
 
         let ix =
             storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
-        // move tick height into segment 1
-        let ticks_till_next_segment = TICKS_IN_SEGMENT + 1;
+        // move _drop height into segment 1
+        let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
         assert_matches!(
-            test_instruction(&ix, &mut accounts, ticks_till_next_segment),
+            test_instruction(&ix, &mut accounts, drops_till_next_segment),
             Ok(_)
         );
     }
@@ -271,14 +271,14 @@ mod tests {
         let mining_pool_keypair = Keypair::new();
         let mining_pool_pubkey = mining_pool_keypair.pubkey();
 
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        let bank = Arc::new(bank);
+        let mut treasury = Treasury::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        let treasury = Arc::new(treasury);
         let slot = 0;
-        let bank_client = BankClient::new_shared(&bank);
+        let treasury_client = TreasuryClient::new_shared(&treasury);
 
         init_storage_accounts(
-            &bank_client,
+            &treasury_client,
             &mint_keypair,
             &[&validator_storage_id],
             &[&miner_1_storage_id, &miner_2_storage_id],
@@ -289,17 +289,17 @@ mod tests {
             &mining_pool_pubkey,
             100,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
-        // tick the bank up until it's moved into storage segment 2 because the next advertise is for segment 1
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
-        for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+        // _drop the treasury up until it's moved into storage segment 2 because the next advertise is for segment 1
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         // advertise for storage segment 1
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT,
@@ -307,7 +307,7 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -321,7 +321,7 @@ mod tests {
                     &mint_keypair,
                     &miner_1_storage_keypair,
                     slot,
-                    &bank_client,
+                    &treasury_client,
                 ));
             checked_proofs
                 .entry(miner_2_storage_id)
@@ -330,11 +330,11 @@ mod tests {
                     &mint_keypair,
                     &miner_2_storage_keypair,
                     slot,
-                    &bank_client,
+                    &treasury_client,
                 ));
         }
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 2,
@@ -342,13 +342,13 @@ mod tests {
             Some(&mint_pubkey),
         );
 
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
-        for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
@@ -362,12 +362,12 @@ mod tests {
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 3,
@@ -375,17 +375,17 @@ mod tests {
             Some(&mint_pubkey),
         );
 
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT;
-        for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_storage_keypair], message),
             Ok(_)
         );
 
-        assert_eq!(bank_client.get_balance(&validator_storage_id).unwrap(), 10);
+        assert_eq!(treasury_client.get_balance(&validator_storage_id).unwrap(), 10);
 
         let message = Message::new_with_payer(
             vec![storage_instruction::claim_reward(
@@ -395,19 +395,19 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
         assert_eq!(
-            bank_client.get_balance(&validator_storage_id).unwrap(),
+            treasury_client.get_balance(&validator_storage_id).unwrap(),
             10 + (TOTAL_VALIDATOR_REWARDS * 10)
         );
 
-        // tick the bank into the next storage epoch so that rewards can be claimed
-        for _ in 0..=TICKS_IN_SEGMENT {
-            bank.register_tick(&bank.last_blockhash());
+        // _drop the treasury into the next storage epoch so that rewards can be claimed
+        for _ in 0..=DROPS_IN_SEGMENT {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
 
         assert_eq!(
-            bank_client.get_balance(&miner_1_storage_id).unwrap(),
+            treasury_client.get_balance(&miner_1_storage_id).unwrap(),
             10
         );
 
@@ -419,7 +419,7 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
 
         let message = Message::new_with_payer(
             vec![storage_instruction::claim_reward(
@@ -429,17 +429,17 @@ mod tests {
             )],
             Some(&mint_pubkey),
         );
-        assert_matches!(bank_client.send_message(&[&mint_keypair], message), Ok(_));
+        assert_matches!(treasury_client.send_message(&[&mint_keypair], message), Ok(_));
 
         // TODO enable when rewards are working
         assert_eq!(
-            bank_client.get_balance(&miner_1_storage_id).unwrap(),
+            treasury_client.get_balance(&miner_1_storage_id).unwrap(),
             10 + (TOTAL_STORAGE_MINER_REWARDS * 5)
         );
     }
 
     fn init_storage_accounts(
-        client: &BankClient,
+        client: &TreasuryClient,
         mint: &Keypair,
         validator_accounts_to_create: &[&Pubkey],
         storage_miner_accounts_to_create: &[&Pubkey],
@@ -508,7 +508,7 @@ mod tests {
         mint_keypair: &Keypair,
         storage_keypair: &Keypair,
         slot: u64,
-        bank_client: &BankClient,
+        treasury_client: &TreasuryClient,
     ) -> CheckedProof {
         let sha_state = Hash::new(Pubkey::new_rand().as_ref());
         let message = Message::new_with_payer(
@@ -522,7 +522,7 @@ mod tests {
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &storage_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &storage_keypair], message),
             Ok(_)
         );
         CheckedProof {
@@ -534,7 +534,7 @@ mod tests {
         }
     }
 
-    fn get_storage_blockhash<C: SyncClient>(client: &C, account: &Pubkey) -> Hash {
+    fn get_storage_transaction_seal<C: SyncClient>(client: &C, account: &Pubkey) -> Hash {
         if let Some(storage_system_account_data) = client.get_account_data(&account).unwrap() {
             let contract = deserialize(&storage_system_account_data);
             if let Ok(contract) = contract {
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bank_storage() {
+    fn test_treasury_storage() {
         let (genesis_block, mint_keypair) = create_genesis_block(1000);
         let mint_pubkey = mint_keypair.pubkey();
         let miner_keypair = Keypair::new();
@@ -558,20 +558,20 @@ mod tests {
         let validator_keypair = Keypair::new();
         let validator_pubkey = validator_keypair.pubkey();
 
-        let mut bank = Bank::new(&genesis_block);
-        bank.add_instruction_processor(id(), process_instruction);
-        // tick the bank up until it's moved into storage segment 2
-        let next_storage_segment_tick_height = TICKS_IN_SEGMENT * 2;
-        for _ in 0..next_storage_segment_tick_height {
-            bank.register_tick(&bank.last_blockhash());
+        let mut treasury = Treasury::new(&genesis_block);
+        treasury.add_instruction_processor(id(), process_instruction);
+        // _drop the treasury up until it's moved into storage segment 2
+        let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
+        for _ in 0..next_storage_segment_drop_height {
+            treasury.register_drop(&treasury.last_transaction_seal());
         }
-        let bank_client = BankClient::new(bank);
+        let treasury_client = TreasuryClient::new(treasury);
 
         let x = 42;
         let x2 = x * 2;
-        let storage_blockhash = hash(&[x2]);
+        let storage_transaction_seal = hash(&[x2]);
 
-        bank_client
+        treasury_client
             .transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
@@ -580,26 +580,26 @@ mod tests {
             &miner_pubkey,
             1,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         let message = Message::new(storage_instruction::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
         ));
-        bank_client.send_message(&[&mint_keypair], message).unwrap();
+        treasury_client.send_message(&[&mint_keypair], message).unwrap();
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_blockhash(
+            vec![storage_instruction::advertise_recent_transaction_seal(
                 &validator_pubkey,
-                storage_blockhash,
+                storage_transaction_seal,
                 SLOTS_PER_SEGMENT,
             )],
             Some(&mint_pubkey),
         );
 
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &validator_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &validator_keypair], message),
             Ok(_)
         );
 
@@ -614,17 +614,17 @@ mod tests {
             Some(&mint_pubkey),
         );
         assert_matches!(
-            bank_client.send_message(&[&mint_keypair, &miner_keypair], message),
+            treasury_client.send_message(&[&mint_keypair, &miner_keypair], message),
             Ok(_)
         );
 
         assert_eq!(
-            get_storage_slot(&bank_client, &validator_pubkey),
+            get_storage_slot(&treasury_client, &validator_pubkey),
             SLOTS_PER_SEGMENT
         );
         assert_eq!(
-            get_storage_blockhash(&bank_client, &validator_pubkey),
-            storage_blockhash
+            get_storage_transaction_seal(&treasury_client, &validator_pubkey),
+            storage_transaction_seal
         );
     }
 }

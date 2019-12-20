@@ -2,7 +2,7 @@ use crate::node_group_info::{NodeGroupInfo, GOSSIP_SLEEP_MILLIS};
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::Result;
 use crate::service::Service;
-use crate::signature_verify_stage::VerifiedPackets;
+use crate::signature_verify_phase ::VerifiedPackets;
 use crate::{packet, signature_verify};
 use morgan_metricbot::inc_new_counter_debug;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -57,7 +57,7 @@ impl ClusterInfoVoteListener {
                 return Ok(());
             }
             let (votes, new_ts) = node_group_info.read().unwrap().get_votes(last_ts);
-            if waterclock_recorder.lock().unwrap().bank().is_some() {
+            if waterclock_recorder.lock().unwrap().treasury().is_some() {
                 last_ts = new_ts;
                 inc_new_counter_debug!("node_group_info_vote_listener-recv_count", votes.len());
                 let msgs = packet::to_packets(&votes);

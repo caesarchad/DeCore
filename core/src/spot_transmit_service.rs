@@ -10,7 +10,7 @@ use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::streamer::{BlobReceiver, BlobSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::duration_as_ms;
@@ -48,10 +48,10 @@ fn retransmit_blobs(blobs: &[SharedBlob], retransmit: &BlobSender, id: &Pubkey) 
 
 /// Process a blob: Add blob to the ledger window.
 fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>) -> Result<()> {
-    // make an iterator for punctuate_info_objs()
+    // make an iterator for insert_data_blobs()
     let blobs: Vec<_> = blobs.iter().map(move |blob| blob.read().unwrap()).collect();
 
-    block_buffer_pool.punctuate_info_objs(blobs.iter().filter_map(|blob| {
+    block_buffer_pool.insert_data_blobs(blobs.iter().filter_map(|blob| {
         if !blob.is_coding() {
             Some(&(**blob))
         } else {
@@ -65,7 +65,7 @@ fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>)
 
         // Insert the new blob into block tree
         if blob.is_coding() {
-            block_buffer_pool.place_encrypting_obj_bytes(
+            block_buffer_pool.insert_coding_blob_bytes(
                 blob.slot(),
                 blob.index(),
                 &blob.data[..BLOB_HEADER_SIZE + blob.size()],
@@ -79,13 +79,13 @@ fn process_blobs(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>)
 /// blob's slot
 pub fn should_retransmit_and_persist(
     blob: &Blob,
-    bank: Option<Arc<Bank>>,
+    treasury: Option<Arc<Treasury>>,
     leader_schedule_cache: &Arc<LeaderScheduleCache>,
     my_pubkey: &Pubkey,
 ) -> bool {
-    let slot_leader_pubkey = match bank {
+    let slot_leader_pubkey = match treasury {
         None => leader_schedule_cache.slot_leader_at(blob.slot(), None),
-        Some(bank) => leader_schedule_cache.slot_leader_at(blob.slot(), Some(&bank)),
+        Some(treasury) => leader_schedule_cache.slot_leader_at(blob.slot(), Some(&treasury)),
     };
 
     if blob.id() == *my_pubkey {
@@ -109,7 +109,7 @@ fn recv_window<F>(
     my_pubkey: &Pubkey,
     r: &BlobReceiver,
     retransmit: &BlobSender,
-    genesis_blockhash: &Hash,
+    genesis_transaction_seal: &Hash,
     blob_filter: F,
 ) -> Result<()>
 where
@@ -126,7 +126,7 @@ where
 
     blobs.retain(|blob| {
         blob_filter(&blob.read().unwrap())
-            && blob.read().unwrap().genesis_blockhash() == *genesis_blockhash
+            && blob.read().unwrap().genesis_transaction_seal() == *genesis_transaction_seal
     });
 
     retransmit_blobs(&blobs, retransmit, my_pubkey)?;
@@ -176,19 +176,19 @@ impl WindowService {
         repair_socket: Arc<UdpSocket>,
         exit: &Arc<AtomicBool>,
         repair_strategy: RepairStrategy,
-        genesis_blockhash: &Hash,
+        genesis_transaction_seal: &Hash,
         blob_filter: F,
     ) -> WindowService
     where
         F: 'static
-            + Fn(&Pubkey, &Blob, Option<Arc<Bank>>) -> bool
+            + Fn(&Pubkey, &Blob, Option<Arc<Treasury>>) -> bool
             + std::marker::Send
             + std::marker::Sync,
     {
-        let bank_forks = match repair_strategy {
+        let treasury_forks = match repair_strategy {
             RepairStrategy::RepairRange(_) => None,
 
-            RepairStrategy::RepairAll { ref bank_forks, .. } => Some(bank_forks.clone()),
+            RepairStrategy::RepairAll { ref treasury_forks, .. } => Some(treasury_forks.clone()),
         };
 
         let repair_service = RepairService::new(
@@ -199,9 +199,9 @@ impl WindowService {
             repair_strategy,
         );
         let exit = exit.clone();
-        let hash = *genesis_blockhash;
+        let hash = *genesis_transaction_seal;
         let blob_filter = Arc::new(blob_filter);
-        let bank_forks = bank_forks.clone();
+        let treasury_forks = treasury_forks.clone();
         let t_window = Builder::new()
             .name("morgan-window".to_string())
             .spawn(move || {
@@ -217,9 +217,9 @@ impl WindowService {
                         blob_filter(
                             &id,
                             blob,
-                            bank_forks
+                            treasury_forks
                                 .as_ref()
-                                .map(|bank_forks| bank_forks.read().unwrap().working_bank()),
+                                .map(|treasury_forks| treasury_forks.read().unwrap().working_treasury()),
                         )
                     }) {
                         match e {
@@ -261,9 +261,9 @@ impl Service for WindowService {
 #[cfg(test)]
 mod test {
     use super::*;
-    // use crate::bank_forks::BankForks;
-    use crate::treasury_forks::BankForks;
-    use crate::block_buffer_pool::{get_tmp_ledger_path, BlockBufferPool};
+    // use crate::treasury_forks::TreasuryForks;
+    use crate::treasury_forks::TreasuryForks;
+    use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::entry_info::{make_consecutive_blobs, make_tiny_test_entries, EntrySlice};
     use crate::genesis_utils::create_genesis_block_with_leader;
@@ -281,7 +281,7 @@ mod test {
 
     #[test]
     fn test_process_blob() {
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap());
         let num_entries = 10;
         let original_entries = make_tiny_test_entries(num_entries);
@@ -294,7 +294,7 @@ mod test {
         }
 
         assert_eq!(
-            block_buffer_pool.fetch_slit_items(0, 0, None).unwrap(),
+            block_buffer_pool.fetch_slot_entries(0, 0, None).unwrap(),
             original_entries
         );
 
@@ -306,41 +306,41 @@ mod test {
     fn test_should_retransmit_and_persist() {
         let me_id = Pubkey::new_rand();
         let leader_pubkey = Pubkey::new_rand();
-        let bank = Arc::new(Bank::new(
+        let treasury = Arc::new(Treasury::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
-        let cache = Arc::new(LeaderScheduleCache::new_from_bank(&bank));
+        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
 
         let mut blob = Blob::default();
         blob.set_id(&leader_pubkey);
 
-        // without a Bank and blobs not from me, blob gets thrown out
+        // without a Treasury and blobs not from me, blob gets thrown out
         assert_eq!(
             should_retransmit_and_persist(&blob, None, &cache, &me_id),
             false
         );
 
-        // with a Bank for slot 0, blob continues
+        // with a Treasury for slot 0, blob continues
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank.clone()), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury.clone()), &cache, &me_id),
             true
         );
 
         // set the blob to have come from the wrong leader
         blob.set_id(&Pubkey::new_rand());
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank.clone()), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury.clone()), &cache, &me_id),
             false
         );
 
-        // with a Bank and no idea who leader is, blob gets thrown out
+        // with a Treasury and no idea who leader is, blob gets thrown out
         blob.set_slot(MINIMUM_SLOT_LENGTH as u64 * 3);
         assert_eq!(
-            should_retransmit_and_persist(&blob, Some(bank), &cache, &me_id),
+            should_retransmit_and_persist(&blob, Some(treasury), &cache, &me_id),
             false
         );
 
-        // if the blob came back from me, it doesn't continue, whether or not I have a bank
+        // if the blob came back from me, it doesn't continue, whether or not I have a treasury
         blob.set_id(&me_id);
         assert_eq!(
             should_retransmit_and_persist(&blob, None, &cache, &me_id),
@@ -363,20 +363,20 @@ mod test {
         let (s_reader, r_reader) = channel();
         let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
             .expect("Expected to be able to open database ledger");
         let block_buffer_pool = Arc::new(block_buffer_pool);
 
-        let bank = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks: bank_forks.clone(),
+            treasury_forks: treasury_forks.clone(),
             completed_slots_receiver,
-            epoch_schedule: bank_forks
+            epoch_schedule: treasury_forks
                 .read()
                 .unwrap()
-                .working_bank()
+                .working_treasury()
                 .epoch_schedule()
                 .clone(),
         };
@@ -450,16 +450,16 @@ mod test {
         let (s_reader, r_reader) = channel();
         let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
-        let block_buffer_pool_path = get_tmp_ledger_path!();
+        let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
             .expect("Expected to be able to open database ledger");
 
         let block_buffer_pool = Arc::new(block_buffer_pool);
-        let bank = Bank::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
-        let epoch_schedule = *bank_forks.read().unwrap().working_bank().epoch_schedule();
+        let treasury = Treasury::new(&create_genesis_block_with_leader(100, &me_id, 10).genesis_block);
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
+        let epoch_schedule = *treasury_forks.read().unwrap().working_treasury().epoch_schedule();
         let repair_strategy = RepairStrategy::RepairAll {
-            bank_forks,
+            treasury_forks,
             completed_slots_receiver,
             epoch_schedule,
         };

@@ -2,7 +2,7 @@
 //! communication with a Morgan server as well a a trait that encompasses both.
 //!
 //! //! Synchronous implementations are expected to create transactions, sign them, and send
-//! them with multiple retries, updating blockhashes and resigning as-needed.
+//! them with multiple retries, updating transaction_seals and resigning as-needed.
 //!
 //! Asynchronous implementations are expected to create transactions, sign them, and send
 //! them but without waiting to see if the server accepted it.
@@ -46,8 +46,8 @@ pub trait SyncClient {
         signature: &Signature,
     ) -> Result<Option<transaction::Result<()>>>;
 
-    /// Get recent blockhash
-    fn get_recent_blockhash(&self) -> Result<(Hash, FeeCalculator)>;
+    /// Get recent transaction_seal
+    fn get_recent_transaction_seal(&self) -> Result<(Hash, FeeCalculator)>;
 
     /// Get transaction count
     fn get_transaction_count(&self) -> Result<u64>;
@@ -62,7 +62,7 @@ pub trait SyncClient {
     /// Poll to confirm a transaction.
     fn poll_for_signature(&self, signature: &Signature) -> Result<()>;
 
-    fn get_new_blockhash(&self, blockhash: &Hash) -> Result<(Hash, FeeCalculator)>;
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, FeeCalculator)>;
 }
 
 pub trait AsyncClient {
@@ -78,7 +78,7 @@ pub trait AsyncClient {
         &self,
         keypairs: &[&Keypair],
         message: Message,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 
     /// Create a transaction from a single instruction that only requires
@@ -87,7 +87,7 @@ pub trait AsyncClient {
         &self,
         keypair: &Keypair,
         instruction: Instruction,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 
     /// Attempt to transfer difs from `keypair` to `pubkey`, but don't wait to confirm.
@@ -96,6 +96,6 @@ pub trait AsyncClient {
         difs: u64,
         keypair: &Keypair,
         pubkey: &Pubkey,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 }

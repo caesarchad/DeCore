@@ -282,15 +282,15 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use crate::bank_forks::BankForks;
-    use crate::treasury_forks::BankForks;
+    // use crate::treasury_forks::TreasuryForks;
+    use crate::treasury_forks::TreasuryForks;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use jsonrpc_core::futures::sync::mpsc;
     use jsonrpc_core::Response;
     use jsonrpc_pubsub::{PubSubHandler, Session};
     use morgan_budget_api;
     use morgan_budget_api::budget_instruction;
-    use morgan_runtime::bank::Bank;
+    use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_program;
@@ -302,17 +302,17 @@ mod tests {
     use tokio::prelude::{Async, Stream};
 
     fn process_transaction_and_notify(
-        bank_forks: &Arc<RwLock<BankForks>>,
+        treasury_forks: &Arc<RwLock<TreasuryForks>>,
         tx: &Transaction,
         subscriptions: &RpcSubscriptions,
     ) -> transaction::Result<()> {
-        bank_forks
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
             .unwrap()
             .process_transaction(tx)?;
-        subscriptions.notify_subscribers(0, &bank_forks);
+        subscriptions.notify_subscribers(0, &treasury_forks);
         Ok(())
     }
 
@@ -329,21 +329,21 @@ mod tests {
         } = create_genesis_block(10_000);
         let bob = Keypair::new();
         let bob_pubkey = bob.pubkey();
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
 
         // Test signature subscriptions
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let session = create_session();
         let (subscriber, _id_receiver, mut receiver) =
             Subscriber::new_test("signatureNotification");
         rpc.signature_subscribe(session, subscriber, tx.signatures[0].to_string(), None);
 
-        process_transaction_and_notify(&bank_forks, &tx, &rpc.subscriptions).unwrap();
+        process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
 
         // Test signature confirmation notification
@@ -365,9 +365,9 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let bob_pubkey = Pubkey::new_rand();
-        let bank = Bank::new(&genesis_block);
-        let arc_bank = Arc::new(bank);
-        let blockhash = arc_bank.last_blockhash();
+        let treasury = Treasury::new(&genesis_block);
+        let arc_treasury = Arc::new(treasury);
+        let transaction_seal = arc_treasury.last_transaction_seal();
 
         let session = create_session();
 
@@ -375,7 +375,7 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
         io.extend_with(rpc.to_delegate());
 
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, blockhash);
+        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"signatureSubscribe","params":["{}"]}}"#,
             tx.signatures[0].to_string()
@@ -422,9 +422,9 @@ mod tests {
         let contract_state = Keypair::new();
         let budget_program_id = morgan_budget_api::id();
         let executable = false; // TODO
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
 
         let rpc = RpcSolPubSubImpl::default();
         let session = create_session();
@@ -440,9 +440,9 @@ mod tests {
             &alice,
             &contract_funds.pubkey(),
             51,
-            blockhash,
+            transaction_seal,
         );
-        process_transaction_and_notify(&bank_forks, &tx, &rpc.subscriptions).unwrap();
+        process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
 
         let ixs = budget_instruction::when_signed(
             &contract_funds.pubkey(),
@@ -452,13 +452,13 @@ mod tests {
             None,
             51,
         );
-        let tx = Transaction::new_signed_instructions(&[&contract_funds], ixs, blockhash);
-        process_transaction_and_notify(&bank_forks, &tx, &rpc.subscriptions).unwrap();
+        let tx = Transaction::new_signed_instructions(&[&contract_funds], ixs, transaction_seal);
+        process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
 
         // Test signature confirmation notification #1
         let string = receiver.poll();
-        let expected_data = bank_forks
+        let expected_data = treasury_forks
             .read()
             .unwrap()
             .get(0)
@@ -485,20 +485,20 @@ mod tests {
             assert_eq!(serde_json::to_string(&expected).unwrap(), response);
         }
 
-        let tx = system_transaction::create_user_account(&alice, &witness.pubkey(), 1, blockhash);
-        process_transaction_and_notify(&bank_forks, &tx, &rpc.subscriptions).unwrap();
+        let tx = system_transaction::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
+        process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
         let ix = budget_instruction::apply_signature(
             &witness.pubkey(),
             &contract_state.pubkey(),
             &bob_pubkey,
         );
-        let tx = Transaction::new_signed_instructions(&[&witness], vec![ix], blockhash);
-        process_transaction_and_notify(&bank_forks, &tx, &rpc.subscriptions).unwrap();
+        let tx = Transaction::new_signed_instructions(&[&witness], vec![ix], transaction_seal);
+        process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
 
         assert_eq!(
-            bank_forks
+            treasury_forks
                 .read()
                 .unwrap()
                 .get(0)
@@ -553,9 +553,9 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();
@@ -563,15 +563,15 @@ mod tests {
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
         rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
 
-        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, blockhash);
-        bank_forks
+        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
             .unwrap()
             .process_transaction(&tx)
             .unwrap();
-        rpc.subscriptions.notify_subscribers(0, &bank_forks);
+        rpc.subscriptions.notify_subscribers(0, &treasury_forks);
         let _panic = receiver.poll();
     }
 
@@ -582,9 +582,9 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let blockhash = bank.last_blockhash();
-        let bank_forks = Arc::new(RwLock::new(BankForks::new(0, bank)));
+        let treasury = Treasury::new(&genesis_block);
+        let transaction_seal = treasury.last_transaction_seal();
+        let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let bob = Keypair::new();
 
         let rpc = RpcSolPubSubImpl::default();
@@ -592,24 +592,24 @@ mod tests {
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
         rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
 
-        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, blockhash);
-        bank_forks
+        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        treasury_forks
             .write()
             .unwrap()
             .get(0)
             .unwrap()
             .process_transaction(&tx)
             .unwrap();
-        rpc.subscriptions.notify_subscribers(0, &bank_forks);
+        rpc.subscriptions.notify_subscribers(0, &treasury_forks);
 
-        let bank0 = bank_forks.read().unwrap()[0].clone();
-        let bank1 = Bank::new_from_parent(&bank0, &Pubkey::default(), 1);
-        bank_forks.write().unwrap().insert(bank1);
-        rpc.subscriptions.notify_subscribers(1, &bank_forks);
-        let bank1 = bank_forks.read().unwrap()[1].clone();
-        let bank2 = Bank::new_from_parent(&bank1, &Pubkey::default(), 2);
-        bank_forks.write().unwrap().insert(bank2);
-        rpc.subscriptions.notify_subscribers(2, &bank_forks);
+        let treasury0 = treasury_forks.read().unwrap()[0].clone();
+        let treasury1 = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        treasury_forks.write().unwrap().insert(treasury1);
+        rpc.subscriptions.notify_subscribers(1, &treasury_forks);
+        let treasury1 = treasury_forks.read().unwrap()[1].clone();
+        let treasury2 = Treasury::new_from_parent(&treasury1, &Pubkey::default(), 2);
+        treasury_forks.write().unwrap().insert(treasury2);
+        rpc.subscriptions.notify_subscribers(2, &treasury_forks);
         let string = receiver.poll();
         let expected = json!({
            "jsonrpc": "2.0",

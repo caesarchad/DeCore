@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import json
 import sys
 
-stages_to_counters = {}
-stages_to_time = {}
+phases_to_counters = {}
+phases_to_time = {}
 
 if len(sys.argv) != 2:
     print("USAGE: {} <input file>".format(sys.argv[0]))
@@ -20,16 +20,16 @@ with open(sys.argv[1]) as fh:
             json_part = line[line.find("{"):]
             x = json.loads(json_part)
             counter = x['name']
-            if not (counter in stages_to_counters):
-                stages_to_counters[counter] = []
-                stages_to_time[counter] = []
-            stages_to_counters[counter].append(x['counts'])
-            stages_to_time[counter].append(x['now'])
+            if not (counter in phases_to_counters):
+                phases_to_counters[counter] = []
+                phases_to_time[counter] = []
+            phases_to_counters[counter].append(x['counts'])
+            phases_to_time[counter].append(x['now'])
 
 fig, ax = plt.subplots()
 
-for stage in stages_to_counters.keys():
-    plt.plot(stages_to_time[stage], stages_to_counters[stage], label=stage)
+for phase in phases_to_counters.keys():
+    plt.plot(phases_to_time[phase], phases_to_counters[phase], label=phase)
 
 plt.xlabel('ms')
 plt.ylabel('count')

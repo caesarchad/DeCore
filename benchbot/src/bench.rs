@@ -136,28 +136,28 @@ where
     let start = Instant::now();
     let mut reclaim_difs_back_to_source_account = false;
     let mut i = keypair0_balance;
-    let mut blockhash = Hash::default();
-    let mut blockhash_time = Instant::now();
+    let mut transaction_seal = Hash::default();
+    let mut transaction_seal_time = Instant::now();
     while start.elapsed() < duration {
         // ping-pong between genesis and destination accounts for each loop iteration
         // this seems to be faster than trying to determine the balance of individual
         // accounts
         let len = tx_count as usize;
-        if let Ok((new_blockhash, _fee_calculator)) = client.get_new_blockhash(&blockhash) {
-            blockhash = new_blockhash;
+        if let Ok((new_transaction_seal, _fee_calculator)) = client.get_new_transaction_seal(&transaction_seal) {
+            transaction_seal = new_transaction_seal;
         } else {
-            if blockhash_time.elapsed().as_secs() > 30 {
-                panic!("Blockhash is not updating");
+            if transaction_seal_time.elapsed().as_secs() > 30 {
+                panic!("TransactionSeal is not updating");
             }
             sleep(Duration::from_millis(100));
             continue;
         }
-        blockhash_time = Instant::now();
+        transaction_seal_time = Instant::now();
         let balance = client.get_balance(&id.pubkey()).unwrap_or(0);
         metrics_submit_lamport_balance(balance);
         generate_txs(
             &shared_txs,
-            &blockhash,
+            &transaction_seal,
             &keypairs[..len],
             &keypairs[len..],
             threads,
@@ -220,7 +220,7 @@ fn metrics_submit_lamport_balance(lamport_balance: u64) {
 
 fn generate_txs(
     shared_txs: &SharedTransactions,
-    blockhash: &Hash,
+    transaction_seal: &Hash,
     genesis: &[Keypair],
     dest: &[Keypair],
     threads: usize,
@@ -239,7 +239,7 @@ fn generate_txs(
         .par_iter()
         .map(|(id, keypair)| {
             (
-                system_transaction::create_user_account(id, &keypair.pubkey(), 1, *blockhash),
+                system_transaction::create_user_account(id, &keypair.pubkey(), 1, *transaction_seal),
                 timestamp(),
             )
         })
@@ -254,7 +254,7 @@ fn generate_txs(
         bsps * 1_000_000_f64,
         nsps / 1_000_f64,
         duration_as_ms(&duration),
-        blockhash,
+        transaction_seal,
     );
     datapoint_info!(
         "bench-tps-generate_txs",
@@ -368,7 +368,7 @@ pub fn fund_keys<T: Client>(client: &T, genesis: &Keypair, dests: &[Keypair], di
             }
         }
 
-        // try to transfer a "few" at a time with recent blockhash
+        // try to transfer a "few" at a time with recent transaction_seal
         //  assume 4MB network buffers, and 512 byte packets
         const FUND_CHUNK_LEN: usize = 4 * 1024 * 1024 / 512;
 
@@ -409,11 +409,11 @@ pub fn fund_keys<T: Client>(client: &T, genesis: &Keypair, dests: &[Keypair], di
                     to_fund_txs.len(),
                 );
 
-                let (blockhash, _fee_calculator) = client.get_recent_blockhash().unwrap();
+                let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
 
-                // re-sign retained to_fund_txes with updated blockhash
+                // re-sign retained to_fund_txes with updated transaction_seal
                 to_fund_txs.par_iter_mut().for_each(|(k, tx)| {
-                    tx.sign(&[*k], blockhash);
+                    tx.sign(&[*k], transaction_seal);
                 });
 
                 to_fund_txs.iter().for_each(|(_, tx)| {
@@ -459,8 +459,8 @@ pub fn airdrop_difs<T: Client>(
             id.pubkey(),
         );
 
-        let (blockhash, _fee_calculator) = client.get_recent_blockhash().unwrap();
-        match request_airdrop_transaction(&drone_addr, &id.pubkey(), airdrop_amount, blockhash) {
+        let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
+        match request_airdrop_transaction(&drone_addr, &id.pubkey(), airdrop_amount, transaction_seal) {
             Ok(transaction) => {
                 let signature = client.async_send_transaction(transaction).unwrap();
                 client
@@ -662,8 +662,8 @@ mod tests {
     use morgan::verifier::ValidatorConfig;
     use morgan_client::thin_client::create_client;
     use morgan_tokenbot::drone::run_local_drone;
-    use morgan_runtime::bank::Bank;
-    use morgan_runtime::bank_client::BankClient;
+    use morgan_runtime::treasury::Treasury;
+    use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::client::SyncClient;
     use morgan_interface::genesis_block::create_genesis_block;
     use std::sync::mpsc::channel;
@@ -707,7 +707,7 @@ mod tests {
         config.duration = Duration::from_secs(5);
 
         let client = create_client(
-            (node_group.entry_point_info.rpc, node_group.entry_point_info.tpu),
+            (node_group.entry_point_info.rpc, node_group.entry_point_info.transaction_digesting_module),
             FULLNODE_PORT_RANGE,
         );
 
@@ -725,10 +725,10 @@ mod tests {
     }
 
     #[test]
-    fn test_bench_tps_bank_client() {
+    fn test_bench_tps_treasury_client() {
         let (genesis_block, id) = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let clients = vec![BankClient::new(bank)];
+        let treasury = Treasury::new(&genesis_block);
+        let clients = vec![TreasuryClient::new(treasury)];
 
         let mut config = Config::default();
         config.id = id;
@@ -744,8 +744,8 @@ mod tests {
     #[test]
     fn test_bench_tps_fund_keys() {
         let (genesis_block, id) = create_genesis_block(10_000);
-        let bank = Bank::new(&genesis_block);
-        let client = BankClient::new(bank);
+        let treasury = Treasury::new(&genesis_block);
+        let client = TreasuryClient::new(treasury);
         let tx_count = 10;
         let difs = 20;
 

@@ -61,7 +61,7 @@ morgan-genesis \
   --difs 1000000000 \
   --bootstrap-leader-difs 10000000 \
   --difs-per-signature 1 \
-  --hashes-per-tick sleep \
+  --hashes-per-_drop sleep \
   --mint "$dataDir"/config/drone-keypair.json \
   --bootstrap-leader-keypair "$dataDir"/config/leader-keypair.json \
   --bootstrap-vote-keypair "$dataDir"/config/leader-vote-account-keypair.json \

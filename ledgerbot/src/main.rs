@@ -63,7 +63,7 @@ fn main() {
         }
     };
 
-    let entries = match block_buffer_pool.extract_bill() {
+    let entries = match block_buffer_pool.fetch_iterator() {
         Ok(entries) => entries,
         Err(err) => {
             eprintln!("Failed to read ledger at {}: {}", ledger_path, err);
@@ -112,8 +112,8 @@ fn main() {
             stdout().write_all(b"\n]}\n").expect("close array");
         }
         ("verify", _) => match process_block_buffer_pool(&genesis_block, &block_buffer_pool, None) {
-            Ok((_bank_forks, bank_forks_info, _)) => {
-                println!("{:?}", bank_forks_info);
+            Ok((_treasury_forks, treasury_forks_info, _)) => {
+                println!("{:?}", treasury_forks_info);
             }
             Err(err) => {
                 eprintln!("Ledger verification failed: {:?}", err);

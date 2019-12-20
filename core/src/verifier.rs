@@ -1,9 +1,9 @@
 //! The `fullnode` module hosts all the fullnode microservices.
 
-// use crate::bank_forks::BankForks;
-use crate::treasury_forks::BankForks;
+// use crate::treasury_forks::TreasuryForks;
+use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
-use crate::block_buffer_pool_processor::{self, BankForksInfo};
+use crate::block_buffer_pool_processor::{self, TreasuryForksInfo};
 use crate::node_group_info::{NodeGroupInfo, Node};
 use crate::connection_info::ContactInfo;
 use crate::gossip_service::{find_node_group_host, GossipService};
@@ -16,10 +16,10 @@ use crate::rpc_service::JsonRpcService;
 use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
 use crate::storage_stage::StorageState;
-use crate::transaction_process_centre::Tpu;
+use crate::transaction_process_centre::TransactionDigestingModule;
 use crate::transaction_verify_centre::{Sockets, Tvu};
 use morgan_metricbot::inc_new_counter_info;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
@@ -67,7 +67,7 @@ pub struct Validator {
     gossip_service: GossipService,
     waterclock_recorder: Arc<Mutex<WaterClockRecorder>>,
     waterclock_service: WaterClockService,
-    tpu: Tpu,
+    transaction_digesting_module: TransactionDigestingModule,
     tvu: Tvu,
     ip_echo_server: morgan_netutil::IpEchoServer,
 }
@@ -83,7 +83,7 @@ impl Validator {
         entrypoint_info_option: Option<&ContactInfo>,
         config: &ValidatorConfig,
     ) -> Self {
-        // info!("{}", Info(format!("creating bank...").to_string()));
+        // info!("{}", Info(format!("creating treasury...").to_string()));
         println!("{}",
             printLn(
                 format!("creating treasury...").to_string(),
@@ -94,35 +94,35 @@ impl Validator {
         assert_eq!(id, node.info.id);
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
-        let bank = Bank::new_with_paths(&genesis_block, None);
-        let genesis_blockhash = bank.last_blockhash();
+        let treasury = Treasury::new_with_paths(&genesis_block, None);
+        let genesis_transaction_seal = treasury.last_transaction_seal();
 
         let (
-            bank_forks,
-            bank_forks_info,
+            treasury_forks,
+            treasury_forks_info,
             block_buffer_pool,
             ledger_signal_receiver,
             completed_slots_receiver,
             leader_schedule_cache,
             waterclock_config,
-        ) = new_banks_from_block_buffer(ledger_path, config.account_paths.clone());
+        ) = new_treasuries_from_block_buffer(ledger_path, config.account_paths.clone());
 
         let leader_schedule_cache = Arc::new(leader_schedule_cache);
         let exit = Arc::new(AtomicBool::new(false));
-        let bank_info = &bank_forks_info[0];
-        let bank = bank_forks[bank_info.bank_slot].clone();
+        let treasury_info = &treasury_forks_info[0];
+        let treasury = treasury_forks[treasury_info.treasury_slot].clone();
 
         // info!(
         //     "{}",
         //     Info(format!("starting Water Clock... {} {}",
-        //     bank.tick_height(),
-        //     bank.last_blockhash()).to_string())
+        //     treasury.drop_height(),
+        //     treasury.last_transaction_seal()).to_string())
         // );
         println!("{}",
             printLn(
                 format!("starting water clock... {} {}",
-                    bank.tick_height(),
-                    bank.last_blockhash()).to_string(),
+                    treasury.drop_height(),
+                    treasury.last_transaction_seal()).to_string(),
                 module_path!().to_string()
             )
         );
@@ -130,11 +130,11 @@ impl Validator {
 
         let waterclock_config = Arc::new(waterclock_config);
         let (waterclock_recorder, entry_receiver) = WaterClockRecorder::new_with_clear_signal(
-            bank.tick_height(),
-            bank.last_blockhash(),
-            bank.slot(),
-            leader_schedule_cache.next_leader_slot(&id, bank.slot(), &bank, Some(&block_buffer_pool)),
-            bank.ticks_per_slot(),
+            treasury.drop_height(),
+            treasury.last_transaction_seal(),
+            treasury.slot(),
+            leader_schedule_cache.next_leader_slot(&id, treasury.slot(), &treasury, Some(&block_buffer_pool)),
+            treasury.drops_per_slot(),
             &id,
             &block_buffer_pool,
             block_buffer_pool.new_blobs_signals.first().cloned(),
@@ -146,7 +146,7 @@ impl Validator {
         assert_eq!(
             block_buffer_pool.new_blobs_signals.len(),
             1,
-            "New blob signal for the TVU should be the same as the clear bank signal."
+            "New blob signal for the TVU should be the same as the clear treasury signal."
         );
 
         // info!("{}", Info(format!("node info: {:?}", node.info).to_string()));
@@ -175,7 +175,7 @@ impl Validator {
                 module_path!().to_string()
             )
         );
-        let bank_forks = Arc::new(RwLock::new(bank_forks));
+        let treasury_forks = Arc::new(RwLock::new(treasury_forks));
 
         node.info.wallclock = timestamp();
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new(
@@ -193,7 +193,7 @@ impl Validator {
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), node.info.rpc.port()),
                 storage_state.clone(),
                 config.rpc_config.clone(),
-                bank_forks.clone(),
+                treasury_forks.clone(),
                 &exit,
             ))
         };
@@ -218,7 +218,7 @@ impl Validator {
         let gossip_service = GossipService::new(
             &node_group_info,
             Some(block_buffer_pool.clone()),
-            Some(bank_forks.clone()),
+            Some(treasury_forks.clone()),
             node.sockets.gossip,
             &exit,
         );
@@ -262,7 +262,7 @@ impl Validator {
             vote_account,
             voting_keypair,
             storage_keypair,
-            &bank_forks,
+            &treasury_forks,
             &node_group_info,
             sockets,
             block_buffer_pool.clone(),
@@ -274,7 +274,7 @@ impl Validator {
             &waterclock_recorder,
             &leader_schedule_cache,
             &exit,
-            &genesis_blockhash,
+            &genesis_transaction_seal,
             completed_slots_receiver,
         );
 
@@ -289,18 +289,18 @@ impl Validator {
             );
         }
 
-        let tpu = Tpu::new(
+        let transaction_digesting_module = TransactionDigestingModule::new(
             &id,
             &node_group_info,
             &waterclock_recorder,
             entry_receiver,
-            node.sockets.tpu,
-            node.sockets.tpu_via_blobs,
+            node.sockets.transaction_digesting_module,
+            node.sockets.transaction_digesting_module_via_blobs,
             node.sockets.broadcast,
             config.sigverify_disabled,
             &block_buffer_pool,
             &exit,
-            &genesis_blockhash,
+            &genesis_transaction_seal,
         );
 
         inc_new_counter_info!("fullnode-new", 1);
@@ -309,7 +309,7 @@ impl Validator {
             gossip_service,
             rpc_service,
             rpc_pubsub_service,
-            tpu,
+            transaction_digesting_module,
             tvu,
             exit,
             waterclock_service,
@@ -329,12 +329,12 @@ impl Validator {
     }
 }
 
-pub fn new_banks_from_block_buffer(
+pub fn new_treasuries_from_block_buffer(
     block_buffer_pool_path: &str,
     account_paths: Option<String>,
 ) -> (
-    BankForks,
-    Vec<BankForksInfo>,
+    TreasuryForks,
+    Vec<TreasuryForksInfo>,
     BlockBufferPool,
     Receiver<bool>,
     CompletedSlotsReceiver,
@@ -348,13 +348,13 @@ pub fn new_banks_from_block_buffer(
         BlockBufferPool::open_by_message(block_buffer_pool_path)
             .expect("Expected to successfully open database ledger");
 
-    let (bank_forks, bank_forks_info, leader_schedule_cache) =
+    let (treasury_forks, treasury_forks_info, leader_schedule_cache) =
         block_buffer_pool_processor::process_block_buffer_pool(&genesis_block, &block_buffer_pool, account_paths)
             .expect("process_block_buffer_pool failed");
 
     (
-        bank_forks,
-        bank_forks_info,
+        treasury_forks,
+        treasury_forks_info,
         block_buffer_pool,
         ledger_signal_receiver,
         completed_slots_receiver,
@@ -377,7 +377,7 @@ impl Service for Validator {
         }
 
         self.gossip_service.join()?;
-        self.tpu.join()?;
+        self.transaction_digesting_module.join()?;
         self.tvu.join()?;
         self.ip_echo_server.shutdown_now();
 
@@ -402,7 +402,7 @@ pub fn new_validator_for_tests() -> (Validator, ContactInfo, Keypair, String) {
         .native_instruction_processors
         .push(morgan_budget_controller!());
 
-    let (ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+    let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     let voting_keypair = Arc::new(Keypair::new());
     let storage_keypair = Arc::new(Keypair::new());
@@ -437,7 +437,7 @@ mod tests {
         let validator_node = Node::new_localhost_with_pubkey(&validator_keypair.pubkey());
         let genesis_block =
             create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000).genesis_block;
-        let (validator_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+        let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let voting_keypair = Arc::new(Keypair::new());
         let storage_keypair = Arc::new(Keypair::new());
@@ -468,7 +468,7 @@ mod tests {
                 let genesis_block =
                     create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000)
                         .genesis_block;
-                let (validator_ledger_path, _blockhash) = create_new_tmp_ledger!(&genesis_block);
+                let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
                 ledger_paths.push(validator_ledger_path.clone());
                 let voting_keypair = Arc::new(Keypair::new());
                 let storage_keypair = Arc::new(Keypair::new());

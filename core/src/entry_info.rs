@@ -71,7 +71,7 @@ impl Entry {
             }
         } else {
             // Otherwise, the next Entry `num_hashes` after `start_hash`.
-            // If you wanted a tick for instance, then pass in num_hashes = 1
+            // If you wanted a _drop for instance, then pass in num_hashes = 1
             // and transactions = empty
             let hash = next_hash(prev_hash, num_hashes, &transactions);
             Entry {
@@ -125,7 +125,7 @@ impl Entry {
     }
 
     #[cfg(test)]
-    pub fn new_tick(num_hashes: u64, hash: &Hash) -> Self {
+    pub fn new_drop(num_hashes: u64, hash: &Hash) -> Self {
         Entry {
             num_hashes,
             hash: *hash,
@@ -134,7 +134,7 @@ impl Entry {
     }
 
     /// Verifies self.hash is the result of hashing a `start_hash` `self.num_hashes` times.
-    /// If the transaction is not a Tick, then hash that as well.
+    /// If the transaction is not a Drop, then hash that as well.
     pub fn verify(&self, start_hash: &Hash) -> bool {
         let ref_hash = next_hash(start_hash, self.num_hashes, &self.transactions);
         if self.hash != ref_hash {
@@ -155,7 +155,7 @@ impl Entry {
         true
     }
 
-    pub fn is_tick(&self) -> bool {
+    pub fn is_drop(&self) -> bool {
         self.transactions.is_empty()
     }
 }
@@ -183,7 +183,7 @@ fn next_hash(start_hash: &Hash, num_hashes: u64, transactions: &[Transaction]) -
     let mut waterclock = WaterClock::new(*start_hash, None);
     waterclock.hash(num_hashes.saturating_sub(1));
     if transactions.is_empty() {
-        waterclock.tick().unwrap().hash
+        waterclock._drop().unwrap().hash
     } else {
         waterclock.record(hash_transactions(transactions)).unwrap().hash
     }
@@ -195,7 +195,7 @@ where
     I::Item: Borrow<Blob>,
 {
     let mut entries: Vec<Entry> = vec![];
-    let mut num_ticks = 0;
+    let mut num_drops = 0;
 
     for blob in blobs.into_iter() {
         let new_entries: Vec<Entry> = {
@@ -203,11 +203,11 @@ where
             deserialize(&blob.borrow().data()[..msg_size])?
         };
 
-        let num_new_ticks: u64 = new_entries.iter().map(|entry| entry.is_tick() as u64).sum();
-        num_ticks += num_new_ticks;
+        let num_new_drops: u64 = new_entries.iter().map(|entry| entry.is_drop() as u64).sum();
+        num_drops += num_new_drops;
         entries.extend(new_entries)
     }
-    Ok((entries, num_ticks))
+    Ok((entries, num_drops))
 }
 
 // an EntrySlice is a slice of Entries
@@ -367,14 +367,14 @@ pub fn next_entries(
     next_entries_mut(&mut hash, &mut num_hashes, transactions)
 }
 
-pub fn create_ticks(num_ticks: u64, mut hash: Hash) -> Vec<Entry> {
-    let mut ticks = Vec::with_capacity(num_ticks as usize);
-    for _ in 0..num_ticks {
-        let new_tick = next_entry_mut(&mut hash, 1, vec![]);
-        ticks.push(new_tick);
+pub fn create_drops(num_drops: u64, mut hash: Hash) -> Vec<Entry> {
+    let mut drops = Vec::with_capacity(num_drops as usize);
+    for _ in 0..num_drops {
+        let new_drop = next_entry_mut(&mut hash, 1, vec![]);
+        drops.push(new_drop);
     }
 
-    ticks
+    drops
 }
 
 pub fn make_tiny_test_entries_from_hash(start: &Hash, num: usize) -> Vec<Entry> {
@@ -422,7 +422,7 @@ pub fn make_consecutive_blobs(
     start_hash: Hash,
     addr: &std::net::SocketAddr,
 ) -> Vec<SharedBlob> {
-    let entries = create_ticks(num_blobs_to_make, start_hash);
+    let entries = create_drops(num_blobs_to_make, start_hash);
 
     let blobs = entries.to_single_entry_shared_blobs();
     let mut index = start_height;
@@ -437,7 +437,7 @@ pub fn make_consecutive_blobs(
 }
 
 #[cfg(test)]
-/// Creates the next Tick or Transaction Entry `num_hashes` after `start_hash`.
+/// Creates the next Drop or Transaction Entry `num_hashes` after `start_hash`.
 pub fn next_entry(prev_hash: &Hash, num_hashes: u64, transactions: Vec<Transaction>) -> Entry {
     assert!(num_hashes > 0 || transactions.is_empty());
     Entry {
@@ -481,8 +481,8 @@ mod tests {
     fn test_entry_verify() {
         let zero = Hash::default();
         let one = hash(&zero.as_ref());
-        assert!(Entry::new_tick(0, &zero).verify(&zero)); // base case, never used
-        assert!(!Entry::new_tick(0, &zero).verify(&one)); // base case, bad
+        assert!(Entry::new_drop(0, &zero).verify(&zero)); // base case, never used
+        assert!(!Entry::new_drop(0, &zero).verify(&one)); // base case, bad
         assert!(next_entry(&zero, 1, vec![]).verify(&zero)); // inductive step
         assert!(!next_entry(&zero, 1, vec![]).verify(&one)); // inductive step, bad
     }
@@ -524,13 +524,13 @@ mod tests {
     #[test]
     fn test_next_entry() {
         let zero = Hash::default();
-        let tick = next_entry(&zero, 1, vec![]);
-        assert_eq!(tick.num_hashes, 1);
-        assert_ne!(tick.hash, zero);
+        let _drop = next_entry(&zero, 1, vec![]);
+        assert_eq!(_drop.num_hashes, 1);
+        assert_ne!(_drop.hash, zero);
 
-        let tick = next_entry(&zero, 0, vec![]);
-        assert_eq!(tick.num_hashes, 0);
-        assert_eq!(tick.hash, zero);
+        let _drop = next_entry(&zero, 0, vec![]);
+        assert_eq!(_drop.num_hashes, 0);
+        assert_eq!(_drop.hash, zero);
 
         let keypair = Keypair::new();
         let tx0 = create_sample_timestamp(&keypair, zero);
@@ -566,13 +566,13 @@ mod tests {
         let zero = Hash::default();
         let one = hash(&zero.as_ref());
         assert!(vec![][..].verify(&zero)); // base case
-        assert!(vec![Entry::new_tick(0, &zero)][..].verify(&zero)); // singleton case 1
-        assert!(!vec![Entry::new_tick(0, &zero)][..].verify(&one)); // singleton case 2, bad
+        assert!(vec![Entry::new_drop(0, &zero)][..].verify(&zero)); // singleton case 1
+        assert!(!vec![Entry::new_drop(0, &zero)][..].verify(&one)); // singleton case 2, bad
         assert!(vec![next_entry(&zero, 0, vec![]); 2][..].verify(&zero)); // inductive step
 
-        let mut bad_ticks = vec![next_entry(&zero, 0, vec![]); 2];
-        bad_ticks[1].hash = one;
-        assert!(!bad_ticks.verify(&zero)); // inductive step, bad
+        let mut bad_drops = vec![next_entry(&zero, 0, vec![]); 2];
+        bad_drops[1].hash = one;
+        assert!(!bad_drops.verify(&zero)); // inductive step, bad
     }
 
     fn blob_sized_entries(num_entries: usize) -> Vec<Entry> {

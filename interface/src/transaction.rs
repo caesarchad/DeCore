@@ -31,14 +31,14 @@ pub enum TransactionError {
     /// This account may not be used to pay transaction fees
     InvalidAccountForFee,
 
-    /// The bank has seen `Signature` before. This can occur under normal operation
+    /// The treasury has seen `Signature` before. This can occur under normal operation
     /// when a UDP packet is duplicated, as a user error from a client not updating
-    /// its `recent_blockhash`, or as a double-spend attack.
+    /// its `recent_transaction_seal`, or as a double-spend attack.
     DuplicateSignature,
 
-    /// The bank has not seen the given `recent_blockhash` or the transaction is too old and
-    /// the `recent_blockhash` has been discarded.
-    BlockhashNotFound,
+    /// The treasury has not seen the given `recent_transaction_seal` or the transaction is too old and
+    /// the `recent_transaction_seal` has been discarded.
+    TransactionSealNotFound,
 
     /// The program returned an error
     InstructionError(u8, InstructionError),
@@ -58,7 +58,7 @@ pub type Result<T> = result::Result<T, TransactionError>;
 /// An atomic transaction
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Transaction {
-    /// A set of digital signatures of `account_keys`, `program_ids`, `recent_blockhash`, and `instructions`, signed by the first
+    /// A set of digital signatures of `account_keys`, `program_ids`, `recent_transaction_seal`, and `instructions`, signed by the first
     /// signatures.len() keys of account_keys
     #[serde(with = "short_vec")]
     pub signatures: Vec<Signature>,
@@ -83,33 +83,33 @@ impl Transaction {
     pub fn new<T: KeypairUtil>(
         from_keypairs: &[&T],
         message: Message,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> Transaction {
         let mut tx = Self::new_unsigned(message);
-        tx.sign(from_keypairs, recent_blockhash);
+        tx.sign(from_keypairs, recent_transaction_seal);
         tx
     }
 
     pub fn new_signed_instructions<T: KeypairUtil>(
         from_keypairs: &[&T],
         instructions: Vec<Instruction>,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> Transaction {
         let message = Message::new(instructions);
-        Self::new(from_keypairs, message, recent_blockhash)
+        Self::new(from_keypairs, message, recent_transaction_seal)
     }
 
     /// Create a signed transaction
     /// * `from_keypairs` - The keys used to sign the transaction.
     /// * `keys` - The keys for the transaction.  These are the program state
     ///    instances or dif recipient keys.
-    /// * `recent_blockhash` - The Water Clock hash.
+    /// * `recent_transaction_seal` - The Water Clock hash.
     /// * `program_ids` - The keys that identify programs used in the `instruction` vector.
     /// * `instructions` - Instructions that will be executed atomically.
     pub fn new_with_compiled_instructions<T: KeypairUtil>(
         from_keypairs: &[&T],
         keys: &[Pubkey],
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
         program_ids: Vec<Pubkey>,
         instructions: Vec<CompiledInstruction>,
     ) -> Self {
@@ -127,7 +127,7 @@ impl Transaction {
             Hash::default(),
             instructions,
         );
-        Transaction::new(from_keypairs, message, recent_blockhash)
+        Transaction::new(from_keypairs, message, recent_transaction_seal)
     }
 
     pub fn data(&self, instruction_index: usize) -> &[u8] {
@@ -168,8 +168,8 @@ impl Transaction {
     }
 
     /// Sign this transaction.
-    pub fn sign_unchecked<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_blockhash: Hash) {
-        self.message.recent_blockhash = recent_blockhash;
+    pub fn sign_unchecked<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
+        self.message.recent_transaction_seal = recent_transaction_seal;
         let message_data = self.message_data();
         self.signatures = keypairs
             .iter()
@@ -178,26 +178,26 @@ impl Transaction {
     }
 
     /// Check keys and keypair lengths, then sign this transaction.
-    pub fn sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_blockhash: Hash) {
+    pub fn sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
         let signed_keys =
             &self.message.account_keys[0..self.message.header.num_required_signatures as usize];
         for (i, keypair) in keypairs.iter().enumerate() {
             assert_eq!(keypair.pubkey(), signed_keys[i], "keypair-pubkey mismatch");
         }
         assert_eq!(keypairs.len(), signed_keys.len(), "not enough keypairs");
-        self.sign_unchecked(keypairs, recent_blockhash);
+        self.sign_unchecked(keypairs, recent_transaction_seal);
     }
 
     /// Sign using some subset of required keys
-    ///  if recent_blockhash is not the same as currently in the transaction,
-    ///  clear any prior signatures and update recent_blockhash
-    pub fn partial_sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_blockhash: Hash) {
+    ///  if recent_transaction_seal is not the same as currently in the transaction,
+    ///  clear any prior signatures and update recent_transaction_seal
+    pub fn partial_sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
         let signed_keys =
             &self.message.account_keys[0..self.message.header.num_required_signatures as usize];
 
-        // if you change the blockhash, you're re-signing...
-        if recent_blockhash != self.message.recent_blockhash {
-            self.message.recent_blockhash = recent_blockhash;
+        // if you change the transaction_seal, you're re-signing...
+        if recent_transaction_seal != self.message.recent_transaction_seal {
+            self.message.recent_transaction_seal = recent_transaction_seal;
             self.signatures
                 .iter_mut()
                 .for_each(|signature| *signature = Signature::default());
@@ -386,14 +386,14 @@ mod tests {
         let len_size = 1;
         let num_required_sigs_size = 1;
         let num_credit_only_accounts_size = 2;
-        let blockhash_size = size_of::<Hash>();
+        let transaction_seal_size = size_of::<Hash>();
         let expected_transaction_size = len_size
             + (tx.signatures.len() * size_of::<Signature>())
             + num_required_sigs_size
             + num_credit_only_accounts_size
             + len_size
             + (tx.message.account_keys.len() * size_of::<Pubkey>())
-            + blockhash_size
+            + transaction_seal_size
             + len_size
             + expected_instruction_size;
         assert_eq!(expected_transaction_size, 215);

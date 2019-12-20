@@ -7,7 +7,7 @@ use crate::waterclock_config::WaterClockConfig;
 use crate::pubkey::Pubkey;
 use crate::signature::{Keypair, KeypairUtil};
 use crate::system_program;
-use crate::timing::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT};
+use crate::timing::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_DROPS_PER_SLOT};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -21,7 +21,7 @@ pub struct GenesisBlock {
     pub native_instruction_processors: Vec<(String, Pubkey)>,
     pub slots_per_epoch: u64,
     pub stakers_slot_offset: u64,
-    pub ticks_per_slot: u64,
+    pub drops_per_slot: u64,
     pub waterclock_config: WaterClockConfig,
 }
 
@@ -55,7 +55,7 @@ impl GenesisBlock {
             native_instruction_processors: native_instruction_processors.to_vec(),
             slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
             stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
-            ticks_per_slot: DEFAULT_TICKS_PER_SLOT,
+            drops_per_slot: DEFAULT_DROPS_PER_SLOT,
             waterclock_config: WaterClockConfig::default(),
         }
     }

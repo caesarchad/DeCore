@@ -43,9 +43,9 @@ type AccountLocks = Mutex<HashSet<Pubkey>>;
 
 // Locks for accounts that are currently being recorded + committed
 type RecordLocks = (
-    // Record Locks for the current bank
+    // Record Locks for the current treasury
     Arc<AccountLocks>,
-    // Any unreleased record locks from all parent/grandparent banks. We use Arc<Mutex> to
+    // Any unreleased record locks from all parent/grandparent treasuries. We use Arc<Mutex> to
     // avoid copies when calling new_from_parent().
     Vec<Arc<AccountLocks>>,
 );
@@ -133,13 +133,13 @@ impl Accounts {
             let (ref record_locks, ref mut grandparent_record_locks) =
                 *parent.record_locks.lock().unwrap();
 
-            // Note that when creating a child bank, we only care about the locks that are held for
+            // Note that when creating a child treasury, we only care about the locks that are held for
             // accounts that are in txs that are currently recording + committing, because other
-            // incoming txs on this bank that are not yet recording will not make it to bank commit.
+            // incoming txs on this treasury that are not yet recording will not make it to treasury commit.
             //
             // Thus:
             // 1) The child doesn't need to care about potential "future" account locks on its parent
-            // bank that the parent does not currently hold.
+            // treasury that the parent does not currently hold.
             // 2) The child only needs the currently held "record locks" from the parent.
             // 3) The parent doesn't need to retain any of the locks other than the ones it owns so
             // that unlock() can be called later (the grandparent locks can be given to the child).
@@ -370,7 +370,7 @@ impl Accounts {
                     parent_locks.retain(|p| {
                         loop {
                             {
-                                // If a parent bank holds a record lock for this account, then loop
+                                // If a parent treasury holds a record lock for this account, then loop
                                 // until that lock is released
                                 let p = p.lock().unwrap();
                                 if !p.contains(k) {
@@ -486,7 +486,7 @@ impl Accounts {
             .collect();
         if error_counters.account_in_use != 0 {
             inc_new_counter_error!(
-                "bank-process_transactions-account_in_use",
+                "treasury-process_transactions-account_in_use",
                 error_counters.account_in_use,
                 0,
                 100
@@ -516,7 +516,7 @@ impl Accounts {
         I: Borrow<Transaction>,
     {
         let my_locks = &mut self.account_locks.lock().unwrap();
-        debug!("bank unlock accounts");
+        debug!("treasury unlock accounts");
         txs.iter()
             .zip(results.iter())
             .for_each(|(tx, result)| Self::unlock_account(tx.borrow(), result, my_locks));
@@ -583,7 +583,7 @@ impl Accounts {
 
 #[cfg(test)]
 mod tests {
-    // TODO: all the bank tests are bank specific, issue: 2194
+    // TODO: all the treasury tests are treasury specific, issue: 2194
 
     use super::*;
     use morgan_interface::account::Account;
@@ -1138,11 +1138,11 @@ mod tests {
             child_account_locks.clear();
         }
 
-        // Make sure calling new_from_parent() on the child bank also cleans up the copy of old locked
+        // Make sure calling new_from_parent() on the child treasury also cleans up the copy of old locked
         // parent accounts, in case the child doesn't call lock_account() after a parent has
         // released their account locks
         {
-            // Mock an empty set of parent record accounts in the child bank
+            // Mock an empty set of parent record accounts in the child treasury
             let (_, ref mut parent_record_locks) = *child.record_locks.lock().unwrap();
             parent_record_locks.push(Arc::new(Mutex::new(HashSet::new())));
         }

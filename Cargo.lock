@@ -179,17 +179,6 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "bitconch-storage-miner"
-version = "1.2.0"
-dependencies = [
- "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan 0.15.3",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
- "morgan-netutil 0.15.3",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2088,6 +2077,17 @@ dependencies = [
  "morgan-interface 0.15.3",
  "morgan-logger 0.15.3",
  "morgan-storage-api 0.15.3",
+]
+
+[[package]]
+name = "morgan-storage-miner"
+version = "1.2.0"
+dependencies = [
+ "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "morgan 0.15.3",
+ "morgan-interface 0.15.3",
+ "morgan-logger 0.15.3",
+ "morgan-netutil 0.15.3",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 use crate::leader_arrange::LeaderSchedule;
 use crate::staking_utils;
-use morgan_runtime::bank::Bank;
+use morgan_runtime::treasury::Treasury;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::NUM_CONSECUTIVE_LEADER_SLOTS;
 use proptest::{
@@ -9,8 +9,8 @@ use proptest::{
 };
 
 /// Return the leader schedule for the given epoch.
-pub fn leader_schedule(epoch_height: u64, bank: &Bank) -> Option<LeaderSchedule> {
-    staking_utils::staked_nodes_at_epoch(bank, epoch_height).map(|stakes| {
+pub fn leader_schedule(epoch_height: u64, treasury: &Treasury) -> Option<LeaderSchedule> {
+    staking_utils::staked_nodes_at_epoch(treasury, epoch_height).map(|stakes| {
         let mut seed = [0u8; 32];
         seed[0..8].copy_from_slice(&epoch_height.to_le_bytes());
         let mut stakes: Vec<_> = stakes.into_iter().collect();
@@ -18,27 +18,27 @@ pub fn leader_schedule(epoch_height: u64, bank: &Bank) -> Option<LeaderSchedule>
         LeaderSchedule::new(
             &stakes,
             seed,
-            bank.get_slots_in_epoch(epoch_height),
+            treasury.get_slots_in_epoch(epoch_height),
             NUM_CONSECUTIVE_LEADER_SLOTS,
         )
     })
 }
 
 /// Return the leader for the given slot.
-pub fn slot_leader_at(slot: u64, bank: &Bank) -> Option<Pubkey> {
-    let (epoch, slot_index) = bank.get_epoch_and_slot_index(slot);
+pub fn slot_leader_at(slot: u64, treasury: &Treasury) -> Option<Pubkey> {
+    let (epoch, slot_index) = treasury.get_epoch_and_slot_index(slot);
 
-    leader_schedule(epoch, bank).map(|leader_schedule| leader_schedule[slot_index])
+    leader_schedule(epoch, treasury).map(|leader_schedule| leader_schedule[slot_index])
 }
 
-// Returns the number of ticks remaining from the specified tick_height to the end of the
-// slot implied by the tick_height
-pub fn num_ticks_left_in_slot(bank: &Bank, tick_height: u64) -> u64 {
-    bank.ticks_per_slot() - tick_height % bank.ticks_per_slot() - 1
+// Returns the number of drops remaining from the specified drop_height to the end of the
+// slot implied by the drop_height
+pub fn num_drops_left_in_slot(treasury: &Treasury, drop_height: u64) -> u64 {
+    treasury.drops_per_slot() - drop_height % treasury.drops_per_slot() - 1
 }
 
-pub fn tick_height_to_slot(ticks_per_slot: u64, tick_height: u64) -> u64 {
-    tick_height / ticks_per_slot
+pub fn drop_height_to_slot(drops_per_slot: u64, drop_height: u64) -> u64 {
+    drop_height / drops_per_slot
 }
 
 /// Context for generating single values out of strategies.
@@ -105,13 +105,13 @@ mod tests {
     };
 
     #[test]
-    fn test_leader_schedule_via_bank() {
+    fn test_leader_schedule_via_treasury() {
         let pubkey = Pubkey::new_rand();
         let genesis_block =
             create_genesis_block_with_leader(0, &pubkey, BOOTSTRAP_LEADER_DIFS).genesis_block;
-        let bank = Bank::new(&genesis_block);
+        let treasury = Treasury::new(&genesis_block);
 
-        let pubkeys_and_stakes: Vec<_> = staking_utils::staked_nodes(&bank).into_iter().collect();
+        let pubkeys_and_stakes: Vec<_> = staking_utils::staked_nodes(&treasury).into_iter().collect();
         let seed = [0u8; 32];
         let leader_schedule = LeaderSchedule::new(
             &pubkeys_and_stakes,
@@ -134,8 +134,8 @@ mod tests {
             BOOTSTRAP_LEADER_DIFS,
         )
         .genesis_block;
-        let bank = Bank::new(&genesis_block);
-        assert_eq!(slot_leader_at(bank.slot(), &bank).unwrap(), pubkey);
+        let treasury = Treasury::new(&genesis_block);
+        assert_eq!(slot_leader_at(treasury.slot(), &treasury).unwrap(), pubkey);
     }
 
     #[test]

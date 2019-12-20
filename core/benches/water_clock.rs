@@ -41,10 +41,10 @@ fn bench_arc_mutex_waterclock_batched_hash(bencher: &mut Bencher) {
     let exit = Arc::new(AtomicBool::new(true));
 
     bencher.iter(|| {
-        // NOTE: This block attempts to look as close as possible to `WaterClockService::tick_producer()`
+        // NOTE: This block attempts to look as close as possible to `WaterClockService::drop_producer()`
         loop {
             if waterclock.lock().unwrap().hash(NUM_HASHES_PER_BATCH) {
-                waterclock.lock().unwrap().tick().unwrap();
+                waterclock.lock().unwrap()._drop().unwrap();
                 if exit.load(Ordering::Relaxed) {
                     break;
                 }

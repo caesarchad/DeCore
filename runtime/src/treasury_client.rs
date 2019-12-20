@@ -1,4 +1,4 @@
-use crate::bank::Bank;
+use crate::treasury::Treasury;
 use morgan_interface::client::{AsyncClient, Client, SyncClient};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
@@ -17,18 +17,18 @@ use std::sync::Mutex;
 use std::thread::{sleep, Builder};
 use std::time::{Duration, Instant};
 
-pub struct BankClient {
-    bank: Arc<Bank>,
+pub struct TreasuryClient {
+    treasury: Arc<Treasury>,
     transaction_sender: Mutex<Sender<Transaction>>,
 }
 
-impl Client for BankClient {
+impl Client for TreasuryClient {
     fn transactions_addr(&self) -> String {
-        "Local BankClient".to_string()
+        "Local TreasuryClient".to_string()
     }
 }
 
-impl AsyncClient for BankClient {
+impl AsyncClient for TreasuryClient {
     fn async_send_transaction(&self, transaction: Transaction) -> io::Result<Signature> {
         let signature = transaction.signatures.get(0).cloned().unwrap_or_default();
         let transaction_sender = self.transaction_sender.lock().unwrap();
@@ -40,9 +40,9 @@ impl AsyncClient for BankClient {
         &self,
         keypairs: &[&Keypair],
         message: Message,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let transaction = Transaction::new(&keypairs, message, recent_blockhash);
+        let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
         self.async_send_transaction(transaction)
     }
 
@@ -50,10 +50,10 @@ impl AsyncClient for BankClient {
         &self,
         keypair: &Keypair,
         instruction: Instruction,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
-        self.async_send_message(&[keypair], message, recent_blockhash)
+        self.async_send_message(&[keypair], message, recent_transaction_seal)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -62,19 +62,19 @@ impl AsyncClient for BankClient {
         difs: u64,
         keypair: &Keypair,
         pubkey: &Pubkey,
-        recent_blockhash: Hash,
+        recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
             system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
-        self.async_send_instruction(keypair, transfer_instruction, recent_blockhash)
+        self.async_send_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
 
-impl SyncClient for BankClient {
+impl SyncClient for TreasuryClient {
     fn send_message(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
-        let blockhash = self.bank.last_blockhash();
-        let transaction = Transaction::new(&keypairs, message, blockhash);
-        self.bank.process_transaction(&transaction)?;
+        let transaction_seal = self.treasury.last_transaction_seal();
+        let transaction = Transaction::new(&keypairs, message, transaction_seal);
+        self.treasury.process_transaction(&transaction)?;
         Ok(transaction.signatures.get(0).cloned().unwrap_or_default())
     }
 
@@ -92,28 +92,28 @@ impl SyncClient for BankClient {
     }
 
     fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>> {
-        Ok(self.bank.get_account(pubkey).map(|account| account.data))
+        Ok(self.treasury.get_account(pubkey).map(|account| account.data))
     }
 
     fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
-        Ok(self.bank.get_balance(pubkey))
+        Ok(self.treasury.get_balance(pubkey))
     }
 
     fn get_signature_status(
         &self,
         signature: &Signature,
     ) -> Result<Option<transaction::Result<()>>> {
-        Ok(self.bank.get_signature_status(signature))
+        Ok(self.treasury.get_signature_status(signature))
     }
 
-    fn get_recent_blockhash(&self) -> Result<(Hash, FeeCalculator)> {
-        let last_blockhash = self.bank.last_blockhash();
-        let fee_calculator = self.bank.fee_calculator.clone();
-        Ok((last_blockhash, fee_calculator))
+    fn get_recent_transaction_seal(&self) -> Result<(Hash, FeeCalculator)> {
+        let last_transaction_seal = self.treasury.last_transaction_seal();
+        let fee_calculator = self.treasury.fee_calculator.clone();
+        Ok((last_transaction_seal, fee_calculator))
     }
 
     fn get_transaction_count(&self) -> Result<u64> {
-        Ok(self.bank.transaction_count())
+        Ok(self.treasury.transaction_count())
     }
 
     fn poll_for_signature_confirmation(
@@ -124,7 +124,7 @@ impl SyncClient for BankClient {
         let mut now = Instant::now();
         let mut confirmed_blocks = 0;
         loop {
-            let response = self.bank.get_signature_confirmation_status(signature);
+            let response = self.treasury.get_signature_confirmation_status(signature);
             if let Some((confirmations, res)) = response {
                 if res.is_ok() {
                     if confirmed_blocks != confirmations {
@@ -151,7 +151,7 @@ impl SyncClient for BankClient {
     fn poll_for_signature(&self, signature: &Signature) -> Result<()> {
         let now = Instant::now();
         loop {
-            let response = self.bank.get_signature_status(signature);
+            let response = self.treasury.get_signature_status(signature);
             if let Some(res) = response {
                 if res.is_ok() {
                     break;
@@ -169,47 +169,47 @@ impl SyncClient for BankClient {
         Ok(())
     }
 
-    fn get_new_blockhash(&self, blockhash: &Hash) -> Result<(Hash, FeeCalculator)> {
-        let (last_blockhash, fee_calculator) = self.get_recent_blockhash()?;
-        if last_blockhash != *blockhash {
-            Ok((last_blockhash, fee_calculator))
+    fn get_new_transaction_seal(&self, transaction_seal: &Hash) -> Result<(Hash, FeeCalculator)> {
+        let (last_transaction_seal, fee_calculator) = self.get_recent_transaction_seal()?;
+        if last_transaction_seal != *transaction_seal {
+            Ok((last_transaction_seal, fee_calculator))
         } else {
             Err(TransportError::IoError(io::Error::new(
                 io::ErrorKind::Other,
-                "Unable to get new blockhash",
+                "Unable to get new transaction_seal",
             )))
         }
     }
 }
 
-impl BankClient {
-    fn run(bank: &Bank, transaction_receiver: Receiver<Transaction>) {
+impl TreasuryClient {
+    fn run(treasury: &Treasury, transaction_receiver: Receiver<Transaction>) {
         while let Ok(tx) = transaction_receiver.recv() {
             let mut transactions = vec![tx];
             while let Ok(tx) = transaction_receiver.try_recv() {
                 transactions.push(tx);
             }
-            let _ = bank.process_transactions(&transactions);
+            let _ = treasury.process_transactions(&transactions);
         }
     }
 
-    pub fn new_shared(bank: &Arc<Bank>) -> Self {
+    pub fn new_shared(treasury: &Arc<Treasury>) -> Self {
         let (transaction_sender, transaction_receiver) = channel();
         let transaction_sender = Mutex::new(transaction_sender);
-        let thread_bank = bank.clone();
-        let bank = bank.clone();
+        let thread_treasury = treasury.clone();
+        let treasury = treasury.clone();
         Builder::new()
-            .name("morgan-bank-client".to_string())
-            .spawn(move || Self::run(&thread_bank, transaction_receiver))
+            .name("morgan-treasury-client".to_string())
+            .spawn(move || Self::run(&thread_treasury, transaction_receiver))
             .unwrap();
         Self {
-            bank,
+            treasury,
             transaction_sender,
         }
     }
 
-    pub fn new(bank: Bank) -> Self {
-        Self::new_shared(&Arc::new(bank))
+    pub fn new(treasury: Treasury) -> Self {
+        Self::new_shared(&Arc::new(treasury))
     }
 }
 
@@ -220,14 +220,14 @@ mod tests {
     use morgan_interface::instruction::AccountMeta;
 
     #[test]
-    fn test_bank_client_new_with_keypairs() {
+    fn test_treasury_client_new_with_keypairs() {
         let (genesis_block, john_doe_keypair) = create_genesis_block(10_000);
         let john_pubkey = john_doe_keypair.pubkey();
         let jane_doe_keypair = Keypair::new();
         let jane_pubkey = jane_doe_keypair.pubkey();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
-        let bank = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(bank);
+        let treasury = Treasury::new(&genesis_block);
+        let treasury_client = TreasuryClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
         let bob_pubkey = Pubkey::new_rand();
@@ -237,7 +237,7 @@ mod tests {
             .push(AccountMeta::new(jane_pubkey, true));
 
         let message = Message::new(vec![transfer_instruction]);
-        bank_client.send_message(&doe_keypairs, message).unwrap();
-        assert_eq!(bank_client.get_balance(&bob_pubkey).unwrap(), 42);
+        treasury_client.send_message(&doe_keypairs, message).unwrap();
+        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }
 }

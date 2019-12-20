@@ -39,9 +39,9 @@ pub struct ErrorCounters {
     pub account_not_found: usize,
     pub account_in_use: usize,
     pub account_loaded_twice: usize,
-    pub blockhash_not_found: usize,
-    pub blockhash_too_old: usize,
-    pub reserve_blockhash: usize,
+    pub transaction_seal_not_found: usize,
+    pub transaction_seal_too_old: usize,
+    pub reserve_transaction_seal: usize,
     pub invalid_account_for_fee: usize,
     pub insufficient_funds: usize,
     pub invalid_account_index: usize,
@@ -307,9 +307,9 @@ impl AccountsDB {
 
     pub fn purge_fork(&self, fork: Fork) {
         //add_root should be called first
-        let is_base = self.accounts_index.read().unwrap().is_base(fork);
-        trace!("PURGING {} {}", fork, is_base);
-        if !is_base {
+        let is_genesis = self.accounts_index.read().unwrap().is_genesis(fork);
+        trace!("PURGING {} {}", fork, is_genesis);
+        if !is_genesis {
             self.storage.write().unwrap().retain(|_, v| {
                 trace!("PURGING {} {}", v.fork_id, fork);
                 v.fork_id != fork
@@ -427,7 +427,7 @@ impl AccountsDB {
 
 #[cfg(test)]
 mod tests {
-    // TODO: all the bank tests are bank specific, issue: 2194
+    // TODO: all the treasury tests are treasury specific, issue: 2194
     use super::*;
     use rand::{thread_rng, Rng};
     use morgan_interface::account::Account;
@@ -878,8 +878,8 @@ mod tests {
     #[test]
     fn test_lazy_gc_fork() {
         //This test is pedantic
-        //A fork is purged when a non root bank is cleaned up.  If a fork is behind root but it is
-        //not root, it means we are retaining dead banks.
+        //A fork is purged when a non root treasury is cleaned up.  If a fork is behind root but it is
+        //not root, it means we are retaining dead treasuries.
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
         let pubkey = Pubkey::new_rand();

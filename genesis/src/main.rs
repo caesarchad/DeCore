@@ -13,7 +13,7 @@ extern crate morgan_config_controller;
 extern crate morgan_exchange_controller;
 
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
-use morgan::block_buffer_pool::generate_new_bill;
+use morgan::block_buffer_pool::make_new_ledger_file;
 use morgan_interface::account::Account;
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::genesis_block::GenesisBlock;
@@ -34,9 +34,9 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let default_bootstrap_leader_difs = &BOOTSTRAP_LEADER_DIFS.to_string();
     let default_difs_per_signature =
         &FeeCalculator::default().difs_per_signature.to_string();
-    let default_target_tick_duration =
-        &timing::duration_as_ms(&WaterClockConfig::default().target_tick_duration).to_string();
-    let default_ticks_per_slot = &timing::DEFAULT_TICKS_PER_SLOT.to_string();
+    let default_target_drop_duration =
+        &timing::duration_as_ms(&WaterClockConfig::default().target_drop_duration).to_string();
+    let default_drops_per_slot = &timing::DEFAULT_DROPS_PER_SLOT.to_string();
     let default_slots_per_epoch = &timing::DEFAULT_SLOTS_PER_EPOCH.to_string();
 
     let matches = App::new(crate_name!())
@@ -122,33 +122,33 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .help("Number of difs the cluster will charge for signature verification"),
         )
         .arg(
-            Arg::with_name("target_tick_duration")
-                .long("target-tick-duration")
+            Arg::with_name("target_drop_duration")
+                .long("target-_drop-duration")
                 .value_name("MILLIS")
                 .takes_value(true)
-                .default_value(default_target_tick_duration)
-                .help("The target tick rate of the cluster in milliseconds"),
+                .default_value(default_target_drop_duration)
+                .help("The target _drop rate of the cluster in milliseconds"),
         )
         .arg(
-            Arg::with_name("hashes_per_tick")
-                .long("hashes-per-tick")
+            Arg::with_name("hashes_per_drop")
+                .long("hashes-per-_drop")
                 .value_name("NUM_HASHES|\"auto\"|\"sleep\"")
                 .takes_value(true)
                 .default_value("auto")
                 .help(
-                    "How many Water Clock hashes to roll before emitting the next tick. \
-                     If \"auto\", determine based on --target-tick-duration \
+                    "How many Water Clock hashes to roll before emitting the next _drop. \
+                     If \"auto\", determine based on --target-_drop-duration \
                      and the hash rate of this computer. If \"sleep\", for development \
-                     sleep for --target-tick-duration instead of hashing",
+                     sleep for --target-_drop-duration instead of hashing",
                 ),
         )
         .arg(
-            Arg::with_name("ticks_per_slot")
-                .long("ticks-per-slot")
-                .value_name("TICKS")
+            Arg::with_name("drops_per_slot")
+                .long("drops-per-slot")
+                .value_name("DROPS")
                 .takes_value(true)
-                .default_value(default_ticks_per_slot)
-                .help("The number of ticks in a slot"),
+                .default_value(default_drops_per_slot)
+                .help("The number of drops in a slot"),
         )
         .arg(
             Arg::with_name("slots_per_epoch")
@@ -225,12 +225,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     genesis_block.fee_calculator.difs_per_signature =
         value_t_or_exit!(matches, "difs_per_signature", u64);
-    genesis_block.ticks_per_slot = value_t_or_exit!(matches, "ticks_per_slot", u64);
+    genesis_block.drops_per_slot = value_t_or_exit!(matches, "drops_per_slot", u64);
     genesis_block.slots_per_epoch = value_t_or_exit!(matches, "slots_per_epoch", u64);
-    genesis_block.waterclock_config.target_tick_duration =
-        Duration::from_millis(value_t_or_exit!(matches, "target_tick_duration", u64));
+    genesis_block.waterclock_config.target_drop_duration =
+        Duration::from_millis(value_t_or_exit!(matches, "target_drop_duration", u64));
 
-    match matches.value_of("hashes_per_tick").unwrap() {
+    match matches.value_of("hashes_per_drop").unwrap() {
         "auto" => {
             let mut v = Hash::default();
             println!("Running 1 million hashes...");
@@ -241,22 +241,22 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             let end = Instant::now();
             let elapsed = end.duration_since(start).as_millis();
 
-            let hashes_per_tick = (genesis_block.waterclock_config.target_tick_duration.as_millis()
+            let hashes_per_drop = (genesis_block.waterclock_config.target_drop_duration.as_millis()
                 * 1_000_000
                 / elapsed) as u64;
-            println!("Hashes per tick: {}", hashes_per_tick);
-            genesis_block.waterclock_config.hashes_per_tick = Some(hashes_per_tick);
+            println!("Hashes per _drop: {}", hashes_per_drop);
+            genesis_block.waterclock_config.hashes_per_drop = Some(hashes_per_drop);
         }
         "sleep" => {
-            genesis_block.waterclock_config.hashes_per_tick = None;
+            genesis_block.waterclock_config.hashes_per_drop = None;
         }
         _ => {
-            genesis_block.waterclock_config.hashes_per_tick =
-                Some(value_t_or_exit!(matches, "hashes_per_tick", u64));
+            genesis_block.waterclock_config.hashes_per_drop =
+                Some(value_t_or_exit!(matches, "hashes_per_drop", u64));
         }
     }
 
-    generate_new_bill(ledger_path, &genesis_block)?;
+    make_new_ledger_file(ledger_path, &genesis_block)?;
     Ok(())
 }
 

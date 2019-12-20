@@ -23,7 +23,7 @@ pub enum StorageInstruction {
         slot: u64,
         signature: Signature,
     },
-    AdvertiseStorageRecentBlockhash {
+    AdvertiseStorageRecentTransactionSeal {
         hash: Hash,
         slot: u64,
     },
@@ -119,12 +119,12 @@ pub fn mining_proof(
     Instruction::new(id(), &storage_instruction, account_metas)
 }
 
-pub fn advertise_recent_blockhash(
+pub fn advertise_recent_transaction_seal(
     storage_pubkey: &Pubkey,
     storage_hash: Hash,
     slot: u64,
 ) -> Instruction {
-    let storage_instruction = StorageInstruction::AdvertiseStorageRecentBlockhash {
+    let storage_instruction = StorageInstruction::AdvertiseStorageRecentTransactionSeal {
         hash: storage_hash,
         slot,
     };

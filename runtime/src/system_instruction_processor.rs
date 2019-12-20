@@ -124,7 +124,7 @@ pub fn process_instruction(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
-    _tick_height: u64,
+    _drop_height: u64,
 ) -> Result<(), InstructionError> {
     if let Ok(instruction) = bincode::deserialize(data) {
         trace!("process_instruction: {:?}", instruction);
@@ -166,8 +166,8 @@ pub fn process_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bank::Bank;
-    use crate::bank_client::BankClient;
+    use crate::treasury::Treasury;
+    use crate::treasury_client::TreasuryClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
     use morgan_interface::client::SyncClient;
@@ -423,14 +423,14 @@ mod tests {
         let mallory_pubkey = mallory_keypair.pubkey();
 
         // Fund to account to bypass AccountNotFound error
-        let bank = Bank::new(&genesis_block);
-        let bank_client = BankClient::new(bank);
-        bank_client
+        let treasury = Treasury::new(&genesis_block);
+        let treasury_client = TreasuryClient::new(treasury);
+        treasury_client
             .transfer(50, &alice_keypair, &mallory_pubkey)
             .unwrap();
 
         // Erroneously sign transaction with recipient account key
-        // No signature case is tested by bank `test_zero_signatures()`
+        // No signature case is tested by treasury `test_zero_signatures()`
         let account_metas = vec![
             AccountMeta::new(alice_pubkey, false),
             AccountMeta::new(mallory_pubkey, true),
@@ -441,13 +441,13 @@ mod tests {
             account_metas,
         );
         assert_eq!(
-            bank_client
+            treasury_client
                 .send_instruction(&mallory_keypair, malicious_instruction)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
         );
-        assert_eq!(bank_client.get_balance(&alice_pubkey).unwrap(), 50);
-        assert_eq!(bank_client.get_balance(&mallory_pubkey).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&mallory_pubkey).unwrap(), 50);
     }
 }

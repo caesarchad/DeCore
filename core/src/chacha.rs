@@ -49,7 +49,7 @@ pub fn chacha_cbc_encrypt_ledger(
     let mut entry = slice;
 
     loop {
-        match block_buffer_pool.extract_objs_bytes(0, SLOTS_PER_SEGMENT - total_entries, &mut buffer, entry) {
+        match block_buffer_pool.read_db_by_bytes(0, SLOTS_PER_SEGMENT - total_entries, &mut buffer, entry) {
             Ok((num_entries, entry_len)) => {
                 debug!(
                     "chacha: encrypting slice: {} num_entries: {} entry_len: {}",
@@ -174,7 +174,7 @@ impl std::iter::FromIterator<[u8; 2]> for WrappedShard {
 
 #[cfg(test)]
 mod tests {
-    use crate::block_buffer_pool::get_tmp_ledger_path;
+    use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
     use crate::entry_info::Entry;
@@ -218,14 +218,14 @@ mod tests {
     fn test_encrypt_ledger() {
         morgan_logger::setup();
         let ledger_dir = "chacha_test_encrypt_file";
-        let ledger_path = fetch_interim_bill_route(ledger_dir);
-        let ticks_per_slot = 16;
+        let ledger_path = fetch_interim_ledger_location(ledger_dir);
+        let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let out_path = Path::new("test_chacha_encrypt_file_output.txt.enc");
 
         let entries = make_tiny_deterministic_test_entries(32);
         block_buffer_pool
-            .record_items(0, 0, 0, ticks_per_slot, &entries)
+            .update_entries(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let mut key = hex!(

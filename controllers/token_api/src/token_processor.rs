@@ -9,7 +9,7 @@ pub fn process_instruction(
     program_id: &Pubkey,
     info: &mut [KeyedAccount],
     input: &[u8],
-    _tick_height: u64,
+    _drop_height: u64,
 ) -> Result<(), InstructionError> {
     morgan_logger::setup();
 
