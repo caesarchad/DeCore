@@ -13,7 +13,7 @@ members = [
     "metricbot",
     "netutil",
     "controllers/bpf",
-    "controllers/bpf_loader",
+    "controllers/bvm_controller",
     "controllers/budget_api",
     "controllers/budget_controller",
     "controllers/config_api",

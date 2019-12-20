@@ -1,5 +1,5 @@
 use log::*;
-use morgan_interface::client::AccountHost;
+use morgan_interface::account_host::AccountHost;
 use morgan_interface::timing::duration_as_s;
 use morgan_helper::logHelper::*;
 use std::sync::atomic::{AtomicBool, Ordering};

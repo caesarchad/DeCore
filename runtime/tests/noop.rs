@@ -1,7 +1,7 @@
 use morgan_runtime::treasury::Treasury;
 use morgan_runtime::treasury_client::TreasuryClient;
 use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
-use morgan_interface::client::OnlineAccount;
+use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::create_genesis_block;
 use morgan_interface::native_loader;
 use morgan_interface::signature::KeypairUtil;

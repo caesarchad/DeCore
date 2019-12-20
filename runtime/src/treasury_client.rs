@@ -1,5 +1,5 @@
 use crate::treasury::Treasury;
-use morgan_interface::client::{OfflineAccount, AccountHost, OnlineAccount};
+use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount};
 use morgan_interface::fee_calculator::FeeCalculator;
 use morgan_interface::hash::Hash;
 use morgan_interface::instruction::Instruction;

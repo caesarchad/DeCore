@@ -277,7 +277,7 @@ mod tests {
             ),
             (
                 "BPFLoader1111111111111111111111111111111111",
-                morgan_interface::bpf_loader::id(),
+                morgan_interface::bvm_controller::id(),
             ),
             (
                 "Budget1111111111111111111111111111111111111",
@@ -321,7 +321,7 @@ mod tests {
         let ids = vec![
             morgan_interface::system_program::id(),
             morgan_interface::native_loader::id(),
-            morgan_interface::bpf_loader::id(),
+            morgan_interface::bvm_controller::id(),
             morgan_budget_api::id(),
             morgan_storage_api::id(),
             morgan_token_api::id(),

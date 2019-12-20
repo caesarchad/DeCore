@@ -9,7 +9,7 @@ use crate::service::Service;
 use crate::verifier::{Validator, ValidatorConfig};
 use morgan_client::slim_account_host::create_client;
 use morgan_client::slim_account_host::SlimAccountHost;
-use morgan_interface::client::OnlineAccount;
+use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::message::Message;
 use morgan_interface::waterclock_config::WaterClockConfig;

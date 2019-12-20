@@ -19,7 +19,7 @@ use morgan_client::rpc_request::RpcRequest;
 use morgan_client::slim_account_host::SlimAccountHost;
 use solana_ed25519_dalek as ed25519_dalek;
 use morgan_runtime::treasury::Treasury;
-use morgan_interface::client::{OfflineAccount, OnlineAccount};
+use morgan_interface::account_host::{OfflineAccount, OnlineAccount};
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::message::Message;

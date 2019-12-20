@@ -6,7 +6,7 @@ use morgan::create_keys::GenKeys;
 use morgan_client::sample_stats::{sample_txs, SampleStats};
 use morgan_tokenbot::drone::request_airdrop_transaction;
 use morgan_metricbot::datapoint_info;
-use morgan_interface::client::AccountHost;
+use morgan_interface::account_host::AccountHost;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::system_instruction;
@@ -664,7 +664,7 @@ mod tests {
     use morgan_tokenbot::drone::run_local_drone;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::OnlineAccount;
+    use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use std::sync::mpsc::channel;
 

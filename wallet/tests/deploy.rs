@@ -3,7 +3,7 @@ use morgan::verifier::new_validator_for_tests;
 use morgan_client::rpc_client::RpcClient;
 use morgan_client::rpc_request::RpcRequest;
 use morgan_tokenbot::drone::run_local_drone;
-use morgan_interface::bpf_loader;
+use morgan_interface::bvm_controller;
 use morgan_wallet::wallet::{process_command, WalletCommand, WalletConfig};
 use std::fs::{remove_dir_all, File};
 use std::io::Read;
@@ -56,7 +56,7 @@ fn test_wallet_deploy_program() {
         1
     );
     let owner_array = account_info.get("owner").unwrap();
-    assert_eq!(owner_array, &json!(bpf_loader::id()));
+    assert_eq!(owner_array, &json!(bvm_controller::id()));
     assert_eq!(
         account_info_obj
             .get("executable")

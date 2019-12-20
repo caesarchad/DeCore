@@ -304,7 +304,7 @@ impl Treasury {
         );
         self.register_native_instruction_processor(
             "morgan_bpf_loader",
-            &morgan_interface::bpf_loader::id(),
+            &morgan_interface::bvm_controller::id(),
         );
         self.register_native_instruction_processor(
             &morgan_vote_controller!().0,

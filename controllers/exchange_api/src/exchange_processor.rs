@@ -677,7 +677,7 @@ mod test {
     use crate::{exchange_instruction, id};
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::OnlineAccount;
+    use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_instruction;

@@ -28,8 +28,8 @@ mod bpf {
     mod bpf_c {
         use super::*;
         use morgan_runtime::loader_utils::create_invoke_instruction;
-        use morgan_interface::bpf_loader;
-        use morgan_interface::client::OnlineAccount;
+        use morgan_interface::bvm_controller;
+        use morgan_interface::account_host::OnlineAccount;
         use morgan_interface::signature::KeypairUtil;
         use std::io::Read;
 
@@ -46,7 +46,7 @@ mod bpf {
             let treasury_client = TreasuryClient::new(treasury);
 
             // Call user program
-            let program_id = load_program(&treasury_client, &alice_keypair, &bpf_loader::id(), elf);
+            let program_id = load_program(&treasury_client, &alice_keypair, &bvm_controller::id(), elf);
             let instruction = create_invoke_instruction(alice_keypair.pubkey(), program_id, &1u8);
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
@@ -97,7 +97,7 @@ mod bpf {
     #[cfg(feature = "bpf_rust")]
     mod bpf_rust {
         use super::*;
-        use morgan_interface::client::OnlineAccount;
+        use morgan_interface::account_host::OnlineAccount;
         use morgan_interface::instruction::{AccountMeta, Instruction};
         use morgan_interface::signature::{Keypair, KeypairUtil};
         use std::io::Read;

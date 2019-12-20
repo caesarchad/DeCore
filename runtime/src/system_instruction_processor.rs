@@ -170,7 +170,7 @@ mod tests {
     use crate::treasury_client::TreasuryClient;
     use bincode::serialize;
     use morgan_interface::account::Account;
-    use morgan_interface::client::OnlineAccount;
+    use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::instruction::{AccountMeta, Instruction, InstructionError};
     use morgan_interface::signature::{Keypair, KeypairUtil};

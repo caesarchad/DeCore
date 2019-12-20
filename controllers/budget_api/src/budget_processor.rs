@@ -155,7 +155,7 @@ mod tests {
     use crate::id;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
-    use morgan_interface::client::OnlineAccount;
+    use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::instruction::InstructionError;
     use morgan_interface::message::Message;

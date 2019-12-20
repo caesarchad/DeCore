@@ -1,6 +1,6 @@
 use crate::treasury_client::TreasuryClient;
 use serde::Serialize;
-use morgan_interface::client::OnlineAccount;
+use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::instruction::{AccountMeta, Instruction};
 use morgan_interface::loader_instruction;
 use morgan_interface::message::Message;
