@@ -7,7 +7,6 @@ members = [
     "validator",
     "genesis",
     "gossip",
-    "install",
     "keybot",
     "kvstore",
     "ledgerbot",
