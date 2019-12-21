@@ -8,7 +8,7 @@ use crate::node_group_info::NodeGroupInfo;
 use crate::entry_info::{Entry, EntrySlice};
 use crate::leader_arrange_cache::LeaderScheduleCache;
 use crate::leader_arrange_utils;
-use crate::fork_selection::{Locktower, StakeLockout};
+use crate::fork_selection::{LockStack, StakeLockout};
 use crate::packet::BlobError;
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
@@ -99,7 +99,7 @@ impl RepeatPhase {
         let waterclock_recorder = waterclock_recorder.clone();
         let my_pubkey = *my_pubkey;
         let mut drops_per_slot = 0;
-        let mut locktower = Locktower::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
+        let mut lock_stack = LockStack::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
         // Start the replay phase loop
         let leader_schedule_cache = leader_schedule_cache.clone();
         let vote_account = *vote_account;
@@ -140,7 +140,7 @@ impl RepeatPhase {
                     }
 
                     let votable =
-                        Self::generate_votable_treasuries(&treasury_forks, &locktower, &mut progress);
+                        Self::generate_votable_treasuries(&treasury_forks, &lock_stack, &mut progress);
 
                     if let Some((_, treasury)) = votable.last() {
                         subscriptions.notify_subscribers(treasury.slot(), &treasury_forks);
@@ -148,7 +148,7 @@ impl RepeatPhase {
                         Self::handle_votable_treasury(
                             &treasury,
                             &treasury_forks,
-                            &mut locktower,
+                            &mut lock_stack,
                             &mut progress,
                             &vote_account,
                             &voting_keypair,
@@ -306,7 +306,7 @@ impl RepeatPhase {
     fn handle_votable_treasury<T>(
         treasury: &Arc<Treasury>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
-        locktower: &mut Locktower,
+        lock_stack: &mut LockStack,
         progress: &mut HashMap<u64, ForkProgress>,
         vote_account: &Pubkey,
         voting_keypair: &Option<Arc<T>>,
@@ -318,7 +318,7 @@ impl RepeatPhase {
     where
         T: 'static + KeypairUtil + Send + Sync,
     {
-        if let Some(new_root) = locktower.record_vote(treasury.slot(), treasury.hash()) {
+        if let Some(new_root) = lock_stack.record_vote(treasury.slot(), treasury.hash()) {
             // get the root treasury before squash
             let root_treasury = treasury_forks
                 .read()
@@ -344,7 +344,7 @@ impl RepeatPhase {
             Self::handle_new_root(&treasury_forks, progress);
             root_slot_sender.send(rooted_slots)?;
         }
-        locktower.update_epoch(&treasury);
+        lock_stack.update_epoch(&treasury);
         if let Some(ref voting_keypair) = voting_keypair {
             let node_keypair = node_group_info.read().unwrap().keypair.clone();
 
@@ -353,7 +353,7 @@ impl RepeatPhase {
                 &node_keypair.pubkey(),
                 &vote_account,
                 &voting_keypair.pubkey(),
-                locktower.recent_votes(),
+                lock_stack.recent_votes(),
             );
 
             let mut vote_tx = Transaction::new_u_opcodes(vec![vote_ix]);
@@ -417,11 +417,11 @@ impl RepeatPhase {
 
     fn generate_votable_treasuries(
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
-        locktower: &Locktower,
+        lock_stack: &LockStack,
         progress: &mut HashMap<u64, ForkProgress>,
     ) -> Vec<(u128, Arc<Treasury>)> {
         let locktower_start = Instant::now();
-        // Locktower voting
+        // LockStack voting
         let descendants = treasury_forks.read().unwrap().descendants();
         let ancestors = treasury_forks.read().unwrap().ancestors();
         let frozen_treasuries = treasury_forks.read().unwrap().frozen_treasuries();
@@ -435,24 +435,24 @@ impl RepeatPhase {
                 is_votable
             })
             .filter(|b| {
-                let is_recent_epoch = locktower.is_recent_epoch(b);
+                let is_recent_epoch = lock_stack.is_recent_epoch(b);
                 trace!("treasury is is_recent_epoch: {} {}", b.slot(), is_recent_epoch);
                 is_recent_epoch
             })
             .filter(|b| {
-                let has_voted = locktower.has_voted(b.slot());
+                let has_voted = lock_stack.has_voted(b.slot());
                 trace!("treasury is has_voted: {} {}", b.slot(), has_voted);
                 !has_voted
             })
             .filter(|b| {
-                let is_locked_out = locktower.is_locked_out(b.slot(), &descendants);
+                let is_locked_out = lock_stack.is_locked_out(b.slot(), &descendants);
                 trace!("treasury is is_locked_out: {} {}", b.slot(), is_locked_out);
                 !is_locked_out
             })
             .map(|treasury| {
                 (
                     treasury,
-                    locktower.collect_vote_lockouts(
+                    lock_stack.collect_vote_lockouts(
                         treasury.slot(),
                         treasury.vote_accounts().into_iter(),
                         &ancestors,
@@ -461,12 +461,12 @@ impl RepeatPhase {
             })
             .filter(|(b, stake_lockouts)| {
                 let vote_threshold =
-                    locktower.check_vote_stake_threshold(b.slot(), &stake_lockouts);
-                Self::confirm_forks(locktower, stake_lockouts, progress, treasury_forks);
+                    lock_stack.check_vote_stake_threshold(b.slot(), &stake_lockouts);
+                Self::confirm_forks(lock_stack, stake_lockouts, progress, treasury_forks);
                 debug!("treasury vote_threshold: {} {}", b.slot(), vote_threshold);
                 vote_threshold
             })
-            .map(|(b, stake_lockouts)| (locktower.calculate_weight(&stake_lockouts), b.clone()))
+            .map(|(b, stake_lockouts)| (lock_stack.calculate_weight(&stake_lockouts), b.clone()))
             .collect();
 
         votable.sort_by_key(|b| b.0);
@@ -477,7 +477,7 @@ impl RepeatPhase {
             let weights: Vec<u128> = votable.iter().map(|x| x.0).collect();
             // info!(
             //     "{}",
-            //     Info(format!("@{:?} locktower duration: {:?} len: {} weights: {:?}",
+            //     Info(format!("@{:?} lock_stack duration: {:?} len: {} weights: {:?}",
             //     timing::timestamp(),
             //     ms,
             //     votable.len(),
@@ -488,7 +488,7 @@ impl RepeatPhase {
             //     "< {} {} {} {} >",
             //     Info(format!("{}", local).to_string()),
             //     Info(format!("INFO").to_string()),
-            //     Info(format!("@{:?} locktower duration: {:?} len: {} weights: {:?}",
+            //     Info(format!("@{:?} lock_stack duration: {:?} len: {} weights: {:?}",
             //         timing::timestamp(),
             //         ms,
             //         votable.len(),
@@ -509,14 +509,14 @@ impl RepeatPhase {
     }
 
     fn confirm_forks(
-        locktower: &Locktower,
+        lock_stack: &LockStack,
         stake_lockouts: &HashMap<u64, StakeLockout>,
         progress: &mut HashMap<u64, ForkProgress>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         progress.retain(|slot, prog| {
             let duration = timing::timestamp() - prog.started_ms;
-            if locktower.is_slot_confirmed(*slot, stake_lockouts)
+            if lock_stack.is_slot_confirmed(*slot, stake_lockouts)
                 && treasury_forks
                     .read()
                     .unwrap()

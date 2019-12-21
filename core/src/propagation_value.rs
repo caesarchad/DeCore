@@ -12,9 +12,9 @@ use prometheus::{
     IntGaugeVec, Opts,
 };
 
-/// CrdsValue that is replicated across the cluster
+/// ContInfTblValue that is replicated across the cluster
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum CrdsValue {
+pub enum ContInfTblValue {
     /// * Merge Strategy - Latest wallclock is picked
     ContactInfo(ContactInfo),
     /// * Merge Strategy - Latest wallclock is picked
@@ -282,102 +282,102 @@ impl Collector for OpMetrics {
 /// Type of the replicated value
 /// These are labels for values in a record that is associated with `Pubkey`
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
-pub enum CrdsValueLabel {
+pub enum ContInfTblValueTag {
     ContactInfo(Pubkey),
     Vote(Pubkey),
     EpochSlots(Pubkey),
 }
 
-impl fmt::Display for CrdsValueLabel {
+impl fmt::Display for ContInfTblValueTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CrdsValueLabel::ContactInfo(_) => write!(f, "ContactInfo({})", self.pubkey()),
-            CrdsValueLabel::Vote(_) => write!(f, "Vote({})", self.pubkey()),
-            CrdsValueLabel::EpochSlots(_) => write!(f, "EpochSlots({})", self.pubkey()),
+            ContInfTblValueTag::ContactInfo(_) => write!(f, "ContactInfo({})", self.pubkey()),
+            ContInfTblValueTag::Vote(_) => write!(f, "Vote({})", self.pubkey()),
+            ContInfTblValueTag::EpochSlots(_) => write!(f, "EpochSlots({})", self.pubkey()),
         }
     }
 }
 
-impl CrdsValueLabel {
+impl ContInfTblValueTag {
     pub fn pubkey(&self) -> Pubkey {
         match self {
-            CrdsValueLabel::ContactInfo(p) => *p,
-            CrdsValueLabel::Vote(p) => *p,
-            CrdsValueLabel::EpochSlots(p) => *p,
+            ContInfTblValueTag::ContactInfo(p) => *p,
+            ContInfTblValueTag::Vote(p) => *p,
+            ContInfTblValueTag::EpochSlots(p) => *p,
         }
     }
 }
 
-impl CrdsValue {
+impl ContInfTblValue {
     /// Totally unsecure unverfiable wallclock of the node that generated this message
     /// Latest wallclock is always picked.
     /// This is used to time out push messages.
     pub fn wallclock(&self) -> u64 {
         match self {
-            CrdsValue::ContactInfo(contact_info) => contact_info.wallclock,
-            CrdsValue::Vote(vote) => vote.wallclock,
-            CrdsValue::EpochSlots(vote) => vote.wallclock,
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.wallclock,
+            ContInfTblValue::Vote(vote) => vote.wallclock,
+            ContInfTblValue::EpochSlots(vote) => vote.wallclock,
         }
     }
-    pub fn label(&self) -> CrdsValueLabel {
+    pub fn label(&self) -> ContInfTblValueTag {
         match self {
-            CrdsValue::ContactInfo(contact_info) => {
-                CrdsValueLabel::ContactInfo(contact_info.pubkey())
+            ContInfTblValue::ContactInfo(contact_info) => {
+                ContInfTblValueTag::ContactInfo(contact_info.pubkey())
             }
-            CrdsValue::Vote(vote) => CrdsValueLabel::Vote(vote.pubkey()),
-            CrdsValue::EpochSlots(slots) => CrdsValueLabel::EpochSlots(slots.pubkey()),
+            ContInfTblValue::Vote(vote) => ContInfTblValueTag::Vote(vote.pubkey()),
+            ContInfTblValue::EpochSlots(slots) => ContInfTblValueTag::EpochSlots(slots.pubkey()),
         }
     }
     pub fn contact_info(&self) -> Option<&ContactInfo> {
         match self {
-            CrdsValue::ContactInfo(contact_info) => Some(contact_info),
+            ContInfTblValue::ContactInfo(contact_info) => Some(contact_info),
             _ => None,
         }
     }
     pub fn vote(&self) -> Option<&Vote> {
         match self {
-            CrdsValue::Vote(vote) => Some(vote),
+            ContInfTblValue::Vote(vote) => Some(vote),
             _ => None,
         }
     }
     pub fn epoch_slots(&self) -> Option<&EpochSlots> {
         match self {
-            CrdsValue::EpochSlots(slots) => Some(slots),
+            ContInfTblValue::EpochSlots(slots) => Some(slots),
             _ => None,
         }
     }
     /// Return all the possible labels for a record identified by Pubkey.
-    pub fn record_labels(key: &Pubkey) -> [CrdsValueLabel; 3] {
+    pub fn record_labels(key: &Pubkey) -> [ContInfTblValueTag; 3] {
         [
-            CrdsValueLabel::ContactInfo(*key),
-            CrdsValueLabel::Vote(*key),
-            CrdsValueLabel::EpochSlots(*key),
+            ContInfTblValueTag::ContactInfo(*key),
+            ContInfTblValueTag::Vote(*key),
+            ContInfTblValueTag::EpochSlots(*key),
         ]
     }
 }
 
-impl Signable for CrdsValue {
+impl Signable for ContInfTblValue {
     fn sign(&mut self, keypair: &Keypair) {
         match self {
-            CrdsValue::ContactInfo(contact_info) => contact_info.sign(keypair),
-            CrdsValue::Vote(vote) => vote.sign(keypair),
-            CrdsValue::EpochSlots(epoch_slots) => epoch_slots.sign(keypair),
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.sign(keypair),
+            ContInfTblValue::Vote(vote) => vote.sign(keypair),
+            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.sign(keypair),
         };
     }
 
     fn verify(&self) -> bool {
         match self {
-            CrdsValue::ContactInfo(contact_info) => contact_info.verify(),
-            CrdsValue::Vote(vote) => vote.verify(),
-            CrdsValue::EpochSlots(epoch_slots) => epoch_slots.verify(),
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.verify(),
+            ContInfTblValue::Vote(vote) => vote.verify(),
+            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.verify(),
         }
     }
 
     fn pubkey(&self) -> Pubkey {
         match self {
-            CrdsValue::ContactInfo(contact_info) => contact_info.pubkey(),
-            CrdsValue::Vote(vote) => vote.pubkey(),
-            CrdsValue::EpochSlots(epoch_slots) => epoch_slots.pubkey(),
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.pubkey(),
+            ContInfTblValue::Vote(vote) => vote.pubkey(),
+            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.pubkey(),
         }
     }
 
@@ -387,9 +387,9 @@ impl Signable for CrdsValue {
 
     fn get_signature(&self) -> Signature {
         match self {
-            CrdsValue::ContactInfo(contact_info) => contact_info.get_signature(),
-            CrdsValue::Vote(vote) => vote.get_signature(),
-            CrdsValue::EpochSlots(epoch_slots) => epoch_slots.get_signature(),
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.get_signature(),
+            ContInfTblValue::Vote(vote) => vote.get_signature(),
+            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.get_signature(),
         }
     }
 
@@ -411,53 +411,53 @@ mod test {
     fn test_labels() {
         let mut hits = [false; 3];
         // this method should cover all the possible labels
-        for v in &CrdsValue::record_labels(&Pubkey::default()) {
+        for v in &ContInfTblValue::record_labels(&Pubkey::default()) {
             match v {
-                CrdsValueLabel::ContactInfo(_) => hits[0] = true,
-                CrdsValueLabel::Vote(_) => hits[1] = true,
-                CrdsValueLabel::EpochSlots(_) => hits[2] = true,
+                ContInfTblValueTag::ContactInfo(_) => hits[0] = true,
+                ContInfTblValueTag::Vote(_) => hits[1] = true,
+                ContInfTblValueTag::EpochSlots(_) => hits[2] = true,
             }
         }
         assert!(hits.iter().all(|x| *x));
     }
     #[test]
     fn test_keys_and_values() {
-        let v = CrdsValue::ContactInfo(ContactInfo::default());
+        let v = ContInfTblValue::ContactInfo(ContactInfo::default());
         assert_eq!(v.wallclock(), 0);
         let key = v.clone().contact_info().unwrap().id;
-        assert_eq!(v.label(), CrdsValueLabel::ContactInfo(key));
+        assert_eq!(v.label(), ContInfTblValueTag::ContactInfo(key));
 
-        let v = CrdsValue::Vote(Vote::new(&Pubkey::default(), test_tx(), 0));
+        let v = ContInfTblValue::Vote(Vote::new(&Pubkey::default(), test_tx(), 0));
         assert_eq!(v.wallclock(), 0);
         let key = v.clone().vote().unwrap().from;
-        assert_eq!(v.label(), CrdsValueLabel::Vote(key));
+        assert_eq!(v.label(), ContInfTblValueTag::Vote(key));
 
-        let v = CrdsValue::EpochSlots(EpochSlots::new(Pubkey::default(), 0, BTreeSet::new(), 0));
+        let v = ContInfTblValue::EpochSlots(EpochSlots::new(Pubkey::default(), 0, BTreeSet::new(), 0));
         assert_eq!(v.wallclock(), 0);
         let key = v.clone().epoch_slots().unwrap().from;
-        assert_eq!(v.label(), CrdsValueLabel::EpochSlots(key));
+        assert_eq!(v.label(), ContInfTblValueTag::EpochSlots(key));
     }
     #[test]
     fn test_signature() {
         let keypair = Keypair::new();
         let wrong_keypair = Keypair::new();
         let mut v =
-            CrdsValue::ContactInfo(ContactInfo::new_localhost(&keypair.pubkey(), timestamp()));
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&keypair.pubkey(), timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
-        v = CrdsValue::Vote(Vote::new(&keypair.pubkey(), test_tx(), timestamp()));
+        v = ContInfTblValue::Vote(Vote::new(&keypair.pubkey(), test_tx(), timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
         let btreeset: BTreeSet<u64> = vec![1, 2, 3, 6, 8].into_iter().collect();
-        v = CrdsValue::EpochSlots(EpochSlots::new(keypair.pubkey(), 0, btreeset, timestamp()));
+        v = ContInfTblValue::EpochSlots(EpochSlots::new(keypair.pubkey(), 0, btreeset, timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
     }
 
-    fn test_serialize_deserialize_value(value: &mut CrdsValue, keypair: &Keypair) {
+    fn test_serialize_deserialize_value(value: &mut ContInfTblValue, keypair: &Keypair) {
         let num_tries = 10;
         value.sign(keypair);
         let original_signature = value.get_signature();
         for _ in 0..num_tries {
             let serialized_value = serialize(value).unwrap();
-            let deserialized_value: CrdsValue = deserialize(&serialized_value).unwrap();
+            let deserialized_value: ContInfTblValue = deserialize(&serialized_value).unwrap();
 
             // Signatures shouldn't change
             let deserialized_signature = deserialized_value.get_signature();
@@ -469,7 +469,7 @@ mod test {
     }
 
     fn verify_signatures(
-        value: &mut CrdsValue,
+        value: &mut ContInfTblValue,
         correct_keypair: &Keypair,
         wrong_keypair: &Keypair,
     ) {

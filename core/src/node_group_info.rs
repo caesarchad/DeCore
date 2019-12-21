@@ -16,10 +16,10 @@
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::connection_info::ContactInfo;
-use crate::gossip::CrdsGossip;
-use crate::gossip_error_type::CrdsGossipError;
-use crate::pull_from_gossip::CRDS_GOSSIP_PULL_CRDS_TIMEOUT_MS;
-use crate::propagation_value::{CrdsValue, CrdsValueLabel, EpochSlots, Vote};
+use crate::gossip::NodeTbleGossip;
+use crate::gossip_error_type::NodeTbleErr;
+use crate::pull_from_gossip::NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS;
+use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag, EpochSlots, Vote};
 use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
 use crate::fix_missing_spot_service::RepairType;
 use crate::result::Result;
@@ -71,8 +71,8 @@ pub enum NodeGroupInfoError {
 #[derive(Clone)]
 pub struct NodeGroupInfo {
     /// The network
-    pub gossip: CrdsGossip,
-    /// set the keypair that will be used to sign crds values generated. It is unset only in tests.
+    pub gossip: NodeTbleGossip,
+    /// set the keypair that will be used to sign contact_info_table values generated. It is unset only in tests.
     pub(crate) keypair: Arc<Keypair>,
     // TODO: remove gossip_leader_pubkey once all usage of `set_leader()` and `leader_data()` is
     // purged
@@ -173,9 +173,9 @@ impl Signable for SlashMessage {
 #[allow(clippy::large_enum_variant)]
 enum Protocol {
     /// Gossip protocol messages
-    PullRequest(Bloom<Hash>, CrdsValue),
-    PullResponse(Pubkey, Vec<CrdsValue>),
-    PushMessage(Pubkey, Vec<CrdsValue>),
+    PullRequest(Bloom<Hash>, ContInfTblValue),
+    PullResponse(Pubkey, Vec<ContInfTblValue>),
+    PushMessage(Pubkey, Vec<ContInfTblValue>),
     PruneMessage(Pubkey, SlashMessage),
 
     /// Window protocol messages
@@ -193,7 +193,7 @@ impl NodeGroupInfo {
 
     pub fn new(contact_info: ContactInfo, keypair: Arc<Keypair>) -> Self {
         let mut me = Self {
-            gossip: CrdsGossip::default(),
+            gossip: NodeTbleGossip::default(),
             keypair,
             gossip_leader_pubkey: Pubkey::default(),
             entrypoint: None,
@@ -207,9 +207,9 @@ impl NodeGroupInfo {
 
     pub fn insert_self(&mut self, contact_info: ContactInfo) {
         if self.id() == contact_info.id {
-            let mut value = CrdsValue::ContactInfo(contact_info.clone());
+            let mut value = ContInfTblValue::ContactInfo(contact_info.clone());
             value.sign(&self.keypair);
-            let _ = self.gossip.crds.insert(value, timestamp());
+            let _ = self.gossip.contact_info_table.insert(value, timestamp());
         }
     }
 
@@ -217,7 +217,7 @@ impl NodeGroupInfo {
         let mut my_data = self.my_data();
         let now = timestamp();
         my_data.wallclock = now;
-        let mut entry = CrdsValue::ContactInfo(my_data);
+        let mut entry = ContInfTblValue::ContactInfo(my_data);
         entry.sign(&self.keypair);
         self.gossip.refresh_push_active_set(stakes);
         self.gossip.process_push_message(vec![entry], now);
@@ -225,9 +225,9 @@ impl NodeGroupInfo {
 
     // TODO kill insert_info, only used by tests
     pub fn insert_info(&mut self, contact_info: ContactInfo) {
-        let mut value = CrdsValue::ContactInfo(contact_info);
+        let mut value = ContInfTblValue::ContactInfo(contact_info);
         value.sign(&self.keypair);
-        let _ = self.gossip.crds.insert(value, timestamp());
+        let _ = self.gossip.contact_info_table.insert(value, timestamp());
     }
 
     pub fn set_entrypoint(&mut self, entrypoint: ContactInfo) {
@@ -239,11 +239,11 @@ impl NodeGroupInfo {
     }
 
     pub fn lookup(&self, id: &Pubkey) -> Option<&ContactInfo> {
-        let entry = CrdsValueLabel::ContactInfo(*id);
+        let entry = ContInfTblValueTag::ContactInfo(*id);
         self.gossip
-            .crds
+            .contact_info_table
             .lookup(&entry)
-            .and_then(CrdsValue::contact_info)
+            .and_then(ContInfTblValue::contact_info)
     }
 
     pub fn my_data(&self) -> ContactInfo {
@@ -337,7 +337,7 @@ impl NodeGroupInfo {
 
     pub fn push_epoch_slots(&mut self, id: Pubkey, root: u64, slots: BTreeSet<u64>) {
         let now = timestamp();
-        let mut entry = CrdsValue::EpochSlots(EpochSlots::new(id, root, slots, now));
+        let mut entry = ContInfTblValue::EpochSlots(EpochSlots::new(id, root, slots, now));
         entry.sign(&self.keypair);
         self.gossip.process_push_message(vec![entry], now);
     }
@@ -345,12 +345,12 @@ impl NodeGroupInfo {
     pub fn push_vote(&mut self, vote: Transaction) {
         let now = timestamp();
         let vote = Vote::new(&self.id(), vote, now);
-        let mut entry = CrdsValue::Vote(vote);
+        let mut entry = ContInfTblValue::Vote(vote);
         entry.sign(&self.keypair);
         self.gossip.process_push_message(vec![entry], now);
     }
 
-    /// Get votes in the crds
+    /// Get votes in the contact_info_table
     /// * since - The timestamp of when the vote inserted must be greater than
     /// since. This allows the treasury to query for new votes only.
     ///
@@ -358,7 +358,7 @@ impl NodeGroupInfo {
     pub fn get_votes(&self, since: u64) -> (Vec<Transaction>, u64) {
         let votes: Vec<_> = self
             .gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter(|x| x.insert_timestamp > since)
@@ -379,9 +379,9 @@ impl NodeGroupInfo {
         since: Option<u64>,
     ) -> Option<(&EpochSlots, u64)> {
         self.gossip
-            .crds
+            .contact_info_table
             .table
-            .get(&CrdsValueLabel::EpochSlots(*pubkey))
+            .get(&ContInfTblValueTag::EpochSlots(*pubkey))
             .filter(|x| {
                 since
                     .map(|since| x.insert_timestamp > since)
@@ -392,9 +392,9 @@ impl NodeGroupInfo {
 
     pub fn get_gossiped_root_for_node(&self, pubkey: &Pubkey, since: Option<u64>) -> Option<u64> {
         self.gossip
-            .crds
+            .contact_info_table
             .table
-            .get(&CrdsValueLabel::EpochSlots(*pubkey))
+            .get(&ContInfTblValueTag::EpochSlots(*pubkey))
             .filter(|x| {
                 since
                     .map(|since| x.insert_timestamp > since)
@@ -405,9 +405,9 @@ impl NodeGroupInfo {
 
     pub fn get_contact_info_for_node(&self, pubkey: &Pubkey) -> Option<&ContactInfo> {
         self.gossip
-            .crds
+            .contact_info_table
             .table
-            .get(&CrdsValueLabel::ContactInfo(*pubkey))
+            .get(&ContInfTblValueTag::ContactInfo(*pubkey))
             .map(|x| x.value.contact_info().unwrap())
     }
 
@@ -418,7 +418,7 @@ impl NodeGroupInfo {
     pub fn rpc_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -431,7 +431,7 @@ impl NodeGroupInfo {
     // All nodes in gossip (including spy nodes) and the last time we heard about them
     pub(crate) fn all_peers(&self) -> Vec<(ContactInfo, u64)> {
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| {
@@ -445,7 +445,7 @@ impl NodeGroupInfo {
     pub fn gossip_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -459,7 +459,7 @@ impl NodeGroupInfo {
     pub fn tvu_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -473,7 +473,7 @@ impl NodeGroupInfo {
     pub fn storage_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -487,7 +487,7 @@ impl NodeGroupInfo {
     pub fn retransmit_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -580,7 +580,7 @@ impl NodeGroupInfo {
     pub fn transaction_digesting_module_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
-            .crds
+            .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
@@ -950,19 +950,19 @@ impl NodeGroupInfo {
 
         Ok((addr, out))
     }
-    // If the network entrypoint hasn't been discovered yet, add it to the crds table
-    fn add_entrypoint(&mut self, pulls: &mut Vec<(Pubkey, Bloom<Hash>, SocketAddr, CrdsValue)>) {
+    // If the network entrypoint hasn't been discovered yet, add it to the contact_info_table table
+    fn add_entrypoint(&mut self, pulls: &mut Vec<(Pubkey, Bloom<Hash>, SocketAddr, ContInfTblValue)>) {
         match &self.entrypoint {
             Some(entrypoint) => {
                 let self_info = self
                     .gossip
-                    .crds
-                    .lookup(&CrdsValueLabel::ContactInfo(self.id()))
+                    .contact_info_table
+                    .lookup(&ContInfTblValueTag::ContactInfo(self.id()))
                     .unwrap_or_else(|| panic!("self_id invalid {}", self.id()));
 
                 pulls.push((
                     entrypoint.id,
-                    self.gossip.pull.build_crds_filter(&self.gossip.crds),
+                    self.gossip.pull.build_crds_filter(&self.gossip.contact_info_table),
                     entrypoint.gossip,
                     self_info.clone(),
                 ))
@@ -983,11 +983,11 @@ impl NodeGroupInfo {
         let mut pr: Vec<_> = pulls
             .into_iter()
             .filter_map(|(peer, filter, self_info)| {
-                let peer_label = CrdsValueLabel::ContactInfo(peer);
+                let peer_label = ContInfTblValueTag::ContactInfo(peer);
                 self.gossip
-                    .crds
+                    .contact_info_table
                     .lookup(&peer_label)
-                    .and_then(CrdsValue::contact_info)
+                    .and_then(ContInfTblValue::contact_info)
                     .map(|peer_info| (peer, filter, peer_info.gossip, self_info))
             })
             .collect();
@@ -1007,11 +1007,11 @@ impl NodeGroupInfo {
         peers
             .into_iter()
             .filter_map(|p| {
-                let peer_label = CrdsValueLabel::ContactInfo(p);
+                let peer_label = ContInfTblValueTag::ContactInfo(p);
                 self.gossip
-                    .crds
+                    .contact_info_table
                     .lookup(&peer_label)
-                    .and_then(CrdsValue::contact_info)
+                    .and_then(ContInfTblValue::contact_info)
                     .map(|p| p.gossip)
             })
             .map(|peer| (peer, Protocol::PushMessage(self_id, msgs.clone())))
@@ -1066,7 +1066,7 @@ impl NodeGroupInfo {
                     obj.write().unwrap().purge(timestamp());
                     //TODO: possibly tune this parameter
                     //we saw a deadlock passing an obj.read().unwrap().timeout into sleep
-                    if start - last_push > CRDS_GOSSIP_PULL_CRDS_TIMEOUT_MS / 2 {
+                    if start - last_push > NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS / 2 {
                         obj.write().unwrap().push_self(&stakes);
                         last_push = timestamp();
                     }
@@ -1184,7 +1184,7 @@ impl NodeGroupInfo {
     fn handle_pull_request(
         me: &Arc<RwLock<Self>>,
         filter: Bloom<Hash>,
-        caller: CrdsValue,
+        caller: ContInfTblValue,
         from_addr: &SocketAddr,
     ) -> Vec<SharedBlob> {
         let self_id = me.read().unwrap().gossip.id;
@@ -1228,7 +1228,7 @@ impl NodeGroupInfo {
         inc_new_counter_debug!("node_group_info-pull_request-rsp", len);
         to_shared_blob(rsp, from.gossip).ok().into_iter().collect()
     }
-    fn handle_pull_response(me: &Arc<RwLock<Self>>, from: &Pubkey, data: Vec<CrdsValue>) {
+    fn handle_pull_response(me: &Arc<RwLock<Self>>, from: &Pubkey, data: Vec<ContInfTblValue>) {
         let len = data.len();
         let now = Instant::now();
         let self_id = me.read().unwrap().gossip.id;
@@ -1245,7 +1245,7 @@ impl NodeGroupInfo {
     fn handle_push_message(
         me: &Arc<RwLock<Self>>,
         from: &Pubkey,
-        data: Vec<CrdsValue>,
+        data: Vec<ContInfTblValue>,
     ) -> Vec<SharedBlob> {
         let self_id = me.read().unwrap().gossip.id;
         inc_new_counter_debug!("node_group_info-push_message", 1, 0, 1000);
@@ -1342,7 +1342,7 @@ impl NodeGroupInfo {
         me.write()
             .unwrap()
             .gossip
-            .crds
+            .contact_info_table
             .update_record_timestamp(&from.id, timestamp());
         let my_info = me.read().unwrap().my_data().clone();
 
@@ -1444,10 +1444,10 @@ impl NodeGroupInfo {
                         data.wallclock,
                         timestamp(),
                     ) {
-                        Err(CrdsGossipError::PruneMessageTimeout) => {
+                        Err(NodeTbleErr::PruneMessageTimeout) => {
                             inc_new_counter_debug!("node_group_info-prune_message_timeout", 1)
                         }
-                        Err(CrdsGossipError::BadPruneDestination) => {
+                        Err(NodeTbleErr::BadPruneDestination) => {
                             inc_new_counter_debug!("node_group_info-bad_prune_destination", 1)
                         }
                         Err(_) => (),
@@ -1508,7 +1508,7 @@ impl NodeGroupInfo {
                     debug!(
                         "{}: run_listen timeout, table size: {}",
                         me.gossip.id,
-                        me.gossip.crds.table.len()
+                        me.gossip.contact_info_table.table.len()
                     );
                 }
             })
@@ -1790,7 +1790,7 @@ mod tests {
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::tests::make_many_slot_entries;
     use crate::block_buffer_pool::BlockBufferPool;
-    use crate::propagation_value::CrdsValueLabel;
+    use crate::propagation_value::ContInfTblValueTag;
     use crate::packet::BLOB_HEADER_SIZE;
     use crate::fix_missing_spot_service::RepairType;
     use crate::result::Error;
@@ -1848,22 +1848,22 @@ mod tests {
         let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(d);
         let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
-        let label = CrdsValueLabel::ContactInfo(d.id);
+        let label = ContInfTblValueTag::ContactInfo(d.id);
         node_group_info.insert_info(d);
-        assert!(node_group_info.gossip.crds.lookup(&label).is_some());
+        assert!(node_group_info.gossip.contact_info_table.lookup(&label).is_some());
     }
     #[test]
     fn test_insert_self() {
         let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(d.clone());
-        let entry_label = CrdsValueLabel::ContactInfo(node_group_info.id());
-        assert!(node_group_info.gossip.crds.lookup(&entry_label).is_some());
+        let entry_label = ContInfTblValueTag::ContactInfo(node_group_info.id());
+        assert!(node_group_info.gossip.contact_info_table.lookup(&entry_label).is_some());
 
         // inserting something else shouldn't work
         let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
         node_group_info.insert_self(d.clone());
-        let label = CrdsValueLabel::ContactInfo(d.id);
-        assert!(node_group_info.gossip.crds.lookup(&label).is_none());
+        let label = ContInfTblValueTag::ContactInfo(d.id);
+        assert!(node_group_info.gossip.contact_info_table.lookup(&label).is_none());
     }
     #[test]
     fn window_index_request() {
@@ -2330,7 +2330,7 @@ mod tests {
         let contact_info = ContactInfo::new_localhost(&keys.pubkey(), 0);
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(contact_info);
 
-        // make sure empty crds is handled correctly
+        // make sure empty contact_info_table is handled correctly
         let (votes, max_ts) = node_group_info.get_votes(now);
         assert_eq!(votes, vec![]);
         assert_eq!(max_ts, now);
@@ -2377,12 +2377,12 @@ fn test_add_entrypoint() {
     }
 
     // now add this message back to the table and make sure after the next pull, the entrypoint is unset
-    let entrypoint_crdsvalue = CrdsValue::ContactInfo(entrypoint.clone());
+    let connect_url_contact_info_table_value = ContInfTblValue::ContactInfo(entrypoint.clone());
     let node_group_info = Arc::new(RwLock::new(node_group_info));
     NodeGroupInfo::handle_pull_response(
         &node_group_info,
         &entrypoint_pubkey,
-        vec![entrypoint_crdsvalue],
+        vec![connect_url_contact_info_table_value],
     );
     let pulls = node_group_info
         .write()

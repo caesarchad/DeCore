@@ -261,7 +261,7 @@ impl Treasury {
         let squash_cache_ms = duration_as_ms(&squash_cache_start.elapsed());
 
         datapoint_info!(
-            "locktower-observed",
+            "lock_stack-observed",
             ("squash_accounts_ms", squash_accounts_ms, i64),
             ("squash_cache_ms", squash_cache_ms, i64)
         );

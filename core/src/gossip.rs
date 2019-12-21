@@ -1,13 +1,13 @@
-//! Crds Gossip
-//! This module ties together Crds and the push and pull gossip overlays.  The interface is
+//! ContactInfoTable Gossip
+//! This module ties together ContactInfoTable and the push and pull gossip overlays.  The interface is
 //! designed to run with a simulator or over a UDP network connection with messages up to a
 //! packet::BLOB_DATA_SIZE size.
 
-use crate::connection_info_table::Crds;
-use crate::gossip_error_type::CrdsGossipError;
-use crate::pull_from_gossip::CrdsGossipPull;
-use crate::push_to_gossip::{CrdsGossipPush, CRDS_GOSSIP_NUM_ACTIVE};
-use crate::propagation_value::CrdsValue;
+use crate::connection_info_table::ContactInfoTable;
+use crate::gossip_error_type::NodeTbleErr;
+use crate::pull_from_gossip::NodeTbleGspPull;
+use crate::push_to_gossip::{NodeTbleGspPush, NDTB_GOSSIP_NUM_ACTIVE};
+use crate::propagation_value::ContInfTblValue;
 use hashbrown::HashMap;
 use morgan_runtime::bloom::Bloom;
 use morgan_interface::hash::Hash;
@@ -15,45 +15,45 @@ use morgan_interface::pubkey::Pubkey;
 use std::{thread, time::Duration};
 
 ///The min size for bloom filters
-pub const CRDS_GOSSIP_BLOOM_SIZE: usize = 1000;
+pub const NDTB_GOSSIP_BLOOM_SIZE: usize = 1000;
 
 #[derive(Clone)]
-pub struct CrdsGossip {
-    pub crds: Crds,
+pub struct NodeTbleGossip {
+    pub contact_info_table: ContactInfoTable,
     pub id: Pubkey,
-    pub push: CrdsGossipPush,
-    pub pull: CrdsGossipPull,
+    pub push: NodeTbleGspPush,
+    pub pull: NodeTbleGspPull,
 }
 
-impl Default for CrdsGossip {
+impl Default for NodeTbleGossip {
     fn default() -> Self {
-        CrdsGossip {
-            crds: Crds::default(),
+        NodeTbleGossip {
+            contact_info_table: ContactInfoTable::default(),
             id: Pubkey::default(),
-            push: CrdsGossipPush::default(),
-            pull: CrdsGossipPull::default(),
+            push: NodeTbleGspPush::default(),
+            pull: NodeTbleGspPull::default(),
         }
     }
 }
 
-impl CrdsGossip {
+impl NodeTbleGossip {
     pub fn set_self(&mut self, id: &Pubkey) {
         self.id = *id;
     }
     /// process a push message to the network
-    pub fn process_push_message(&mut self, values: Vec<CrdsValue>, now: u64) -> Vec<Pubkey> {
-        let labels: Vec<_> = values.iter().map(CrdsValue::label).collect();
+    pub fn process_push_message(&mut self, values: Vec<ContInfTblValue>, now: u64) -> Vec<Pubkey> {
+        let labels: Vec<_> = values.iter().map(ContInfTblValue::label).collect();
 
         let results: Vec<_> = values
             .into_iter()
-            .map(|val| self.push.process_push_message(&mut self.crds, val, now))
+            .map(|val| self.push.process_push_message(&mut self.contact_info_table, val, now))
             .collect();
 
         results
             .into_iter()
             .zip(labels)
             .filter_map(|(r, d)| {
-                if r == Err(CrdsGossipError::PushMessagePrune) {
+                if r == Err(NodeTbleErr::PushMessagePrune) {
                     Some(d.pubkey())
                 } else if let Ok(Some(val)) = r {
                     self.pull
@@ -66,8 +66,8 @@ impl CrdsGossip {
             .collect()
     }
 
-    pub fn new_push_messages(&mut self, now: u64) -> (Pubkey, Vec<Pubkey>, Vec<CrdsValue>) {
-        let (peers, values) = self.push.new_push_messages(&self.crds, now);
+    pub fn new_push_messages(&mut self, now: u64) -> (Pubkey, Vec<Pubkey>, Vec<ContInfTblValue>) {
+        let (peers, values) = self.push.new_push_messages(&self.contact_info_table, now);
         (self.id, peers, values)
     }
 
@@ -79,16 +79,16 @@ impl CrdsGossip {
         origin: &[Pubkey],
         wallclock: u64,
         now: u64,
-    ) -> Result<(), CrdsGossipError> {
+    ) -> Result<(), NodeTbleErr> {
         let expired = now > wallclock + self.push.prune_timeout;
         if expired {
-            return Err(CrdsGossipError::PruneMessageTimeout);
+            return Err(NodeTbleErr::PruneMessageTimeout);
         }
         if self.id == *destination {
             self.push.process_prune_msg(peer, origin);
             Ok(())
         } else {
-            Err(CrdsGossipError::BadPruneDestination)
+            Err(NodeTbleErr::BadPruneDestination)
         }
     }
 
@@ -96,11 +96,11 @@ impl CrdsGossip {
     /// * ratio - number of actives to rotate
     pub fn refresh_push_active_set(&mut self, stakes: &HashMap<Pubkey, u64>) {
         self.push.refresh_push_active_set(
-            &self.crds,
+            &self.contact_info_table,
             stakes,
             &self.id,
             self.pull.pull_request_time.len(),
-            CRDS_GOSSIP_NUM_ACTIVE,
+            NDTB_GOSSIP_NUM_ACTIVE,
         )
     }
 
@@ -109,9 +109,9 @@ impl CrdsGossip {
         &self,
         now: u64,
         stakes: &HashMap<Pubkey, u64>,
-    ) -> Result<(Pubkey, Bloom<Hash>, CrdsValue), CrdsGossipError> {
+    ) -> Result<(Pubkey, Bloom<Hash>, ContInfTblValue), NodeTbleErr> {
         self.pull
-            .new_pull_request(&self.crds, &self.id, now, stakes)
+            .new_pull_request(&self.contact_info_table, &self.id, now, stakes)
     }
 
     /// time when a request to `from` was initiated
@@ -124,38 +124,38 @@ impl CrdsGossip {
     /// process a pull request and create a response
     pub fn process_pull_request(
         &mut self,
-        caller: CrdsValue,
+        caller: ContInfTblValue,
         filter: Bloom<Hash>,
         now: u64,
-    ) -> Vec<CrdsValue> {
+    ) -> Vec<ContInfTblValue> {
         self.pull
-            .process_pull_request(&mut self.crds, caller, filter, now)
+            .process_pull_request(&mut self.contact_info_table, caller, filter, now)
     }
     /// process a pull response
     pub fn process_pull_response(
         &mut self,
         from: &Pubkey,
-        response: Vec<CrdsValue>,
+        response: Vec<ContInfTblValue>,
         now: u64,
     ) -> usize {
         self.pull
-            .process_pull_response(&mut self.crds, from, response, now)
+            .process_pull_response(&mut self.contact_info_table, from, response, now)
     }
     pub fn purge(&mut self, now: u64) {
         if now > self.push.msg_timeout {
             let min = now - self.push.msg_timeout;
-            self.push.purge_old_pending_push_messages(&self.crds, min);
+            self.push.purge_old_pending_push_messages(&self.contact_info_table, min);
         }
         if now > 5 * self.push.msg_timeout {
             let min = now - 5 * self.push.msg_timeout;
             self.push.purge_old_pushed_once_messages(min);
         }
-        if now > self.pull.crds_timeout {
-            let min = now - self.pull.crds_timeout;
-            self.pull.purge_active(&mut self.crds, &self.id, min);
+        if now > self.pull.ndtb_timeout {
+            let min = now - self.pull.ndtb_timeout;
+            self.pull.purge_active(&mut self.contact_info_table, &self.id, min);
         }
-        if now > 5 * self.pull.crds_timeout {
-            let min = now - 5 * self.pull.crds_timeout;
+        if now > 5 * self.pull.ndtb_timeout {
+            let min = now - 5 * self.pull.ndtb_timeout;
             self.pull.purge_purged(min);
         }
     }
@@ -235,32 +235,32 @@ mod test {
 
     #[test]
     fn test_prune_errors() {
-        let mut crds_gossip = CrdsGossip::default();
-        crds_gossip.id = Pubkey::new(&[0; 32]);
-        let id = crds_gossip.id;
+        let mut node_table_gossip = NodeTbleGossip::default();
+        node_table_gossip.id = Pubkey::new(&[0; 32]);
+        let id = node_table_gossip.id;
         let ci = ContactInfo::new_localhost(&Pubkey::new(&[1; 32]), 0);
         let prune_pubkey = Pubkey::new(&[2; 32]);
-        crds_gossip
-            .crds
-            .insert(CrdsValue::ContactInfo(ci.clone()), 0)
+        node_table_gossip
+            .contact_info_table
+            .insert(ContInfTblValue::ContactInfo(ci.clone()), 0)
             .unwrap();
-        crds_gossip.refresh_push_active_set(&HashMap::new());
+        node_table_gossip.refresh_push_active_set(&HashMap::new());
         let now = timestamp();
         //incorrect dest
-        let mut res = crds_gossip.process_prune_msg(
+        let mut res = node_table_gossip.process_prune_msg(
             &ci.id,
             &Pubkey::new(hash(&[1; 32]).as_ref()),
             &[prune_pubkey],
             now,
             now,
         );
-        assert_eq!(res.err(), Some(CrdsGossipError::BadPruneDestination));
+        assert_eq!(res.err(), Some(NodeTbleErr::BadPruneDestination));
         //correct dest
-        res = crds_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, now);
+        res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, now);
         res.unwrap();
         //test timeout
-        let timeout = now + crds_gossip.push.prune_timeout * 2;
-        res = crds_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, timeout);
-        assert_eq!(res.err(), Some(CrdsGossipError::PruneMessageTimeout));
+        let timeout = now + node_table_gossip.push.prune_timeout * 2;
+        res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, timeout);
+        assert_eq!(res.err(), Some(NodeTbleErr::PruneMessageTimeout));
     }
 }

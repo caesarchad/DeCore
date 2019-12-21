@@ -5366,8 +5366,8 @@
     {
       "aliasColors": {
         "cluster-info.repair": "#ba43a9",
-        "locktower-observed.squash_account": "#0a437c",
-        "locktower-observed.squash_cache": "#ea6460",
+        "lock_stack-observed.squash_account": "#0a437c",
+        "lock_stack-observed.squash_cache": "#ea6460",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
         "window-phase.consumed": "#5195ce"
@@ -5465,7 +5465,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT mean(\"squash_accounts_ms\")  AS \"squash_account\" FROM \"$testnet\".\"autogen\".\"locktower-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT mean(\"squash_accounts_ms\")  AS \"squash_account\" FROM \"$testnet\".\"autogen\".\"lock_stack-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -5504,7 +5504,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT mean(\"squash_cache_ms\")  AS \"squash_cache\" FROM \"$testnet\".\"autogen\".\"locktower-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT mean(\"squash_cache_ms\")  AS \"squash_cache\" FROM \"$testnet\".\"autogen\".\"lock_stack-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -5576,7 +5576,7 @@
         "cluster-info.repair": "#ba43a9",
         "fetch_phase-discard_forwards.sum": "#00ffbb",
         "fetch_phase-honor_forwards.sum": "#bf1b00",
-        "locktower-vote.last": "#00ffbb",
+        "lock_stack-vote.last": "#00ffbb",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
         "window-phase.consumed": "#5195ce"
@@ -5892,7 +5892,7 @@
         "cluster-info.repair": "#ba43a9",
         "fetch_phase-discard_forwards.sum": "#00ffbb",
         "fetch_phase-honor_forwards.sum": "#bf1b00",
-        "locktower-vote.last": "#00ffbb",
+        "lock_stack-vote.last": "#00ffbb",
         "waterclock_recorder-record_lock_contention.sum": "#5195ce",
         "waterclock_recorder-drop_lock_contention.sum": "#962d82",
         "replay_phase-new_leader.last": "#00ffbb",
@@ -7025,7 +7025,7 @@
       },
       "id": 51,
       "panels": [],
-      "title": "Locktower Consensus",
+      "title": "LockStack Consensus",
       "type": "row"
     },
     {
@@ -7089,7 +7089,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT last(\"latest\") - last(\"root\") FROM \"$testnet\".\"autogen\".\"locktower-vote\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT last(\"latest\") - last(\"root\") FROM \"$testnet\".\"autogen\".\"lock_stack-vote\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -7126,7 +7126,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"slot\") - last(\"root\") FROM \"$testnet\".\"autogen\".\"locktower-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT last(\"slot\") - last(\"root\") FROM \"$testnet\".\"autogen\".\"lock_stack-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -7150,7 +7150,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Locktower Distance in Latest and Root Slot ($hostid)",
+      "title": "LockStack Distance in Latest and Root Slot ($hostid)",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -7190,7 +7190,7 @@
     {
       "aliasColors": {
         "cluster-info.repair": "#ba43a9",
-        "locktower-vote.last": "#00ffbb",
+        "lock_stack-vote.last": "#00ffbb",
         "replay_phase-new_leader.last": "#00ffbb",
         "window-service.receive": "#b7dbab",
         "window-phase.consumed": "#5195ce"
@@ -7249,7 +7249,7 @@
           "measurement": "node_group_info-vote-count",
           "orderByTime": "ASC",
           "policy": "autogen",
-          "query": "SELECT last(\"root\") FROM \"$testnet\".\"autogen\".\"locktower-vote\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT last(\"root\") FROM \"$testnet\".\"autogen\".\"lock_stack-vote\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -7286,7 +7286,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"root\") FROM \"$testnet\".\"autogen\".\"locktower-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
+          "query": "SELECT last(\"root\") FROM \"$testnet\".\"autogen\".\"lock_stack-observed\" WHERE  host_id =~ /$hostid/ AND $timeFilter GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -7310,7 +7310,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Locktower Root Slot ($hostid)",
+      "title": "LockStack Root Slot ($hostid)",
       "tooltip": {
         "shared": true,
         "sort": 0,

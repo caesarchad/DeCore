@@ -40,7 +40,7 @@ impl<'de> Visitor<'de> for SLVstr {
         formatter.write_str("a multi-byte length")
     }
 
-    fn access_sequence<A>(self, mut seq: A) -> Result<BU16, A::Error>
+    fn visit_seq<A>(self, mut seq: A) -> Result<BU16, A::Error>
     where
         A: SeqAccess<'de>,
     {
@@ -110,7 +110,7 @@ where
         formatter.write_str("a Vec with a multi-byte length")
     }
 
-    fn access_sequence<A>(self, mut seq: A) -> Result<Vec<T>, A::Error>
+    fn visit_seq<A>(self, mut seq: A) -> Result<Vec<T>, A::Error>
     where
         A: SeqAccess<'de>,
     {

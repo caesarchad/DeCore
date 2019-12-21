@@ -229,7 +229,7 @@ rollingNodeRestart() {
       echo "--- Restarting $pid: $cmd"
       killNode "$pid"
       # Delay 20 seconds to ensure the remaining cluster nodes will
-      # hit CRDS_GOSSIP_PULL_CRDS_TIMEOUT_MS (currently 15 seconds) for the
+      # hit NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS (currently 15 seconds) for the
       # node that was just stopped
       echo "(sleeping for 20 seconds)"
       sleep 20

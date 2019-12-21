@@ -1,4 +1,4 @@
-//! Crds Gossip Push overlay
+//! ContactInfoTable Gossip Push overlay
 //! This module is used to propagate recently created CrdsValues across the network
 //! Eager push strategy is based on Plumtree
 //! http://asc.di.fct.unl.pt/~jleitao/pdf/srds07-leitao.pdf
@@ -9,10 +9,10 @@
 //! 2. The prune set is stored in a Bloom filter.
 
 use crate::connection_info::ContactInfo;
-use crate::connection_info_table::{Crds, VersionedCrdsValue};
-use crate::gossip::{get_stake, get_weight, CRDS_GOSSIP_BLOOM_SIZE};
-use crate::gossip_error_type::CrdsGossipError;
-use crate::propagation_value::{CrdsValue, CrdsValueLabel};
+use crate::connection_info_table::{ContactInfoTable, VerContInfTblValue};
+use crate::gossip::{get_stake, get_weight, NDTB_GOSSIP_BLOOM_SIZE};
+use crate::gossip_error_type::NodeTbleErr;
+use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag};
 use crate::packet::BLOB_DATA_SIZE;
 use bincode::serialized_size;
 use hashbrown::HashMap;
@@ -26,19 +26,19 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::timestamp;
 use std::cmp;
 
-pub const CRDS_GOSSIP_NUM_ACTIVE: usize = 30;
-pub const CRDS_GOSSIP_PUSH_FANOUT: usize = 6;
-pub const CRDS_GOSSIP_PUSH_MSG_TIMEOUT_MS: u64 = 5000;
-pub const CRDS_GOSSIP_PRUNE_MSG_TIMEOUT_MS: u64 = 500;
+pub const NDTB_GOSSIP_NUM_ACTIVE: usize = 30;
+pub const NDTB_GOSSIP_PUSH_FANOUT: usize = 6;
+pub const NDTB_GOSSIP_PUSH_MSG_TIMEOUT_MS: u64 = 5000;
+pub const NDTB_GOSSIP_PRUNE_MSG_TIMEOUT_MS: u64 = 500;
 
 #[derive(Clone)]
-pub struct CrdsGossipPush {
+pub struct NodeTbleGspPush {
     /// max bytes per message
     pub max_bytes: usize,
     /// active set of validators for push
     active_set: IndexMap<Pubkey, Bloom<Pubkey>>,
     /// push message queue
-    push_messages: HashMap<CrdsValueLabel, Hash>,
+    push_messages: HashMap<ContInfTblValueTag, Hash>,
     pushed_once: HashMap<Hash, u64>,
     pub num_active: usize,
     pub push_fanout: usize,
@@ -46,47 +46,47 @@ pub struct CrdsGossipPush {
     pub prune_timeout: u64,
 }
 
-impl Default for CrdsGossipPush {
+impl Default for NodeTbleGspPush {
     fn default() -> Self {
         Self {
             max_bytes: BLOB_DATA_SIZE,
             active_set: IndexMap::new(),
             push_messages: HashMap::new(),
             pushed_once: HashMap::new(),
-            num_active: CRDS_GOSSIP_NUM_ACTIVE,
-            push_fanout: CRDS_GOSSIP_PUSH_FANOUT,
-            msg_timeout: CRDS_GOSSIP_PUSH_MSG_TIMEOUT_MS,
-            prune_timeout: CRDS_GOSSIP_PRUNE_MSG_TIMEOUT_MS,
+            num_active: NDTB_GOSSIP_NUM_ACTIVE,
+            push_fanout: NDTB_GOSSIP_PUSH_FANOUT,
+            msg_timeout: NDTB_GOSSIP_PUSH_MSG_TIMEOUT_MS,
+            prune_timeout: NDTB_GOSSIP_PRUNE_MSG_TIMEOUT_MS,
         }
     }
 }
-impl CrdsGossipPush {
+impl NodeTbleGspPush {
     pub fn num_pending(&self) -> usize {
         self.push_messages.len()
     }
     /// process a push message to the network
     pub fn process_push_message(
         &mut self,
-        crds: &mut Crds,
-        value: CrdsValue,
+        contact_info_table: &mut ContactInfoTable,
+        value: ContInfTblValue,
         now: u64,
-    ) -> Result<Option<VersionedCrdsValue>, CrdsGossipError> {
+    ) -> Result<Option<VerContInfTblValue>, NodeTbleErr> {
         if now > value.wallclock() + self.msg_timeout {
-            return Err(CrdsGossipError::PushMessageTimeout);
+            return Err(NodeTbleErr::PushMessageTimeout);
         }
         if now + self.msg_timeout < value.wallclock() {
-            return Err(CrdsGossipError::PushMessageTimeout);
+            return Err(NodeTbleErr::PushMessageTimeout);
         }
         let label = value.label();
 
-        let new_value = crds.new_versioned(now, value);
+        let new_value = contact_info_table.new_versioned(now, value);
         let value_hash = new_value.value_hash;
         if self.pushed_once.get(&value_hash).is_some() {
-            return Err(CrdsGossipError::PushMessagePrune);
+            return Err(NodeTbleErr::PushMessagePrune);
         }
-        let old = crds.insert_versioned(new_value);
+        let old = contact_info_table.insert_versioned(new_value);
         if old.is_err() {
-            return Err(CrdsGossipError::PushMessageOldVersion);
+            return Err(NodeTbleErr::PushMessageOldVersion);
         }
         self.push_messages.insert(label, value_hash);
         self.pushed_once.insert(value_hash, now);
@@ -98,7 +98,7 @@ impl CrdsGossipPush {
     /// peers.
     /// The list of push messages is created such that all the randomly selected peers have not
     /// pruned the genesis addresses.
-    pub fn new_push_messages(&mut self, crds: &Crds, now: u64) -> (Vec<Pubkey>, Vec<CrdsValue>) {
+    pub fn new_push_messages(&mut self, contact_info_table: &ContactInfoTable, now: u64) -> (Vec<Pubkey>, Vec<ContInfTblValue>) {
         let max = self.active_set.len();
         let mut nodes: Vec<_> = (0..max).collect();
         nodes.shuffle(&mut rand::thread_rng());
@@ -119,7 +119,7 @@ impl CrdsGossipPush {
             if failed {
                 continue;
             }
-            let res = crds.lookup_versioned(label);
+            let res = contact_info_table.lookup_versioned(label);
             if res.is_none() {
                 continue;
             }
@@ -161,7 +161,7 @@ impl CrdsGossipPush {
     /// * ratio - active_set.len()/ratio is the number of actives to rotate
     pub fn refresh_push_active_set(
         &mut self,
-        crds: &Crds,
+        contact_info_table: &ContactInfoTable,
         stakes: &HashMap<Pubkey, u64>,
         self_id: &Pubkey,
         network_size: usize,
@@ -170,7 +170,7 @@ impl CrdsGossipPush {
         let need = Self::compute_need(self.num_active, self.active_set.len(), ratio);
         let mut new_items = HashMap::new();
 
-        let mut options: Vec<_> = self.push_options(crds, &self_id, stakes);
+        let mut options: Vec<_> = self.push_options(contact_info_table, &self_id, stakes);
         if options.is_empty() {
             return;
         }
@@ -189,7 +189,7 @@ impl CrdsGossipPush {
             if new_items.get(&item.id).is_some() {
                 continue;
             }
-            let size = cmp::max(CRDS_GOSSIP_BLOOM_SIZE, network_size);
+            let size = cmp::max(NDTB_GOSSIP_BLOOM_SIZE, network_size);
             let bloom = Bloom::random(size, 0.1, 1024 * 8 * 4);
             new_items.insert(item.id, bloom);
         }
@@ -206,11 +206,11 @@ impl CrdsGossipPush {
 
     fn push_options<'a>(
         &self,
-        crds: &'a Crds,
+        contact_info_table: &'a ContactInfoTable,
         self_id: &Pubkey,
         stakes: &HashMap<Pubkey, u64>,
     ) -> Vec<(f32, &'a ContactInfo)> {
-        crds.table
+        contact_info_table.table
             .values()
             .filter(|v| v.value.contact_info().is_some())
             .map(|v| (v.value.contact_info().unwrap(), v))
@@ -227,12 +227,12 @@ impl CrdsGossipPush {
     }
 
     /// purge old pending push messages
-    pub fn purge_old_pending_push_messages(&mut self, crds: &Crds, min_time: u64) {
-        let old_msgs: Vec<CrdsValueLabel> = self
+    pub fn purge_old_pending_push_messages(&mut self, contact_info_table: &ContactInfoTable, min_time: u64) {
+        let old_msgs: Vec<ContInfTblValueTag> = self
             .push_messages
             .iter()
             .filter_map(|(k, hash)| {
-                if let Some(versioned) = crds.lookup_versioned(k) {
+                if let Some(versioned) = contact_info_table.lookup_versioned(k) {
                     if versioned.value.wallclock() < min_time || versioned.value_hash != *hash {
                         Some(k)
                     } else {
@@ -269,84 +269,84 @@ mod test {
 
     #[test]
     fn test_process_push() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
-        let value = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
+        let value = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
         let label = value.label();
         // push a new message
         assert_eq!(
-            push.process_push_message(&mut crds, value.clone(), 0),
+            push.process_push_message(&mut contact_info_table, value.clone(), 0),
             Ok(None)
         );
-        assert_eq!(crds.lookup(&label), Some(&value));
+        assert_eq!(contact_info_table.lookup(&label), Some(&value));
 
         // push it again
         assert_eq!(
-            push.process_push_message(&mut crds, value.clone(), 0),
-            Err(CrdsGossipError::PushMessagePrune)
+            push.process_push_message(&mut contact_info_table, value.clone(), 0),
+            Err(NodeTbleErr::PushMessagePrune)
         );
     }
     #[test]
     fn test_process_push_old_version() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
         let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
         ci.wallclock = 1;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
 
         // push a new message
-        assert_eq!(push.process_push_message(&mut crds, value, 0), Ok(None));
+        assert_eq!(push.process_push_message(&mut contact_info_table, value, 0), Ok(None));
 
         // push an old version
         ci.wallclock = 0;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
-            push.process_push_message(&mut crds, value, 0),
-            Err(CrdsGossipError::PushMessageOldVersion)
+            push.process_push_message(&mut contact_info_table, value, 0),
+            Err(NodeTbleErr::PushMessageOldVersion)
         );
     }
     #[test]
     fn test_process_push_timeout() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
         let timeout = push.msg_timeout;
         let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
 
         // push a version to far in the future
         ci.wallclock = timeout + 1;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
-            push.process_push_message(&mut crds, value, 0),
-            Err(CrdsGossipError::PushMessageTimeout)
+            push.process_push_message(&mut contact_info_table, value, 0),
+            Err(NodeTbleErr::PushMessageTimeout)
         );
 
         // push a version to far in the past
         ci.wallclock = 0;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
-            push.process_push_message(&mut crds, value, timeout + 1),
-            Err(CrdsGossipError::PushMessageTimeout)
+            push.process_push_message(&mut contact_info_table, value, timeout + 1),
+            Err(NodeTbleErr::PushMessageTimeout)
         );
     }
     #[test]
     fn test_process_push_update() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
         let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
         ci.wallclock = 0;
-        let value_old = CrdsValue::ContactInfo(ci.clone());
+        let value_old = ContInfTblValue::ContactInfo(ci.clone());
 
         // push a new message
         assert_eq!(
-            push.process_push_message(&mut crds, value_old.clone(), 0),
+            push.process_push_message(&mut contact_info_table, value_old.clone(), 0),
             Ok(None)
         );
 
         // push an old version
         ci.wallclock = 1;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
-            push.process_push_message(&mut crds, value, 0)
+            push.process_push_message(&mut contact_info_table, value, 0)
                 .unwrap()
                 .unwrap()
                 .value,
@@ -355,27 +355,27 @@ mod test {
     }
     #[test]
     fn test_compute_need() {
-        assert_eq!(CrdsGossipPush::compute_need(30, 0, 10), 30);
-        assert_eq!(CrdsGossipPush::compute_need(30, 1, 10), 29);
-        assert_eq!(CrdsGossipPush::compute_need(30, 30, 10), 3);
-        assert_eq!(CrdsGossipPush::compute_need(30, 29, 10), 3);
+        assert_eq!(NodeTbleGspPush::compute_need(30, 0, 10), 30);
+        assert_eq!(NodeTbleGspPush::compute_need(30, 1, 10), 29);
+        assert_eq!(NodeTbleGspPush::compute_need(30, 30, 10), 3);
+        assert_eq!(NodeTbleGspPush::compute_need(30, 29, 10), 3);
     }
     #[test]
     fn test_refresh_active_set() {
         morgan_logger::setup();
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
-        let value1 = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
+        let value1 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
 
-        assert_eq!(crds.insert(value1.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+        assert_eq!(contact_info_table.insert(value1.clone(), 0), Ok(None));
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
 
         assert!(push.active_set.get(&value1.label().pubkey()).is_some());
-        let value2 = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
         assert!(push.active_set.get(&value2.label().pubkey()).is_none());
-        assert_eq!(crds.insert(value2.clone(), 0), Ok(None));
+        assert_eq!(contact_info_table.insert(value2.clone(), 0), Ok(None));
         for _ in 0..30 {
-            push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+            push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
             if push.active_set.get(&value2.label().pubkey()).is_some() {
                 break;
             }
@@ -383,26 +383,26 @@ mod test {
         assert!(push.active_set.get(&value2.label().pubkey()).is_some());
 
         for _ in 0..push.num_active {
-            let value2 = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
-            assert_eq!(crds.insert(value2.clone(), 0), Ok(None));
+            let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            assert_eq!(contact_info_table.insert(value2.clone(), 0), Ok(None));
         }
-        push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
         assert_eq!(push.active_set.len(), push.num_active);
     }
     #[test]
     fn test_active_set_refresh_with_treasury() {
         let time = timestamp() - 1024; //make sure there's at least a 1 second delay
-        let mut crds = Crds::default();
-        let push = CrdsGossipPush::default();
+        let mut contact_info_table = ContactInfoTable::default();
+        let push = NodeTbleGspPush::default();
         let mut stakes = HashMap::new();
         for i in 1..=100 {
             let peer =
-                CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), time));
+                ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), time));
             let id = peer.label().pubkey();
-            crds.insert(peer.clone(), time).unwrap();
+            contact_info_table.insert(peer.clone(), time).unwrap();
             stakes.insert(id, i * 100);
         }
-        let mut options = push.push_options(&crds, &Pubkey::default(), &stakes);
+        let mut options = push.push_options(&contact_info_table, &Pubkey::default(), &stakes);
         assert!(!options.is_empty());
         options.sort_by(|(weight_l, _), (weight_r, _)| weight_r.partial_cmp(weight_l).unwrap());
         // check that the highest stake holder is also the heaviest weighted.
@@ -413,83 +413,83 @@ mod test {
     }
     #[test]
     fn test_new_push_messages() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
-        let peer = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
-        assert_eq!(crds.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
 
-        let new_msg = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
         assert_eq!(
-            push.process_push_message(&mut crds, new_msg.clone(), 0),
+            push.process_push_message(&mut contact_info_table, new_msg.clone(), 0),
             Ok(None)
         );
         assert_eq!(push.active_set.len(), 1);
         assert_eq!(
-            push.new_push_messages(&crds, 0),
+            push.new_push_messages(&contact_info_table, 0),
             (vec![peer.label().pubkey()], vec![new_msg])
         );
     }
     #[test]
     fn test_process_prune() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
-        let peer = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
-        assert_eq!(crds.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
 
-        let new_msg = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
         assert_eq!(
-            push.process_push_message(&mut crds, new_msg.clone(), 0),
+            push.process_push_message(&mut contact_info_table, new_msg.clone(), 0),
             Ok(None)
         );
         push.process_prune_msg(&peer.label().pubkey(), &[new_msg.label().pubkey()]);
         assert_eq!(
-            push.new_push_messages(&crds, 0),
+            push.new_push_messages(&contact_info_table, 0),
             (vec![peer.label().pubkey()], vec![])
         );
     }
     #[test]
     fn test_purge_old_pending_push_messages() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
-        let peer = CrdsValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
-        assert_eq!(crds.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&crds, &HashMap::new(), &Pubkey::default(), 1, 1);
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
 
         let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
         ci.wallclock = 1;
-        let new_msg = CrdsValue::ContactInfo(ci.clone());
+        let new_msg = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
-            push.process_push_message(&mut crds, new_msg.clone(), 1),
+            push.process_push_message(&mut contact_info_table, new_msg.clone(), 1),
             Ok(None)
         );
-        push.purge_old_pending_push_messages(&crds, 0);
+        push.purge_old_pending_push_messages(&contact_info_table, 0);
         assert_eq!(
-            push.new_push_messages(&crds, 0),
+            push.new_push_messages(&contact_info_table, 0),
             (vec![peer.label().pubkey()], vec![])
         );
     }
 
     #[test]
     fn test_purge_old_pushed_once_messages() {
-        let mut crds = Crds::default();
-        let mut push = CrdsGossipPush::default();
+        let mut contact_info_table = ContactInfoTable::default();
+        let mut push = NodeTbleGspPush::default();
         let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
         ci.wallclock = 0;
-        let value = CrdsValue::ContactInfo(ci.clone());
+        let value = ContInfTblValue::ContactInfo(ci.clone());
         let label = value.label();
         // push a new message
         assert_eq!(
-            push.process_push_message(&mut crds, value.clone(), 0),
+            push.process_push_message(&mut contact_info_table, value.clone(), 0),
             Ok(None)
         );
-        assert_eq!(crds.lookup(&label), Some(&value));
+        assert_eq!(contact_info_table.lookup(&label), Some(&value));
 
         // push it again
         assert_eq!(
-            push.process_push_message(&mut crds, value.clone(), 0),
-            Err(CrdsGossipError::PushMessagePrune)
+            push.process_push_message(&mut contact_info_table, value.clone(), 0),
+            Err(NodeTbleErr::PushMessagePrune)
         );
 
         // purge the old pushed
@@ -497,8 +497,8 @@ mod test {
 
         // push it again
         assert_eq!(
-            push.process_push_message(&mut crds, value.clone(), 0),
-            Err(CrdsGossipError::PushMessageOldVersion)
+            push.process_push_message(&mut contact_info_table, value.clone(), 0),
+            Err(NodeTbleErr::PushMessageOldVersion)
         );
     }
 }

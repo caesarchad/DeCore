@@ -1,5 +1,5 @@
 #[derive(PartialEq, Debug)]
-pub enum CrdsGossipError {
+pub enum NodeTbleErr {
     NoPeers,
     PushMessageTimeout,
     PushMessagePrune,
