@@ -1,4 +1,4 @@
-pub mod vote_instruction;
+pub mod vote_opcode;
 pub mod vote_state;
 
 const VOTE_PROGRAM_ID: [u8; 32] = [

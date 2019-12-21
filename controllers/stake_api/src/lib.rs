@@ -1,4 +1,4 @@
-pub mod stake_instruction;
+pub mod stake_opcode;
 pub mod stake_state;
 
 const STAKE_PROGRAM_ID: [u8; 32] = [

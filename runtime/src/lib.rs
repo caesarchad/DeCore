@@ -11,10 +11,10 @@ pub mod genesis_utils;
 pub mod loader_utils;
 pub mod locked_accounts_results;
 pub mod message_processor;
-mod native_loader;
+mod bultin_mounter;
 pub mod stakes;
 mod status_cache;
-mod system_instruction_processor;
+mod sys_opcode_handler;
 
 #[macro_use]
 extern crate morgan_metricbot;

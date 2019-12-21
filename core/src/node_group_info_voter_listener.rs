@@ -120,7 +120,7 @@ mod tests {
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::Transaction;
-    use morgan_vote_api::vote_instruction;
+    use morgan_vote_api::vote_opcode;
     use morgan_vote_api::vote_state::Vote;
     use morgan_helper::logHelper::*;
 
@@ -132,14 +132,14 @@ mod tests {
         let votes = (0..MAX_RECENT_VOTES)
             .map(|i| Vote::new(i as u64, Hash::default()))
             .collect::<Vec<_>>();
-        let vote_ix = vote_instruction::vote(
+        let vote_ix = vote_opcode::vote(
             &node_keypair.pubkey(),
             &vote_keypair.pubkey(),
             &vote_keypair.pubkey(),
             votes,
         );
 
-        let mut vote_tx = Transaction::new_unsigned_instructions(vec![vote_ix]);
+        let mut vote_tx = Transaction::new_u_opcodes(vec![vote_ix]);
         vote_tx.partial_sign(&[&node_keypair], Hash::default());
         vote_tx.partial_sign(&[&vote_keypair], Hash::default());
 

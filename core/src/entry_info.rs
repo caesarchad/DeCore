@@ -8,7 +8,7 @@ use crate::result::Result;
 use bincode::{deserialize, serialized_size};
 use chrono::prelude::Utc;
 use rayon::prelude::*;
-use morgan_budget_api::budget_instruction;
+use morgan_budget_api::budget_opcode;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::transaction::Transaction;
@@ -385,8 +385,8 @@ pub fn make_tiny_test_entries_from_hash(start: &Hash, num: usize) -> Vec<Entry> 
     let mut num_hashes = 0;
     (0..num)
         .map(|_| {
-            let ix = budget_instruction::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
-            let tx = Transaction::new_signed_instructions(&[&keypair], vec![ix], *start);
+            let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+            let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], *start);
             Entry::new_mut(&mut hash, &mut num_hashes, vec![tx])
         })
         .collect()
@@ -404,8 +404,8 @@ pub fn make_large_test_entries(num_entries: usize) -> Vec<Entry> {
     let keypair = Keypair::new();
     let pubkey = keypair.pubkey();
 
-    let ix = budget_instruction::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
-    let tx = Transaction::new_signed_instructions(&[&keypair], vec![ix], one);
+    let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+    let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], one);
 
     let serialized_size = serialized_size(&tx).unwrap();
     let num_txs = BLOB_DATA_SIZE / serialized_size as usize;
@@ -453,7 +453,7 @@ mod tests {
     use crate::entry_info::Entry;
     use crate::packet::{to_blobs, BLOB_DATA_SIZE, PACKET_DATA_SIZE};
     use morgan_interface::hash::hash;
-    use morgan_interface::instruction::Instruction;
+    use morgan_interface::opcodes::OpCode;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_transaction;
@@ -461,20 +461,20 @@ mod tests {
 
     fn create_sample_payment(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ixs = budget_instruction::payment(&pubkey, &pubkey, 1);
-        Transaction::new_signed_instructions(&[keypair], ixs, hash)
+        let ixs = budget_opcode::payment(&pubkey, &pubkey, 1);
+        Transaction::new_s_opcodes(&[keypair], ixs, hash)
     }
 
     fn create_sample_timestamp(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ix = budget_instruction::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
-        Transaction::new_signed_instructions(&[keypair], vec![ix], hash)
+        let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+        Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 
     fn create_sample_apply_signature(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ix = budget_instruction::apply_signature(&pubkey, &pubkey, &pubkey);
-        Transaction::new_signed_instructions(&[keypair], vec![ix], hash)
+        let ix = budget_opcode::apply_signature(&pubkey, &pubkey, &pubkey);
+        Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 
     #[test]
@@ -589,8 +589,8 @@ mod tests {
             let entries = vec![Entry {
                 num_hashes: 0,
                 hash: Hash::default(),
-                transactions: vec![Transaction::new_unsigned_instructions(vec![
-                    Instruction::new(Pubkey::default(), &vec![0u8; magic_len as usize], vec![]),
+                transactions: vec![Transaction::new_u_opcodes(vec![
+                    OpCode::new(Pubkey::default(), &vec![0u8; magic_len as usize], vec![]),
                 ])],
             }];
             let size = serialized_size(&entries).unwrap() as usize;
@@ -606,8 +606,8 @@ mod tests {
             Entry {
                 num_hashes: 0,
                 hash: Hash::default(),
-                transactions: vec![Transaction::new_unsigned_instructions(vec![
-                    Instruction::new(Pubkey::default(), &vec![0u8; magic_len], vec![]),
+                transactions: vec![Transaction::new_u_opcodes(vec![
+                    OpCode::new(Pubkey::default(), &vec![0u8; magic_len], vec![]),
                 ])],
             };
             num_entries

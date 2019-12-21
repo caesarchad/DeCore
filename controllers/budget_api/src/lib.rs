@@ -1,5 +1,5 @@
 pub mod budget_expr;
-pub mod budget_instruction;
+pub mod budget_opcode;
 pub mod budget_processor;
 pub mod budget_state;
 

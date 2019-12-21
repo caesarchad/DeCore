@@ -1,7 +1,7 @@
 //! A library for generating a message from a sequence of instructions
 
 use crate::hash::Hash;
-use crate::instruction::{AccountMeta, CompiledInstruction, Instruction};
+use crate::opcodes::{AccountMeta, EncodedOpCodes, OpCode};
 use crate::pubkey::Pubkey;
 use crate::short_vec;
 use itertools::Itertools;
@@ -10,36 +10,36 @@ fn position(keys: &[Pubkey], key: &Pubkey) -> u8 {
     keys.iter().position(|k| k == key).unwrap() as u8
 }
 
-fn compile_instruction(ix: Instruction, keys: &[Pubkey]) -> CompiledInstruction {
+fn encode_opcode(ix:OpCode,keys: &[Pubkey]) -> EncodedOpCodes {
     let accounts: Vec<_> = ix
         .accounts
         .iter()
         .map(|account_meta| position(keys, &account_meta.pubkey))
         .collect();
 
-    CompiledInstruction {
+    EncodedOpCodes {
         program_ids_index: position(keys, &ix.program_ids_index),
         data: ix.data.clone(),
         accounts,
     }
 }
 
-fn compile_instructions(ixs: Vec<Instruction>, keys: &[Pubkey]) -> Vec<CompiledInstruction> {
+fn encode_multiple_opcodes(ixs: Vec<OpCode>, keys: &[Pubkey]) -> Vec<EncodedOpCodes> {
     ixs.into_iter()
-        .map(|ix| compile_instruction(ix, keys))
+        .map(|ix| encode_opcode(ix, keys))
         .collect()
 }
 
 /// A helper struct to collect pubkeys referenced by a set of instructions and credit-only counts
 #[derive(Debug, PartialEq, Eq)]
-struct InstructionKeys {
+struct OpCodeKeys {
     pub signed_keys: Vec<Pubkey>,
     pub unsigned_keys: Vec<Pubkey>,
     pub num_credit_only_signed_accounts: u8,
     pub num_credit_only_unsigned_accounts: u8,
 }
 
-impl InstructionKeys {
+impl OpCodeKeys {
     fn new(
         signed_keys: Vec<Pubkey>,
         unsigned_keys: Vec<Pubkey>,
@@ -59,7 +59,7 @@ impl InstructionKeys {
 /// payer key is provided, it is always placed first in the list of signed keys. Credit-only signed
 /// accounts are placed last in the set of signed accounts. Credit-only unsigned accounts,
 /// including program ids, are placed last in the set. No duplicates and order is preserved.
-fn get_keys(instructions: &[Instruction], payer: Option<&Pubkey>) -> InstructionKeys {
+fn get_keys(instructions: &[OpCode], payer: Option<&Pubkey>) -> OpCodeKeys {
     let programs: Vec<_> = get_program_ids(instructions)
         .iter()
         .map(|program_id| AccountMeta {
@@ -106,7 +106,7 @@ fn get_keys(instructions: &[Instruction], payer: Option<&Pubkey>) -> Instruction
             }
         }
     }
-    InstructionKeys::new(
+    OpCodeKeys::new(
         signed_keys,
         unsigned_keys,
         num_credit_only_signed_accounts,
@@ -115,7 +115,7 @@ fn get_keys(instructions: &[Instruction], payer: Option<&Pubkey>) -> Instruction
 }
 
 /// Return program ids referenced by all instructions.  No duplicates and order is preserved.
-fn get_program_ids(instructions: &[Instruction]) -> Vec<Pubkey> {
+fn get_program_ids(instructions: &[OpCode]) -> Vec<Pubkey> {
     instructions
         .iter()
         .map(|ix| ix.program_ids_index)
@@ -154,17 +154,17 @@ pub struct Message {
     /// Programs that will be executed in sequence and committed in one atomic transaction if all
     /// succeed.
     #[serde(with = "short_vec")]
-    pub instructions: Vec<CompiledInstruction>,
+    pub instructions: Vec<EncodedOpCodes>,
 }
 
 impl Message {
-    pub fn new_with_compiled_instructions(
+    pub fn new_with_encoded_opcodes(
         num_required_signatures: u8,
         num_credit_only_signed_accounts: u8,
         num_credit_only_unsigned_accounts: u8,
         account_keys: Vec<Pubkey>,
         recent_transaction_seal: Hash,
-        instructions: Vec<CompiledInstruction>,
+        instructions: Vec<EncodedOpCodes>,
     ) -> Self {
         Self {
             header: MessageHeader {
@@ -178,12 +178,12 @@ impl Message {
         }
     }
 
-    pub fn new(instructions: Vec<Instruction>) -> Self {
+    pub fn new(instructions: Vec<OpCode>) -> Self {
         Self::new_with_payer(instructions, None)
     }
 
-    pub fn new_with_payer(instructions: Vec<Instruction>, payer: Option<&Pubkey>) -> Self {
-        let InstructionKeys {
+    pub fn new_with_payer(instructions: Vec<OpCode>, payer: Option<&Pubkey>) -> Self {
+        let OpCodeKeys {
             mut signed_keys,
             unsigned_keys,
             num_credit_only_signed_accounts,
@@ -191,8 +191,8 @@ impl Message {
         } = get_keys(&instructions, payer);
         let num_required_signatures = signed_keys.len() as u8;
         signed_keys.extend(&unsigned_keys);
-        let instructions = compile_instructions(instructions, &signed_keys);
-        Self::new_with_compiled_instructions(
+        let instructions = encode_multiple_opcodes(instructions, &signed_keys);
+        Self::new_with_encoded_opcodes(
             num_required_signatures,
             num_credit_only_signed_accounts,
             num_credit_only_unsigned_accounts,
@@ -241,15 +241,15 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruction::AccountMeta;
+    use crate::opcodes::AccountMeta;
     use crate::signature::{Keypair, KeypairUtil};
 
     #[test]
     fn test_message_unique_program_ids() {
         let program_id0 = Pubkey::default();
         let program_ids = get_program_ids(&[
-            Instruction::new(program_id0, &0, vec![]),
-            Instruction::new(program_id0, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
         ]);
         assert_eq!(program_ids, vec![program_id0]);
     }
@@ -259,9 +259,9 @@ mod tests {
         let program_id0 = Pubkey::default();
         let program_id1 = Pubkey::new_rand();
         let program_ids = get_program_ids(&[
-            Instruction::new(program_id0, &0, vec![]),
-            Instruction::new(program_id1, &0, vec![]),
-            Instruction::new(program_id0, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
+            OpCode::new(program_id1, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
         ]);
         assert_eq!(program_ids, vec![program_id0, program_id1]);
     }
@@ -271,9 +271,9 @@ mod tests {
         let program_id0 = Pubkey::new_rand();
         let program_id1 = Pubkey::default(); // Key less than program_id0
         let program_ids = get_program_ids(&[
-            Instruction::new(program_id0, &0, vec![]),
-            Instruction::new(program_id1, &0, vec![]),
-            Instruction::new(program_id0, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
+            OpCode::new(program_id1, &0, vec![]),
+            OpCode::new(program_id0, &0, vec![]),
         ]);
         assert_eq!(program_ids, vec![program_id0, program_id1]);
     }
@@ -284,12 +284,12 @@ mod tests {
         let id0 = Pubkey::default();
         let keys = get_keys(
             &[
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
             ],
             None,
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id0], vec![], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id0], vec![], 0, 0));
     }
 
     #[test]
@@ -297,14 +297,14 @@ mod tests {
         let program_id = Pubkey::default();
         let id0 = Pubkey::default();
         let keys = get_keys(
-            &[Instruction::new(
+            &[OpCode::new(
                 program_id,
                 &0,
                 vec![AccountMeta::new(id0, true)],
             )],
             Some(&id0),
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id0], vec![], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id0], vec![], 0, 0));
     }
 
     #[test]
@@ -312,14 +312,14 @@ mod tests {
         let program_id = Pubkey::default();
         let id0 = Pubkey::default();
         let keys = get_keys(
-            &[Instruction::new(
+            &[OpCode::new(
                 program_id,
                 &0,
                 vec![AccountMeta::new(id0, false)],
             )],
             Some(&id0),
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id0], vec![], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id0], vec![], 0, 0));
     }
 
     #[test]
@@ -328,12 +328,12 @@ mod tests {
         let id0 = Pubkey::default();
         let keys = get_keys(
             &[
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
             ],
             None,
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id0], vec![], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id0], vec![], 0, 0));
     }
 
     #[test]
@@ -343,12 +343,12 @@ mod tests {
         let id1 = Pubkey::default(); // Key less than id0
         let keys = get_keys(
             &[
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id1, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id1, false)]),
             ],
             None,
         );
-        assert_eq!(keys, InstructionKeys::new(vec![], vec![id0, id1], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![], vec![id0, id1], 0, 0));
     }
 
     #[test]
@@ -358,13 +358,13 @@ mod tests {
         let id1 = Pubkey::new_rand();
         let keys = get_keys(
             &[
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id1, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id1, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
             ],
             None,
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id0], vec![id1], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id0], vec![id1], 0, 0));
     }
 
     #[test]
@@ -374,12 +374,12 @@ mod tests {
         let id1 = Pubkey::new_rand();
         let keys = get_keys(
             &[
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
             ],
             None,
         );
-        assert_eq!(keys, InstructionKeys::new(vec![id1], vec![id0], 0, 0));
+        assert_eq!(keys, OpCodeKeys::new(vec![id1], vec![id0], 0, 0));
     }
 
     #[test]
@@ -387,11 +387,11 @@ mod tests {
     fn test_message_signed_keys_len() {
         let program_id = Pubkey::default();
         let id0 = Pubkey::default();
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
         let message = Message::new(vec![ix]);
         assert_eq!(message.header.num_required_signatures, 0);
 
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
         let message = Message::new(vec![ix]);
         assert_eq!(message.header.num_required_signatures, 1);
     }
@@ -405,24 +405,24 @@ mod tests {
         let id3 = Pubkey::new_rand();
         let keys = get_keys(
             &[
-                Instruction::new(
+                OpCode::new(
                     program_id,
                     &0,
                     vec![AccountMeta::new_credit_only(id0, false)],
                 ),
-                Instruction::new(
+                OpCode::new(
                     program_id,
                     &0,
                     vec![AccountMeta::new_credit_only(id1, true)],
                 ),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id2, false)]),
-                Instruction::new(program_id, &0, vec![AccountMeta::new(id3, true)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id2, false)]),
+                OpCode::new(program_id, &0, vec![AccountMeta::new(id3, true)]),
             ],
             None,
         );
         assert_eq!(
             keys,
-            InstructionKeys::new(vec![id3, id1], vec![id2, id0], 1, 1)
+            OpCodeKeys::new(vec![id3, id1], vec![id2, id0], 1, 1)
         );
     }
 
@@ -434,21 +434,21 @@ mod tests {
         let keypair1 = Keypair::new();
         let id1 = keypair1.pubkey();
         let message = Message::new(vec![
-            Instruction::new(program_id0, &0, vec![AccountMeta::new(id0, false)]),
-            Instruction::new(program_id1, &0, vec![AccountMeta::new(id1, true)]),
-            Instruction::new(program_id0, &0, vec![AccountMeta::new(id1, false)]),
+            OpCode::new(program_id0, &0, vec![AccountMeta::new(id0, false)]),
+            OpCode::new(program_id1, &0, vec![AccountMeta::new(id1, true)]),
+            OpCode::new(program_id0, &0, vec![AccountMeta::new(id1, false)]),
         ]);
         assert_eq!(
             message.instructions[0],
-            CompiledInstruction::new(2, &0, vec![1])
+            EncodedOpCodes::new(2, &0, vec![1])
         );
         assert_eq!(
             message.instructions[1],
-            CompiledInstruction::new(3, &0, vec![0])
+            EncodedOpCodes::new(3, &0, vec![0])
         );
         assert_eq!(
             message.instructions[2],
-            CompiledInstruction::new(2, &0, vec![0])
+            EncodedOpCodes::new(2, &0, vec![0])
         );
     }
 
@@ -458,15 +458,15 @@ mod tests {
         let payer = Pubkey::new_rand();
         let id0 = Pubkey::default();
 
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
         let message = Message::new_with_payer(vec![ix], Some(&payer));
         assert_eq!(message.header.num_required_signatures, 1);
 
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
         let message = Message::new_with_payer(vec![ix], Some(&payer));
         assert_eq!(message.header.num_required_signatures, 2);
 
-        let ix = Instruction::new(
+        let ix = OpCode::new(
             program_id,
             &0,
             vec![AccountMeta::new(payer, true), AccountMeta::new(id0, true)],
@@ -482,12 +482,12 @@ mod tests {
         let id1 = Pubkey::new_rand();
         let keys = get_keys(
             &[
-                Instruction::new(
+                OpCode::new(
                     program_id,
                     &0,
                     vec![AccountMeta::new_credit_only(id0, false)],
                 ),
-                Instruction::new(
+                OpCode::new(
                     program_id,
                     &0,
                     vec![AccountMeta::new_credit_only(id1, true)],
@@ -497,7 +497,7 @@ mod tests {
         );
         assert_eq!(
             keys,
-            InstructionKeys::new(vec![id1], vec![id0, program_id], 1, 2)
+            OpCodeKeys::new(vec![id1], vec![id0, program_id], 1, 2)
         );
     }
 
@@ -507,8 +507,8 @@ mod tests {
         let program_id1 = Pubkey::new_rand();
         let id = Pubkey::new_rand();
         let message = Message::new(vec![
-            Instruction::new(program_id0, &0, vec![AccountMeta::new(id, false)]),
-            Instruction::new(program_id1, &0, vec![AccountMeta::new(id, true)]),
+            OpCode::new(program_id0, &0, vec![AccountMeta::new(id, false)]),
+            OpCode::new(program_id1, &0, vec![AccountMeta::new(id, true)]),
         ]);
         assert_eq!(message.program_position(0), None);
         assert_eq!(message.program_position(1), Some(0));
@@ -550,14 +550,14 @@ mod tests {
         let id2 = Pubkey::new_rand();
         let id3 = Pubkey::new_rand();
         let message = Message::new(vec![
-            Instruction::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
-            Instruction::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
-            Instruction::new(
+            OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
+            OpCode::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
+            OpCode::new(
                 program_id,
                 &0,
                 vec![AccountMeta::new_credit_only(id2, false)],
             ),
-            Instruction::new(
+            OpCode::new(
                 program_id,
                 &0,
                 vec![AccountMeta::new_credit_only(id3, true)],

@@ -5,6 +5,6 @@ macro_rules! morgan_token_controller {
     };
 }
 
-use morgan_token_api::token_processor::process_instruction;
+use morgan_token_api::token_processor::handle_opcode;
 
-morgan_interface::morgan_entrypoint!(process_instruction);
+morgan_interface::morgan_entrypoint!(handle_opcode);

@@ -18,7 +18,7 @@ pub struct GenesisBlock {
     pub bootstrap_leader_pubkey: Pubkey,
     pub epoch_warmup: bool,
     pub fee_calculator: GasCost,
-    pub native_instruction_processors: Vec<(String, Pubkey)>,
+    pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
     pub slots_per_epoch: u64,
     pub stakers_slot_offset: u64,
     pub drops_per_slot: u64,
@@ -45,14 +45,14 @@ impl GenesisBlock {
     pub fn new(
         bootstrap_leader_pubkey: &Pubkey,
         accounts: &[(Pubkey, Account)],
-        native_instruction_processors: &[(String, Pubkey)],
+        builtin_opcode_handlers: &[(String, Pubkey)],
     ) -> Self {
         Self {
             accounts: accounts.to_vec(),
             bootstrap_leader_pubkey: *bootstrap_leader_pubkey, // TODO: leader_schedule to derive from actual stakes, instead ;)
             epoch_warmup: true,
             fee_calculator: GasCost::default(),
-            native_instruction_processors: native_instruction_processors.to_vec(),
+            builtin_opcode_handlers: builtin_opcode_handlers.to_vec(),
             slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
             stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
             drops_per_slot: DEFAULT_DROPS_PER_SLOT,

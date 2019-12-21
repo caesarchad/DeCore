@@ -1,5 +1,5 @@
 pub mod storage_contract;
-pub mod storage_instruction;
+pub mod storage_opcode;
 pub mod storage_processor;
 
 pub const SLOTS_PER_SEGMENT: u64 = 16;

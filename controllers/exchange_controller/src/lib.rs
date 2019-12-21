@@ -7,6 +7,6 @@ macro_rules! morgan_exchange_controller {
         )
     };
 }
-use morgan_exchange_api::exchange_processor::process_instruction;
+use morgan_exchange_api::exchange_processor::handle_opcode;
 
-morgan_interface::morgan_entrypoint!(process_instruction);
+morgan_interface::morgan_entrypoint!(handle_opcode);

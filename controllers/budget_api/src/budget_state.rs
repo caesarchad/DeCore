@@ -3,8 +3,8 @@ use crate::budget_expr::BudgetExpr;
 use bincode::{self, deserialize, serialize_into};
 use num_derive::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
-use morgan_interface::instruction::InstructionError;
-use morgan_interface::instruction_processor_utils::DecodeError;
+use morgan_interface::opcodes::OpCodeErr;
+use morgan_interface::opcodes_utils::DecodeError;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromPrimitive)]
 pub enum BudgetError {
@@ -42,12 +42,12 @@ impl BudgetState {
         self.pending_budget.is_some()
     }
 
-    pub fn serialize(&self, output: &mut [u8]) -> Result<(), InstructionError> {
-        serialize_into(output, self).map_err(|_| InstructionError::AccountDataTooSmall)
+    pub fn serialize(&self, output: &mut [u8]) -> Result<(), OpCodeErr> {
+        serialize_into(output, self).map_err(|_| OpCodeErr::AccountDataTooSmall)
     }
 
-    pub fn deserialize(input: &[u8]) -> Result<Self, InstructionError> {
-        deserialize(input).map_err(|_| InstructionError::InvalidAccountData)
+    pub fn deserialize(input: &[u8]) -> Result<Self, OpCodeErr> {
+        deserialize(input).map_err(|_| OpCodeErr::InvalidAccountData)
     }
 }
 
@@ -72,7 +72,7 @@ mod test {
         let b = BudgetState::default();
         assert_eq!(
             b.serialize(&mut a.data),
-            Err(InstructionError::AccountDataTooSmall)
+            Err(OpCodeErr::AccountDataTooSmall)
         );
     }
 }

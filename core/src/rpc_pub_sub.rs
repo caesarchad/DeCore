@@ -289,7 +289,7 @@ mod tests {
     use jsonrpc_core::Response;
     use jsonrpc_pubsub::{PubSubHandler, Session};
     use morgan_budget_api;
-    use morgan_budget_api::budget_instruction;
+    use morgan_budget_api::budget_opcode;
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -413,7 +413,7 @@ mod tests {
 
         // This test depends on the budget program
         genesis_block
-            .native_instruction_processors
+            .builtin_opcode_handlers
             .push(morgan_budget_controller!());
 
         let bob_pubkey = Pubkey::new_rand();
@@ -444,7 +444,7 @@ mod tests {
         );
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
 
-        let ixs = budget_instruction::when_signed(
+        let ixs = budget_opcode::when_signed(
             &contract_funds.pubkey(),
             &bob_pubkey,
             &contract_state.pubkey(),
@@ -452,7 +452,7 @@ mod tests {
             None,
             51,
         );
-        let tx = Transaction::new_signed_instructions(&[&contract_funds], ixs, transaction_seal);
+        let tx = Transaction::new_s_opcodes(&[&contract_funds], ixs, transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
 
@@ -488,12 +488,12 @@ mod tests {
         let tx = system_transaction::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
-        let ix = budget_instruction::apply_signature(
+        let ix = budget_opcode::apply_signature(
             &witness.pubkey(),
             &contract_state.pubkey(),
             &bob_pubkey,
         );
-        let tx = Transaction::new_signed_instructions(&[&witness], vec![ix], transaction_seal);
+        let tx = Transaction::new_s_opcodes(&[&witness], vec![ix], transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
 

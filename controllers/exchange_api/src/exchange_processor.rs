@@ -6,7 +6,7 @@ use crate::faucet_id;
 use log::*;
 use morgan_metricbot::inc_new_counter_info;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use std::cmp;
 use morgan_helper::logHelper::*;
@@ -15,7 +15,7 @@ pub struct ExchangeProcessor {}
 
 impl ExchangeProcessor {
     #[allow(clippy::needless_pass_by_value)]
-    fn map_to_invalid_arg(err: std::boxed::Box<bincode::ErrorKind>) -> InstructionError {
+    fn map_to_invalid_arg(err: std::boxed::Box<bincode::ErrorKind>) -> OpCodeErr {
         // warn!("Deserialize failed, not a valid state: {:?}", err);
         println!(
             "{}",
@@ -24,10 +24,10 @@ impl ExchangeProcessor {
                 module_path!().to_string()
             )
         );
-        InstructionError::InvalidArgument
+        OpCodeErr::InvalidArgument
     }
 
-    fn is_account_unallocated(data: &[u8]) -> Result<(), InstructionError> {
+    fn is_account_unallocated(data: &[u8]) -> Result<(), OpCodeErr> {
         let state: ExchangeState = bincode::deserialize(data).map_err(Self::map_to_invalid_arg)?;
         if let ExchangeState::Unallocated = state {
             Ok(())
@@ -40,11 +40,11 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidAccountData)?
+            Err(OpCodeErr::InvalidAccountData)?
         }
     }
 
-    fn deserialize_account(data: &[u8]) -> Result<TokenAccountInfo, InstructionError> {
+    fn deserialize_account(data: &[u8]) -> Result<TokenAccountInfo, OpCodeErr> {
         let state: ExchangeState = bincode::deserialize(data).map_err(Self::map_to_invalid_arg)?;
         if let ExchangeState::Account(account) = state {
             Ok(account)
@@ -57,11 +57,11 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidAccountData)?
+            Err(OpCodeErr::InvalidAccountData)?
         }
     }
 
-    fn deserialize_trade(data: &[u8]) -> Result<TradeOrderInfo, InstructionError> {
+    fn deserialize_trade(data: &[u8]) -> Result<TradeOrderInfo, OpCodeErr> {
         let state: ExchangeState = bincode::deserialize(data).map_err(Self::map_to_invalid_arg)?;
         if let ExchangeState::Trade(info) = state {
             Ok(info)
@@ -74,11 +74,11 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidAccountData)?
+            Err(OpCodeErr::InvalidAccountData)?
         }
     }
 
-    fn serialize(state: &ExchangeState, data: &mut [u8]) -> Result<(), InstructionError> {
+    fn serialize(state: &ExchangeState, data: &mut [u8]) -> Result<(), OpCodeErr> {
         let writer = std::io::BufWriter::new(data);
         match bincode::serialize_into(writer, state) {
             Ok(_) => Ok(()),
@@ -91,7 +91,7 @@ impl ExchangeProcessor {
                         module_path!().to_string()
                     )
                 );
-                Err(InstructionError::GenericError)?
+                Err(OpCodeErr::GenericError)?
             }
         }
     }
@@ -114,7 +114,7 @@ impl ExchangeProcessor {
         to_trade: &mut TradeOrderInfo,
         from_trade: &mut TradeOrderInfo,
         profit_account: &mut TokenAccountInfo,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         if to_trade.tokens == 0 || from_trade.tokens == 0 {
             // error!("{}", Error(format!("Inactive Trade, balance is zero").to_string()));
             println!(
@@ -124,7 +124,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         if to_trade.price == 0 || from_trade.price == 0 {
             // error!("{}", Error(format!("Inactive Trade, price is zero").to_string()));
@@ -135,7 +135,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         // Calc swap
@@ -173,7 +173,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         trace!("pt {} st {}", primary_tokens, secondary_tokens);
@@ -202,7 +202,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         if from_trade.tokens < secondary_cost {
             // error!("{}", Error(format!("Not enough tokens in from account").to_string()));
@@ -213,7 +213,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         to_trade.tokens -= primary_cost;
         to_trade.tokens_settled += secondary_tokens;
@@ -226,7 +226,7 @@ impl ExchangeProcessor {
         Ok(())
     }
 
-    fn do_account_request(keyed_accounts: &mut [KeyedAccount]) -> Result<(), InstructionError> {
+    fn do_account_request(keyed_accounts: &mut [KeyedAccount]) -> Result<(), OpCodeErr> {
         const OWNER_INDEX: usize = 0;
         const NEW_ACCOUNT_INDEX: usize = 1;
 
@@ -239,7 +239,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         Self::is_account_unallocated(&keyed_accounts[NEW_ACCOUNT_INDEX].account.data)?;
@@ -257,7 +257,7 @@ impl ExchangeProcessor {
         keyed_accounts: &mut [KeyedAccount],
         token: Token,
         tokens: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         const OWNER_INDEX: usize = 0;
         const TO_ACCOUNT_INDEX: usize = 1;
         const FROM_ACCOUNT_INDEX: usize = 2;
@@ -271,7 +271,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         let mut to_account =
@@ -294,7 +294,7 @@ impl ExchangeProcessor {
                                 module_path!().to_string()
                             )
                         );
-                        Err(InstructionError::GenericError)?
+                        Err(OpCodeErr::GenericError)?
                     }
 
                     if from_account.tokens[token] < tokens {
@@ -306,7 +306,7 @@ impl ExchangeProcessor {
                                 module_path!().to_string()
                             )
                         );
-                        Err(InstructionError::GenericError)?
+                        Err(OpCodeErr::GenericError)?
                     }
 
                     from_account.tokens[token] -= tokens;
@@ -327,7 +327,7 @@ impl ExchangeProcessor {
                                 module_path!().to_string()
                             )
                         );
-                        Err(InstructionError::GenericError)?
+                        Err(OpCodeErr::GenericError)?
                     }
 
                     let from_token = match from_trade.direction {
@@ -343,7 +343,7 @@ impl ExchangeProcessor {
                                 module_path!().to_string()
                             )
                         );
-                        Err(InstructionError::GenericError)?
+                        Err(OpCodeErr::GenericError)?
                     }
 
                     if from_trade.tokens_settled < tokens {
@@ -355,7 +355,7 @@ impl ExchangeProcessor {
                                 module_path!().to_string()
                             )
                         );
-                        Err(InstructionError::GenericError)?
+                        Err(OpCodeErr::GenericError)?
                     }
 
                     from_trade.tokens_settled -= tokens;
@@ -375,7 +375,7 @@ impl ExchangeProcessor {
                             module_path!().to_string()
                         )
                     );
-                    Err(InstructionError::InvalidArgument)?
+                    Err(OpCodeErr::InvalidArgument)?
                 }
             }
         }
@@ -389,7 +389,7 @@ impl ExchangeProcessor {
     fn do_trade_request(
         keyed_accounts: &mut [KeyedAccount],
         info: &TradeRequestInfo,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         const OWNER_INDEX: usize = 0;
         const TRADE_INDEX: usize = 1;
         const ACCOUNT_INDEX: usize = 2;
@@ -403,7 +403,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         Self::is_account_unallocated(&keyed_accounts[TRADE_INDEX].account.data)?;
@@ -419,7 +419,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::GenericError)?
+            Err(OpCodeErr::GenericError)?
         }
         let from_token = match info.direction {
             Direction::To => info.pair.primary(),
@@ -434,7 +434,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::GenericError)?
+            Err(OpCodeErr::GenericError)?
         }
 
         if let Err(e) = check_trade(info.direction, info.tokens, info.price) {
@@ -463,7 +463,7 @@ impl ExchangeProcessor {
         )
     }
 
-    fn do_trade_cancellation(keyed_accounts: &mut [KeyedAccount]) -> Result<(), InstructionError> {
+    fn do_trade_cancellation(keyed_accounts: &mut [KeyedAccount]) -> Result<(), OpCodeErr> {
         const OWNER_INDEX: usize = 0;
         const TRADE_INDEX: usize = 1;
 
@@ -476,7 +476,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         let trade = Self::deserialize_trade(&keyed_accounts[TRADE_INDEX].account.data)?;
@@ -490,7 +490,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::GenericError)?
+            Err(OpCodeErr::GenericError)?
         }
 
         let token = match trade.direction {
@@ -509,7 +509,7 @@ impl ExchangeProcessor {
         )
     }
 
-    fn do_swap_request(keyed_accounts: &mut [KeyedAccount]) -> Result<(), InstructionError> {
+    fn do_swap_request(keyed_accounts: &mut [KeyedAccount]) -> Result<(), OpCodeErr> {
         const TO_TRADE_INDEX: usize = 1;
         const FROM_TRADE_INDEX: usize = 2;
         const PROFIT_ACCOUNT_INDEX: usize = 3;
@@ -523,7 +523,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         let mut to_trade = Self::deserialize_trade(&keyed_accounts[TO_TRADE_INDEX].account.data)?;
@@ -541,7 +541,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         if from_trade.direction != Direction::From {
             // error!("{}", Error(format!("From trade is not a From").to_string()));
@@ -552,7 +552,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         if to_trade.pair != from_trade.pair {
             // error!("{}", Error(format!("Mismatched token pairs").to_string()));
@@ -563,7 +563,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
         if to_trade.direction == from_trade.direction {
             // error!("{}", Error(format!("Matching trade directions").to_string()));
@@ -574,7 +574,7 @@ impl ExchangeProcessor {
                     module_path!().to_string()
                 )
             );
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
 
         if let Err(e) =
@@ -632,12 +632,12 @@ impl ExchangeProcessor {
     }
 }
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
 
     let command = bincode::deserialize::<ExchangeInstruction>(data).map_err(|err| {
@@ -649,7 +649,7 @@ pub fn process_instruction(
                 module_path!().to_string()
             )
         );
-        InstructionError::InvalidInstructionData
+        OpCodeErr::BadOpCodeContext
     })?;
 
     trace!("{:?}", command);
@@ -680,7 +680,7 @@ mod test {
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_instruction;
+    use morgan_interface::sys_opcode;
     use std::mem;
 
     fn try_calc(
@@ -694,7 +694,7 @@ mod test {
         primary_tokens_settled_expect: u64,
         secondary_tokens_settled_expect: u64,
         profit_account_tokens: Tokens,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         trace!(
             "Swap {} for {} to {} for {}",
             primary_tokens,
@@ -763,7 +763,7 @@ mod test {
     fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Treasury::new(&genesis_block);
-        treasury.add_instruction_processor(id(), process_instruction);
+        treasury.add_opcode_handler(id(), handle_opcode);
         (treasury, mint_keypair)
     }
 
@@ -779,7 +779,7 @@ mod test {
 
     fn create_account(client: &TreasuryClient, owner: &Keypair) -> Pubkey {
         let new = Pubkey::new_rand();
-        let instruction = system_instruction::create_account(
+        let instruction = sys_opcode::create_account(
             &owner.pubkey(),
             &new,
             1,

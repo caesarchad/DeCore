@@ -7,7 +7,7 @@ use crate::id;
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::{Account, KeyedAccount};
 use morgan_interface::account_utils::State;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_vote_api::vote_state::VoteState;
 
@@ -88,37 +88,37 @@ impl StakeState {
 }
 
 pub trait StakeAccount {
-    fn initialize_mining_pool(&mut self) -> Result<(), InstructionError>;
-    fn initialize_delegate(&mut self) -> Result<(), InstructionError>;
-    fn delegate_stake(&mut self, vote_account: &KeyedAccount) -> Result<(), InstructionError>;
+    fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr>;
+    fn initialize_delegate(&mut self) -> Result<(), OpCodeErr>;
+    fn delegate_stake(&mut self, vote_account: &KeyedAccount) -> Result<(), OpCodeErr>;
     fn redeem_vote_credits(
         &mut self,
         stake_account: &mut KeyedAccount,
         vote_account: &mut KeyedAccount,
-    ) -> Result<(), InstructionError>;
+    ) -> Result<(), OpCodeErr>;
 }
 
 impl<'a> StakeAccount for KeyedAccount<'a> {
-    fn initialize_mining_pool(&mut self) -> Result<(), InstructionError> {
+    fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr> {
         if let StakeState::Uninitialized = self.state()? {
             self.set_state(&StakeState::MiningPool)
         } else {
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         }
     }
-    fn initialize_delegate(&mut self) -> Result<(), InstructionError> {
+    fn initialize_delegate(&mut self) -> Result<(), OpCodeErr> {
         if let StakeState::Uninitialized = self.state()? {
             self.set_state(&StakeState::Delegate {
                 voter_pubkey: Pubkey::default(),
                 credits_observed: 0,
             })
         } else {
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         }
     }
-    fn delegate_stake(&mut self, vote_account: &KeyedAccount) -> Result<(), InstructionError> {
+    fn delegate_stake(&mut self, vote_account: &KeyedAccount) -> Result<(), OpCodeErr> {
         if self.signer_key().is_none() {
-            return Err(InstructionError::MissingRequiredSignature);
+            return Err(OpCodeErr::MissingRequiredSignature);
         }
 
         if let StakeState::Delegate { .. } = self.state()? {
@@ -128,7 +128,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
                 credits_observed: vote_state.credits(),
             })
         } else {
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         }
     }
 
@@ -136,7 +136,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
         &mut self,
         stake_account: &mut KeyedAccount,
         vote_account: &mut KeyedAccount,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         if let (
             StakeState::MiningPool,
             StakeState::Delegate {
@@ -148,11 +148,11 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
             let vote_state: VoteState = vote_account.state()?;
 
             if voter_pubkey != *vote_account.unsigned_key() {
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
 
             if credits_observed > vote_state.credits() {
-                return Err(InstructionError::InvalidAccountData);
+                return Err(OpCodeErr::InvalidAccountData);
             }
 
             if let Some((stakers_reward, voters_reward)) = StakeState::calculate_rewards(
@@ -161,7 +161,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
                 &vote_state,
             ) {
                 if self.account.difs < (stakers_reward + voters_reward) {
-                    return Err(InstructionError::UnbalancedInstruction);
+                    return Err(OpCodeErr::DeficitOpCode);
                 }
                 self.account.difs -= stakers_reward + voters_reward;
                 stake_account.account.difs += stakers_reward;
@@ -173,10 +173,10 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
                 })
             } else {
                 // not worth collecting
-                Err(InstructionError::CustomError(1))
+                Err(OpCodeErr::CustomError(1))
             }
         } else {
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         }
     }
 }
@@ -235,7 +235,7 @@ mod tests {
         stake_keyed_account.initialize_delegate().unwrap();
         assert_eq!(
             stake_keyed_account.delegate_stake(&vote_keyed_account),
-            Err(InstructionError::MissingRequiredSignature)
+            Err(OpCodeErr::MissingRequiredSignature)
         );
 
         let mut stake_keyed_account = KeyedAccount::new(&stake_pubkey, true, &mut stake_account);
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote_keyed_account),
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         );
 
         mining_pool_keyed_account
@@ -361,7 +361,7 @@ mod tests {
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote_keyed_account),
-            Err(InstructionError::CustomError(1))
+            Err(OpCodeErr::CustomError(1))
         );
 
         // move the vote account forward
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote_keyed_account),
-            Err(InstructionError::UnbalancedInstruction)
+            Err(OpCodeErr::DeficitOpCode)
         );
 
         // add a dif to pool
@@ -429,7 +429,7 @@ mod tests {
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote_keyed_account),
-            Err(InstructionError::InvalidAccountData)
+            Err(OpCodeErr::InvalidAccountData)
         );
 
         let vote1_keypair = Keypair::new();
@@ -443,7 +443,7 @@ mod tests {
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote1_keyed_account),
-            Err(InstructionError::InvalidArgument)
+            Err(OpCodeErr::InvalidArgument)
         );
     }
 

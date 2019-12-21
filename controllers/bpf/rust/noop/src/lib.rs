@@ -19,8 +19,8 @@ fn return_sstruct() -> SStruct {
     SStruct { x: 1, y: 2, z: 3 }
 }
 
-entrypoint!(process_instruction);
-fn process_instruction(
+entrypoint!(handle_opcode);
+fn handle_opcode(
     ka: &mut [Option<SolKeyedAccount>; MAX_ACCOUNTS],
     info: &SolClusterInfo,
     data: &[u8],

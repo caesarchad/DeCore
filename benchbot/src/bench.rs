@@ -9,7 +9,7 @@ use morgan_metricbot::datapoint_info;
 use morgan_interface::account_host::AccountHost;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 use morgan_interface::system_transaction;
 use morgan_interface::timing::timestamp;
 use morgan_interface::timing::{duration_as_ms, duration_as_s};
@@ -382,7 +382,7 @@ pub fn fund_keys<T: AccountHost>(client: &T, genesis: &Keypair, dests: &[Keypair
                 .map(|(k, m)| {
                     (
                         k.clone(),
-                        Transaction::new_unsigned_instructions(system_instruction::transfer_many(
+                        Transaction::new_u_opcodes(sys_opcode::transfer_many(
                             &k.pubkey(),
                             &m,
                         )),

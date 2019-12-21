@@ -1,26 +1,26 @@
 //! useful extras for Account state
 use crate::account::{Account, KeyedAccount};
-use crate::instruction::InstructionError;
+use crate::opcodes::OpCodeErr;
 use bincode::ErrorKind;
 
 /// Convenience trait to covert bincode errors to instruction errors.
 pub trait State<T> {
-    fn state(&self) -> Result<T, InstructionError>;
-    fn set_state(&mut self, state: &T) -> Result<(), InstructionError>;
+    fn state(&self) -> Result<T, OpCodeErr>;
+    fn set_state(&mut self, state: &T) -> Result<(), OpCodeErr>;
 }
 
 impl<T> State<T> for Account
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    fn state(&self) -> Result<T, InstructionError> {
+    fn state(&self) -> Result<T, OpCodeErr> {
         self.deserialize_data()
-            .map_err(|_| InstructionError::InvalidAccountData)
+            .map_err(|_| OpCodeErr::InvalidAccountData)
     }
-    fn set_state(&mut self, state: &T) -> Result<(), InstructionError> {
+    fn set_state(&mut self, state: &T) -> Result<(), OpCodeErr> {
         self.serialize_data(state).map_err(|err| match *err {
-            ErrorKind::SizeLimit => InstructionError::AccountDataTooSmall,
-            _ => InstructionError::GenericError,
+            ErrorKind::SizeLimit => OpCodeErr::AccountDataTooSmall,
+            _ => OpCodeErr::GenericError,
         })
     }
 }
@@ -29,10 +29,10 @@ impl<'a, T> State<T> for KeyedAccount<'a>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    fn state(&self) -> Result<T, InstructionError> {
+    fn state(&self) -> Result<T, OpCodeErr> {
         self.account.state()
     }
-    fn set_state(&mut self, state: &T) -> Result<(), InstructionError> {
+    fn set_state(&mut self, state: &T) -> Result<(), OpCodeErr> {
         self.account.set_state(state)
     }
 }
@@ -48,7 +48,7 @@ mod tests {
         let state = 42u64;
 
         assert!(Account::default().set_state(&state).is_err());
-        let res = Account::default().state() as Result<u64, InstructionError>;
+        let res = Account::default().state() as Result<u64, OpCodeErr>;
         assert!(res.is_err());
 
         let mut account = Account::new(0, 0, std::mem::size_of::<u64>(), &Pubkey::default());

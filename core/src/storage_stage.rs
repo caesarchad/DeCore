@@ -14,14 +14,14 @@ use bincode::deserialize;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::Instruction;
+use morgan_interface::opcodes::OpCode;
 use morgan_interface::message::Message;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;
 use morgan_storage_api::storage_contract::{CheckedProof, Proof, ProofStatus};
-use morgan_storage_api::storage_instruction::{proof_validation, StorageInstruction};
-use morgan_storage_api::{get_segment_from_slot, storage_instruction};
+use morgan_storage_api::storage_opcode::{proof_validation, StorageOpCode};
+use morgan_storage_api::{get_segment_from_slot, storage_opcode};
 use std::collections::HashMap;
 use std::io;
 use std::mem::size_of;
@@ -64,7 +64,7 @@ const NUM_IDENTITIES: usize = 1024;
 pub const NUM_STORAGE_SAMPLES: usize = 4;
 const KEY_SIZE: usize = 64;
 
-type InstructionSender = Sender<Instruction>;
+type OpCodeSender = Sender<OpCode>;
 
 fn get_identity_index_from_signature(key: &Signature) -> usize {
     let rkey = key.as_ref();
@@ -133,7 +133,7 @@ impl StoragePhase {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         storage_state: &StorageState,
-        slot_receiver: Receiver<Vec<u64>>,
+        slot_rcvr: Receiver<Vec<u64>>,
         block_buffer_pool: Option<Arc<BlockBufferPool>>,
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
@@ -142,7 +142,7 @@ impl StoragePhase {
         storage_rotate_count: u64,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     ) -> Self {
-        let (instruction_sender, instruction_receiver) = channel();
+        let (instruction_sndr, opcode_rcvr) = channel();
 
         let t_storage_mining_verifier = {
             let storage_state_inner = storage_state.state.clone();
@@ -159,13 +159,13 @@ impl StoragePhase {
                             if let Err(e) = Self::process_entries(
                                 &storage_keypair,
                                 &storage_state_inner,
-                                &slot_receiver,
+                                &slot_rcvr,
                                 &some_block_buffer,
                                 &mut slot_count,
                                 &mut last_root,
                                 &mut current_key,
                                 storage_rotate_count,
-                                &instruction_sender,
+                                &instruction_sndr,
                             ) {
                                 match e {
                                     Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
@@ -219,7 +219,7 @@ impl StoragePhase {
                     }
 
                     loop {
-                        match instruction_receiver.recv_timeout(Duration::from_secs(1)) {
+                        match opcode_rcvr.recv_timeout(Duration::from_secs(1)) {
                             Ok(instruction) => {
                                 Self::send_transaction(
                                     &treasury_forks,
@@ -263,7 +263,7 @@ impl StoragePhase {
     fn send_transaction(
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-        instruction: Instruction,
+        instruction: OpCode,
         keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         account_host_socket: &UdpSocket,
@@ -323,17 +323,17 @@ impl StoragePhase {
         _block_buffer_pool: &Arc<BlockBufferPool>,
         entry_id: Hash,
         slot: u64,
-        instruction_sender: &InstructionSender,
+        instruction_sndr: &OpCodeSender,
     ) -> Result<()> {
         let mut seed = [0u8; 32];
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
-        let ix = storage_instruction::advertise_recent_transaction_seal(
+        let ix = storage_opcode::advertise_recent_transaction_seal(
             &storage_keypair.pubkey(),
             entry_id,
             slot,
         );
-        instruction_sender.send(ix)?;
+        instruction_sndr.send(ix)?;
 
         seed.copy_from_slice(&signature.to_bytes()[..32]);
 
@@ -411,7 +411,7 @@ impl StoragePhase {
         storage_account_key: Pubkey,
     ) {
         match deserialize(data) {
-            Ok(StorageInstruction::SubmitMiningProof {
+            Ok(StorageOpCode::SubmitMiningProof {
                 slot: proof_slot,
                 signature,
                 sha_state,
@@ -466,16 +466,16 @@ impl StoragePhase {
     fn process_entries(
         storage_keypair: &Arc<Keypair>,
         storage_state: &Arc<RwLock<StorageStateInner>>,
-        slot_receiver: &Receiver<Vec<u64>>,
+        slot_rcvr: &Receiver<Vec<u64>>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         slot_count: &mut u64,
         last_root: &mut u64,
         current_key_idx: &mut usize,
         storage_rotate_count: u64,
-        instruction_sender: &InstructionSender,
+        instruction_sndr: &OpCodeSender,
     ) -> Result<()> {
         let timeout = Duration::new(1, 0);
-        let slots: Vec<u64> = slot_receiver.recv_timeout(timeout)?;
+        let slots: Vec<u64> = slot_rcvr.recv_timeout(timeout)?;
         // check if any rooted slots were missed leading up to this one and bump slot count and process proofs for each missed root
         for slot in slots.into_iter().rev() {
             if slot > *last_root {
@@ -517,7 +517,7 @@ impl StoragePhase {
                             &block_buffer_pool,
                             entries.last().unwrap().hash,
                             slot,
-                            instruction_sender,
+                            instruction_sndr,
                         )?;
                         // bundle up mining submissions from miners
                         // and submit them in a tx to the leader to get rewarded.
@@ -557,7 +557,7 @@ impl StoragePhase {
                         // TODO Avoid AccountInUse errors in this loop
                         let res: std::result::Result<_, _> = instructions
                             .into_iter()
-                            .map(|ix| instruction_sender.send(ix))
+                            .map(|ix| instruction_sndr.send(ix))
                             .collect();
                         res?
                     }
@@ -610,11 +610,11 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
-        let (_slot_sender, slot_receiver) = channel();
+        let (_slot_sender, slot_rcvr) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StoragePhase::new(
             &storage_state,
-            slot_receiver,
+            slot_rcvr,
             None,
             &keypair,
             &storage_keypair,
@@ -655,11 +655,11 @@ mod tests {
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
-        let (slot_sender, slot_receiver) = channel();
+        let (slot_sender, slot_rcvr) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StoragePhase::new(
             &storage_state,
-            slot_receiver,
+            slot_rcvr,
             Some(block_buffer_pool.clone()),
             &keypair,
             &storage_keypair,
@@ -746,11 +746,11 @@ mod tests {
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         let node_group_info = test_node_group_info(&keypair.pubkey());
 
-        let (slot_sender, slot_receiver) = channel();
+        let (slot_sender, slot_rcvr) = channel();
         let storage_state = StorageState::new();
         let storage_stage = StoragePhase::new(
             &storage_state,
-            slot_receiver,
+            slot_rcvr,
             Some(block_buffer_pool.clone()),
             &keypair,
             &storage_keypair,
@@ -769,13 +769,13 @@ mod tests {
         }
 
         let keypair = Keypair::new();
-        let mining_proof_ix = storage_instruction::mining_proof(
+        let mining_proof_ix = storage_opcode::mining_proof(
             &keypair.pubkey(),
             Hash::default(),
             0,
             keypair.sign_message(b"test"),
         );
-        let mining_proof_tx = Transaction::new_unsigned_instructions(vec![mining_proof_ix]);
+        let mining_proof_tx = Transaction::new_u_opcodes(vec![mining_proof_ix]);
         let mining_txs = vec![mining_proof_tx];
 
         let proof_entries = vec![Entry::new(&Hash::default(), 1, mining_txs)];

@@ -9,12 +9,12 @@ use log::*;
 use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount};
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::Instruction;
+use morgan_interface::opcodes::OpCode;
 use morgan_interface::message::Message;
 use morgan_interface::packet::PACKET_DATA_SIZE;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 use morgan_interface::transaction::{self, Transaction};
 use morgan_interface::transport::Result as TransportResult;
 use std::io;
@@ -178,7 +178,7 @@ impl OnlineAccount for SlimAccountHost {
     fn snd_online_instruction(
         &self,
         keypair: &Keypair,
-        instruction: Instruction,
+        instruction: OpCode,
     ) -> TransportResult<Signature> {
         let message = Message::new(vec![instruction]);
         self.send_online_msg(&[keypair], message)
@@ -191,7 +191,7 @@ impl OnlineAccount for SlimAccountHost {
         pubkey: &Pubkey,
     ) -> TransportResult<Signature> {
         let transfer_instruction =
-            system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
         self.snd_online_instruction(keypair, transfer_instruction)
     }
 
@@ -272,7 +272,7 @@ impl OfflineAccount for SlimAccountHost {
     fn send_offline_instruction(
         &self,
         keypair: &Keypair,
-        instruction: Instruction,
+        instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let message = Message::new(vec![instruction]);
@@ -286,7 +286,7 @@ impl OfflineAccount for SlimAccountHost {
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
-            system_instruction::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
         self.send_offline_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }

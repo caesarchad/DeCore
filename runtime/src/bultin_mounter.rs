@@ -7,9 +7,9 @@ use libloading::os::unix::*;
 use libloading::os::windows::*;
 use log::*;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
-use morgan_interface::instruction_processor_utils;
-use morgan_interface::loader_instruction::LoaderInstruction;
+use morgan_interface::opcodes::OpCodeErr;
+use morgan_interface::opcodes_utils;
+use morgan_interface::mounter_opcode::MounterOpCode;
 use morgan_interface::pubkey::Pubkey;
 use std::env;
 use std::path::PathBuf;
@@ -62,7 +62,7 @@ pub fn entrypoint(
     ix_data: &[u8],
     drop_height: u64,
     symbol_cache: &SymbolCache,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     if keyed_accounts[0].account.executable {
         // dispatch it
         let (names, params) = keyed_accounts.split_at_mut(1);
@@ -77,7 +77,7 @@ pub fn entrypoint(
             Err(e) => {
                 // warn!("Invalid UTF-8 sequence: {}", e);
                 println!("{}",Warn(format!("Invalid UTF-8 sequence: {}", e).to_string(),module_path!().to_string()));
-                return Err(InstructionError::GenericError);
+                return Err(OpCodeErr::GenericError);
             }
         };
         trace!("Call native {:?}", name);
@@ -85,24 +85,24 @@ pub fn entrypoint(
         // TODO linux tls bug can cause crash on dlclose(), workaround by never unloading
         match Library::open(Some(&path), libc::RTLD_NODELETE | libc::RTLD_NOW) {
             Ok(library) => unsafe {
-                let entrypoint: Symbol<instruction_processor_utils::Entrypoint> =
-                    match library.get(instruction_processor_utils::ENTRYPOINT.as_bytes()) {
+                let entrypoint: Symbol<opcodes_utils::Entrypoint> =
+                    match library.get(opcodes_utils::ENTRYPOINT.as_bytes()) {
                         Ok(s) => s,
                         Err(e) => {
                             // warn!(
                             //     "{:?}: Unable to find {:?} in program",
                             //     e,
-                            //     instruction_processor_utils::ENTRYPOINT
+                            //     opcodes_utils::ENTRYPOINT
                             // );
                             println!(
                                 "{}",
                                 Warn(format!("{:?}: Unable to find {:?} in program",
                                     e,
-                                    instruction_processor_utils::ENTRYPOINT).to_string(),
+                                    opcodes_utils::ENTRYPOINT).to_string(),
                                 module_path!().to_string())
                             );
 
-                            return Err(InstructionError::GenericError);
+                            return Err(OpCodeErr::GenericError);
                         }
                     };
                 let ret = entrypoint(program_id, params, ix_data, drop_height);
@@ -119,7 +119,7 @@ pub fn entrypoint(
                     Warn(format!("Unable to load: {:?}", e).to_string(),
                     module_path!().to_string())
                 );
-                return Err(InstructionError::GenericError);
+                return Err(OpCodeErr::GenericError);
             }
         }
     } else if let Ok(instruction) = deserialize(ix_data) {
@@ -130,10 +130,10 @@ pub fn entrypoint(
                 Warn(format!("key[0] did not sign the transaction").to_string(),
                 module_path!().to_string())
             );
-            return Err(InstructionError::GenericError);
+            return Err(OpCodeErr::GenericError);
         }
         match instruction {
-            LoaderInstruction::Write { offset, bytes } => {
+            MounterOpCode::Write { offset, bytes } => {
                 trace!("NativeLoader::Write offset {} bytes {:?}", offset, bytes);
                 let offset = offset as usize;
                 if keyed_accounts[0].account.data.len() < offset + bytes.len() {
@@ -150,13 +150,13 @@ pub fn entrypoint(
                                 offset + bytes.len()).to_string(),
                             module_path!().to_string())
                     );
-                    return Err(InstructionError::GenericError);
+                    return Err(OpCodeErr::GenericError);
                 }
                 // native loader takes a name and we assume it all comes in at once
                 keyed_accounts[0].account.data = bytes;
             }
 
-            LoaderInstruction::Finalize => {
+            MounterOpCode::Finalize => {
                 keyed_accounts[0].account.executable = true;
                 trace!(
                     "NativeLoader::Finalize prog: {:?}",
@@ -172,7 +172,7 @@ pub fn entrypoint(
                 format!("Invalid data in instruction: {:?}", ix_data).to_string(),
                 module_path!().to_string())
         );
-        return Err(InstructionError::GenericError);
+        return Err(OpCodeErr::GenericError);
     }
     Ok(())
 }

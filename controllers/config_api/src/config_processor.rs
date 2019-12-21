@@ -2,16 +2,16 @@
 
 use log::*;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_helper::logHelper::*;
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     if keyed_accounts[0].signer_key().is_none() {
         // error!("{}", Error(format!("account[0].signer_key().is_none()").to_string()));
         println!(
@@ -21,7 +21,7 @@ pub fn process_instruction(
                 module_path!().to_string()
             )
         );
-        Err(InstructionError::MissingRequiredSignature)?;
+        Err(OpCodeErr::MissingRequiredSignature)?;
     }
 
     if keyed_accounts[0].account.data.len() < data.len() {
@@ -33,7 +33,7 @@ pub fn process_instruction(
                 module_path!().to_string()
             )
         );
-        Err(InstructionError::InvalidInstructionData)?;
+        Err(OpCodeErr::BadOpCodeContext)?;
     }
 
     keyed_accounts[0].account.data[0..data.len()].copy_from_slice(data);
@@ -52,7 +52,7 @@ mod tests {
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::message::Message;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_instruction;
+    use morgan_interface::sys_opcode;
 
     #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
     struct MyConfig {
@@ -76,7 +76,7 @@ mod tests {
     fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Treasury::new(&genesis_block);
-        treasury.add_instruction_processor(id(), process_instruction);
+        treasury.add_opcode_handler(id(), handle_opcode);
         (treasury, mint_keypair)
     }
 
@@ -168,7 +168,7 @@ mod tests {
         let config_pubkey = config_keypair.pubkey();
 
         let transfer_instruction =
-            system_instruction::transfer(&system_pubkey, &Pubkey::new_rand(), 42);
+            sys_opcode::transfer(&system_pubkey, &Pubkey::new_rand(), 42);
         let my_config = MyConfig::new(42);
         let mut store_instruction = config_instruction::store(&config_pubkey, &my_config);
         store_instruction.accounts[0].is_signer = false; // <----- not a signer

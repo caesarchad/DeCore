@@ -1,7 +1,7 @@
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::CompiledInstruction;
+use morgan_interface::opcodes::EncodedOpCodes;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_instruction::SystemInstruction;
+use morgan_interface::sys_opcode::SysOpCode;
 use morgan_interface::system_program;
 use morgan_interface::system_transaction;
 use morgan_interface::transaction::Transaction;
@@ -20,17 +20,17 @@ pub fn test_multisig_tx() -> Transaction {
     let difs = 5;
     let transaction_seal = Hash::default();
 
-    let transfer_instruction = SystemInstruction::Transfer { difs };
+    let transfer_instruction = SysOpCode::Transfer { difs };
 
     let program_ids = vec![system_program::id(), morgan_budget_api::id()];
 
-    let instructions = vec![CompiledInstruction::new(
+    let instructions = vec![EncodedOpCodes::new(
         0,
         &transfer_instruction,
         vec![0, 1],
     )];
 
-    Transaction::new_with_compiled_instructions(
+    Transaction::new_with_encoded_opcodes(
         &keypairs,
         &[],
         transaction_seal,

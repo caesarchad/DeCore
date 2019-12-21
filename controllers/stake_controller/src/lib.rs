@@ -5,5 +5,5 @@ macro_rules! morgan_stake_controller {
     };
 }
 
-use morgan_stake_api::stake_instruction::process_instruction;
-morgan_interface::morgan_entrypoint!(process_instruction);
+use morgan_stake_api::stake_opcode::handle_opcode;
+morgan_interface::morgan_entrypoint!(handle_opcode);

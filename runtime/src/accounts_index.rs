@@ -8,13 +8,10 @@ pub type Fork = u64;
 pub struct AccountsIndex<T> {
     account_maps: HashMap<Pubkey, Vec<(Fork, T)>>,
     roots: HashSet<Fork>,
-    //This value that needs to be stored to restore the index from AppendVec
     pub last_root: Fork,
 }
 
 impl<T: Clone> AccountsIndex<T> {
-    /// Get an account
-    /// The latest account that appears in `ancestors` or `roots` is returned.
     pub fn get(&self, pubkey: &Pubkey, ancestors: &HashMap<Fork, usize>) -> Option<(&T, Fork)> {
         let list = self.account_maps.get(pubkey)?;
         let mut max = 0;
@@ -29,8 +26,6 @@ impl<T: Clone> AccountsIndex<T> {
         rv
     }
 
-    /// Insert a new fork.
-    /// @retval - The return value contains any squashed accounts that can freed from storage.
     pub fn insert(&mut self, fork: Fork, pubkey: &Pubkey, account_info: T) -> Vec<(Fork, T)> {
         let mut rv = vec![];
         let mut fork_vec: Vec<(Fork, T)> = vec![];
@@ -39,11 +34,10 @@ impl<T: Clone> AccountsIndex<T> {
             std::mem::swap(entry, &mut fork_vec);
         };
 
-        // filter out old entries
         rv.extend(fork_vec.iter().filter(|(f, _)| *f == fork).cloned());
         fork_vec.retain(|(f, _)| *f != fork);
 
-        // add the new entry
+
         fork_vec.push((fork, account_info));
 
         rv.extend(
@@ -73,8 +67,7 @@ impl<T: Clone> AccountsIndex<T> {
         self.last_root = fork;
         self.roots.insert(fork);
     }
-    /// Remove the fork when the storage for the fork is freed
-    /// Accounts no longer reference this fork.
+
     pub fn cleanup_dead_fork(&mut self, fork: Fork) {
         self.roots.remove(&fork);
     }
@@ -183,7 +176,6 @@ mod tests {
 
     #[test]
     fn test_cleanup_last() {
-        //this behavior might be undefined, clean up should only occur on older forks
         let mut index = AccountsIndex::<bool>::default();
         index.add_root(0);
         index.add_root(1);

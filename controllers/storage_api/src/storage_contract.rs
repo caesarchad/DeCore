@@ -5,7 +5,7 @@ use morgan_interface::account::Account;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::account_utils::State;
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use std::collections::HashMap;
@@ -89,17 +89,17 @@ impl<'a> StorageAccount<'a> {
         Self { account }
     }
 
-    pub fn initialize_mining_pool(&mut self) -> Result<(), InstructionError> {
+    pub fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr> {
         let storage_contract = &mut self.account.state()?;
         if let StorageContract::Uninitialized = storage_contract {
             *storage_contract = StorageContract::MiningPool;
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::AccountAlreadyInitialized)?
+            Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
-    pub fn initialize_storage_miner_storage(&mut self) -> Result<(), InstructionError> {
+    pub fn initialize_storage_miner_storage(&mut self) -> Result<(), OpCodeErr> {
         let storage_contract = &mut self.account.state()?;
         if let StorageContract::Uninitialized = storage_contract {
             *storage_contract = StorageContract::MinerStorage {
@@ -108,11 +108,11 @@ impl<'a> StorageAccount<'a> {
             };
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::AccountAlreadyInitialized)?
+            Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
-    pub fn initialize_validator_storage(&mut self) -> Result<(), InstructionError> {
+    pub fn initialize_validator_storage(&mut self) -> Result<(), OpCodeErr> {
         let storage_contract = &mut self.account.state()?;
         if let StorageContract::Uninitialized = storage_contract {
             *storage_contract = StorageContract::ValidatorStorage {
@@ -123,7 +123,7 @@ impl<'a> StorageAccount<'a> {
             };
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::AccountAlreadyInitialized)?
+            Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
@@ -133,7 +133,7 @@ impl<'a> StorageAccount<'a> {
         slot: u64,
         signature: Signature,
         current_slot: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let mut storage_contract = &mut self.account.state()?;
         if let StorageContract::MinerStorage { proofs, .. } = &mut storage_contract {
             let segment_index = get_segment_from_slot(slot);
@@ -141,7 +141,7 @@ impl<'a> StorageAccount<'a> {
 
             if segment_index >= current_segment {
                 // attempt to submit proof for unconfirmed segment
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
 
             debug!(
@@ -152,7 +152,7 @@ impl<'a> StorageAccount<'a> {
             let segment_proofs = proofs.entry(segment_index).or_default();
             if segment_proofs.contains_key(&sha_state) {
                 // do not accept duplicate proofs
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
             segment_proofs.insert(
                 sha_state,
@@ -164,7 +164,7 @@ impl<'a> StorageAccount<'a> {
 
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
     }
 
@@ -173,7 +173,7 @@ impl<'a> StorageAccount<'a> {
         hash: Hash,
         slot: u64,
         current_slot: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let mut storage_contract = &mut self.account.state()?;
         if let StorageContract::ValidatorStorage {
             slot: state_slot,
@@ -190,7 +190,7 @@ impl<'a> StorageAccount<'a> {
                 segment, current_segment
             );
             if segment < original_segment || segment >= current_segment {
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
 
             *state_slot = slot;
@@ -200,7 +200,7 @@ impl<'a> StorageAccount<'a> {
             reward_validations.extend(lockout_validations.drain());
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
     }
 
@@ -209,7 +209,7 @@ impl<'a> StorageAccount<'a> {
         segment: u64,
         proofs: Vec<(Pubkey, Vec<CheckedProof>)>,
         storage_miner_accounts: &mut [StorageAccount],
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let mut storage_contract = &mut self.account.state()?;
         if let StorageContract::ValidatorStorage {
             slot: state_slot,
@@ -221,7 +221,7 @@ impl<'a> StorageAccount<'a> {
             let state_segment = get_segment_from_slot(*state_slot);
 
             if segment_index > state_segment {
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
 
             let accounts_and_proofs = storage_miner_accounts
@@ -247,7 +247,7 @@ impl<'a> StorageAccount<'a> {
 
             if accounts_and_proofs.len() != proofs.len() {
                 // don't have all the accounts to validate the proofs against
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
 
             let valid_proofs: Vec<_> = proofs
@@ -274,7 +274,7 @@ impl<'a> StorageAccount<'a> {
 
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
     }
 
@@ -283,7 +283,7 @@ impl<'a> StorageAccount<'a> {
         mining_pool: &mut KeyedAccount,
         slot: u64,
         current_slot: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let mut storage_contract = &mut self.account.state()?;
 
         if let StorageContract::ValidatorStorage {
@@ -301,7 +301,7 @@ impl<'a> StorageAccount<'a> {
                     claim_segment,
                     reward_validations.len()
                 );
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
             let num_validations = count_valid_proofs(
                 &reward_validations
@@ -343,7 +343,7 @@ impl<'a> StorageAccount<'a> {
                         module_path!().to_string()
                     )
                 );
-                return Err(InstructionError::InvalidArgument);
+                return Err(OpCodeErr::InvalidArgument);
             }
             // remove proofs for which rewards have already been collected
             let segment_proofs = proofs.get_mut(&claim_segment).unwrap();
@@ -373,7 +373,7 @@ impl<'a> StorageAccount<'a> {
             self.account.difs += reward;
             self.account.set_state(storage_contract)
         } else {
-            Err(InstructionError::InvalidArgument)?
+            Err(OpCodeErr::InvalidArgument)?
         }
     }
 }
@@ -383,7 +383,7 @@ fn store_validation_result(
     storage_account: &mut StorageAccount,
     segment: usize,
     checked_proof: CheckedProof,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     let mut storage_contract = storage_account.account.state()?;
     match &mut storage_contract {
         StorageContract::MinerStorage {
@@ -392,7 +392,7 @@ fn store_validation_result(
             ..
         } => {
             if !proofs.contains_key(&segment) {
-                return Err(InstructionError::InvalidAccountData);
+                return Err(OpCodeErr::InvalidAccountData);
             }
 
             if proofs
@@ -407,10 +407,10 @@ fn store_validation_result(
                     .or_default()
                     .push(checked_proof.status);
             } else {
-                return Err(InstructionError::InvalidAccountData);
+                return Err(OpCodeErr::InvalidAccountData);
             }
         }
-        _ => return Err(InstructionError::InvalidAccountData),
+        _ => return Err(OpCodeErr::InvalidAccountData),
     }
     storage_account.account.set_state(&storage_contract)
 }
@@ -430,12 +430,12 @@ fn process_validation(
     segment_index: usize,
     proof: &Proof,
     checked_proof: &CheckedProof,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     store_validation_result(account, segment_index, checked_proof.clone())?;
     if proof.signature != checked_proof.proof.signature
         || checked_proof.status != ProofStatus::Valid
     {
-        return Err(InstructionError::GenericError);
+        return Err(OpCodeErr::GenericError);
     }
     Ok(())
 }

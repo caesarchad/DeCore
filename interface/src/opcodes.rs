@@ -1,14 +1,14 @@
-//! Defines a composable Instruction type and a memory-efficient CompiledInstruction.
+//! Defines a composable Instruction type and a memory-efficient EncodedOpCodes.
 
 use crate::pubkey::Pubkey;
 use crate::short_vec;
-use crate::system_instruction::SystemError;
+use crate::sys_opcode::SystemError;
 use bincode::serialize;
 use serde::Serialize;
 
 /// Reasons the runtime might have rejected an instruction.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum InstructionError {
+pub enum OpCodeErr {
     /// Deprecated! Use CustomError instead!
     /// The program instruction returned an error
     GenericError,
@@ -17,7 +17,7 @@ pub enum InstructionError {
     InvalidArgument,
 
     /// An instruction's data contents was invalid
-    InvalidInstructionData,
+    BadOpCodeContext,
 
     /// An account's data contents was invalid
     InvalidAccountData,
@@ -38,7 +38,7 @@ pub enum InstructionError {
     UninitializedAccount,
 
     /// Program's instruction dif balance does not equal the balance after the instruction
-    UnbalancedInstruction,
+    DeficitOpCode,
 
     /// Program modified an account's program id
     ModifiedProgramId,
@@ -58,14 +58,14 @@ pub enum InstructionError {
     CustomError(u32),
 }
 
-impl InstructionError {
+impl OpCodeErr {
     pub fn new_result_with_negative_difs() -> Self {
-        InstructionError::CustomError(SystemError::ResultWithNegativeDifs as u32)
+        OpCodeErr::CustomError(SystemError::ResultWithNegativeDifs as u32)
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Instruction {
+pub struct OpCode {
     /// Pubkey of the instruction processor that executes this instruction
     pub program_ids_index: Pubkey,
     /// Metadata for what accounts should be passed to the instruction processor
@@ -74,7 +74,7 @@ pub struct Instruction {
     pub data: Vec<u8>,
 }
 
-impl Instruction {
+impl OpCode {
     pub fn new<T: Serialize>(
         program_ids_index: Pubkey,
         data: &T,
@@ -120,7 +120,7 @@ impl AccountMeta {
 
 /// An instruction to execute a program
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct CompiledInstruction {
+pub struct EncodedOpCodes {
     /// Index into the transaction keys array indicating the program account that executes this instruction
     pub program_ids_index: u8,
     /// Ordered indices into the transaction keys array indicating which accounts to pass to the program
@@ -131,7 +131,7 @@ pub struct CompiledInstruction {
     pub data: Vec<u8>,
 }
 
-impl CompiledInstruction {
+impl EncodedOpCodes {
     pub fn new<T: Serialize>(program_ids_index: u8, data: &T, accounts: Vec<u8>) -> Self {
         let data = serialize(data).unwrap();
         Self {

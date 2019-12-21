@@ -1,12 +1,12 @@
 //! budget program
 use crate::budget_expr::Witness;
-use crate::budget_instruction::BudgetInstruction;
+use crate::budget_opcode::SmarContractOpCode;
 use crate::budget_state::{BudgetError, BudgetState};
 use bincode::deserialize;
 use chrono::prelude::{DateTime, Utc};
 use log::*;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_helper::logHelper::*;
 
@@ -71,12 +71,12 @@ fn apply_timestamp(
     Ok(())
 }
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     let instruction = deserialize(data).map_err(|err| {
         // info!("{}", Info(format!("Invalid transaction data: {:?} {:?}", data, err).to_string()));
         let info:String = format!("Invalid transaction data: {:?} {:?}", data, err).to_string();
@@ -86,13 +86,13 @@ pub fn process_instruction(
                 module_path!().to_string()
             )
         );
-        InstructionError::InvalidInstructionData
+        OpCodeErr::BadOpCodeContext
     })?;
 
-    trace!("process_instruction: {:?}", instruction);
+    trace!("handle_opcode: {:?}", instruction);
 
     match instruction {
-        BudgetInstruction::InitializeAccount(expr) => {
+        SmarContractOpCode::InitializeAccount(expr) => {
             let expr = expr.clone();
             if let Some(payment) = expr.final_payment() {
                 keyed_accounts[1].account.difs = 0;
@@ -102,46 +102,46 @@ pub fn process_instruction(
             let existing = BudgetState::deserialize(&keyed_accounts[0].account.data).ok();
             if Some(true) == existing.map(|x| x.initialized) {
                 trace!("contract already exists");
-                return Err(InstructionError::AccountAlreadyInitialized);
+                return Err(OpCodeErr::AccountAlreadyInitialized);
             }
             let mut budget_state = BudgetState::default();
             budget_state.pending_budget = Some(expr);
             budget_state.initialized = true;
             budget_state.serialize(&mut keyed_accounts[0].account.data)
         }
-        BudgetInstruction::ApplyTimestamp(dt) => {
+        SmarContractOpCode::ApplyTimestamp(dt) => {
             let mut budget_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
             if !budget_state.is_pending() {
                 return Ok(()); // Nothing to do here.
             }
             if !budget_state.initialized {
                 trace!("contract is uninitialized");
-                return Err(InstructionError::UninitializedAccount);
+                return Err(OpCodeErr::UninitializedAccount);
             }
             if keyed_accounts[0].signer_key().is_none() {
-                return Err(InstructionError::MissingRequiredSignature);
+                return Err(OpCodeErr::MissingRequiredSignature);
             }
             trace!("apply timestamp");
             apply_timestamp(&mut budget_state, keyed_accounts, dt)
-                .map_err(|e| InstructionError::CustomError(e as u32))?;
+                .map_err(|e| OpCodeErr::CustomError(e as u32))?;
             trace!("apply timestamp committed");
             budget_state.serialize(&mut keyed_accounts[1].account.data)
         }
-        BudgetInstruction::ApplySignature => {
+        SmarContractOpCode::ApplySignature => {
             let mut budget_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
             if !budget_state.is_pending() {
                 return Ok(()); // Nothing to do here.
             }
             if !budget_state.initialized {
                 trace!("contract is uninitialized");
-                return Err(InstructionError::UninitializedAccount);
+                return Err(OpCodeErr::UninitializedAccount);
             }
             if keyed_accounts[0].signer_key().is_none() {
-                return Err(InstructionError::MissingRequiredSignature);
+                return Err(OpCodeErr::MissingRequiredSignature);
             }
             trace!("apply signature");
             apply_signature(&mut budget_state, keyed_accounts)
-                .map_err(|e| InstructionError::CustomError(e as u32))?;
+                .map_err(|e| OpCodeErr::CustomError(e as u32))?;
             trace!("apply signature committed");
             budget_state.serialize(&mut keyed_accounts[1].account.data)
         }
@@ -151,13 +151,13 @@ pub fn process_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::budget_instruction;
+    use crate::budget_opcode;
     use crate::id;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
-    use morgan_interface::instruction::InstructionError;
+    use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::message::Message;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::TransactionError;
@@ -165,7 +165,7 @@ mod tests {
     fn create_treasury(difs: u64) -> (Treasury, Keypair) {
         let (genesis_block, mint_keypair) = create_genesis_block(difs);
         let mut treasury = Treasury::new(&genesis_block);
-        treasury.add_instruction_processor(id(), process_instruction);
+        treasury.add_opcode_handler(id(), handle_opcode);
         (treasury, mint_keypair)
     }
 
@@ -175,7 +175,7 @@ mod tests {
         let treasury_client = TreasuryClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let bob_pubkey = Pubkey::new_rand();
-        let instructions = budget_instruction::payment(&alice_pubkey, &bob_pubkey, 100);
+        let instructions = budget_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
         let message = Message::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
@@ -193,7 +193,7 @@ mod tests {
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let witness = Pubkey::new_rand();
-        let instructions = budget_instruction::when_signed(
+        let instructions = budget_opcode::when_signed(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -213,7 +213,7 @@ mod tests {
             .transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
-            budget_instruction::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            budget_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
         let mut message = Message::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
@@ -227,7 +227,7 @@ mod tests {
                 .send_online_msg(&[&mallory_keypair], message)
                 .unwrap_err()
                 .unwrap(),
-            TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
+            TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
         );
     }
 
@@ -241,7 +241,7 @@ mod tests {
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
-        let instructions = budget_instruction::on_date(
+        let instructions = budget_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -262,7 +262,7 @@ mod tests {
             .transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
-            budget_instruction::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            budget_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
         let mut message = Message::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
@@ -276,7 +276,7 @@ mod tests {
                 .send_online_msg(&[&mallory_keypair], message)
                 .unwrap_err()
                 .unwrap(),
-            TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
+            TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
         );
     }
 
@@ -289,7 +289,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let mallory_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
-        let instructions = budget_instruction::on_date(
+        let instructions = budget_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -314,15 +314,15 @@ mod tests {
 
         // Attack! Try to payout to mallory_pubkey
         let instruction =
-            budget_instruction::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
+            budget_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
         assert_eq!(
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
                 .unwrap_err()
                 .unwrap(),
-            TransactionError::InstructionError(
+            TransactionError::OpCodeErr(
                 0,
-                InstructionError::CustomError(BudgetError::DestinationMissing as u32)
+                OpCodeErr::CustomError(BudgetError::DestinationMissing as u32)
             )
         );
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
@@ -339,7 +339,7 @@ mod tests {
         // Now, acknowledge the time in the condition occurred and
         // that pubkey's funds are now available.
         let instruction =
-            budget_instruction::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            budget_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
@@ -358,7 +358,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
 
-        let instructions = budget_instruction::on_date(
+        let instructions = budget_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
 
         let instruction =
-            budget_instruction::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            budget_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
         treasury_client
             .snd_online_instruction(&mallory_keypair, instruction)
             .unwrap();
@@ -401,7 +401,7 @@ mod tests {
 
         // Now, cancel the transaction. mint gets her funds back
         let instruction =
-            budget_instruction::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
+            budget_opcode::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();

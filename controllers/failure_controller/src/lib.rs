@@ -1,5 +1,5 @@
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::morgan_entrypoint;
 
@@ -9,6 +9,6 @@ fn entrypoint(
     _keyed_accounts: &mut [KeyedAccount],
     _data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
-    Err(InstructionError::GenericError)
+) -> Result<(), OpCodeErr> {
+    Err(OpCodeErr::GenericError)
 }

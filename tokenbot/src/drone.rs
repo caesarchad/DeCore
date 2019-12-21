@@ -15,7 +15,7 @@ use morgan_interface::message::Message;
 use morgan_interface::packet::PACKET_DATA_SIZE;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 use morgan_interface::transaction::Transaction;
 use std::io;
 use std::io::{Error, ErrorKind};
@@ -131,7 +131,7 @@ impl Drone {
                             module_path!().to_string()
                         )
                     );
-                    let create_instruction = system_instruction::create_user_account(
+                    let create_instruction = sys_opcode::create_user_account(
                         &self.mint_keypair.pubkey(),
                         &to,
                         difs,
@@ -167,7 +167,7 @@ impl Drone {
                             module_path!().to_string()
                         )
                     );
-                    let create_instruction = system_instruction::create_user_account_with_reputation(
+                    let create_instruction = sys_opcode::create_user_account_with_reputation(
                         &self.mint_keypair.pubkey(),
                         &to,
                         reputations,
@@ -494,7 +494,7 @@ pub fn run_drone(
 mod tests {
     use super::*;
     use bytes::BufMut;
-    use morgan_interface::system_instruction::SystemInstruction;
+    use morgan_interface::sys_opcode::SysOpCode;
     use std::time::Duration;
 
     #[test]
@@ -575,10 +575,10 @@ mod tests {
         assert_eq!(message.recent_transaction_seal, transaction_seal);
 
         assert_eq!(message.instructions.len(), 1);
-        let instruction: SystemInstruction = deserialize(&message.instructions[0].data).unwrap();
+        let instruction: SysOpCode = deserialize(&message.instructions[0].data).unwrap();
         assert_eq!(
             instruction,
-            SystemInstruction::CreateAccount {
+            SysOpCode::CreateAccount {
                 difs: 2,
                 reputations: 0,
                 space: 0,
@@ -617,10 +617,10 @@ mod tests {
         assert_eq!(message.recent_transaction_seal, transaction_seal);
 
         assert_eq!(message.instructions.len(), 1);
-        let instruction: SystemInstruction = deserialize(&message.instructions[0].data).unwrap();
+        let instruction: SysOpCode = deserialize(&message.instructions[0].data).unwrap();
         assert_eq!(
             instruction,
-            SystemInstruction::CreateAccountWithReputation {
+            SysOpCode::CreateAccountWithReputation {
                 reputations: 2,
                 space: 0,
                 program_id: Pubkey::default()
@@ -649,7 +649,7 @@ mod tests {
 
         let keypair = Keypair::new();
         let expected_instruction =
-            system_instruction::create_user_account(&keypair.pubkey(), &to, difs);
+            sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
         let message = Message::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
@@ -683,7 +683,7 @@ mod tests {
 
         let keypair = Keypair::new();
         let expected_instruction =
-            system_instruction::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
+            sys_opcode::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
         let message = Message::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();

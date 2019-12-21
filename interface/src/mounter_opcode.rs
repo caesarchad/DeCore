@@ -1,8 +1,8 @@
-use crate::instruction::{AccountMeta, Instruction};
+use crate::opcodes::{AccountMeta, OpCode};
 use crate::pubkey::Pubkey;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum LoaderInstruction {
+pub enum MounterOpCode {
     /// Write program data into an account
     ///
     /// * key[0] - the account to write into.
@@ -25,16 +25,16 @@ pub fn write(
     program_id: &Pubkey,
     offset: u32,
     bytes: Vec<u8>,
-) -> Instruction {
+) -> OpCode {
     let account_metas = vec![AccountMeta::new(*account_pubkey, true)];
-    Instruction::new(
+    OpCode::new(
         *program_id,
-        &LoaderInstruction::Write { offset, bytes },
+        &MounterOpCode::Write { offset, bytes },
         account_metas,
     )
 }
 
-pub fn finalize(account_pubkey: &Pubkey, program_id: &Pubkey) -> Instruction {
+pub fn finalize(account_pubkey: &Pubkey, program_id: &Pubkey) -> OpCode {
     let account_metas = vec![AccountMeta::new(*account_pubkey, true)];
-    Instruction::new(*program_id, &LoaderInstruction::Finalize, account_metas)
+    OpCode::new(*program_id, &MounterOpCode::Finalize, account_metas)
 }

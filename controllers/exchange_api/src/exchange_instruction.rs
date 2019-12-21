@@ -3,7 +3,7 @@
 use crate::exchange_state::*;
 use crate::id;
 use serde_derive::{Deserialize, Serialize};
-use morgan_interface::instruction::{AccountMeta, Instruction};
+use morgan_interface::opcodes::{AccountMeta, OpCode};
 use morgan_interface::pubkey::Pubkey;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -54,12 +54,12 @@ pub enum ExchangeInstruction {
     SwapRequest,
 }
 
-pub fn account_request(owner: &Pubkey, new: &Pubkey) -> Instruction {
+pub fn account_request(owner: &Pubkey, new: &Pubkey) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*owner, true),
         AccountMeta::new(*new, false),
     ];
-    Instruction::new(id(), &ExchangeInstruction::AccountRequest, account_metas)
+    OpCode::new(id(), &ExchangeInstruction::AccountRequest, account_metas)
 }
 
 pub fn transfer_request(
@@ -68,13 +68,13 @@ pub fn transfer_request(
     from: &Pubkey,
     token: Token,
     tokens: u64,
-) -> Instruction {
+) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*owner, true),
         AccountMeta::new(*to, false),
         AccountMeta::new(*from, false),
     ];
-    Instruction::new(
+    OpCode::new(
         id(),
         &ExchangeInstruction::TransferRequest(token, tokens),
         account_metas,
@@ -89,13 +89,13 @@ pub fn trade_request(
     tokens: u64,
     price: u64,
     src_account: &Pubkey,
-) -> Instruction {
+) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*owner, true),
         AccountMeta::new(*trade, false),
         AccountMeta::new(*src_account, false),
     ];
-    Instruction::new(
+    OpCode::new(
         id(),
         &ExchangeInstruction::TradeRequest(TradeRequestInfo {
             direction,
@@ -107,12 +107,12 @@ pub fn trade_request(
     )
 }
 
-pub fn trade_cancellation(owner: &Pubkey, trade: &Pubkey) -> Instruction {
+pub fn trade_cancellation(owner: &Pubkey, trade: &Pubkey) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*owner, true),
         AccountMeta::new(*trade, false),
     ];
-    Instruction::new(id(), &ExchangeInstruction::TradeCancellation, account_metas)
+    OpCode::new(id(), &ExchangeInstruction::TradeCancellation, account_metas)
 }
 
 pub fn swap_request(
@@ -120,12 +120,12 @@ pub fn swap_request(
     to_trade: &Pubkey,
     from_trade: &Pubkey,
     profit_account: &Pubkey,
-) -> Instruction {
+) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*owner, true),
         AccountMeta::new(*to_trade, false),
         AccountMeta::new(*from_trade, false),
         AccountMeta::new(*profit_account, false),
     ];
-    Instruction::new(id(), &ExchangeInstruction::SwapRequest, account_metas)
+    OpCode::new(id(), &ExchangeInstruction::SwapRequest, account_metas)
 }

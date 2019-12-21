@@ -12,9 +12,8 @@ use std::mem;
 use std::path::PathBuf;
 use test::Bencher;
 
-/// BPF program file extension
+
 const PLATFORM_FILE_EXTENSION_BPF: &str = "so";
-/// Create a BPF program file name
 fn create_bpf_path(name: &str) -> PathBuf {
     let mut pathbuf = {
         let current_exe = env::current_exe().unwrap();
@@ -92,7 +91,7 @@ fn bench_program_alu(bencher: &mut Bencher) {
     bencher.iter(|| {
         vm.execute_program(&mut inner_iter, &[], &[]).unwrap();
     });
-    let instructions = vm.get_last_instruction_count();
+    let instructions = vm.fetch_last_opcode_num();
     let summary = bencher.bench(|_bencher| {}).unwrap();
     println!("  {:?} instructions", instructions);
     println!("  {:?} ns/iter median", summary.median as u64);

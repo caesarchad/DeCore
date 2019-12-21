@@ -1,6 +1,6 @@
 use log::*;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::morgan_entrypoint;
 
@@ -10,7 +10,7 @@ fn entrypoint(
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
     trace!("noop: program_id: {:?}", program_id);
     trace!("noop: keyed_accounts: {:#?}", keyed_accounts);

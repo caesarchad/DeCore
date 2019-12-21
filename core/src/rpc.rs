@@ -645,7 +645,7 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use jsonrpc_core::{MetaIoHandler, Response};
     use morgan_interface::hash::{hash, Hash};
-    use morgan_interface::instruction::InstructionError;
+    use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_transaction;
     use morgan_interface::transaction::TransactionError;
@@ -894,7 +894,7 @@ mod tests {
         );
         let res = io.handle_request_sync(&req, meta);
         let expected_res: Option<transaction::Result<()>> = Some(Err(
-            TransactionError::InstructionError(0, InstructionError::DuplicateAccountIndex),
+            TransactionError::OpCodeErr(0, OpCodeErr::DuplicateAccountIndex),
         ));
         let expected = json!({
             "jsonrpc": "2.0",

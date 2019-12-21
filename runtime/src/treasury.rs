@@ -3,12 +3,12 @@
 //! on behalf of the caller, and a low-level API for when they have
 //! already been signed and verified.
 use crate::accounts::{AccountLockType, Accounts};
-use crate::accounts_db::{ErrorCounters, InstructionAccounts, InstructionLoaders};
+use crate::accounts_db::{ErrorCounters, OpCodeAcct, OpCodeMounter};
 use crate::accounts_index::Fork;
 use crate::transaction_seal_queue::TransactionSealQueue;
 use crate::epoch_schedule::EpochSchedule;
 use crate::locked_accounts_results::LockedAccountsResults;
-use crate::message_processor::{MessageProcessor, ProcessInstruction};
+use crate::message_processor::{MessageHandler, HandleOpCode};
 use crate::stakes::Stakes;
 use crate::status_cache::StatusCache;
 use bincode::serialize;
@@ -21,7 +21,7 @@ use morgan_interface::account::Account;
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{extend_and_hash, Hash};
-use morgan_interface::native_loader;
+use morgan_interface::bultin_mounter;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, Signature};
 use morgan_interface::syscall::slot_hashes::{self, SlotHashes};
@@ -100,7 +100,7 @@ pub struct Treasury {
     is_delta: AtomicBool,
 
     /// The Message processor
-    message_processor: MessageProcessor,
+    message_processor: MessageHandler,
 }
 
 impl Default for TransactionSealQueue {
@@ -297,7 +297,7 @@ impl Treasury {
             genesis_block.epoch_warmup,
         );
 
-        // Add native programs mandatory for the MessageProcessor to function
+        // Add native programs mandatory for the MessageHandler to function
         self.register_native_instruction_processor(
             "morgan_system_program",
             &morgan_interface::system_program::id(),
@@ -312,14 +312,14 @@ impl Treasury {
         );
 
         // Add additional native programs specified in the genesis block
-        for (name, program_id) in &genesis_block.native_instruction_processors {
+        for (name, program_id) in &genesis_block.builtin_opcode_handlers {
             self.register_native_instruction_processor(name, program_id);
         }
     }
 
     pub fn register_native_instruction_processor(&self, name: &str, program_id: &Pubkey) {
         debug!("Adding native program {} under {:?}", name, program_id);
-        let account = native_loader::create_loadable_account(name);
+        let account = bultin_mounter::create_loadable_account(name);
         self.store(program_id, &account);
     }
 
@@ -349,7 +349,7 @@ impl Treasury {
     pub fn can_commit(result: &Result<()>) -> bool {
         match result {
             Ok(_) => true,
-            Err(TransactionError::InstructionError(_, _)) => true,
+            Err(TransactionError::OpCodeErr(_, _)) => true,
             Err(_) => false,
         }
     }
@@ -485,7 +485,7 @@ impl Treasury {
         txs: &[Transaction],
         results: Vec<Result<()>>,
         error_counters: &mut ErrorCounters,
-    ) -> Vec<Result<(InstructionAccounts, InstructionLoaders)>> {
+    ) -> Vec<Result<(OpCodeAcct, OpCodeMounter)>> {
         self.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -643,7 +643,7 @@ impl Treasury {
         lock_results: &LockedAccountsResults<Transaction>,
         max_age: usize,
     ) -> (
-        Vec<Result<(InstructionAccounts, InstructionLoaders)>>,
+        Vec<Result<(OpCodeAcct, OpCodeMounter)>>,
         Vec<Result<()>>,
     ) {
         debug!("processing transactions: {}", txs.len());
@@ -722,8 +722,8 @@ impl Treasury {
                 let fee = self.fee_calculator.calculate_fee(tx.message());
                 let message = tx.message();
                 match *res {
-                    Err(TransactionError::InstructionError(_, _)) => {
-                        // credit the transaction fee even in case of InstructionError
+                    Err(TransactionError::OpCodeErr(_, _)) => {
+                        // credit the transaction fee even in case of OpCodeErr
                         // necessary to withdraw from account[0] here because previous
                         // work of doing so (in accounts.load()) is ignored by store()
                         self.withdraw(&message.account_keys[0], fee)?;
@@ -745,7 +745,7 @@ impl Treasury {
     pub fn commit_transactions(
         &self,
         txs: &[Transaction],
-        loaded_accounts: &[Result<(InstructionAccounts, InstructionLoaders)>],
+        loaded_accounts: &[Result<(OpCodeAcct, OpCodeMounter)>],
         executed: &[Result<()>],
     ) -> Vec<Result<()>> {
         if self.is_frozen() {
@@ -959,7 +959,7 @@ impl Treasury {
         &self,
         txs: &[Transaction],
         res: &[Result<()>],
-        loaded: &[Result<(InstructionAccounts, InstructionLoaders)>],
+        loaded: &[Result<(OpCodeAcct, OpCodeMounter)>],
     ) {
         for (i, raccs) in loaded.iter().enumerate() {
             if res[i].is_err() || raccs.is_err() {
@@ -1007,13 +1007,13 @@ impl Treasury {
     }
 
     /// Add an instruction processor to intercept instructions before the dynamic loader.
-    pub fn add_instruction_processor(
+    pub fn add_opcode_handler(
         &mut self,
         program_id: Pubkey,
-        process_instruction: ProcessInstruction,
+        handle_opcode: HandleOpCode,
     ) {
         self.message_processor
-            .add_instruction_processor(program_id, process_instruction);
+            .add_opcode_handler(program_id, handle_opcode);
 
         // Register a bogus executable account, which will be loaded and ignored.
         self.register_native_instruction_processor("", &program_id);
@@ -1036,11 +1036,11 @@ mod tests {
     };
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::hash;
-    use morgan_interface::instruction::InstructionError;
+    use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_instruction;
+    use morgan_interface::sys_opcode;
     use morgan_interface::system_transaction;
-    use morgan_vote_api::vote_instruction;
+    use morgan_vote_api::vote_opcode;
     use morgan_vote_api::vote_state::VoteState;
 
     #[test]
@@ -1111,17 +1111,17 @@ mod tests {
         let key2 = Pubkey::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
-            system_instruction::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
-        let tx = Transaction::new_signed_instructions(
+            sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
+        let tx = Transaction::new_s_opcodes(
             &[&mint_keypair],
             instructions,
             genesis_block.hash(),
         );
         assert_eq!(
             treasury.process_transaction(&tx).unwrap_err(),
-            TransactionError::InstructionError(
+            TransactionError::OpCodeErr(
                 1,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             )
         );
         assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 1);
@@ -1136,8 +1136,8 @@ mod tests {
         let key2 = Pubkey::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
-            system_instruction::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
-        let tx = Transaction::new_signed_instructions(
+            sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
+        let tx = Transaction::new_s_opcodes(
             &[&mint_keypair],
             instructions,
             genesis_block.hash(),
@@ -1169,9 +1169,9 @@ mod tests {
 
         assert_eq!(
             treasury.process_transaction(&tx),
-            Err(TransactionError::InstructionError(
+            Err(TransactionError::OpCodeErr(
                 0,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             ))
         );
 
@@ -1204,9 +1204,9 @@ mod tests {
         assert_eq!(treasury.get_balance(&pubkey), 1_000);
         assert_eq!(
             treasury.transfer(10_001, &mint_keypair, &pubkey),
-            Err(TransactionError::InstructionError(
+            Err(TransactionError::OpCodeErr(
                 0,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             ))
         );
         assert_eq!(treasury.transaction_count(), 1);
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(treasury.get_balance(&key2.pubkey()), 1);
         assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 100 - 5);
 
-        // verify that an InstructionError collects fees, too
+        // verify that an OpCodeErr collects fees, too
         let mut tx =
             system_transaction::transfer(&mint_keypair, &key2.pubkey(), 1, genesis_block.hash());
         // send a bogus instruction to system_program, cause an instruction error
@@ -1328,9 +1328,9 @@ mod tests {
 
         let results = vec![
             Ok(()),
-            Err(TransactionError::InstructionError(
+            Err(TransactionError::OpCodeErr(
                 1,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             )),
         ];
 
@@ -1727,10 +1727,10 @@ mod tests {
         let key = Keypair::new();
 
         let mut transfer_instruction =
-            system_instruction::transfer(&mint_keypair.pubkey(), &key.pubkey(), 0);
+            sys_opcode::transfer(&mint_keypair.pubkey(), &key.pubkey(), 0);
         transfer_instruction.accounts[0].is_signer = false;
 
-        let tx = Transaction::new_signed_instructions(
+        let tx = Transaction::new_s_opcodes(
             &Vec::<&Keypair>::new(),
             vec![transfer_instruction],
             treasury.last_transaction_seal(),
@@ -1908,7 +1908,7 @@ mod tests {
                                             // to have a vote account
 
         let vote_keypair = Keypair::new();
-        let instructions = vote_instruction::create_account(
+        let instructions = vote_opcode::create_account(
             &mint_keypair.pubkey(),
             &vote_keypair.pubkey(),
             &mint_keypair.pubkey(),
@@ -1916,7 +1916,7 @@ mod tests {
             10,
         );
 
-        let transaction = Transaction::new_signed_instructions(
+        let transaction = Transaction::new_s_opcodes(
             &[&mint_keypair],
             instructions,
             treasury.last_transaction_seal(),
@@ -1973,13 +1973,13 @@ mod tests {
         // Check the treasury is_delta is still false
         assert!(!treasury.is_delta.load(Ordering::Relaxed));
 
-        // Should fail with InstructionError, but InstructionErrors are committable,
+        // Should fail with OpCodeErr, but InstructionErrors are committable,
         // so is_delta should be true
         assert_eq!(
             treasury.transfer(10_001, &mint_keypair, &Pubkey::new_rand()),
-            Err(TransactionError::InstructionError(
+            Err(TransactionError::OpCodeErr(
                 0,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             ))
         );
 

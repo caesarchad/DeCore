@@ -184,12 +184,12 @@ pub(crate) mod tests {
         BOOTSTRAP_LEADER_DIFS,
     };
     use hashbrown::HashSet;
-    use morgan_interface::instruction::Instruction;
+    use morgan_interface::opcodes::OpCode;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::Transaction;
-    use morgan_stake_api::stake_instruction;
-    use morgan_vote_api::vote_instruction;
+    use morgan_stake_api::stake_opcode;
+    use morgan_vote_api::vote_opcode;
     use std::iter::FromIterator;
     use std::sync::Arc;
 
@@ -232,9 +232,9 @@ pub(crate) mod tests {
         fn process_instructions<T: KeypairUtil>(
             treasury: &Treasury,
             keypairs: &[&T],
-            ixs: Vec<Instruction>,
+            ixs: Vec<OpCode>,
         ) {
-            treasury.process_transaction(&Transaction::new_signed_instructions(
+            treasury.process_transaction(&Transaction::new_s_opcodes(
                 keypairs,
                 ixs,
                 treasury.last_transaction_seal(),
@@ -245,7 +245,7 @@ pub(crate) mod tests {
         process_instructions(
             treasury,
             &[from_account],
-            vote_instruction::create_account(
+            vote_opcode::create_account(
                 &from_account.pubkey(),
                 vote_pubkey,
                 node_pubkey,
@@ -260,7 +260,7 @@ pub(crate) mod tests {
         process_instructions(
             treasury,
             &[from_account],
-            stake_instruction::create_delegate_account(
+            stake_opcode::create_delegate_account(
                 &from_account.pubkey(),
                 &stake_account_pubkey,
                 amount,
@@ -270,7 +270,7 @@ pub(crate) mod tests {
         process_instructions(
             treasury,
             &[from_account, &stake_account_keypair],
-            vec![stake_instruction::delegate_stake(
+            vec![stake_opcode::delegate_stake(
                 &from_account.pubkey(),
                 &stake_account_pubkey,
                 vote_pubkey,

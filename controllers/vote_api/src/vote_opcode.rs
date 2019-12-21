@@ -8,13 +8,13 @@ use log::*;
 use serde_derive::{Deserialize, Serialize};
 use morgan_metricbot::datapoint_warn;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::{AccountMeta, Instruction, InstructionError};
+use morgan_interface::opcodes::{AccountMeta, OpCode, OpCodeErr};
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::syscall::slot_hashes;
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum VoteInstruction {
+pub enum VoteOpCode {
     /// Initialize the VoteState for this `vote account`
     /// takes a node_pubkey and commission
     InitializeAccount(Pubkey, u32),
@@ -31,14 +31,14 @@ fn initialize_account(
     vote_pubkey: &Pubkey,
     node_pubkey: &Pubkey,
     commission: u32,
-) -> Instruction {
+) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
         AccountMeta::new(*vote_pubkey, false),
     ];
-    Instruction::new(
+    OpCode::new(
         id(),
-        &VoteInstruction::InitializeAccount(*node_pubkey, commission),
+        &VoteOpCode::InitializeAccount(*node_pubkey, commission),
         account_metas,
     )
 }
@@ -49,10 +49,10 @@ pub fn create_account(
     node_pubkey: &Pubkey,
     commission: u32,
     difs: u64,
-) -> Vec<Instruction> {
+) -> Vec<OpCode> {
     let space = VoteState::size_of() as u64;
     let create_ix =
-        system_instruction::create_account(from_pubkey, vote_pubkey, difs, space, &id());
+        sys_opcode::create_account(from_pubkey, vote_pubkey, difs, space, &id());
     let init_ix = initialize_account(from_pubkey, vote_pubkey, node_pubkey, commission);
     vec![create_ix, init_ix]
 }
@@ -79,13 +79,13 @@ pub fn authorize_voter(
     vote_pubkey: &Pubkey,
     authorized_voter_pubkey: &Pubkey, // currently authorized
     new_authorized_voter_pubkey: &Pubkey,
-) -> Instruction {
+) -> OpCode {
     let account_metas =
         metas_for_authorized_signer(from_pubkey, vote_pubkey, authorized_voter_pubkey);
 
-    Instruction::new(
+    OpCode::new(
         id(),
-        &VoteInstruction::AuthorizeVoter(*new_authorized_voter_pubkey),
+        &VoteOpCode::AuthorizeVoter(*new_authorized_voter_pubkey),
         account_metas,
     )
 }
@@ -95,29 +95,29 @@ pub fn vote(
     vote_pubkey: &Pubkey,
     authorized_voter_pubkey: &Pubkey,
     recent_votes: Vec<Vote>,
-) -> Instruction {
+) -> OpCode {
     let mut account_metas =
         metas_for_authorized_signer(from_pubkey, vote_pubkey, authorized_voter_pubkey);
 
     // request slot_hashes syscall account after vote_pubkey
     account_metas.insert(2, AccountMeta::new(slot_hashes::id(), false));
 
-    Instruction::new(id(), &VoteInstruction::Vote(recent_votes), account_metas)
+    OpCode::new(id(), &VoteOpCode::Vote(recent_votes), account_metas)
 }
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
 
-    trace!("process_instruction: {:?}", data);
+    trace!("handle_opcode: {:?}", data);
     trace!("keyed_accounts: {:?}", keyed_accounts);
 
     if keyed_accounts.len() < 2 {
-        Err(InstructionError::InvalidInstructionData)?;
+        Err(OpCodeErr::BadOpCodeContext)?;
     }
 
     // 0th index is the guy who paid for the transaction
@@ -125,14 +125,14 @@ pub fn process_instruction(
     let me = &mut me[1];
 
     // TODO: data-driven unpack and dispatch of KeyedAccounts
-    match deserialize(data).map_err(|_| InstructionError::InvalidInstructionData)? {
-        VoteInstruction::InitializeAccount(node_pubkey, commission) => {
+    match deserialize(data).map_err(|_| OpCodeErr::BadOpCodeContext)? {
+        VoteOpCode::InitializeAccount(node_pubkey, commission) => {
             vote_state::initialize_account(me, &node_pubkey, commission)
         }
-        VoteInstruction::AuthorizeVoter(voter_pubkey) => {
+        VoteOpCode::AuthorizeVoter(voter_pubkey) => {
             vote_state::authorize_voter(me, rest, &voter_pubkey)
         }
-        VoteInstruction::Vote(votes) => {
+        VoteOpCode::Vote(votes) => {
             datapoint_warn!("vote-native", ("count", 1, i64));
             let (slot_hashes, other_signers) = rest.split_at_mut(1);
             let slot_hashes = &mut slot_hashes[0];
@@ -150,12 +150,12 @@ mod tests {
     #[test]
     fn test_vote_process_instruction_decode_bail() {
         assert_eq!(
-            super::process_instruction(&Pubkey::default(), &mut [], &[], 0,),
-            Err(InstructionError::InvalidInstructionData),
+            super::handle_opcode(&Pubkey::default(), &mut [], &[], 0,),
+            Err(OpCodeErr::BadOpCodeContext),
         );
     }
 
-    fn process_instruction(instruction: &Instruction) -> Result<(), InstructionError> {
+    fn handle_opcode(instruction: &Instruction) -> Result<(), OpCodeErr> {
         let mut accounts = vec![];
         for _ in 0..instruction.accounts.len() {
             accounts.push(Account::default());
@@ -167,7 +167,7 @@ mod tests {
                 .zip(accounts.iter_mut())
                 .map(|(meta, account)| KeyedAccount::new(&meta.pubkey, meta.is_signer, account))
                 .collect();
-            super::process_instruction(
+            super::handle_opcode(
                 &Pubkey::default(),
                 &mut keyed_accounts,
                 &instruction.data,
@@ -186,26 +186,26 @@ mod tests {
             100,
         );
         assert_eq!(
-            process_instruction(&instructions[1]),
-            Err(InstructionError::InvalidAccountData),
+            handle_opcode(&instructions[1]),
+            Err(OpCodeErr::InvalidAccountData),
         );
         assert_eq!(
-            process_instruction(&vote(
+            handle_opcode(&vote(
                 &Pubkey::default(),
                 &Pubkey::default(),
                 &Pubkey::default(),
                 vec![Vote::default()]
             )),
-            Err(InstructionError::InvalidAccountData),
+            Err(OpCodeErr::InvalidAccountData),
         );
         assert_eq!(
-            process_instruction(&authorize_voter(
+            handle_opcode(&authorize_voter(
                 &Pubkey::default(),
                 &Pubkey::default(),
                 &Pubkey::default(),
                 &Pubkey::default(),
             )),
-            Err(InstructionError::InvalidAccountData),
+            Err(OpCodeErr::InvalidAccountData),
         );
     }
 

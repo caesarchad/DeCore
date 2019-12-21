@@ -2,52 +2,52 @@
 //!  Receive mining proofs from miners, validate the answers
 //!  and give reward for good proofs.
 use crate::storage_contract::StorageAccount;
-use crate::storage_instruction::StorageInstruction;
+use crate::storage_opcode::StorageOpCode;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use morgan_helper::logHelper::*;
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
 
     let (me, rest) = keyed_accounts.split_at_mut(1);
     let me_unsigned = me[0].signer_key().is_none();
     let mut storage_account = StorageAccount::new(&mut me[0].account);
 
-    match bincode::deserialize(data).map_err(|_| InstructionError::InvalidInstructionData)? {
-        StorageInstruction::InitializeMiningPool => {
+    match bincode::deserialize(data).map_err(|_| OpCodeErr::BadOpCodeContext)? {
+        StorageOpCode::InitializeMiningPool => {
             if !rest.is_empty() {
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.initialize_mining_pool()
         }
-        StorageInstruction::InitializeMinerStorage => {
+        StorageOpCode::InitializeMinerStorage => {
             if !rest.is_empty() {
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.initialize_storage_miner_storage()
         }
-        StorageInstruction::InitializeValidatorStorage => {
+        StorageOpCode::InitializeValidatorStorage => {
             if !rest.is_empty() {
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.initialize_validator_storage()
         }
-        StorageInstruction::SubmitMiningProof {
+        StorageOpCode::SubmitMiningProof {
             sha_state,
             slot,
             signature,
         } => {
             if me_unsigned || !rest.is_empty() {
                 // This instruction must be signed by `me`
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.submit_mining_proof(
                 sha_state,
@@ -56,10 +56,10 @@ pub fn process_instruction(
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageInstruction::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
+        StorageOpCode::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
             if me_unsigned || !rest.is_empty() {
                 // This instruction must be signed by `me`
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.advertise_storage_recent_transaction_seal(
                 hash,
@@ -67,9 +67,9 @@ pub fn process_instruction(
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageInstruction::ClaimStorageReward { slot } => {
+        StorageOpCode::ClaimStorageReward { slot } => {
             if rest.len() != 1 {
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             storage_account.claim_storage_reward(
                 &mut rest[0],
@@ -77,10 +77,10 @@ pub fn process_instruction(
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageInstruction::ProofValidation { segment, proofs } => {
+        StorageOpCode::ProofValidation { segment, proofs } => {
             if me_unsigned || rest.is_empty() {
                 // This instruction must be signed by `me` and `rest` cannot be empty
-                Err(InstructionError::InvalidArgument)?;
+                Err(OpCodeErr::InvalidArgument)?;
             }
             let mut rest: Vec<_> = rest
                 .iter_mut()
@@ -98,7 +98,7 @@ mod tests {
         CheckedProof, Proof, ProofStatus, StorageContract, STORAGE_ACCOUNT_SPACE,
         TOTAL_STORAGE_MINER_REWARDS, TOTAL_VALIDATOR_REWARDS,
     };
-    use crate::storage_instruction;
+    use crate::storage_opcode;
     use crate::SLOTS_PER_SEGMENT;
     use crate::{get_segment_from_slot, id};
     use assert_matches::assert_matches;
@@ -110,7 +110,7 @@ mod tests {
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::hash::{hash, Hash};
-    use morgan_interface::instruction::Instruction;
+    use morgan_interface::opcodes::OpCode;
     use morgan_interface::message::Message;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
@@ -123,7 +123,7 @@ mod tests {
         ix: &Instruction,
         program_accounts: &mut [Account],
         drop_height: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let mut keyed_accounts: Vec<_> = ix
             .accounts
             .iter()
@@ -133,7 +133,7 @@ mod tests {
             })
             .collect();
 
-        let ret = process_instruction(&id(), &mut keyed_accounts, &ix.data, drop_height);
+        let ret = handle_opcode(&id(), &mut keyed_accounts, &ix.data, drop_height);
         // info!("{}", Info(format!("ret: {:?}", ret).to_string()));
         let info:String = format!("ret: {:?}", ret).to_string();
         println!("{}",
@@ -157,7 +157,7 @@ mod tests {
             storage_account.initialize_storage_miner_storage().unwrap();
         }
 
-        let ix = storage_instruction::mining_proof(
+        let ix = storage_opcode::mining_proof(
             &pubkey,
             Hash::default(),
             SLOTS_PER_SEGMENT,
@@ -177,7 +177,7 @@ mod tests {
         let pubkey = Pubkey::new_rand();
         let mut accounts = [(pubkey, Account::default())];
         let mut keyed_accounts = create_keyed_accounts(&mut accounts);
-        assert!(process_instruction(&id(), &mut keyed_accounts, &[], 42).is_err());
+        assert!(handle_opcode(&id(), &mut keyed_accounts, &[], 42).is_err());
     }
 
     #[test]
@@ -187,15 +187,15 @@ mod tests {
         let mut user_account = Account::default();
         keyed_accounts.push(KeyedAccount::new(&pubkey, true, &mut user_account));
 
-        let ix = storage_instruction::advertise_recent_transaction_seal(
+        let ix = storage_opcode::advertise_recent_transaction_seal(
             &pubkey,
             Hash::default(),
             SLOTS_PER_SEGMENT,
         );
 
         assert_eq!(
-            process_instruction(&id(), &mut keyed_accounts, &ix.data, 42),
-            Err(InstructionError::InvalidAccountData)
+            handle_opcode(&id(), &mut keyed_accounts, &ix.data, 42),
+            Err(OpCodeErr::InvalidAccountData)
         );
     }
 
@@ -205,7 +205,7 @@ mod tests {
         let mut accounts = [Account::default()];
 
         let ix =
-            storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -225,7 +225,7 @@ mod tests {
         accounts[1].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
 
         let ix =
-            storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
 
         // submitting a proof for a slot in the past, so this should fail
         assert!(test_instruction(&ix, &mut accounts, 0).is_err());
@@ -243,7 +243,7 @@ mod tests {
         }
 
         let ix =
-            storage_instruction::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -272,7 +272,7 @@ mod tests {
         let mining_pool_pubkey = mining_pool_keypair.pubkey();
 
         let mut treasury = Treasury::new(&genesis_block);
-        treasury.add_instruction_processor(id(), process_instruction);
+        treasury.add_opcode_handler(id(), handle_opcode);
         let treasury = Arc::new(treasury);
         let slot = 0;
         let treasury_client = TreasuryClient::new_shared(&treasury);
@@ -284,7 +284,7 @@ mod tests {
             &[&miner_1_storage_id, &miner_2_storage_id],
             10,
         );
-        let message = Message::new(storage_instruction::create_mining_pool_account(
+        let message = Message::new(storage_opcode::create_mining_pool_account(
             &mint_pubkey,
             &mining_pool_pubkey,
             100,
@@ -299,7 +299,7 @@ mod tests {
 
         // advertise for storage segment 1
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_transaction_seal(
+            vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT,
@@ -334,7 +334,7 @@ mod tests {
                 ));
         }
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_transaction_seal(
+            vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 2,
@@ -353,7 +353,7 @@ mod tests {
         );
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::proof_validation(
+            vec![storage_opcode::proof_validation(
                 &validator_storage_id,
                 get_segment_from_slot(slot) as u64,
                 checked_proofs,
@@ -367,7 +367,7 @@ mod tests {
         );
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_transaction_seal(
+            vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 3,
@@ -388,7 +388,7 @@ mod tests {
         assert_eq!(treasury_client.get_balance(&validator_storage_id).unwrap(), 10);
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::claim_reward(
+            vec![storage_opcode::claim_reward(
                 &validator_storage_id,
                 &mining_pool_pubkey,
                 slot,
@@ -412,7 +412,7 @@ mod tests {
         );
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::claim_reward(
+            vec![storage_opcode::claim_reward(
                 &miner_1_storage_id,
                 &mining_pool_pubkey,
                 slot,
@@ -422,7 +422,7 @@ mod tests {
         assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::claim_reward(
+            vec![storage_opcode::claim_reward(
                 &miner_2_storage_id,
                 &mining_pool_pubkey,
                 slot,
@@ -448,7 +448,7 @@ mod tests {
         let mut ixs: Vec<_> = validator_accounts_to_create
             .into_iter()
             .flat_map(|account| {
-                storage_instruction::create_validator_storage_account(
+                storage_opcode::create_validator_storage_account(
                     &mint.pubkey(),
                     account,
                     difs,
@@ -458,7 +458,7 @@ mod tests {
         storage_miner_accounts_to_create
             .into_iter()
             .for_each(|account| {
-                ixs.append(&mut storage_instruction::create_miner_storage_account(
+                ixs.append(&mut storage_opcode::create_miner_storage_account(
                     &mint.pubkey(),
                     account,
                     difs,
@@ -512,7 +512,7 @@ mod tests {
     ) -> CheckedProof {
         let sha_state = Hash::new(Pubkey::new_rand().as_ref());
         let message = Message::new_with_payer(
-            vec![storage_instruction::mining_proof(
+            vec![storage_opcode::mining_proof(
                 &storage_keypair.pubkey(),
                 sha_state,
                 slot,
@@ -559,7 +559,7 @@ mod tests {
         let validator_pubkey = validator_keypair.pubkey();
 
         let mut treasury = Treasury::new(&genesis_block);
-        treasury.add_instruction_processor(id(), process_instruction);
+        treasury.add_opcode_handler(id(), handle_opcode);
         // _drop the treasury up until it's moved into storage segment 2
         let next_storage_segment_drop_height = DROPS_IN_SEGMENT * 2;
         for _ in 0..next_storage_segment_drop_height {
@@ -575,14 +575,14 @@ mod tests {
             .transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
-        let message = Message::new(storage_instruction::create_miner_storage_account(
+        let message = Message::new(storage_opcode::create_miner_storage_account(
             &mint_pubkey,
             &miner_pubkey,
             1,
         ));
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
-        let message = Message::new(storage_instruction::create_validator_storage_account(
+        let message = Message::new(storage_opcode::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
@@ -590,7 +590,7 @@ mod tests {
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
         let message = Message::new_with_payer(
-            vec![storage_instruction::advertise_recent_transaction_seal(
+            vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_pubkey,
                 storage_transaction_seal,
                 SLOTS_PER_SEGMENT,
@@ -605,7 +605,7 @@ mod tests {
 
         let slot = 0;
         let message = Message::new_with_payer(
-            vec![storage_instruction::mining_proof(
+            vec![storage_opcode::mining_proof(
                 &miner_pubkey,
                 Hash::default(),
                 slot,

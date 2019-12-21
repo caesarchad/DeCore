@@ -9,7 +9,7 @@
 
 use crate::gas_cost::GasCost;
 use crate::hash::Hash;
-use crate::instruction::Instruction;
+use crate::opcodes::OpCode;
 use crate::message::Message;
 use crate::pubkey::Pubkey;
 use crate::signature::{Keypair, Signature};
@@ -28,7 +28,7 @@ pub trait OnlineAccount {
 
     /// Create a transaction from a single instruction that only requires
     /// a single signer. Then send it to the server, retrying as-needed.
-    fn snd_online_instruction(&self, keypair: &Keypair, instruction: Instruction) -> Result<Signature>;
+    fn snd_online_instruction(&self, keypair: &Keypair, instruction: OpCode) -> Result<Signature>;
 
     /// Transfer difs from `keypair` to `pubkey`, retrying until the
     /// transfer completes or produces and error.
@@ -86,7 +86,7 @@ pub trait OfflineAccount {
     fn send_offline_instruction(
         &self,
         keypair: &Keypair,
-        instruction: Instruction,
+        instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 

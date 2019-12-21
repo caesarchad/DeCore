@@ -1,5 +1,5 @@
 use crate::account::KeyedAccount;
-use crate::instruction::InstructionError;
+use crate::opcodes::OpCodeErr;
 use crate::pubkey::Pubkey;
 use num_traits::FromPrimitive;
 
@@ -12,7 +12,7 @@ pub type Entrypoint = unsafe extern "C" fn(
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
-) -> Result<(), InstructionError>;
+) -> Result<(), OpCodeErr>;
 
 // Convenience macro to define the native program entrypoint.  Supply a fn to this macro that
 // conforms to the `Entrypoint` type signature.
@@ -25,7 +25,7 @@ macro_rules! morgan_entrypoint(
             keyed_accounts: &mut [morgan_interface::account::KeyedAccount],
             data: &[u8],
             drop_height: u64
-        ) -> Result<(), morgan_interface::instruction::InstructionError> {
+        ) -> Result<(), morgan_interface::opcodes::OpCodeErr> {
             $entrypoint(program_id, keyed_accounts, data, drop_height)
         }
     )

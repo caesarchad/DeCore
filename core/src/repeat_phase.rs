@@ -22,7 +22,7 @@ use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::KeypairUtil;
 use morgan_interface::timing::{self, duration_as_ms};
 use morgan_interface::transaction::Transaction;
-use morgan_vote_api::vote_instruction;
+use morgan_vote_api::vote_opcode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, RwLock};
@@ -349,14 +349,14 @@ impl RepeatPhase {
             let node_keypair = node_group_info.read().unwrap().keypair.clone();
 
             // Send our last few votes along with the new one
-            let vote_ix = vote_instruction::vote(
+            let vote_ix = vote_opcode::vote(
                 &node_keypair.pubkey(),
                 &vote_account,
                 &voting_keypair.pubkey(),
                 locktower.recent_votes(),
             );
 
-            let mut vote_tx = Transaction::new_unsigned_instructions(vec![vote_ix]);
+            let mut vote_tx = Transaction::new_u_opcodes(vec![vote_ix]);
             let transaction_seal = treasury.last_transaction_seal();
             vote_tx.partial_sign(&[node_keypair.as_ref()], transaction_seal);
             vote_tx.partial_sign(&[voting_keypair.as_ref()], transaction_seal);

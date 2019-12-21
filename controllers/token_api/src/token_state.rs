@@ -2,7 +2,7 @@ use log::*;
 use num_derive::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction_processor_utils::DecodeError;
+use morgan_interface::opcodes_utils::DecodeError;
 use morgan_interface::pubkey::Pubkey;
 use morgan_helper::logHelper::*;
 
@@ -30,47 +30,35 @@ pub type Result<T> = std::result::Result<T, TokenError>;
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct TokenInfo {
-    /// Total supply of tokens
     supply: u64,
 
-    /// Number of base 10 digits to the right of the decimal place in the total supply
     decimals: u8,
 
-    /// Descriptive name of this token
     name: String,
 
-    /// Symbol for this token
     symbol: String,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenAccountDelegateInfo {
-    /// The genesis account for the tokens
     genesis: Pubkey,
 
-    /// The original amount that this delegate account was authorized to spend up to
     original_amount: u64,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenAccountInfo {
-    /// The kind of token this account holds
     token: Pubkey,
 
-    /// Owner of this account
     owner: Pubkey,
 
-    /// Amount of tokens this account holds
     amount: u64,
 
-    /// If `delegate` None, `amount` belongs to this account.
-    /// If `delegate` is Option<_>, `amount` represents the remaining allowance
-    /// of tokens that may be transferred from the `genesis` account.
     delegate: Option<TokenAccountDelegateInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-enum TokenInstruction {
+enum TokenOpCode {
     NewToken(TokenInfo),
     NewTokenAccount,
     Transfer(u64),
@@ -94,7 +82,7 @@ impl Default for TokenState {
 impl TokenState {
     #[allow(clippy::needless_pass_by_value)]
     fn map_to_invalid_args(err: std::boxed::Box<bincode::ErrorKind>) -> TokenError {
-        // warn!("invalid argument: {:?}", err);
+        
         println!(
             "{}",
             Warn(
@@ -124,7 +112,7 @@ impl TokenState {
 
     fn serialize(self: &TokenState, output: &mut [u8]) -> Result<()> {
         if output.is_empty() {
-            // warn!("serialize fail: ouput.len is 0");
+            
             println!(
                 "{}",
                 Warn(
@@ -167,7 +155,7 @@ impl TokenState {
                 }
             }
         }
-        // warn!("TokenState: non-owner rejected");
+        
         println!(
             "{}",
             Warn(
@@ -185,7 +173,7 @@ impl TokenState {
         output_accounts: &mut Vec<(usize, TokenState)>,
     ) -> Result<()> {
         if input_accounts.len() != 2 {
-            // error!("{}", Error(format!("Expected 2 accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -198,7 +186,7 @@ impl TokenState {
 
         if let TokenState::Account(dest_account) = &input_accounts[1] {
             if info[0].signer_key().unwrap() != &dest_account.token {
-                // error!("{}", Error(format!("account 1 token mismatch").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -210,7 +198,7 @@ impl TokenState {
             }
 
             if dest_account.delegate.is_some() {
-                // error!("{}", Error(format!("account 1 is a delegate and cannot accept tokens").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -225,7 +213,7 @@ impl TokenState {
             output_dest_account.amount = token_info.supply;
             output_accounts.push((1, TokenState::Account(output_dest_account)));
         } else {
-            // error!("{}", Error(format!("account 1 invalid").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -237,7 +225,7 @@ impl TokenState {
         }
 
         if input_accounts[0] != TokenState::Unallocated {
-            // error!("{}", Error(format!("account 0 not available").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -272,7 +260,7 @@ impl TokenState {
             Err(TokenError::InvalidArgument)?;
         }
         if input_accounts[0] != TokenState::Unallocated {
-            // error!("{}", Error(format!("account 0 is already allocated").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -305,7 +293,7 @@ impl TokenState {
         output_accounts: &mut Vec<(usize, TokenState)>,
     ) -> Result<()> {
         if input_accounts.len() < 3 {
-            // error!("{}", Error(format!("Expected 3 accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -320,7 +308,7 @@ impl TokenState {
             (&input_accounts[1], &input_accounts[2])
         {
             if source_account.token != dest_account.token {
-                // error!("{}", Error(format!("account 1/2 token mismatch").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -332,7 +320,7 @@ impl TokenState {
             }
 
             if dest_account.delegate.is_some() {
-                // error!("{}", Error(format!("account 2 is a delegate and cannot accept tokens").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -344,7 +332,7 @@ impl TokenState {
             }
 
             if info[0].signer_key().unwrap() != &source_account.owner {
-                // error!("{}", Error(format!("owner of account 1 not present").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -365,7 +353,7 @@ impl TokenState {
 
             if let Some(ref delegate_info) = source_account.delegate {
                 if input_accounts.len() != 4 {
-                    // error!("{}", Error(format!("Expected 4 accounts").to_string()));
+                    
                     println!(
                         "{}",
                         Error(
@@ -379,7 +367,7 @@ impl TokenState {
                 let delegate_account = source_account;
                 if let TokenState::Account(source_account) = &input_accounts[3] {
                     if source_account.token != delegate_account.token {
-                        // error!("{}", Error(format!("account 1/3 token mismatch").to_string()));
+                        
                         println!(
                             "{}",
                             Error(
@@ -390,7 +378,7 @@ impl TokenState {
                         Err(TokenError::InvalidArgument)?;
                     }
                     if info[3].unsigned_key() != &delegate_info.genesis {
-                        // error!("{}", Error(format!("Account 1 is not a delegate of account 3").to_string()));
+                        
                         println!(
                             "{}",
                             Error(
@@ -409,7 +397,7 @@ impl TokenState {
                     output_source_account.amount -= amount;
                     output_accounts.push((3, TokenState::Account(output_source_account)));
                 } else {
-                    // error!("{}", Error(format!("account 3 is an invalid account").to_string()));
+                    
                     println!(
                         "{}",
                         Error(
@@ -425,7 +413,7 @@ impl TokenState {
             output_dest_account.amount += amount;
             output_accounts.push((2, TokenState::Account(output_dest_account)));
         } else {
-            // error!("{}", Error(format!("account 1 and/or 2 are invalid accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -445,7 +433,7 @@ impl TokenState {
         output_accounts: &mut Vec<(usize, TokenState)>,
     ) -> Result<()> {
         if input_accounts.len() != 3 {
-            // error!("{}", Error(format!("Expected 3 accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -460,7 +448,7 @@ impl TokenState {
             (&input_accounts[1], &input_accounts[2])
         {
             if source_account.token != delegate_account.token {
-                // error!("{}", Error(format!("account 1/2 token mismatch").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -472,7 +460,7 @@ impl TokenState {
             }
 
             if info[0].signer_key().unwrap() != &source_account.owner {
-                // error!("{}", Error(format!("owner of account 1 not present").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -484,7 +472,7 @@ impl TokenState {
             }
 
             if source_account.delegate.is_some() {
-                // error!("{}", Error(format!("account 1 is a delegate").to_string()));
+                
                 println!(
                     "{}",
                     Error(
@@ -497,7 +485,7 @@ impl TokenState {
 
             match &delegate_account.delegate {
                 None => {
-                    // error!("{}", Error(format!("account 2 is not a delegate").to_string()));
+                    
                     println!(
                         "{}",
                         Error(
@@ -509,7 +497,7 @@ impl TokenState {
                 }
                 Some(delegate_info) => {
                     if info[1].unsigned_key() != &delegate_info.genesis {
-                        // error!("{}", Error(format!("account 2 is not a delegate of account 1").to_string()));
+                        
                         println!(
                             "{}",
                             Error(
@@ -530,7 +518,7 @@ impl TokenState {
                 }
             }
         } else {
-            // error!("{}", Error(format!("account 1 and/or 2 are invalid accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -549,7 +537,7 @@ impl TokenState {
         output_accounts: &mut Vec<(usize, TokenState)>,
     ) -> Result<()> {
         if input_accounts.len() < 3 {
-            // error!("{}", Error(format!("Expected 3 accounts").to_string()));
+            
             println!(
                 "{}",
                 Error(
@@ -562,7 +550,7 @@ impl TokenState {
 
         if let TokenState::Account(source_account) = &input_accounts[1] {
             if info[0].signer_key().unwrap() != &source_account.owner {
-                // info!("{}", Info(format!("owner of account 1 not present").to_string()));
+                
                 let info:String = format!("owner of account 1 not present").to_string();
                 println!("{}",
                     printLn(
@@ -578,7 +566,7 @@ impl TokenState {
             output_source_account.owner = *info[2].unsigned_key();
             output_accounts.push((1, TokenState::Account(output_source_account)));
         } else {
-            // info!("{}", Info(format!("account 1 is invalid").to_string()));
+            
             let info:String = format!("account 1 is invalid").to_string();
             println!("{}",
                 printLn(
@@ -593,8 +581,8 @@ impl TokenState {
 
     pub fn process(program_id: &Pubkey, info: &mut [KeyedAccount], input: &[u8]) -> Result<()> {
         let command =
-            bincode::deserialize::<TokenInstruction>(input).map_err(Self::map_to_invalid_args)?;
-        // info!("{}", Info(format!("process_transaction: command={:?}", command).to_string()));
+            bincode::deserialize::<TokenOpCode>(input).map_err(Self::map_to_invalid_args)?;
+        
         let loginfo:String = format!("process_transaction: command={:?}", command).to_string();
         println!("{}",
             printLn(
@@ -613,7 +601,7 @@ impl TokenState {
                     match Self::deserialize(&account.data) {
                         Ok(token_state) => token_state,
                         Err(err) => {
-                            // error!("{}", Error(format!("deserialize failed: {:?}", err).to_string()));
+                            
                             println!(
                                 "{}",
                                 Error(
@@ -631,7 +619,7 @@ impl TokenState {
             .collect();
 
         for account in &input_accounts {
-            // info!("{}", Info(format!("input_account: data={:?}", account).to_string()));
+            
             let loginfo:String = format!("input_account: data={:?}", account).to_string();
             println!("{}",
                 printLn(
@@ -644,27 +632,27 @@ impl TokenState {
         let mut output_accounts: Vec<(_, _)> = vec![];
 
         match command {
-            TokenInstruction::NewToken(token_info) => {
+            TokenOpCode::NewToken(token_info) => {
                 Self::process_newtoken(info, token_info, &input_accounts, &mut output_accounts)?
             }
-            TokenInstruction::NewTokenAccount => {
+            TokenOpCode::NewTokenAccount => {
                 Self::process_newaccount(info, &input_accounts, &mut output_accounts)?
             }
 
-            TokenInstruction::Transfer(amount) => {
+            TokenOpCode::Transfer(amount) => {
                 Self::process_transfer(info, amount, &input_accounts, &mut output_accounts)?
             }
 
-            TokenInstruction::Approve(amount) => {
+            TokenOpCode::Approve(amount) => {
                 Self::process_approve(info, amount, &input_accounts, &mut output_accounts)?
             }
 
-            TokenInstruction::SetOwner => {
+            TokenOpCode::SetOwner => {
                 Self::process_setowner(info, &input_accounts, &mut output_accounts)?
             }
         }
         for (index, account) in &output_accounts {
-            // info!("{}", Info(format!("output_account: index={} data={:?}", index, account).to_string()));
+            
             let loginfo:String = format!("output_account: index={} data={:?}", index, account).to_string();
             println!("{}",
                 printLn(
@@ -710,7 +698,7 @@ mod test {
     pub fn serde_expect_fail() {
         let mut data = vec![0; 256];
 
-        // Certain TokenState's may not be serialized
+        
         let account = TokenState::default();
         assert_eq!(account, TokenState::Unallocated);
         assert!(account.serialize(&mut data).is_err());
@@ -718,7 +706,7 @@ mod test {
         let account = TokenState::Invalid;
         assert!(account.serialize(&mut data).is_err());
 
-        // Bad deserialize data
+        
         assert!(TokenState::deserialize(&[]).is_err());
         assert!(TokenState::deserialize(&[1]).is_err());
         assert!(TokenState::deserialize(&[1, 2]).is_err());
@@ -726,5 +714,5 @@ mod test {
         assert!(TokenState::deserialize(&[3]).is_err());
     }
 
-    // Note: business logic tests are located in the @morgan/web3.js test suite
+    
 }

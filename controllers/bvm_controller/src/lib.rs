@@ -9,8 +9,8 @@ use libc::c_char;
 use log::*;
 use solana_rbpf::{EbpfVmRaw, MemoryRegion};
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
-use morgan_interface::loader_instruction::LoaderInstruction;
+use morgan_interface::opcodes::OpCodeErr;
+use morgan_interface::mounter_opcode::MounterOpCode;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::morgan_entrypoint;
 use std::alloc::Layout;
@@ -310,7 +310,7 @@ fn entrypoint(
     keyed_accounts: &mut [KeyedAccount],
     tx_data: &[u8],
     drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
 
     if keyed_accounts[0].account.executable {
@@ -336,7 +336,7 @@ fn entrypoint(
                         module_path!().to_string()
                     )
                 );
-                return Err(InstructionError::GenericError);
+                return Err(OpCodeErr::GenericError);
             }
         };
         let mut v = serialize_parameters(program_id, params, &tx_data, drop_height);
@@ -352,7 +352,7 @@ fn entrypoint(
                             module_path!().to_string()
                         )
                     );
-                    return Err(InstructionError::GenericError);
+                    return Err(OpCodeErr::GenericError);
                 }
             }
             Err(e) => {
@@ -364,14 +364,10 @@ fn entrypoint(
                         module_path!().to_string()
                     )
                 );
-                return Err(InstructionError::GenericError);
+                return Err(OpCodeErr::GenericError);
             }
         }
         deserialize_parameters(params, &v);
-        // info!(
-        //     "{}", Info(format!("BPF program executed {} instructions",
-        //     vm.get_last_instruction_count()).to_string())
-        // );
         let info:String = format!("BPF program executed {} instructions",
             vm.get_last_instruction_count()).to_string();
         println!("{}",
@@ -390,20 +386,14 @@ fn entrypoint(
                     module_path!().to_string()
                 )
             );
-            return Err(InstructionError::GenericError);
+            return Err(OpCodeErr::GenericError);
         }
         match instruction {
-            LoaderInstruction::Write { offset, bytes } => {
+            MounterOpCode::Write { offset, bytes } => {
                 let offset = offset as usize;
                 let len = bytes.len();
                 debug!("Write: offset={} length={}", offset, len);
                 if keyed_accounts[0].account.data.len() < offset + len {
-                    // warn!(
-                    //     "{}",
-                    //     Warn(format!("Write overflow: {} < {}",
-                    //     keyed_accounts[0].account.data.len(),
-                    //     offset + len).to_string())
-                    // );
                     println!(
                         "{}",
                         Warn(
@@ -413,17 +403,12 @@ fn entrypoint(
                             module_path!().to_string()
                         )
                     );
-                    return Err(InstructionError::GenericError);
+                    return Err(OpCodeErr::GenericError);
                 }
                 keyed_accounts[0].account.data[offset..offset + len].copy_from_slice(&bytes);
             }
-            LoaderInstruction::Finalize => {
+            MounterOpCode::Finalize => {
                 keyed_accounts[0].account.executable = true;
-                // info!(
-                //     "{}",
-                //     Info(format!("Finalize: account {:?}",
-                //     keyed_accounts[0].signer_key().unwrap()).to_string())
-                // );
                 let info:String = format!("Finalize: account {:?}",
                     keyed_accounts[0].signer_key().unwrap()).to_string();
                 println!("{}",
@@ -435,7 +420,6 @@ fn entrypoint(
             }
         }
     } else {
-        // warn!("{}", Warn(format!("Invalid program transaction: {:?}", tx_data).to_string()));
         println!(
             "{}",
             Warn(
@@ -443,7 +427,7 @@ fn entrypoint(
                 module_path!().to_string()
             )
         );
-        return Err(InstructionError::GenericError);
+        return Err(OpCodeErr::GenericError);
     }
     Ok(())
 }

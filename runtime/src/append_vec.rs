@@ -9,8 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use log::*;
 
-//Data is aligned at the next 64 byte offset. Without alignment loading the memory may
-//crash on some architectures.
+
 macro_rules! align_up {
     ($addr: expr, $align: expr) => {
         ($addr + ($align - 1)) & !($align - 1)

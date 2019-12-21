@@ -5,5 +5,5 @@ macro_rules! morgan_budget_controller {
     };
 }
 
-use morgan_budget_api::budget_processor::process_instruction;
-morgan_interface::morgan_entrypoint!(process_instruction);
+use morgan_budget_api::budget_processor::handle_opcode;
+morgan_interface::morgan_entrypoint!(handle_opcode);

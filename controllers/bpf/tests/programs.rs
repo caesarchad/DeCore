@@ -4,7 +4,7 @@ mod bpf {
     use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_runtime::loader_utils::load_program;
     use morgan_interface::genesis_block::create_genesis_block;
-    use morgan_interface::native_loader;
+    use morgan_interface::bultin_mounter;
     use std::env;
     use std::fs::File;
     use std::path::PathBuf;
@@ -27,7 +27,7 @@ mod bpf {
     #[cfg(feature = "bpf_c")]
     mod bpf_c {
         use super::*;
-        use morgan_runtime::loader_utils::create_invoke_instruction;
+        use morgan_runtime::loader_utils::compose_call_opcode;
         use morgan_interface::bvm_controller;
         use morgan_interface::account_host::OnlineAccount;
         use morgan_interface::signature::KeypairUtil;
@@ -47,7 +47,7 @@ mod bpf {
 
             // Call user program
             let program_id = load_program(&treasury_client, &alice_keypair, &bvm_controller::id(), elf);
-            let instruction = create_invoke_instruction(alice_keypair.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(alice_keypair.pubkey(), program_id, &1u8);
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
                 .unwrap();
@@ -79,14 +79,14 @@ mod bpf {
                 let loader_pubkey = load_program(
                     &treasury_client,
                     &alice_keypair,
-                    &native_loader::id(),
+                    &bultin_mounter::id(),
                     "morgan_bpf_loader".as_bytes().to_vec(),
                 );
 
                 // Call user program
                 let program_id = load_program(&treasury_client, &alice_keypair, &loader_pubkey, elf);
                 let instruction =
-                    create_invoke_instruction(alice_keypair.pubkey(), program_id, &1u8);
+                    compose_call_opcode(alice_keypair.pubkey(), program_id, &1u8);
                 treasury_client
                     .snd_online_instruction(&alice_keypair, instruction)
                     .unwrap();
@@ -98,7 +98,7 @@ mod bpf {
     mod bpf_rust {
         use super::*;
         use morgan_interface::account_host::OnlineAccount;
-        use morgan_interface::instruction::{AccountMeta, Instruction};
+        use morgan_interface::opcodes::{AccountMeta, OpCode};
         use morgan_interface::signature::{Keypair, KeypairUtil};
         use std::io::Read;
 
@@ -125,7 +125,7 @@ mod bpf {
                 let loader_pubkey = load_program(
                     &treasury_client,
                     &alice_keypair,
-                    &native_loader::id(),
+                    &bultin_mounter::id(),
                     "morgan_bpf_loader".as_bytes().to_vec(),
                 );
 
@@ -135,7 +135,7 @@ mod bpf {
                     AccountMeta::new(alice_keypair.pubkey(), true),
                     AccountMeta::new(Keypair::new().pubkey(), false),
                 ];
-                let instruction = Instruction::new(program_id, &1u8, account_metas);
+                let instruction = OpCode::new(program_id, &1u8, account_metas);
                 treasury_client
                     .snd_online_instruction(&alice_keypair, instruction)
                     .unwrap();

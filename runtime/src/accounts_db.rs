@@ -1,23 +1,3 @@
-//! Persistent accounts are stored in below path location:
-//!  <path>/<pid>/data/
-//!
-//! The persistent store would allow for this mode of operation:
-//!  - Concurrent single thread append with many concurrent readers.
-//!
-//! The underlying memory is memory mapped to a file. The accounts would be
-//! stored across multiple files and the mappings of file and offset of a
-//! particular account would be stored in a shared index. This will allow for
-//! concurrent commits without blocking reads, which will sequentially write
-//! to memory, ssd or disk, and should be as fast as the hardware allow for.
-//! The only required in memory data structure with a write lock is the index,
-//! which should be fast to update.
-//!
-//! AppendVec's only store accounts for single forks.  To bootstrap the
-//! index from a persistent store of AppendVec's, the entries include
-//! a "write_version".  A single global atomic `AccountsDB::write_version`
-//! tracks the number of commits to the entire data store. So the latest
-//! commit for each fork entry would be indexed.
-
 use crate::accounts_index::{AccountsIndex, Fork};
 use crate::append_vec::{AppendVec, StorageMeta, StoredAccount};
 use hashbrown::{HashMap, HashSet};
@@ -52,21 +32,18 @@ pub struct ErrorCounters {
 
 #[derive(Default, Clone)]
 pub struct AccountInfo {
-    /// index identifying the append storage
+
     id: AppendVecId,
 
-    /// offset into the storage
     offset: usize,
 
-    /// difs in the account used when squashing kept for optimization
-    /// purposes to remove accounts with zero balance.
     difs: u64,
 }
-/// An offset into the AccountsDB::storage vector
+
 type AppendVecId = usize;
 pub type AccountStorage = HashMap<usize, Arc<AccountStorageEntry>>;
-pub type InstructionAccounts = Vec<Account>;
-pub type InstructionLoaders = Vec<Vec<(Pubkey, Account)>>;
+pub type OpCodeAcct = Vec<Account>;
+pub type OpCodeMounter = Vec<Vec<(Pubkey, Account)>>;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AccountStorageStatus {
@@ -74,20 +51,13 @@ pub enum AccountStorageStatus {
     StorageFull = 1,
 }
 
-/// Persistent storage structure holding the accounts
 pub struct AccountStorageEntry {
     id: AppendVecId,
 
     fork_id: Fork,
 
-    /// storage holding the accounts
     accounts: AppendVec,
 
-    /// Keeps track of the number of accounts stored in a specific AppendVec.
-    ///  This is periodically checked to reuse the stores that do not have
-    ///  any accounts in it
-    /// status corresponding to the storage, lets us know that
-    ///  the append_vec, once maxed out, then emptied, can be reclaimed
     count_and_status: RwLock<(usize, AccountStorageStatus)>,
 }
 
@@ -113,14 +83,7 @@ impl AccountStorageEntry {
         let count = count_and_status.0;
 
         if status == AccountStorageStatus::StorageFull && count == 0 {
-            // this case arises when the append_vec is full (store_ptrs fails),
-            //  but all accounts have already been removed from the storage
-            //
-            // the only time it's safe to call reset() on an append_vec is when
-            //  every account has been removed
-            //          **and**
-            //  the append_vec has previously been completely full
-            //
+            
             self.accounts.reset();
             status = AccountStorageStatus::StorageAvailable;
         }
@@ -146,17 +109,6 @@ impl AccountStorageEntry {
         let (count, mut status) = *count_and_status;
 
         if count == 1 && status == AccountStorageStatus::StorageFull {
-            // this case arises when we remove the last account from the
-            //  storage, but we've learned from previous write attempts that
-            //  the storage is full
-            //
-            // the only time it's safe to call reset() on an append_vec is when
-            //  every account has been removed
-            //          **and**
-            //  the append_vec has previously been completely full
-            //
-            // otherwise, the storage may be in flight with a store()
-            //   call
             self.accounts.reset();
             status = AccountStorageStatus::StorageAvailable;
         }
@@ -165,25 +117,18 @@ impl AccountStorageEntry {
     }
 }
 
-// This structure handles the load/store of the accounts
 #[derive(Default)]
 pub struct AccountsDB {
-    /// Keeps tracks of index into AppendVec on a per fork basis
     pub accounts_index: RwLock<AccountsIndex<AccountInfo>>,
 
-    /// Account storage
     pub storage: RwLock<AccountStorage>,
 
-    /// distribute the accounts across storage lists
     next_id: AtomicUsize,
 
-    /// write version
     write_version: AtomicUsize,
 
-    /// Set of storage paths to pick from
     paths: Vec<String>,
 
-    /// Starting file size of appendvecs
     file_size: u64,
 }
 
@@ -226,8 +171,6 @@ impl AccountsDB {
         false
     }
 
-    /// Scan a specific fork through all the account storage in parallel with sequential read
-    // PERF: Sequentially read each storage entry in parallel
     pub fn scan_account_storage<F, B>(&self, fork_id: Fork, scan_func: F) -> Vec<B>
     where
         F: Fn(&StoredAccount, &mut B) -> (),
@@ -262,7 +205,6 @@ impl AccountsDB {
         pubkey: &Pubkey,
     ) -> Option<(Account, Fork)> {
         let (info, fork) = accounts_index.get(pubkey, ancestors)?;
-        //TODO: thread this as a ref
         storage
             .get(&info.id)
             .and_then(|store| Some(store.accounts.get_account(info.offset)?.0.clone_account()))
@@ -306,7 +248,6 @@ impl AccountsDB {
     }
 
     pub fn purge_fork(&self, fork: Fork) {
-        //add_root should be called first
         let is_genesis = self.accounts_index.read().unwrap().is_genesis(fork);
         trace!("PURGING {} {}", fork, is_genesis);
         if !is_genesis {
@@ -380,7 +321,6 @@ impl AccountsDB {
                 store.remove_account();
             }
         }
-        //TODO: performance here could be improved if AccountsDB::storage was organized by fork
         let dead_forks: HashSet<Fork> = storage
             .values()
             .filter_map(|x| {
@@ -399,14 +339,12 @@ impl AccountsDB {
     }
     fn cleanup_dead_forks(&self, dead_forks: &mut HashSet<Fork>) {
         let mut index = self.accounts_index.write().unwrap();
-        // a fork is not totally dead until it is older than the root
         dead_forks.retain(|fork| *fork < index.last_root);
         for fork in dead_forks.iter() {
             index.cleanup_dead_fork(*fork);
         }
     }
 
-    /// Store the account update.
     pub fn store(&self, fork_id: Fork, accounts: &[(&Pubkey, &Account)]) {
         let infos = self.store_accounts(fork_id, accounts);
         let reclaims = self.update_index(fork_id, infos, accounts);
@@ -427,7 +365,7 @@ impl AccountsDB {
 
 #[cfg(test)]
 mod tests {
-    // TODO: all the treasury tests are treasury specific, issue: 2194
+
     use super::*;
     use rand::{thread_rng, Rng};
     use morgan_interface::account::Account;
@@ -538,29 +476,14 @@ mod tests {
         let key = Pubkey::default();
         let account0 = Account::new(1, 0, 0, &key);
 
-        // store value 1 in the "root", i.e. db zero
         db.store(0, &[(&key, &account0)]);
 
-        // now we have:
-        //
-        //                       root0 -> key.difs==1
-        //                        / \
-        //                       /   \
-        //  key.difs==0 <- fork1    \
-        //                             fork2 -> key.difs==1
-        //                                       (via root0)
-
-        // store value 0 in one child
         let account1 = Account::new(0, 0, 0, &key);
         db.store(1, &[(&key, &account1)]);
 
-        // masking accounts is done at the Accounts level, at accountsDB we see
-        // original account (but could also accept "None", which is implemented
-        // at the Accounts level)
         let ancestors = vec![(0, 0), (1, 1)].into_iter().collect();
         assert_eq!(&db.load_slow(&ancestors, &key).unwrap().0, &account1);
 
-        // we should see 1 token in fork 2
         let ancestors = vec![(0, 0), (2, 2)].into_iter().collect();
         assert_eq!(&db.load_slow(&ancestors, &key).unwrap().0, &account0);
 
@@ -569,7 +492,7 @@ mod tests {
         let ancestors = vec![(1, 1)].into_iter().collect();
         assert_eq!(db.load_slow(&ancestors, &key), Some((account1, 1)));
         let ancestors = vec![(2, 2)].into_iter().collect();
-        assert_eq!(db.load_slow(&ancestors, &key), Some((account0, 0))); // original value
+        assert_eq!(db.load_slow(&ancestors, &key), Some((account0, 0))); 
     }
 
     #[test]
@@ -590,7 +513,6 @@ mod tests {
 
         db.add_root(0);
 
-        // check that all the accounts appear with a new root
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(0, 0)].into_iter().collect();
@@ -643,18 +565,14 @@ mod tests {
     fn test_accounts_unsquashed() {
         let key = Pubkey::default();
 
-        // 1 token in the "root", i.e. db zero
         let paths = get_tmp_accounts_path!();
         let db0 = AccountsDB::new(&paths.paths);
         let account0 = Account::new(1, 0, 0, &key);
         db0.store(0, &[(&key, &account0)]);
 
-        // 0 difs in the child
         let account1 = Account::new(0, 0, 0, &key);
         db0.store(1, &[(&key, &account1)]);
 
-        // masking accounts is done at the Accounts level, at accountsDB we see
-        // original account
         let ancestors = vec![(0, 0), (1, 1)].into_iter().collect();
         assert_eq!(db0.load_slow(&ancestors, &key), Some((account1, 1)));
         let ancestors = vec![(0, 0)].into_iter().collect();
@@ -825,7 +743,6 @@ mod tests {
             account2
         );
 
-        // lots of stores, but 3 storages should be enough for everything
         for i in 0..25 {
             let index = i % 2;
             accounts.store(0, &[(&pubkey1, &account1)]);
@@ -877,14 +794,10 @@ mod tests {
 
     #[test]
     fn test_lazy_gc_fork() {
-        //This test is pedantic
-        //A fork is purged when a non root treasury is cleaned up.  If a fork is behind root but it is
-        //not root, it means we are retaining dead treasuries.
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
         let pubkey = Pubkey::new_rand();
         let account = Account::new(1, 0, 0, &Account::default().owner);
-        //store an account
         accounts.store(0, &[(&pubkey, &account)]);
         let ancestors = vec![(0, 0)].into_iter().collect();
         let info = accounts
@@ -895,20 +808,15 @@ mod tests {
             .unwrap()
             .0
             .clone();
-        //fork 0 is behind root, but it is not root, therefore it is purged
         accounts.add_root(1);
         assert!(accounts.accounts_index.read().unwrap().is_purged(0));
 
-        //fork is still there, since gc is lazy
         assert!(accounts.storage.read().unwrap().get(&info.id).is_some());
 
-        //store causes cleanup
         accounts.store(1, &[(&pubkey, &account)]);
 
-        //fork is gone
         assert!(accounts.storage.read().unwrap().get(&info.id).is_none());
 
-        //new value is there
         let ancestors = vec![(1, 1)].into_iter().collect();
         assert_eq!(accounts.load_slow(&ancestors, &pubkey), Some((account, 1)));
     }

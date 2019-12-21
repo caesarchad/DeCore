@@ -1,7 +1,7 @@
 //! Defines a Transaction type to package an atomic sequence of instructions.
 
 use crate::hash::Hash;
-use crate::instruction::{CompiledInstruction, Instruction, InstructionError};
+use crate::opcodes::{EncodedOpCodes, OpCode, OpCodeErr};
 use crate::message::Message;
 use crate::pubkey::Pubkey;
 use crate::short_vec;
@@ -12,7 +12,7 @@ use std::result;
 /// Reasons a transaction might be rejected.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum TransactionError {
-    /// This Pubkey is being processed in another transaction
+    
     AccountInUse,
 
     /// Pubkey appears twice in the same transaction, typically in a pay-to-self
@@ -41,7 +41,7 @@ pub enum TransactionError {
     TransactionSealNotFound,
 
     /// The program returned an error
-    InstructionError(u8, InstructionError),
+    OpCodeErr(u8, OpCodeErr),
 
     /// Loader call chain too deep
     CallChainTooDeep,
@@ -75,7 +75,7 @@ impl Transaction {
         }
     }
 
-    pub fn new_unsigned_instructions(instructions: Vec<Instruction>) -> Self {
+    pub fn new_u_opcodes(instructions: Vec<OpCode>) -> Self {
         let message = Message::new(instructions);
         Self::new_unsigned(message)
     }
@@ -90,28 +90,22 @@ impl Transaction {
         tx
     }
 
-    pub fn new_signed_instructions<T: KeypairUtil>(
+    pub fn new_s_opcodes<T: KeypairUtil>(
         from_keypairs: &[&T],
-        instructions: Vec<Instruction>,
+        instructions: Vec<OpCode>,
         recent_transaction_seal: Hash,
     ) -> Transaction {
         let message = Message::new(instructions);
         Self::new(from_keypairs, message, recent_transaction_seal)
     }
 
-    /// Create a signed transaction
-    /// * `from_keypairs` - The keys used to sign the transaction.
-    /// * `keys` - The keys for the transaction.  These are the program state
-    ///    instances or dif recipient keys.
-    /// * `recent_transaction_seal` - The Water Clock hash.
-    /// * `program_ids` - The keys that identify programs used in the `instruction` vector.
-    /// * `instructions` - Instructions that will be executed atomically.
-    pub fn new_with_compiled_instructions<T: KeypairUtil>(
+    
+    pub fn new_with_encoded_opcodes<T: KeypairUtil>(
         from_keypairs: &[&T],
         keys: &[Pubkey],
         recent_transaction_seal: Hash,
         program_ids: Vec<Pubkey>,
-        instructions: Vec<CompiledInstruction>,
+        instructions: Vec<EncodedOpCodes>,
     ) -> Self {
         let mut account_keys: Vec<_> = from_keypairs
             .iter()
@@ -119,7 +113,7 @@ impl Transaction {
             .collect();
         account_keys.extend_from_slice(keys);
         account_keys.extend(&program_ids);
-        let message = Message::new_with_compiled_instructions(
+        let message = Message::new_with_encoded_opcodes(
             from_keypairs.len() as u8,
             0,
             program_ids.len() as u8,
@@ -240,9 +234,9 @@ impl Transaction {
 mod tests {
     use super::*;
     use crate::hash::hash;
-    use crate::instruction::AccountMeta;
+    use crate::opcodes::AccountMeta;
     use crate::signature::Keypair;
-    use crate::system_instruction;
+    use crate::sys_opcode;
     use bincode::{deserialize, serialize, serialized_size};
     use std::mem::size_of;
 
@@ -260,10 +254,10 @@ mod tests {
         let prog1 = Pubkey::new_rand();
         let prog2 = Pubkey::new_rand();
         let instructions = vec![
-            CompiledInstruction::new(3, &(), vec![0, 1]),
-            CompiledInstruction::new(4, &(), vec![0, 2]),
+            EncodedOpCodes::new(3, &(), vec![0, 1]),
+            EncodedOpCodes::new(4, &(), vec![0, 2]),
         ];
-        let tx = Transaction::new_with_compiled_instructions(
+        let tx = Transaction::new_with_encoded_opcodes(
             &[&key],
             &[key1, key2],
             Hash::default(),
@@ -296,8 +290,8 @@ mod tests {
     #[test]
     fn test_refs_invalid_program_id() {
         let key = Keypair::new();
-        let instructions = vec![CompiledInstruction::new(1, &(), vec![])];
-        let tx = Transaction::new_with_compiled_instructions(
+        let instructions = vec![EncodedOpCodes::new(1, &(), vec![])];
+        let tx = Transaction::new_with_encoded_opcodes(
             &[&key],
             &[],
             Hash::default(),
@@ -309,8 +303,8 @@ mod tests {
     #[test]
     fn test_refs_invalid_account() {
         let key = Keypair::new();
-        let instructions = vec![CompiledInstruction::new(1, &(), vec![2])];
-        let tx = Transaction::new_with_compiled_instructions(
+        let instructions = vec![EncodedOpCodes::new(1, &(), vec![2])];
+        let tx = Transaction::new_with_encoded_opcodes(
             &[&key],
             &[],
             Hash::default(),
@@ -342,7 +336,7 @@ mod tests {
             AccountMeta::new(keypair.pubkey(), true),
             AccountMeta::new(to, false),
         ];
-        let instruction = Instruction::new(program_id, &(1u8, 2u8, 3u8), account_metas);
+        let instruction = OpCode::new(program_id, &(1u8, 2u8, 3u8), account_metas);
         let message = Message::new(vec![instruction]);
         Transaction::new(&[&keypair], message, Hash::default())
     }
@@ -361,7 +355,7 @@ mod tests {
         let alice_keypair = Keypair::new();
         let alice_pubkey = alice_keypair.pubkey();
         let bob_pubkey = Pubkey::new_rand();
-        let ix = system_instruction::transfer(&alice_pubkey, &bob_pubkey, 42);
+        let ix = sys_opcode::transfer(&alice_pubkey, &bob_pubkey, 42);
 
         let expected_data_size = size_of::<u32>() + size_of::<u64>();
         assert_eq!(expected_data_size, 12);
@@ -430,14 +424,14 @@ mod tests {
     #[should_panic]
     fn test_transaction_missing_key() {
         let keypair = Keypair::new();
-        Transaction::new_unsigned_instructions(vec![]).sign(&[&keypair], Hash::default());
+        Transaction::new_u_opcodes(vec![]).sign(&[&keypair], Hash::default());
     }
 
     #[test]
     #[should_panic]
     fn test_partial_sign_mismatched_key() {
         let keypair = Keypair::new();
-        Transaction::new_unsigned_instructions(vec![Instruction::new(
+        Transaction::new_u_opcodes(vec![OpCode::new(
             Pubkey::default(),
             &0,
             vec![AccountMeta::new(Pubkey::new_rand(), true)],
@@ -450,7 +444,7 @@ mod tests {
         let keypair0 = Keypair::new();
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
-        let mut tx = Transaction::new_unsigned_instructions(vec![Instruction::new(
+        let mut tx = Transaction::new_u_opcodes(vec![OpCode::new(
             Pubkey::default(),
             &0,
             vec![
@@ -478,8 +472,8 @@ mod tests {
         let program_id = Pubkey::default();
         let keypair0 = Keypair::new();
         let id0 = keypair0.pubkey();
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        Transaction::new_unsigned_instructions(vec![ix])
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
+        Transaction::new_u_opcodes(vec![ix])
             .sign(&Vec::<&Keypair>::new(), Hash::default());
     }
 
@@ -489,8 +483,8 @@ mod tests {
         let program_id = Pubkey::default();
         let keypair0 = Keypair::new();
         let wrong_id = Pubkey::default();
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(wrong_id, true)]);
-        Transaction::new_unsigned_instructions(vec![ix]).sign(&[&keypair0], Hash::default());
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(wrong_id, true)]);
+        Transaction::new_u_opcodes(vec![ix]).sign(&[&keypair0], Hash::default());
     }
 
     #[test]
@@ -498,12 +492,12 @@ mod tests {
         let program_id = Pubkey::default();
         let keypair0 = Keypair::new();
         let id0 = keypair0.pubkey();
-        let ix = Instruction::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        let mut tx = Transaction::new_unsigned_instructions(vec![ix]);
+        let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
+        let mut tx = Transaction::new_u_opcodes(vec![ix]);
         tx.sign(&[&keypair0], Hash::default());
         assert_eq!(
             tx.message.instructions[0],
-            CompiledInstruction::new(1, &0, vec![0])
+            EncodedOpCodes::new(1, &0, vec![0])
         );
         assert!(tx.is_signed());
     }

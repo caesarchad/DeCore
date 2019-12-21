@@ -2,14 +2,14 @@ use crate::id;
 use crate::storage_contract::{CheckedProof, STORAGE_ACCOUNT_SPACE};
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::{AccountMeta, Instruction};
+use morgan_interface::opcodes::{AccountMeta, OpCode};
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum StorageInstruction {
+pub enum StorageOpCode {
     /// Initialize the account as a mining pool, validator or storage-miner
     ///
     /// Expects 1 Account:
@@ -45,18 +45,18 @@ pub fn create_validator_storage_account(
     from_pubkey: &Pubkey,
     storage_pubkey: &Pubkey,
     difs: u64,
-) -> Vec<Instruction> {
+) -> Vec<OpCode> {
     vec![
-        system_instruction::create_account(
+        sys_opcode::create_account(
             from_pubkey,
             storage_pubkey,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
         ),
-        Instruction::new(
+        OpCode::new(
             id(),
-            &StorageInstruction::InitializeValidatorStorage,
+            &StorageOpCode::InitializeValidatorStorage,
             vec![AccountMeta::new(*storage_pubkey, false)],
         ),
     ]
@@ -66,18 +66,18 @@ pub fn create_miner_storage_account(
     from_pubkey: &Pubkey,
     storage_pubkey: &Pubkey,
     difs: u64,
-) -> Vec<Instruction> {
+) -> Vec<OpCode> {
     vec![
-        system_instruction::create_account(
+        sys_opcode::create_account(
             from_pubkey,
             storage_pubkey,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
         ),
-        Instruction::new(
+        OpCode::new(
             id(),
-            &StorageInstruction::InitializeMinerStorage,
+            &StorageOpCode::InitializeMinerStorage,
             vec![AccountMeta::new(*storage_pubkey, false)],
         ),
     ]
@@ -87,18 +87,18 @@ pub fn create_mining_pool_account(
     from_pubkey: &Pubkey,
     storage_pubkey: &Pubkey,
     difs: u64,
-) -> Vec<Instruction> {
+) -> Vec<OpCode> {
     vec![
-        system_instruction::create_account(
+        sys_opcode::create_account(
             from_pubkey,
             storage_pubkey,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
         ),
-        Instruction::new(
+        OpCode::new(
             id(),
-            &StorageInstruction::InitializeMiningPool,
+            &StorageOpCode::InitializeMiningPool,
             vec![AccountMeta::new(*storage_pubkey, false)],
         ),
     ]
@@ -109,53 +109,53 @@ pub fn mining_proof(
     sha_state: Hash,
     slot: u64,
     signature: Signature,
-) -> Instruction {
-    let storage_instruction = StorageInstruction::SubmitMiningProof {
+) -> OpCode {
+    let storage_opcode = StorageOpCode::SubmitMiningProof {
         sha_state,
         slot,
         signature,
     };
     let account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
-    Instruction::new(id(), &storage_instruction, account_metas)
+    OpCode::new(id(), &storage_opcode, account_metas)
 }
 
 pub fn advertise_recent_transaction_seal(
     storage_pubkey: &Pubkey,
     storage_hash: Hash,
     slot: u64,
-) -> Instruction {
-    let storage_instruction = StorageInstruction::AdvertiseStorageRecentTransactionSeal {
+) -> OpCode {
+    let storage_opcode = StorageOpCode::AdvertiseStorageRecentTransactionSeal {
         hash: storage_hash,
         slot,
     };
     let account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
-    Instruction::new(id(), &storage_instruction, account_metas)
+    OpCode::new(id(), &storage_opcode, account_metas)
 }
 
 pub fn proof_validation<S: std::hash::BuildHasher>(
     storage_pubkey: &Pubkey,
     segment: u64,
     checked_proofs: HashMap<Pubkey, Vec<CheckedProof>, S>,
-) -> Instruction {
+) -> OpCode {
     let mut account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
     let mut proofs = vec![];
     checked_proofs.into_iter().for_each(|(id, p)| {
         proofs.push((id, p));
         account_metas.push(AccountMeta::new(id, false))
     });
-    let storage_instruction = StorageInstruction::ProofValidation { segment, proofs };
-    Instruction::new(id(), &storage_instruction, account_metas)
+    let storage_opcode = StorageOpCode::ProofValidation { segment, proofs };
+    OpCode::new(id(), &storage_opcode, account_metas)
 }
 
 pub fn claim_reward(
     storage_pubkey: &Pubkey,
     mining_pool_pubkey: &Pubkey,
     slot: u64,
-) -> Instruction {
-    let storage_instruction = StorageInstruction::ClaimStorageReward { slot };
+) -> OpCode {
+    let storage_opcode = StorageOpCode::ClaimStorageReward { slot };
     let account_metas = vec![
         AccountMeta::new(*storage_pubkey, false),
         AccountMeta::new(*mining_pool_pubkey, false),
     ];
-    Instruction::new(id(), &storage_instruction, account_metas)
+    OpCode::new(id(), &storage_opcode, account_metas)
 }

@@ -6,7 +6,6 @@ use morgan_interface::system_program;
 use morgan_stake_api::stake_state;
 use morgan_vote_api::vote_state;
 
-// The default stake placed with the bootstrap leader
 pub const BOOTSTRAP_LEADER_DIFS: u64 = 42;
 
 pub struct GenesisBlockInfo {
@@ -24,8 +23,6 @@ pub fn create_genesis_block_with_leader(
     let voting_keypair = Keypair::new();
     let staking_keypair = Keypair::new();
 
-    // TODO: de-duplicate the stake once passive staking
-    //  is fully implemented
     let (vote_account, vote_state) = vote_state::create_bootstrap_leader_account(
         &voting_keypair.pubkey(),
         &bootstrap_leader_pubkey,
@@ -36,7 +33,6 @@ pub fn create_genesis_block_with_leader(
     let genesis_block = GenesisBlock::new(
         &bootstrap_leader_pubkey,
         &[
-            // the mint
             (
                 mint_keypair.pubkey(),
                 Account::new(mint_difs, 0, 0, &system_program::id()),

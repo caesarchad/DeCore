@@ -414,7 +414,7 @@ pub mod tests {
     };
     use morgan_runtime::epoch_schedule::EpochSchedule;
     use morgan_interface::hash::Hash;
-    use morgan_interface::instruction::InstructionError;
+    use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_transaction;
@@ -834,7 +834,7 @@ pub mod tests {
             entries.push(entry);
 
             // Add a second Transaction that will produce a
-            // InstructionError<0, ResultWithNegativeDifs> error when processed
+            // OpCodeErr<0, ResultWithNegativeDifs> error when processed
             let keypair2 = Keypair::new();
             let tx = system_transaction::create_user_account(
                 &keypair,
@@ -1316,9 +1316,9 @@ pub mod tests {
         assert_eq!(treasury.get_balance(&pubkey), 1_000);
         assert_eq!(
             treasury.transfer(10_001, &mint_keypair, &pubkey),
-            Err(TransactionError::InstructionError(
+            Err(TransactionError::OpCodeErr(
                 0,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             ))
         );
         assert_eq!(

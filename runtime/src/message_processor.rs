@@ -1,8 +1,8 @@
-use crate::native_loader;
-use crate::system_instruction_processor;
+use crate::bultin_mounter;
+use crate::sys_opcode_handler;
 use morgan_interface::account::{create_keyed_accounts, Account, KeyedAccount};
-use morgan_interface::instruction::{CompiledInstruction, InstructionError};
-use morgan_interface::instruction_processor_utils;
+use morgan_interface::opcodes::{EncodedOpCodes, OpCodeErr};
+use morgan_interface::opcodes_utils;
 use morgan_interface::message::Message;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::system_program;
@@ -33,7 +33,7 @@ pub fn has_duplicates<T: PartialEq>(xs: &[T]) -> bool {
 fn get_subset_unchecked_mut<'a, T>(
     xs: &'a mut [T],
     indexes: &[u8],
-) -> Result<Vec<&'a mut T>, InstructionError> {
+) -> Result<Vec<&'a mut T>, OpCodeErr> {
     // Since the compiler doesn't know the indexes are unique, dereferencing
     // multiple mut elements is assumed to be unsafe. If, however, all
     // indexes are unique, it's perfectly safe. The returned elements will share
@@ -42,7 +42,7 @@ fn get_subset_unchecked_mut<'a, T>(
     // Make certain there are no duplicate indexes. If there are, return an error
     // because we can't return multiple mut references to the same element.
     if has_duplicates(indexes) {
-        return Err(InstructionError::DuplicateAccountIndex);
+        return Err(OpCodeErr::DuplicateAccountIndex);
     }
 
     Ok(indexes
@@ -54,78 +54,78 @@ fn get_subset_unchecked_mut<'a, T>(
         .collect())
 }
 
-fn verify_instruction(
+fn check_opcode(
     program_id: &Pubkey,
     pre_program_id: &Pubkey,
     pre_difs: u64,
     pre_data: &[u8],
     account: &Account,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     // Verify the transaction
 
     // Make sure that program_id is still the same or this was just assigned by the system program
     if *pre_program_id != account.owner && !system_program::check_id(&program_id) {
-        return Err(InstructionError::ModifiedProgramId);
+        return Err(OpCodeErr::ModifiedProgramId);
     }
     // For accounts unassigned to the program, the individual balance of each accounts cannot decrease.
     if *program_id != account.owner && pre_difs > account.difs {
-        return Err(InstructionError::ExternalAccountDifSpend);
+        return Err(OpCodeErr::ExternalAccountDifSpend);
     }
     // For accounts unassigned to the program, the data may not change.
     if *program_id != account.owner
         && !system_program::check_id(&program_id)
         && pre_data != &account.data[..]
     {
-        return Err(InstructionError::ExternalAccountDataModified);
+        return Err(OpCodeErr::ExternalAccountDataModified);
     }
     Ok(())
 }
 
-pub type ProcessInstruction =
-    fn(&Pubkey, &mut [KeyedAccount], &[u8], u64) -> Result<(), InstructionError>;
+pub type HandleOpCode =
+    fn(&Pubkey, &mut [KeyedAccount], &[u8], u64) -> Result<(), OpCodeErr>;
 
-pub type SymbolCache = RwLock<HashMap<Vec<u8>, Symbol<instruction_processor_utils::Entrypoint>>>;
+pub type SymbolCache = RwLock<HashMap<Vec<u8>, Symbol<opcodes_utils::Entrypoint>>>;
 
-pub struct MessageProcessor {
-    instruction_processors: Vec<(Pubkey, ProcessInstruction)>,
+pub struct MessageHandler {
+    opcode_handler: Vec<(Pubkey, HandleOpCode)>,
     symbol_cache: SymbolCache,
 }
 
-impl Default for MessageProcessor {
+impl Default for MessageHandler {
     fn default() -> Self {
-        let instruction_processors: Vec<(Pubkey, ProcessInstruction)> = vec![(
+        let opcode_handler: Vec<(Pubkey, HandleOpCode)> = vec![(
             system_program::id(),
-            system_instruction_processor::process_instruction,
+            sys_opcode_handler::handle_opcode,
         )];
 
         Self {
-            instruction_processors,
+            opcode_handler,
             symbol_cache: RwLock::new(HashMap::new()),
         }
     }
 }
 
-impl MessageProcessor {
+impl MessageHandler {
     /// Add a static entrypoint to intercept intructions before the dynamic loader.
-    pub fn add_instruction_processor(
+    pub fn add_opcode_handler(
         &mut self,
         program_id: Pubkey,
-        process_instruction: ProcessInstruction,
+        handle_opcode: HandleOpCode,
     ) {
-        self.instruction_processors
-            .push((program_id, process_instruction));
+        self.opcode_handler
+            .push((program_id, handle_opcode));
     }
 
     /// Process an instruction
     /// This method calls the instruction's program entrypoint method
-    fn process_instruction(
+    fn handle_opcode(
         &self,
         message: &Message,
-        instruction: &CompiledInstruction,
+        instruction: &EncodedOpCodes,
         executable_accounts: &mut [(Pubkey, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let program_id = instruction.program_id(&message.account_keys);
         let mut keyed_accounts = create_keyed_accounts(executable_accounts);
         let mut keyed_accounts2: Vec<_> = instruction
@@ -141,9 +141,9 @@ impl MessageProcessor {
             .collect();
         keyed_accounts.append(&mut keyed_accounts2);
 
-        for (id, process_instruction) in &self.instruction_processors {
+        for (id, handle_opcode) in &self.opcode_handler {
             if id == program_id {
-                return process_instruction(
+                return handle_opcode(
                     &program_id,
                     &mut keyed_accounts[1..],
                     &instruction.data,
@@ -152,7 +152,7 @@ impl MessageProcessor {
             }
         }
 
-        native_loader::entrypoint(
+        bultin_mounter::entrypoint(
             &program_id,
             &mut keyed_accounts,
             &instruction.data,
@@ -168,11 +168,11 @@ impl MessageProcessor {
     fn execute_instruction(
         &self,
         message: &Message,
-        instruction: &CompiledInstruction,
+        instruction: &EncodedOpCodes,
         executable_accounts: &mut [(Pubkey, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
-    ) -> Result<(), InstructionError> {
+    ) -> Result<(), OpCodeErr> {
         let program_id = instruction.program_id(&message.account_keys);
         // TODO: the runtime should be checking read/write access to memory
         // we are trusting the hard-coded programs not to clobber or allocate
@@ -182,7 +182,7 @@ impl MessageProcessor {
             .map(|a| (a.owner, a.difs, a.data.clone()))
             .collect();
 
-        self.process_instruction(
+        self.handle_opcode(
             message,
             instruction,
             executable_accounts,
@@ -194,7 +194,7 @@ impl MessageProcessor {
         for ((pre_program_id, pre_difs, pre_data), post_account) in
             pre_data.iter().zip(program_accounts.iter())
         {
-            verify_instruction(
+            check_opcode(
                 &program_id,
                 pre_program_id,
                 *pre_difs,
@@ -205,7 +205,7 @@ impl MessageProcessor {
         // The total sum of all the difs in all the accounts cannot change.
         let post_total: u64 = program_accounts.iter().map(|a| a.difs).sum();
         if pre_total != post_total {
-            return Err(InstructionError::UnbalancedInstruction);
+            return Err(OpCodeErr::DeficitOpCode);
         }
         Ok(())
     }
@@ -226,7 +226,7 @@ impl MessageProcessor {
                 .ok_or(TransactionError::InvalidAccountIndex)?;
             let executable_accounts = &mut loaders[executable_index];
             let mut program_accounts = get_subset_unchecked_mut(accounts, &instruction.accounts)
-                .map_err(|err| TransactionError::InstructionError(instruction_index as u8, err))?;
+                .map_err(|err| TransactionError::OpCodeErr(instruction_index as u8, err))?;
             // TODO: `get_subset_unchecked_mut` panics on an index out of bounds if an executable
             // account is also included as a regular account for an instruction, because the
             // executable account is not passed in as part of the accounts slice
@@ -237,7 +237,7 @@ impl MessageProcessor {
                 &mut program_accounts,
                 drop_height,
             )
-            .map_err(|err| TransactionError::InstructionError(instruction_index as u8, err))?;
+            .map_err(|err| TransactionError::OpCodeErr(instruction_index as u8, err))?;
         }
         Ok(())
     }
@@ -270,7 +270,7 @@ mod tests {
         // This panics, because it assumes duplicate detection is done elsewhere.
         assert_eq!(
             get_subset_unchecked_mut(&mut [7, 8], &[0, 0]).unwrap_err(),
-            InstructionError::DuplicateAccountIndex
+            OpCodeErr::DuplicateAccountIndex
         );
     }
 
@@ -287,8 +287,8 @@ mod tests {
             ix: &Pubkey,
             pre: &Pubkey,
             post: &Pubkey,
-        ) -> Result<(), InstructionError> {
-            verify_instruction(&ix, &pre, 0, &[], &Account::new(0, 0, 0, post))
+        ) -> Result<(), OpCodeErr> {
+            check_opcode(&ix, &pre, 0, &[], &Account::new(0, 0, 0, post))
         }
 
         let system_program_id = system_program::id();
@@ -302,17 +302,17 @@ mod tests {
         );
         assert_eq!(
             change_program_id(&mallory_program_id, &system_program_id, &alice_program_id),
-            Err(InstructionError::ModifiedProgramId),
+            Err(OpCodeErr::ModifiedProgramId),
             "malicious Mallory should not be able to change the account owner"
         );
     }
 
     #[test]
     fn test_verify_instruction_change_data() {
-        fn change_data(program_id: &Pubkey) -> Result<(), InstructionError> {
+        fn change_data(program_id: &Pubkey) -> Result<(), OpCodeErr> {
             let alice_program_id = Pubkey::new_rand();
             let account = Account::new(0, 0, 0, &alice_program_id);
-            verify_instruction(&program_id, &alice_program_id, 0, &[42], &account)
+            check_opcode(&program_id, &alice_program_id, 0, &[42], &account)
         }
 
         let system_program_id = system_program::id();
@@ -325,7 +325,7 @@ mod tests {
         );
         assert_eq!(
             change_data(&mallory_program_id),
-            Err(InstructionError::ExternalAccountDataModified),
+            Err(OpCodeErr::ExternalAccountDataModified),
             "malicious Mallory should not be able to change the account data"
         );
     }

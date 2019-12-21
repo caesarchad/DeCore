@@ -5,11 +5,6 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem::size_of;
 
-/// Same as u16, but serialized with 1 to 3 bytes. If the value is above
-/// 0x7f, the top bit is set and the remaining value is stored in the next
-/// bytes. Each byte follows the same pattern until the 3rd byte. The 3rd
-/// byte, if needed, uses all 8 bits to store the last byte of the original
-/// value.
 pub struct ShortU16(pub u16);
 
 impl Serialize for ShortU16 {
@@ -17,8 +12,7 @@ impl Serialize for ShortU16 {
     where
         S: Serializer,
     {
-        // Pass a non-zero value to serialize_tuple() so that serde_json will
-        // generate an open bracket.
+        
         let mut seq = serializer.serialize_tuple(1)?;
 
         let mut rem_len = self.0;
@@ -82,17 +76,11 @@ impl<'de> Deserialize<'de> for ShortU16 {
     }
 }
 
-/// If you don't want to use the ShortVec newtype, you can do ShortVec
-/// serialization on an ordinary vector with the following field annotation:
-///
-/// #[serde(with = "short_vec")]
-///
 pub fn serialize<S: Serializer, T: Serialize>(
     elements: &[T],
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    // Pass a non-zero value to serialize_tuple() so that serde_json will
-    // generate an open bracket.
+    
     let mut seq = serializer.serialize_tuple(1)?;
 
     let len = elements.len();
@@ -142,11 +130,7 @@ where
     }
 }
 
-/// If you don't want to use the ShortVec newtype, you can do ShortVec
-/// deserialization on an ordinary vector with the following field annotation:
-///
-/// #[serde(with = "short_vec")]
-///
+
 pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
@@ -176,7 +160,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for ShortVec<T> {
     }
 }
 
-/// Return the decoded value and how many bytes it consumed.
+
 pub fn decode_len(bytes: &[u8]) -> (usize, usize) {
     let short_len: ShortU16 = bincode::deserialize(bytes).unwrap();
     let num_bytes = bincode::serialized_size(&short_len).unwrap() as usize;
@@ -189,7 +173,7 @@ mod tests {
     use assert_matches::assert_matches;
     use bincode::{deserialize, serialize};
 
-    /// Return the serialized length.
+
     fn encode_len(len: u16) -> Vec<u8> {
         bincode::serialize(&ShortU16(len)).unwrap()
     }

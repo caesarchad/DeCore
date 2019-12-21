@@ -19,10 +19,10 @@ use morgan_interface::system_transaction;
 use morgan_interface::timing::DEFAULT_SLOTS_PER_EPOCH;
 use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
 use morgan_interface::transaction::Transaction;
-use morgan_stake_api::stake_instruction;
-use morgan_storage_api::storage_instruction;
+use morgan_stake_api::stake_opcode;
+use morgan_storage_api::storage_opcode;
 use morgan_storage_controller::genesis_block_util::GenesisBlockUtil;
-use morgan_vote_api::vote_instruction;
+use morgan_vote_api::vote_opcode;
 use morgan_vote_api::vote_state::VoteState;
 use std::collections::HashMap;
 use std::fs::remove_dir_all;
@@ -67,7 +67,7 @@ pub struct NodeGroupConfig {
     pub drops_per_slot: u64,
     pub slots_per_epoch: u64,
     pub stakers_slot_offset: u64,
-    pub native_instruction_processors: Vec<(String, Pubkey)>,
+    pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
     pub waterclock_config: WaterClockConfig,
 }
 
@@ -82,7 +82,7 @@ impl Default for NodeGroupConfig {
             drops_per_slot: DEFAULT_DROPS_PER_SLOT,
             slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
             stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
-            native_instruction_processors: vec![],
+            builtin_opcode_handlers: vec![],
             waterclock_config: WaterClockConfig::default(),
         }
     }
@@ -138,8 +138,8 @@ impl LocalNodeGroup {
         genesis_block.stakers_slot_offset = config.stakers_slot_offset;
         genesis_block.waterclock_config = config.waterclock_config.clone();
         genesis_block
-            .native_instruction_processors
-            .extend_from_slice(&config.native_instruction_processors);
+            .builtin_opcode_handlers
+            .extend_from_slice(&config.builtin_opcode_handlers);
 
         let (genesis_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let leader_ledger_path = tmp_copy_block_buffer!(&genesis_ledger_path);
@@ -433,9 +433,9 @@ impl LocalNodeGroup {
         if client.poll_get_balance(&vote_account_pubkey).unwrap_or(0) == 0 {
             // 1) Create vote account
 
-            let mut transaction = Transaction::new_signed_instructions(
+            let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref()],
-                vote_instruction::create_account(
+                vote_opcode::create_account(
                     &from_account.pubkey(),
                     &vote_account_pubkey,
                     &node_pubkey,
@@ -453,9 +453,9 @@ impl LocalNodeGroup {
 
             let stake_account_keypair = Keypair::new();
             let stake_account_pubkey = stake_account_keypair.pubkey();
-            let mut transaction = Transaction::new_signed_instructions(
+            let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref()],
-                stake_instruction::create_delegate_account(
+                stake_opcode::create_delegate_account(
                     &from_account.pubkey(),
                     &stake_account_pubkey,
                     amount,
@@ -470,9 +470,9 @@ impl LocalNodeGroup {
                 .wait_for_balance(&stake_account_pubkey, Some(amount))
                 .expect("get balance");
 
-            let mut transaction = Transaction::new_signed_instructions(
+            let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref(), &stake_account_keypair],
-                vec![stake_instruction::delegate_stake(
+                vec![stake_opcode::delegate_stake(
                     &from_account.pubkey(),
                     &stake_account_pubkey,
                     &vote_account_pubkey,
@@ -525,13 +525,13 @@ impl LocalNodeGroup {
     ) -> Result<()> {
         let message = Message::new_with_payer(
             if storage_miner {
-                storage_instruction::create_miner_storage_account(
+                storage_opcode::create_miner_storage_account(
                     &from_keypair.pubkey(),
                     &storage_keypair.pubkey(),
                     1,
                 )
             } else {
-                storage_instruction::create_validator_storage_account(
+                storage_opcode::create_validator_storage_account(
                     &from_keypair.pubkey(),
                     &storage_keypair.pubkey(),
                     1,

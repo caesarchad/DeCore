@@ -13,7 +13,7 @@ impl GenesisBlockUtil for GenesisBlock {
             *validator_storage_pubkey,
             storage_contract::create_validator_storage_account(1),
         ));
-        self.native_instruction_processors
+        self.builtin_opcode_handlers
             .push(morgan_storage_controller!());
     }
 }

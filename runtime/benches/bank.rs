@@ -5,13 +5,13 @@ extern crate test;
 use log::*;
 use morgan_runtime::treasury::*;
 use morgan_runtime::treasury_client::TreasuryClient;
-use morgan_runtime::loader_utils::{create_invoke_instruction, load_program};
+use morgan_runtime::loader_utils::{compose_call_opcode, load_program};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::account_host::OfflineAccount;
 use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::create_genesis_block;
-use morgan_interface::instruction::InstructionError;
-use morgan_interface::native_loader;
+use morgan_interface::opcodes::OpCodeErr;
+use morgan_interface::bultin_mounter;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::transaction::Transaction;
@@ -26,12 +26,12 @@ const BUILTIN_PROGRAM_ID: [u8; 32] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-fn process_instruction(
+fn handle_opcode(
     _program_id: &Pubkey,
     _keyed_accounts: &mut [KeyedAccount],
     _data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     Ok(())
 }
 
@@ -50,9 +50,9 @@ pub fn create_builtin_transactions(
                 .transfer(10_000, &mint_keypair, &rando0.pubkey())
                 .expect(&format!("{}:{}", line!(), file!()));
 
-            let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(rando0.pubkey(), program_id, &1u8);
             let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
-            Transaction::new_signed_instructions(&[&rando0], vec![instruction], transaction_seal)
+            Transaction::new_s_opcodes(&[&rando0], vec![instruction], transaction_seal)
         })
         .collect()
 }
@@ -62,7 +62,7 @@ pub fn create_native_loader_transactions(
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
     let program = "morgan_noop_program".as_bytes().to_vec();
-    let program_id = load_program(&treasury_client, &mint_keypair, &native_loader::id(), program);
+    let program_id = load_program(&treasury_client, &mint_keypair, &bultin_mounter::id(), program);
 
     (0..4096)
         .into_iter()
@@ -73,9 +73,9 @@ pub fn create_native_loader_transactions(
                 .transfer(10_000, &mint_keypair, &rando0.pubkey())
                 .expect(&format!("{}:{}", line!(), file!()));
 
-            let instruction = create_invoke_instruction(rando0.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(rando0.pubkey(), program_id, &1u8);
             let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
-            Transaction::new_signed_instructions(&[&rando0], vec![instruction], transaction_seal)
+            Transaction::new_s_opcodes(&[&rando0], vec![instruction], transaction_seal)
         })
         .collect()
 }
@@ -131,7 +131,7 @@ fn do_bench_transactions(
     let ns_per_s = 1_000_000_000;
     let (genesis_block, mint_keypair) = create_genesis_block(100_000_000);
     let mut treasury = Treasury::new(&genesis_block);
-    treasury.add_instruction_processor(Pubkey::new(&BUILTIN_PROGRAM_ID), process_instruction);
+    treasury.add_opcode_handler(Pubkey::new(&BUILTIN_PROGRAM_ID), handle_opcode);
     let treasury = Arc::new(treasury);
     let treasury_client = TreasuryClient::new_shared(&treasury);
     let transactions = create_transactions(&treasury_client, &mint_keypair);

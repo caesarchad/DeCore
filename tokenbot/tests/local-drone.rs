@@ -3,7 +3,7 @@ use morgan_interface::hash::Hash;
 use morgan_interface::message::Message;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_instruction;
+use morgan_interface::sys_opcode;
 use morgan_interface::transaction::Transaction;
 use std::sync::mpsc::channel;
 
@@ -14,7 +14,7 @@ fn test_local_drone() {
     let difs = 50;
     let transaction_seal = Hash::new(&to.as_ref());
     let create_instruction =
-        system_instruction::create_user_account(&keypair.pubkey(), &to, difs);
+        sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
     let message = Message::new(vec![create_instruction]);
     let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
 

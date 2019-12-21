@@ -861,7 +861,7 @@ mod tests {
     use crate::water_clock_recorder::WorkingTreasury;
     use crate::{fetch_interim_ledger_location, tmp_ledger_name};
     use itertools::Itertools;
-    use morgan_interface::instruction::InstructionError;
+    use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_transaction;
     use morgan_interface::transaction::TransactionError;
@@ -1206,9 +1206,9 @@ mod tests {
             assert_eq!(entries[0].0.transactions.len(), transactions.len());
 
             // InstructionErrors should still be recorded
-            results[0] = Err(TransactionError::InstructionError(
+            results[0] = Err(TransactionError::OpCodeErr(
                 1,
-                InstructionError::new_result_with_negative_difs(),
+                OpCodeErr::new_result_with_negative_difs(),
             ));
             TreasuryPhase::record_transactions(
                 &treasury,

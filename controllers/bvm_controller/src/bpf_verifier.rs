@@ -25,13 +25,7 @@ fn check_prog_len(prog: &[u8]) -> Result<(), Error> {
         reject("No program set, call prog_set() to load one".to_string())?;
     }
 
-    // TODO BPF program may deterministically exit even if the last
-    // instruction in the block is not an exit (might be earlier and jumped to)
-    // TODO need to validate more intelligently
-    // let last_insn = ebpf::get_insn(prog, (prog.len() / ebpf::INSN_SIZE) - 1);
-    // if last_insn.opc != ebpf::EXIT {
-    //     reject("program does not end with “EXIT” instruction".to_string())?;
-    // }
+    
 
     Ok(())
 }
@@ -55,8 +49,7 @@ fn check_imm_endian(insn: &ebpf::Insn, insn_ptr: usize) -> Result<(), Error> {
 }
 
 fn check_load_dw(prog: &[u8], insn_ptr: usize) -> Result<(), Error> {
-    // We know we can reach next insn since we enforce an EXIT insn at the end of program, while
-    // this function should be called only for LD_DW insn, that cannot be last in program.
+    
     let next_insn = ebpf::get_insn(prog, insn_ptr + 1);
     if next_insn.opc != 0 {
         reject(format!(
@@ -120,7 +113,7 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
         let mut store = false;
 
         match insn.opc {
-            // BPF_LD class
+            
             ebpf::LD_ABS_B => {}
             ebpf::LD_ABS_H => {}
             ebpf::LD_ABS_W => {}
@@ -136,19 +129,19 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
                 insn_ptr += 1;
             }
 
-            // BPF_LDX class
+            
             ebpf::LD_B_REG => {}
             ebpf::LD_H_REG => {}
             ebpf::LD_W_REG => {}
             ebpf::LD_DW_REG => {}
 
-            // BPF_ST class
+            
             ebpf::ST_B_IMM => store = true,
             ebpf::ST_H_IMM => store = true,
             ebpf::ST_W_IMM => store = true,
             ebpf::ST_DW_IMM => store = true,
 
-            // BPF_STX class
+            
             ebpf::ST_B_REG => store = true,
             ebpf::ST_H_REG => store = true,
             ebpf::ST_W_REG => store = true,
@@ -160,7 +153,7 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
                 unimplemented!();
             }
 
-            // BPF_ALU class
+            
             ebpf::ADD32_IMM => {}
             ebpf::ADD32_REG => {}
             ebpf::SUB32_IMM => {}
@@ -197,7 +190,7 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
                 check_imm_endian(&insn, insn_ptr)?;
             }
 
-            // BPF_ALU64 class
+            
             ebpf::ADD64_IMM => {}
             ebpf::ADD64_REG => {}
             ebpf::SUB64_IMM => {}
@@ -228,7 +221,7 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
             ebpf::ARSH64_IMM => {}
             ebpf::ARSH64_REG => {}
 
-            // BPF_JMP class
+            
             ebpf::JA => {
                 check_jmp_offset(prog, insn_ptr)?;
             }
@@ -315,7 +308,7 @@ pub fn check(prog: &[u8]) -> Result<(), Error> {
         insn_ptr += 1;
     }
 
-    // insn_ptr should now be equal to number of instructions.
+    
     if insn_ptr != prog.len() / ebpf::INSN_SIZE {
         reject(format!("jumped out of code to #{:?}", insn_ptr))?;
     }

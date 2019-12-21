@@ -27,6 +27,6 @@ impl Alloc for BPFAllocator {
     }
 
     fn dealloc(&mut self, _ptr: *mut u8, _layout: Layout) {
-        // It's a bump allocator, free not supported
+        
     }
 }

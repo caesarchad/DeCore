@@ -46,13 +46,13 @@ pub struct SolClusterInfo<'a> {
 /// their program will not be created.
 #[macro_export]
 macro_rules! entrypoint {
-    ($process_instruction:ident) => {
+    ($handle_opcode:ident) => {
         #[no_mangle]
         pub extern "C" fn entrypoint(input: *mut u8) -> bool {
             unsafe {
                 if let Ok((mut ka, info, data)) = $crate::entrypoint::deserialize(input) {
                     // Call use function
-                    $process_instruction(&mut ka, &info, &data)
+                    $handle_opcode(&mut ka, &info, &data)
                 } else {
                     false
                 }

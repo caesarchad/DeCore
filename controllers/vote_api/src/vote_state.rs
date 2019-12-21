@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::{Account, KeyedAccount};
 use morgan_interface::account_utils::State;
 use morgan_interface::hash::Hash;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::syscall::slot_hashes;
 use std::collections::VecDeque;
@@ -101,14 +101,14 @@ impl VoteState {
         account.state().ok()
     }
 
-    pub fn deserialize(input: &[u8]) -> Result<Self, InstructionError> {
-        deserialize(input).map_err(|_| InstructionError::InvalidAccountData)
+    pub fn deserialize(input: &[u8]) -> Result<Self, OpCodeErr> {
+        deserialize(input).map_err(|_| OpCodeErr::InvalidAccountData)
     }
 
-    pub fn serialize(&self, output: &mut [u8]) -> Result<(), InstructionError> {
+    pub fn serialize(&self, output: &mut [u8]) -> Result<(), OpCodeErr> {
         serialize_into(output, self).map_err(|err| match *err {
-            ErrorKind::SizeLimit => InstructionError::AccountDataTooSmall,
-            _ => InstructionError::GenericError,
+            ErrorKind::SizeLimit => OpCodeErr::AccountDataTooSmall,
+            _ => OpCodeErr::GenericError,
         })
     }
 
@@ -248,7 +248,7 @@ pub fn authorize_voter(
     vote_account: &mut KeyedAccount,
     other_signers: &[KeyedAccount],
     authorized_voter_pubkey: &Pubkey,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     let mut vote_state: VoteState = vote_account.state()?;
 
     // current authorized signer must say "yay"
@@ -258,7 +258,7 @@ pub fn authorize_voter(
             .iter()
             .all(|account| account.signer_key() != authorized)
     {
-        return Err(InstructionError::MissingRequiredSignature);
+        return Err(OpCodeErr::MissingRequiredSignature);
     }
 
     vote_state.authorized_voter_pubkey = *authorized_voter_pubkey;
@@ -272,11 +272,11 @@ pub fn initialize_account(
     vote_account: &mut KeyedAccount,
     node_pubkey: &Pubkey,
     commission: u32,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     let vote_state: VoteState = vote_account.state()?;
 
     if vote_state.authorized_voter_pubkey != Pubkey::default() {
-        return Err(InstructionError::AccountAlreadyInitialized);
+        return Err(OpCodeErr::AccountAlreadyInitialized);
     }
     vote_account.set_state(&VoteState::new(
         vote_account.unsigned_key(),
@@ -290,15 +290,15 @@ pub fn process_votes(
     slot_hashes_account: &mut KeyedAccount,
     other_signers: &[KeyedAccount],
     votes: &[Vote],
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     let mut vote_state: VoteState = vote_account.state()?;
 
     if vote_state.authorized_voter_pubkey == Pubkey::default() {
-        return Err(InstructionError::UninitializedAccount);
+        return Err(OpCodeErr::UninitializedAccount);
     }
 
     if !slot_hashes::check_id(slot_hashes_account.unsigned_key()) {
-        return Err(InstructionError::InvalidArgument);
+        return Err(OpCodeErr::InvalidArgument);
     }
 
     let slot_hashes: Vec<(u64, Hash)> = slot_hashes_account.state()?;
@@ -310,7 +310,7 @@ pub fn process_votes(
             .iter()
             .all(|account| account.signer_key() != authorized)
     {
-        return Err(InstructionError::MissingRequiredSignature);
+        return Err(OpCodeErr::MissingRequiredSignature);
     }
 
     vote_state.process_votes(&votes, &slot_hashes);
@@ -381,7 +381,7 @@ mod tests {
 
         // reinit should fail
         let res = initialize_account(&mut vote_account, &node_pubkey, 0);
-        assert_eq!(res, Err(InstructionError::AccountAlreadyInitialized));
+        assert_eq!(res, Err(OpCodeErr::AccountAlreadyInitialized));
     }
 
     fn create_test_account() -> (Pubkey, Account) {
@@ -410,7 +410,7 @@ mod tests {
         vote_account: &mut Account,
         vote: &Vote,
         slot_hashes: &[(u64, Hash)],
-    ) -> Result<VoteState, InstructionError> {
+    ) -> Result<VoteState, OpCodeErr> {
         let (slot_hashes_id, mut slot_hashes_account) =
             create_test_slot_hashes_account(slot_hashes);
 
@@ -428,7 +428,7 @@ mod tests {
         vote_pubkey: &Pubkey,
         vote_account: &mut Account,
         vote: &Vote,
-    ) -> Result<VoteState, InstructionError> {
+    ) -> Result<VoteState, OpCodeErr> {
         simulate_process_vote(vote_pubkey, vote_account, vote, &[(vote.slot, vote.hash)])
     }
 
@@ -511,7 +511,7 @@ mod tests {
                 &[],
                 &[vote.clone()],
             ),
-            Err(InstructionError::InvalidArgument)
+            Err(OpCodeErr::InvalidArgument)
         );
     }
 
@@ -531,7 +531,7 @@ mod tests {
             &[],
             &vote,
         );
-        assert_eq!(res, Err(InstructionError::MissingRequiredSignature));
+        assert_eq!(res, Err(OpCodeErr::MissingRequiredSignature));
 
         // unsigned
         let res = process_votes(
@@ -549,7 +549,7 @@ mod tests {
             &[],
             &authorized_voter_pubkey,
         );
-        assert_eq!(res, Err(InstructionError::MissingRequiredSignature));
+        assert_eq!(res, Err(OpCodeErr::MissingRequiredSignature));
 
         let res = authorize_voter(
             &mut KeyedAccount::new(&vote_pubkey, true, &mut vote_account),
@@ -579,7 +579,7 @@ mod tests {
             &[],
             &vote,
         );
-        assert_eq!(res, Err(InstructionError::MissingRequiredSignature));
+        assert_eq!(res, Err(OpCodeErr::MissingRequiredSignature));
 
         // signed by authorized voter
         let vote = vec![Vote::new(2, Hash::default())];
@@ -606,7 +606,7 @@ mod tests {
             &mut vote_account,
             &Vote::new(1, Hash::default()),
         );
-        assert_eq!(res, Err(InstructionError::UninitializedAccount));
+        assert_eq!(res, Err(OpCodeErr::UninitializedAccount));
     }
 
     #[test]

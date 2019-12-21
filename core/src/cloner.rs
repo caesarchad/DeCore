@@ -27,7 +27,7 @@ use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;
 use morgan_interface::transport::TransportError;
-use morgan_storage_api::{get_segment_from_slot, storage_instruction, SLOTS_PER_SEGMENT};
+use morgan_storage_api::{get_segment_from_slot, storage_opcode, SLOTS_PER_SEGMENT};
 use std::fs::File;
 use std::io::{self, BufReader, Error, ErrorKind, Read, Seek, SeekFrom};
 use std::mem::size_of;
@@ -502,12 +502,12 @@ impl StorageMiner {
         if balance.is_err() || balance.unwrap() == 0 {
             let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().expect("transaction_seal");
 
-            let ix = storage_instruction::create_miner_storage_account(
+            let ix = storage_opcode::create_miner_storage_account(
                 &keypair.pubkey(),
                 &storage_keypair.pubkey(),
                 1,
             );
-            let tx = Transaction::new_signed_instructions(&[keypair], ix, transaction_seal);
+            let tx = Transaction::new_s_opcodes(&[keypair], ix, transaction_seal);
             let signature = client.send_offline_transaction(tx)?;
             client
                 .poll_for_signature(&signature)
@@ -536,7 +536,7 @@ impl StorageMiner {
         assert!(client.poll_get_balance(&self.keypair.pubkey()).unwrap() > 0);
 
         let (transaction_seal, _) = client.get_recent_transaction_seal().expect("No recent transaction_seal");
-        let instruction = storage_instruction::mining_proof(
+        let instruction = storage_opcode::mining_proof(
             &self.storage_keypair.pubkey(),
             self.hash,
             self.slot,

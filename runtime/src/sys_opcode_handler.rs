@@ -1,8 +1,8 @@
 use log::*;
 use morgan_interface::account::KeyedAccount;
-use morgan_interface::instruction::InstructionError;
+use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::system_instruction::{SystemError, SystemInstruction};
+use morgan_interface::sys_opcode::{SystemError, SysOpCode};
 use morgan_interface::system_program;
 
 const FROM_ACCOUNT_INDEX: usize = 0;
@@ -120,46 +120,46 @@ fn transfer_reputations(
     Ok(())
 }
 
-pub fn process_instruction(
+pub fn handle_opcode(
     _program_id: &Pubkey,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
-) -> Result<(), InstructionError> {
+) -> Result<(), OpCodeErr> {
     if let Ok(instruction) = bincode::deserialize(data) {
-        trace!("process_instruction: {:?}", instruction);
+        trace!("handle_opcode: {:?}", instruction);
         trace!("keyed_accounts: {:?}", keyed_accounts);
         // All system instructions require that accounts_keys[0] be a signer
         if keyed_accounts[FROM_ACCOUNT_INDEX].signer_key().is_none() {
             debug!("account[from] is unsigned");
-            Err(InstructionError::MissingRequiredSignature)?;
+            Err(OpCodeErr::MissingRequiredSignature)?;
         }
 
         match instruction {
-            SystemInstruction::CreateAccount {
+            SysOpCode::CreateAccount {
                 difs,
                 reputations,
                 space,
                 program_id,
             } => create_system_account(keyed_accounts, difs, reputations, space, &program_id),
-            SystemInstruction::CreateAccountWithReputation {
+            SysOpCode::CreateAccountWithReputation {
                 reputations,
                 space,
                 program_id,
             } => create_system_account_with_reputation(keyed_accounts, reputations, space, &program_id),
-            SystemInstruction::Assign { program_id } => {
+            SysOpCode::Assign { program_id } => {
                 if !system_program::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
-                    Err(InstructionError::IncorrectProgramId)?;
+                    Err(OpCodeErr::IncorrectProgramId)?;
                 }
                 assign_account_to_program(keyed_accounts, &program_id)
             }
-            SystemInstruction::Transfer { difs } => transfer_difs(keyed_accounts, difs),
-            SystemInstruction::TransferReputations { reputations } => transfer_reputations(keyed_accounts, reputations),
+            SysOpCode::Transfer { difs } => transfer_difs(keyed_accounts, difs),
+            SysOpCode::TransferReputations { reputations } => transfer_reputations(keyed_accounts, reputations),
         }
-        .map_err(|e| InstructionError::CustomError(e as u32))
+        .map_err(|e| OpCodeErr::CustomError(e as u32))
     } else {
         debug!("Invalid instruction data: {:?}", data);
-        Err(InstructionError::InvalidInstructionData)
+        Err(OpCodeErr::BadOpCodeContext)
     }
 }
 
@@ -172,7 +172,7 @@ mod tests {
     use morgan_interface::account::Account;
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
-    use morgan_interface::instruction::{AccountMeta, Instruction, InstructionError};
+    use morgan_interface::opcodes::{AccountMeta, OpCode, OpCodeErr};
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::system_program;
     use morgan_interface::transaction::TransactionError;
@@ -352,12 +352,12 @@ mod tests {
         // Attempt to assign account not owned by system program
         let another_program_owner = Pubkey::new(&[8; 32]);
         keyed_accounts = [KeyedAccount::new(&from, true, &mut from_account)];
-        let instruction = SystemInstruction::Assign {
+        let instruction = SysOpCode::Assign {
             program_id: another_program_owner,
         };
         let data = serialize(&instruction).unwrap();
-        let result = process_instruction(&system_program::id(), &mut keyed_accounts, &data, 0);
-        assert_eq!(result, Err(InstructionError::IncorrectProgramId));
+        let result = handle_opcode(&system_program::id(), &mut keyed_accounts, &data, 0);
+        assert_eq!(result, Err(OpCodeErr::IncorrectProgramId));
         assert_eq!(from_account.owner, new_program_owner);
     }
 
@@ -435,9 +435,9 @@ mod tests {
             AccountMeta::new(alice_pubkey, false),
             AccountMeta::new(mallory_pubkey, true),
         ];
-        let malicious_instruction = Instruction::new(
+        let malicious_instruction = OpCode::new(
             system_program::id(),
-            &SystemInstruction::Transfer { difs: 10 },
+            &SysOpCode::Transfer { difs: 10 },
             account_metas,
         );
         assert_eq!(
@@ -445,7 +445,7 @@ mod tests {
                 .snd_online_instruction(&mallory_keypair, malicious_instruction)
                 .unwrap_err()
                 .unwrap(),
-            TransactionError::InstructionError(0, InstructionError::MissingRequiredSignature)
+            TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
         );
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 50);
         assert_eq!(treasury_client.get_balance(&mallory_pubkey).unwrap(), 50);
