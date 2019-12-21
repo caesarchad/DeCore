@@ -7,7 +7,7 @@ use crate::waterclock_config::WaterClockConfig;
 use crate::pubkey::Pubkey;
 use crate::signature::{Keypair, KeypairUtil};
 use crate::system_program;
-use crate::timing::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_DROPS_PER_SLOT};
+use crate::constants::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_DROPS_PER_SLOT};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;

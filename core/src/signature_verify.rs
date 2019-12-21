@@ -10,7 +10,7 @@ use bincode::serialized_size;
 use morgan_metricbot::inc_new_counter_debug;
 use morgan_interface::message::MessageHeader;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::short_vec::decode_len;
+use morgan_interface::short_vec::des_lenth;
 use morgan_interface::signature::Signature;
 #[cfg(test)]
 use morgan_interface::transaction::Transaction;
@@ -108,10 +108,10 @@ pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
 }
 
 pub fn get_packet_offsets(packet: &Packet, current_offset: u32) -> (u32, u32, u32, u32) {
-    let (sig_len, sig_size) = decode_len(&packet.data);
+    let (sig_len, sig_size) = des_lenth(&packet.data);
     let msg_start_offset = sig_size + sig_len * size_of::<Signature>();
 
-    let (_pubkey_len, pubkey_size) = decode_len(&packet.data[msg_start_offset..]);
+    let (_pubkey_len, pubkey_size) = des_lenth(&packet.data[msg_start_offset..]);
 
     let sig_start = current_offset as usize + sig_size;
     let msg_start = current_offset as usize + msg_start_offset;
@@ -207,14 +207,9 @@ pub fn init() {
 
 #[cfg(feature = "cuda")]
 pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
-    use crate::packet::PACKET_DATA_SIZE;
+    use morgan_interface::constants::PACKET_DATA_SIZE;
     let count = batch_size(batches);
 
-    // micro-benchmarks show GPU time for smallest batch around 15-20ms
-    // and CPU speed for 64-128 sigverifies around 10-20ms. 64 is a nice
-    // power-of-two number around that accounting for the fact that the CPU
-    // may be busy doing other things while being a real fullnode
-    // TODO: dynamically adjust this crossover
     if count < 64 {
         return ed25519_verify_cpu(batches);
     }
@@ -355,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_system_transaction_data_layout() {
-        use crate::packet::PACKET_DATA_SIZE;
+        use morgan_interface::constants::PACKET_DATA_SIZE;
         let mut tx0 = test_tx();
         tx0.message.instructions[0].data = vec![1, 2, 3];
         let message0a = tx0.message_data();

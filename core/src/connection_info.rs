@@ -175,8 +175,8 @@ impl ContactInfo {
         let gossip_addr = next_port(&bind_addr, 1);
         let tvu_addr = next_port(&bind_addr, 2);
         let transaction_digesting_module_via_blobs_addr = next_port(&bind_addr, 3);
-        let rpc_addr = SocketAddr::new(bind_addr.ip(), rpc_port::DEFAULT_RPC_PORT);
-        let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), rpc_port::DEFAULT_RPC_PUBSUB_PORT);
+        let rpc_addr = SocketAddr::new(bind_addr.ip(), constants::DEFAULT_RPC_PORT);
+        let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), constants::DEFAULT_RPC_PUBSUB_PORT);
         Self::new(
             pubkey,
             gossip_addr,

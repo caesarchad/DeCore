@@ -21,8 +21,8 @@ use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::timing::{
-    self, duration_as_us, DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
+use morgan_interface::timing::{self, duration_as_us,};
+use morgan_interface::constants::{DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
     MAX_TRANSACTION_FORWARDING_DELAY,
 };
 use morgan_interface::transaction::{self, Transaction, TransactionError};

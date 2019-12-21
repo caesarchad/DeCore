@@ -4,8 +4,8 @@
 use crate::treasury_forks::TreasuryForks;
 use crate::node_group_info::NodeGroupInfo;
 use crate::connection_info::ContactInfo;
-use crate::packet::PACKET_DATA_SIZE;
 use crate::storage_stage::StorageState;
+use morgan_interface::constants::PACKET_DATA_SIZE;
 use bincode::{deserialize, serialize};
 use jsonrpc_core::{Error, Metadata, Result};
 use jsonrpc_derive::rpc;
@@ -546,7 +546,6 @@ impl RpcSol for RpcSolImpl {
 
     fn send_transaction(&self, meta: Self::Metadata, data: Vec<u8>) -> Result<String> {
         let tx: Transaction = deserialize(&data).map_err(|err| {
-            // info!("{}", Info(format!("send_transaction: deserialize error: {:?}", err).to_string()));
             println!("{}",
                 printLn(
                     format!("send_transaction: deserialize error: {:?}", err).to_string(),
@@ -556,12 +555,7 @@ impl RpcSol for RpcSolImpl {
             Error::invalid_request()
         })?;
         if data.len() >= PACKET_DATA_SIZE {
-            // info!(
-            //     "{}",
-            //     Info(format!("send_transaction: transaction too large: {} bytes (max: {} bytes)",
-            //     data.len(),
-            //     PACKET_DATA_SIZE).to_string())
-            // );
+            
             println!("{}",
                 printLn(
                     format!("send_transaction: transaction too large: {} bytes (max: {} bytes)",
@@ -578,7 +572,6 @@ impl RpcSol for RpcSolImpl {
         account_host_socket
             .send_to(&data, account_host_url)
             .map_err(|err| {
-                // info!("{}", Info(format!("send_transaction: send_to error: {:?}", err).to_string()));
                 println!("{}",
                     printLn(
                         format!("send_transaction: send_to error: {:?}", err).to_string(),

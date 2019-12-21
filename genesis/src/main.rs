@@ -22,6 +22,7 @@ use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::signature::{read_keypair, KeypairUtil};
 use morgan_interface::system_program;
 use morgan_interface::timing;
+use morgan_interface::constants;
 use morgan_stake_api::stake_state;
 use morgan_storage_controller::genesis_block_util::GenesisBlockUtil;
 use morgan_vote_api::vote_state;
@@ -36,8 +37,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         &GasCost::default().difs_per_signature.to_string();
     let default_target_drop_duration =
         &timing::duration_as_ms(&WaterClockConfig::default().target_drop_duration).to_string();
-    let default_drops_per_slot = &timing::DEFAULT_DROPS_PER_SLOT.to_string();
-    let default_slots_per_epoch = &timing::DEFAULT_SLOTS_PER_EPOCH.to_string();
+    let default_drops_per_slot = &constants::DEFAULT_DROPS_PER_SLOT.to_string();
+    let default_slots_per_epoch = &constants::DEFAULT_SLOTS_PER_EPOCH.to_string();
 
     let matches = App::new(crate_name!())
         .about(crate_description!())

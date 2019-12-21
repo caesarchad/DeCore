@@ -6,7 +6,7 @@ use crate::storage_opcode::StorageOpCode;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
+use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use morgan_helper::logHelper::*;
 
 pub fn handle_opcode(

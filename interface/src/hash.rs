@@ -26,8 +26,7 @@ impl Hasher {
         }
     }
     pub fn result(self) -> Hash {
-        // At the time of this writing, the sha2 library is stuck on an old version
-        // of generic_array (0.9.0). Decouple ourselves with a clone to our version.
+        
         Hash(GenericArray::clone_from_slice(
             self.hasher.result().as_slice(),
         ))
@@ -79,19 +78,19 @@ impl Hash {
     }
 }
 
-/// Return a Sha256 hash for the given data.
+
 pub fn hashv(vals: &[&[u8]]) -> Hash {
     let mut hasher = Hasher::default();
     hasher.hashv(vals);
     hasher.result()
 }
 
-/// Return a Sha256 hash for the given data.
+
 pub fn hash(val: &[u8]) -> Hash {
     hashv(&[val])
 }
 
-/// Return the hash of the given hash extended with the given value.
+
 pub fn extend_and_hash(id: &Hash, val: &[u8]) -> Hash {
     let mut hash_data = id.as_ref().to_vec();
     hash_data.extend_from_slice(val);
@@ -129,7 +128,7 @@ mod tests {
         let mut hash_base58_str = bs58::encode(hash.0).into_string();
         assert_eq!(hash_base58_str.parse::<Hash>(), Ok(hash));
 
-        // throw some non-base58 stuff in there
+        
         hash_base58_str.replace_range(..1, "I");
         assert_eq!(
             hash_base58_str.parse::<Hash>(),

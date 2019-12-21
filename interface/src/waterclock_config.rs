@@ -1,4 +1,4 @@
-use crate::timing::DEFAULT_NUM_DROPS_PER_SECOND;
+use crate::constants::DEFAULT_NUM_DROPS_PER_SECOND;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

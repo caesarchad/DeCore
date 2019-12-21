@@ -2,7 +2,7 @@ use crate::leader_arrange::LeaderSchedule;
 use crate::staking_utils;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::timing::NUM_CONSECUTIVE_LEADER_SLOTS;
+use morgan_interface::constants::NUM_CONSECUTIVE_LEADER_SLOTS;
 use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::{Config, TestRunner},

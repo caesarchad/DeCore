@@ -12,7 +12,7 @@ use serde_derive::{Deserialize, Serialize};
 use morgan_metricbot::datapoint_info;
 use morgan_interface::hash::Hash;
 use morgan_interface::message::Message;
-use morgan_interface::packet::PACKET_DATA_SIZE;
+use morgan_interface::constants::PACKET_DATA_SIZE;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;

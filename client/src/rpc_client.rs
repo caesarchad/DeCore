@@ -11,7 +11,7 @@ use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{KeypairUtil, Signature};
-use morgan_interface::timing::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
+use morgan_interface::constants::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
 use morgan_interface::transaction::{self, Transaction, TransactionError};
 use std::error;
 use std::io;

@@ -96,7 +96,7 @@ pub fn recvmmsg(sock: &UdpSocket, packets: &mut [Packet]) -> io::Result<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::PACKET_DATA_SIZE;
+    use morgan_interface::constants::PACKET_DATA_SIZE;
     use crate::recvmmsg::*;
     use std::time::{Duration, Instant};
 

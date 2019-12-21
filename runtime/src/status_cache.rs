@@ -4,7 +4,7 @@ use rand::{thread_rng, Rng};
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::Signature;
 
-const MAX_CACHE_ENTRIES: usize = morgan_interface::timing::MAX_HASH_AGE_IN_SECONDS;
+const MAX_CACHE_ENTRIES: usize = morgan_interface::constants::MAX_HASH_AGE_IN_SECONDS;
 const CACHED_SIGNATURE_SIZE: usize = 20;
 
 // Store forks in a single chunk of memory to avoid another lookup.

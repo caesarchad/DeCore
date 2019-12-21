@@ -2,8 +2,9 @@
 //!
 
 use crate::packet::{
-    deserialize_packets_in_blob, Blob, Meta, Packets, SharedBlobs, PACKET_DATA_SIZE,
+    deserialize_packets_in_blob, Blob, Meta, Packets, SharedBlobs, 
 };
+use morgan_interface::constants::PACKET_DATA_SIZE;
 use crate::result::{Error, Result};
 use bincode;
 use morgan_interface::timing::duration_as_ms;
@@ -228,7 +229,8 @@ pub fn blob_packet_receiver(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::packet::{Blob, Packet, Packets, SharedBlob, PACKET_DATA_SIZE};
+    use crate::packet::{Blob, Packet, Packets, SharedBlob};
+    use morgan_interface::constants::PACKET_DATA_SIZE;
     use crate::streamer::{receiver, responder};
     use std::io;
     use std::io::Write;

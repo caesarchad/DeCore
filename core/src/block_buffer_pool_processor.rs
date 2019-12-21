@@ -9,7 +9,7 @@ use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::timing::duration_as_ms;
-use morgan_interface::timing::MAX_RECENT_TRANSACTION_SEALS;
+use morgan_interface::constants::MAX_RECENT_TRANSACTION_SEALS;
 use morgan_interface::transaction::Result;
 use morgan_interface::transaction::Transaction;
 use std::result;

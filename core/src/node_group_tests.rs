@@ -15,10 +15,9 @@ use morgan_interface::hash::Hash;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::system_transaction;
-use morgan_interface::timing::{
-    duration_as_ms, DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT,
-    NUM_CONSECUTIVE_LEADER_SLOTS,
-};
+use morgan_interface::timing::duration_as_ms;
+use morgan_interface::constants::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT,
+    NUM_CONSECUTIVE_LEADER_SLOTS,};
 use morgan_interface::transport::TransportError;
 use std::thread::sleep;
 use std::time::Duration;

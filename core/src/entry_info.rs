@@ -451,7 +451,8 @@ pub fn next_entry(prev_hash: &Hash, num_hashes: u64, transactions: Vec<Transacti
 mod tests {
     use super::*;
     use crate::entry_info::Entry;
-    use crate::packet::{to_blobs, BLOB_DATA_SIZE, PACKET_DATA_SIZE};
+    use crate::packet::{to_blobs, BLOB_DATA_SIZE};
+    use morgan_interface::constants::PACKET_DATA_SIZE;
     use morgan_interface::hash::hash;
     use morgan_interface::opcodes::OpCode;
     use morgan_interface::pubkey::Pubkey;

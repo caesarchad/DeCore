@@ -21,9 +21,8 @@ use morgan_interface::hash::hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
 use morgan_interface::system_transaction;
-use morgan_interface::timing::{
-    duration_as_ms, timestamp, DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
-};
+use morgan_interface::timing::{duration_as_ms, timestamp,};
+use morgan_interface::constants::{DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,};
 use std::iter;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver};

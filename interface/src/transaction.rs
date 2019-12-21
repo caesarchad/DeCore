@@ -15,41 +15,26 @@ pub enum TransactionError {
     
     AccountInUse,
 
-    /// Pubkey appears twice in the same transaction, typically in a pay-to-self
-    /// transaction.
     AccountLoadedTwice,
 
-    /// Attempt to debit from `Pubkey`, but no found no record of a prior credit.
     AccountNotFound,
 
-    /// Attempt to load program from `Pubkey`, but it doesn't exist.
     ProgramAccountNotFound,
 
-    /// The from `Pubkey` does not have sufficient balance to pay the fee to schedule the transaction
     InsufficientFundsForFee,
 
-    /// This account may not be used to pay transaction fees
     InvalidAccountForFee,
 
-    /// The treasury has seen `Signature` before. This can occur under normal operation
-    /// when a UDP packet is duplicated, as a user error from a client not updating
-    /// its `recent_transaction_seal`, or as a double-spend attack.
     DuplicateSignature,
 
-    /// The treasury has not seen the given `recent_transaction_seal` or the transaction is too old and
-    /// the `recent_transaction_seal` has been discarded.
     TransactionSealNotFound,
 
-    /// The program returned an error
     OpCodeErr(u8, OpCodeErr),
 
-    /// Loader call chain too deep
     CallChainTooDeep,
 
-    /// Transaction has a fee but has no signature present
     MissingSignatureForFee,
 
-    /// Transaction contains an invalid account reference
     InvalidAccountIndex,
 }
 

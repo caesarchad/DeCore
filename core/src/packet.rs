@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use serde::Serialize;
 use morgan_metricbot::inc_new_counter_debug;
 use morgan_interface::hash::Hash;
-pub use morgan_interface::packet::PACKET_DATA_SIZE;
+pub use morgan_interface::constants::PACKET_DATA_SIZE;
 use morgan_interface::pubkey::Pubkey;
 use std::borrow::Borrow;
 use std::cmp;
