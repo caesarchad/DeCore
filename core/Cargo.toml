@@ -17,7 +17,6 @@ codecov = { repository = "morgan-labs/morgan", branch = "master", service = "git
 chacha = []
 cuda = []
 erasure = []
-kvstore = ["morgan-kvstore"]
 
 [dependencies]
 bincode = "1.1.4"
@@ -67,7 +66,6 @@ morgan-budget-controller = { path = "../controllers/budget_controller", version 
 morgan-client = { path = "../client", version = "0.15.3"     }
 morgan-tokenbot = { path = "../tokenbot", version = "0.15.3"     }
 solana-ed25519-dalek = "0.2.0"
-morgan-kvstore = { path = "../kvstore", version = "0.15.3" , optional = true     }
 morgan-logger = { path = "../logger", version = "0.15.3"     }
 morgan-metricbot = { path = "../metricbot", version = "0.15.3"     }
 morgan-netutil = { path = "../netutil", version = "0.15.3"     }

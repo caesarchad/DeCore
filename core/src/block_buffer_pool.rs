@@ -5,14 +5,10 @@ use crate::expunge::{self, Session};
 use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
 use crate::result::{Error, Result};
 
-#[cfg(feature = "kvstore")]
-use morgan_kvstore as kvstore;
-
 use bincode::deserialize;
 
 use hashbrown::HashMap;
 
-#[cfg(not(feature = "kvstore"))]
 use rocksdb;
 
 use morgan_metricbot::{datapoint_error, datapoint_info};
@@ -60,10 +56,7 @@ macro_rules! db_imports {
     };
 }
 
-#[cfg(not(feature = "kvstore"))]
 db_imports! {rocks, RocksDB, "rocksdb"}
-#[cfg(feature = "kvstore")]
-db_imports! {kvs, Kvs, "kvstore"}
 
 pub const MAX_COMPLETED_SLOTS_IN_CHANNEL: usize = 100_000;
 
@@ -74,8 +67,6 @@ pub enum BlockBufferPoolError {
     BlobForIndexExists,
     InvalidBlobData,
     RocksDb(rocksdb::Error),
-    #[cfg(feature = "kvstore")]
-    KvsDb(kvstore::Error),
     SlotNotRooted,
 }
 

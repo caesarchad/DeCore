@@ -8,7 +8,6 @@ members = [
     "genesis",
     "gossip",
     "keybot",
-    "kvstore",
     "ledgerbot",
     "metricbot",
     "netutil",
