@@ -36,17 +36,17 @@ pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
 
 // Implement a destructor for the RepeatPhase thread to signal it exited
 // even on panics
-struct Finalizer {
+struct EndSignal {
     exit_sender: Arc<AtomicBool>,
 }
 
-impl Finalizer {
+impl EndSignal {
     fn new(exit_sender: Arc<AtomicBool>) -> Self {
-        Finalizer { exit_sender }
+        EndSignal { exit_sender }
     }
 }
-// Implement a destructor for Finalizer.
-impl Drop for Finalizer {
+// Implement a destructor for EndSignal.
+impl Drop for EndSignal {
     fn drop(&mut self) {
         self.exit_sender.clone().store(true, Ordering::Relaxed);
     }
@@ -107,7 +107,7 @@ impl RepeatPhase {
         let t_replay = Builder::new()
             .name("morgan-replay-phase".to_string())
             .spawn(move || {
-                let _exit = Finalizer::new(exit_.clone());
+                let _exit = EndSignal::new(exit_.clone());
                 let mut progress = HashMap::new();
                 loop {
                     let now = Instant::now();

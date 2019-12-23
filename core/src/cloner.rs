@@ -6,11 +6,11 @@ use crate::node_group_info::{NodeGroupInfo, Node};
 use crate::connection_info::ContactInfo;
 use crate::gossip_service::GossipService;
 use crate::packet::to_shared_blob;
-use crate::fix_missing_spot_service::{RepairSlotRange, RepairStrategy};
+use crate::fix_missing_spot_service::{FixSlotLength, FixPlan};
 use crate::result::Result;
 use crate::service::Service;
 use crate::streamer::{receiver, responder};
-use crate::spot_transmit_service::WindowService;
+use crate::spot_transmit_service::SpotTransmitService;
 use bincode::deserialize;
 use rand::thread_rng;
 use rand::Rng;
@@ -49,7 +49,7 @@ pub enum StorageMinerRequest {
 pub struct StorageMiner {
     gossip_service: GossipService,
     fetch_phase: BlobFetchPhase,
-    window_service: WindowService,
+    spot_service: SpotTransmitService,
     thread_handles: Vec<JoinHandle<()>>,
     exit: Arc<AtomicBool>,
     slot: u64,
@@ -207,7 +207,7 @@ impl StorageMiner {
 
         // Note for now, this ledger will not contain any of the existing entries
         // in the ledger located at ledger_path, and will only append on newly received
-        // entries after being passed to window_service
+        // entries after being passed to spot_service
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
         let treasury = Treasury::new_with_paths(&genesis_block, None);
@@ -245,27 +245,27 @@ impl StorageMiner {
                 module_path!().to_string()
             )
         );
-        let mut repair_slot_range = RepairSlotRange::default();
+        let mut repair_slot_range = FixSlotLength::default();
         repair_slot_range.end = slot + SLOTS_PER_SEGMENT;
         repair_slot_range.start = slot;
 
-        let repair_socket = Arc::new(node.sockets.repair);
+        let fix_socket = Arc::new(node.sockets.repair);
         let mut blob_sockets: Vec<Arc<UdpSocket>> =
             node.sockets.tvu.into_iter().map(Arc::new).collect();
-        blob_sockets.push(repair_socket.clone());
+        blob_sockets.push(fix_socket.clone());
         let (blob_fetch_sender, blob_fetch_receiver) = channel();
         let fetch_phase = BlobFetchPhase::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
 
         let (retransmit_sender, retransmit_receiver) = channel();
 
-        let window_service = WindowService::new(
+        let spot_service = SpotTransmitService::new(
             block_buffer_pool.clone(),
             node_group_info.clone(),
             blob_fetch_receiver,
             retransmit_sender,
-            repair_socket,
+            fix_socket,
             &exit,
-            RepairStrategy::RepairRange(repair_slot_range),
+            FixPlan::FixSlotList(repair_slot_range),
             &genesis_transaction_seal,
             |_, _, _| true,
         );
@@ -301,7 +301,7 @@ impl StorageMiner {
         Ok(Self {
             gossip_service,
             fetch_phase,
-            window_service,
+            spot_service,
             thread_handles,
             exit,
             slot,
@@ -399,10 +399,10 @@ impl StorageMiner {
             sleep(Duration::from_secs(1));
         }
 
-        // info!("{}", Info(format!("Done receiving entries from window_service").to_string()));
+        // info!("{}", Info(format!("Done receiving entries from spot_service").to_string()));
         println!("{}",
             printLn(
-                format!("Done receiving entries from window_service").to_string(),
+                format!("Done receiving entries from spot_service").to_string(),
                 module_path!().to_string()
             )
         );
@@ -566,7 +566,7 @@ impl StorageMiner {
     pub fn join(self) {
         self.gossip_service.join().unwrap();
         self.fetch_phase.join().unwrap();
-        self.window_service.join().unwrap();
+        self.spot_service.join().unwrap();
         for handle in self.thread_handles {
             handle.join().unwrap();
         }

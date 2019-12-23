@@ -67,8 +67,8 @@ fn check_miner_connection(storage_miner_info: &ContactInfo) {
 
     let exit = Arc::new(AtomicBool::new(false));
     let (s_reader, r_reader) = channel();
-    let repair_socket = Arc::new(tn.sockets.repair);
-    let t_receiver = blob_receiver(repair_socket.clone(), &exit, s_reader);
+    let fix_socket = Arc::new(tn.sockets.repair);
+    let t_receiver = blob_receiver(fix_socket.clone(), &exit, s_reader);
 
     println!("{}",
         printLn(
@@ -79,7 +79,7 @@ fn check_miner_connection(storage_miner_info: &ContactInfo) {
     );
     let mut received_blob = false;
     for _ in 0..5 {
-        repair_socket.send_to(&req, storage_miner_info.gossip).unwrap();
+        fix_socket.send_to(&req, storage_miner_info.gossip).unwrap();
 
         let x = r_reader.recv_timeout(Duration::new(1, 0));
 

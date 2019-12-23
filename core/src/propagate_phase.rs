@@ -192,17 +192,17 @@ impl Broadcast {
 
 // Implement a destructor for the BroadcastPhase thread to signal it exited
 // even on panics
-struct Finalizer {
+struct EndSignal {
     exit_sender: Arc<AtomicBool>,
 }
 
-impl Finalizer {
+impl EndSignal {
     fn new(exit_sender: Arc<AtomicBool>) -> Self {
-        Finalizer { exit_sender }
+        EndSignal { exit_sender }
     }
 }
-// Implement a destructor for Finalizer.
-impl Drop for Finalizer {
+// Implement a destructor for EndSignal.
+impl Drop for EndSignal {
     fn drop(&mut self) {
         self.exit_sender.clone().store(true, Ordering::Relaxed);
     }
@@ -286,7 +286,7 @@ impl BroadcastPhase {
         let thread_hdl = Builder::new()
             .name("morgan-broadcaster".to_string())
             .spawn(move || {
-                let _finalizer = Finalizer::new(exit_sender);
+                let _finalizer = EndSignal::new(exit_sender);
                 Self::run(
                     &sock,
                     &node_group_info,

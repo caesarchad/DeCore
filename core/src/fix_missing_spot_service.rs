@@ -27,9 +27,9 @@ pub const MAX_REPAIR_TRIES: u64 = 128;
 pub const NUM_FORKS_TO_REPAIR: usize = 5;
 pub const MAX_ORPHANS: usize = 5;
 
-pub enum RepairStrategy {
-    RepairRange(RepairSlotRange),
-    RepairAll {
+pub enum FixPlan {
+    FixSlotList(FixSlotLength),
+    FixAll {
         treasury_forks: Arc<RwLock<TreasuryForks>>,
         completed_slots_receiver: CompletedSlotsReceiver,
         epoch_schedule: EpochSchedule,
@@ -37,41 +37,41 @@ pub enum RepairStrategy {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RepairType {
-    Orphan(u64),
+pub enum FixPlanType {
+    SingletonFix(u64),
     HighestBlob(u64, u64),
     Blob(u64, u64),
 }
 
-pub struct RepairSlotRange {
+pub struct FixSlotLength {
     pub start: u64,
     pub end: u64,
 }
 
-impl Default for RepairSlotRange {
+impl Default for FixSlotLength {
     fn default() -> Self {
-        RepairSlotRange {
+        FixSlotLength {
             start: 0,
             end: std::u64::MAX,
         }
     }
 }
 
-pub struct RepairService {
+pub struct FixService {
     t_repair: JoinHandle<()>,
     node_group_info_fix_listener: Option<NodeGroupInfoFixListener>,
 }
 
-impl RepairService {
+impl FixService {
     pub fn new(
         block_buffer_pool: Arc<BlockBufferPool>,
         exit: Arc<AtomicBool>,
-        repair_socket: Arc<UdpSocket>,
+        fix_socket: Arc<UdpSocket>,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
-        repair_strategy: RepairStrategy,
+        fix_plan: FixPlan,
     ) -> Self {
-        let node_group_info_fix_listener = match repair_strategy {
-            RepairStrategy::RepairAll {
+        let node_group_info_fix_listener = match fix_plan {
+            FixPlan::FixAll {
                 ref epoch_schedule, ..
             } => Some(NodeGroupInfoFixListener::new(
                 &block_buffer_pool,
@@ -84,19 +84,19 @@ impl RepairService {
         };
 
         let t_repair = Builder::new()
-            .name("morgan-repair-service".to_string())
+            .name("morgan-fix-function".to_string())
             .spawn(move || {
                 Self::run(
                     &block_buffer_pool,
                     &exit,
-                    &repair_socket,
+                    &fix_socket,
                     &node_group_info,
-                    repair_strategy,
+                    fix_plan,
                 )
             })
             .unwrap();
 
-        RepairService {
+        FixService {
             t_repair,
             node_group_info_fix_listener,
         }
@@ -105,18 +105,18 @@ impl RepairService {
     fn run(
         block_buffer_pool: &Arc<BlockBufferPool>,
         exit: &Arc<AtomicBool>,
-        repair_socket: &Arc<UdpSocket>,
+        fix_socket: &Arc<UdpSocket>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-        repair_strategy: RepairStrategy,
+        fix_plan: FixPlan,
     ) {
         let mut epoch_slots: BTreeSet<u64> = BTreeSet::new();
         let id = node_group_info.read().unwrap().id();
         let mut current_root = 0;
-        if let RepairStrategy::RepairAll {
+        if let FixPlan::FixAll {
             ref treasury_forks,
             ref epoch_schedule,
             ..
-        } = repair_strategy
+        } = fix_plan
         {
             current_root = treasury_forks.read().unwrap().root();
             Self::initialize_epoch_slots(
@@ -133,9 +133,9 @@ impl RepairService {
                 break;
             }
 
-            let repairs = {
-                match repair_strategy {
-                    RepairStrategy::RepairRange(ref repair_slot_range) => {
+            let fixerbot = {
+                match fix_plan {
+                    FixPlan::FixSlotList(ref repair_slot_range) => {
                         Self::generate_repairs_in_range(
                             block_buffer_pool,
                             MAX_REPAIR_LENGTH,
@@ -143,7 +143,7 @@ impl RepairService {
                         )
                     }
 
-                    RepairStrategy::RepairAll {
+                    FixPlan::FixAll {
                         ref treasury_forks,
                         ref completed_slots_receiver,
                         ..
@@ -162,8 +162,8 @@ impl RepairService {
                 }
             };
 
-            if let Ok(repairs) = repairs {
-                let reqs: Vec<_> = repairs
+            if let Ok(fixerbot) = fixerbot {
+                let reqs: Vec<_> = fixerbot
                     .into_iter()
                     .filter_map(|repair_request| {
                         node_group_info
@@ -176,7 +176,7 @@ impl RepairService {
                     .collect();
 
                 for ((to, req), repair_request) in reqs {
-                    if let Ok(local_addr) = repair_socket.local_addr() {
+                    if let Ok(local_addr) = fix_socket.local_addr() {
                         datapoint_info!(
                             "repair_service",
                             ("repair_request", format!("{:?}", repair_request), String),
@@ -185,7 +185,7 @@ impl RepairService {
                             ("id", id.to_string(), String)
                         );
                     }
-                    repair_socket.send_to(&req, to).unwrap_or_else(|e| {
+                    fix_socket.send_to(&req, to).unwrap_or_else(|e| {
                         // info!("{}", Info(format!("{} repair req send_to({}) error {:?}", id, to, e).to_string()));
                         println!("{}",
                             printLn(
@@ -201,16 +201,16 @@ impl RepairService {
         }
     }
 
-    // Generate repairs for all slots `x` in the repair_range.start <= x <= repair_range.end
+    // Generate fixerbot for all slots `x` in the fixerbot_range.start <= x <= fixerbot_range.end
     fn generate_repairs_in_range(
         block_buffer_pool: &BlockBufferPool,
-        max_repairs: usize,
-        repair_range: &RepairSlotRange,
-    ) -> Result<(Vec<RepairType>)> {
+        fixerbot_upperbound: usize,
+        fixerbot_range: &FixSlotLength,
+    ) -> Result<(Vec<FixPlanType>)> {
         // Slot height and blob indexes for blobs we want to repair
-        let mut repairs: Vec<RepairType> = vec![];
-        for slot in repair_range.start..=repair_range.end {
-            if repairs.len() >= max_repairs {
+        let mut fixerbot: Vec<FixPlanType> = vec![];
+        for slot in fixerbot_range.start..=fixerbot_range.end {
+            if fixerbot.len() >= fixerbot_upperbound {
                 break;
             }
 
@@ -226,78 +226,78 @@ impl RepairService {
                 block_buffer_pool,
                 slot,
                 &meta,
-                max_repairs - repairs.len(),
+                fixerbot_upperbound - fixerbot.len(),
             );
-            repairs.extend(new_repairs);
+            fixerbot.extend(new_repairs);
         }
 
-        Ok(repairs)
+        Ok(fixerbot)
     }
 
     fn generate_repairs(
         block_buffer_pool: &BlockBufferPool,
         root: u64,
-        max_repairs: usize,
-    ) -> Result<(Vec<RepairType>)> {
+        fixerbot_upperbound: usize,
+    ) -> Result<(Vec<FixPlanType>)> {
         // Slot height and blob indexes for blobs we want to repair
-        let mut repairs: Vec<RepairType> = vec![];
-        Self::generate_repairs_for_fork(block_buffer_pool, &mut repairs, max_repairs, root);
+        let mut fixerbot: Vec<FixPlanType> = vec![];
+        Self::generate_repairs_for_fork(block_buffer_pool, &mut fixerbot, fixerbot_upperbound, root);
 
         // TODO: Incorporate gossip to determine priorities for repair?
 
         // Try to resolve orphans in block_buffer_pool
         let orphans = block_buffer_pool.fetch_singletons(Some(MAX_ORPHANS));
 
-        Self::generate_repairs_for_orphans(&orphans[..], &mut repairs);
-        Ok(repairs)
+        Self::generate_repairs_for_orphans(&orphans[..], &mut fixerbot);
+        Ok(fixerbot)
     }
 
     fn generate_repairs_for_slot(
         block_buffer_pool: &BlockBufferPool,
         slot: u64,
         slot_meta: &MetaInfoCol,
-        max_repairs: usize,
-    ) -> Vec<RepairType> {
+        fixerbot_upperbound: usize,
+    ) -> Vec<FixPlanType> {
         if slot_meta.is_full() {
             vec![]
         } else if slot_meta.consumed == slot_meta.received {
-            vec![RepairType::HighestBlob(slot, slot_meta.received)]
+            vec![FixPlanType::HighestBlob(slot, slot_meta.received)]
         } else {
             let reqs = block_buffer_pool.search_absent_data_indexes(
                 slot,
                 slot_meta.consumed,
                 slot_meta.received,
-                max_repairs,
+                fixerbot_upperbound,
             );
 
             reqs.into_iter()
-                .map(|i| RepairType::Blob(slot, i))
+                .map(|i| FixPlanType::Blob(slot, i))
                 .collect()
         }
     }
 
-    fn generate_repairs_for_orphans(orphans: &[u64], repairs: &mut Vec<RepairType>) {
-        repairs.extend(orphans.iter().map(|h| RepairType::Orphan(*h)));
+    fn generate_repairs_for_orphans(orphans: &[u64], fixerbot: &mut Vec<FixPlanType>) {
+        fixerbot.extend(orphans.iter().map(|h| FixPlanType::SingletonFix(*h)));
     }
 
     /// Repairs any fork starting at the input slot
     fn generate_repairs_for_fork(
         block_buffer_pool: &BlockBufferPool,
-        repairs: &mut Vec<RepairType>,
-        max_repairs: usize,
+        fixerbot: &mut Vec<FixPlanType>,
+        fixerbot_upperbound: usize,
         slot: u64,
     ) {
         let mut pending_slots = vec![slot];
-        while repairs.len() < max_repairs && !pending_slots.is_empty() {
+        while fixerbot.len() < fixerbot_upperbound && !pending_slots.is_empty() {
             let slot = pending_slots.pop().unwrap();
             if let Some(slot_meta) = block_buffer_pool.meta(slot).unwrap() {
                 let new_repairs = Self::generate_repairs_for_slot(
                     block_buffer_pool,
                     slot,
                     &slot_meta,
-                    max_repairs - repairs.len(),
+                    fixerbot_upperbound - fixerbot.len(),
                 );
-                repairs.extend(new_repairs);
+                fixerbot.extend(new_repairs);
                 let next_slots = slot_meta.next_slots;
                 pending_slots.extend(next_slots);
             } else {
@@ -341,7 +341,7 @@ impl RepairService {
 
         // Safe to set into gossip because by this time, the leader schedule cache should
         // also be updated with the latest root (done in block_buffer_processor) and thus
-        // will provide a schedule to window_service for any incoming blobs up to the
+        // will provide a schedule to spot_service for any incoming blobs up to the
         // last_confirmed_epoch.
         node_group_info
             .write()
@@ -394,7 +394,7 @@ impl RepairService {
     }
 }
 
-impl Service for RepairService {
+impl Service for FixService {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -435,11 +435,11 @@ mod test {
             blobs.extend(blobs2);
             block_buffer_pool.update_blobs(&blobs).unwrap();
             assert_eq!(
-                RepairService::generate_repairs(&block_buffer_pool, 0, 2).unwrap(),
+                FixService::generate_repairs(&block_buffer_pool, 0, 2).unwrap(),
                 vec![
-                    RepairType::HighestBlob(0, 0),
-                    RepairType::Orphan(0),
-                    RepairType::Orphan(2)
+                    FixPlanType::HighestBlob(0, 0),
+                    FixPlanType::SingletonFix(0),
+                    FixPlanType::SingletonFix(2)
                 ]
             );
         }
@@ -461,8 +461,8 @@ mod test {
 
             // Check that repair tries to patch the empty slot
             assert_eq!(
-                RepairService::generate_repairs(&block_buffer_pool, 0, 2).unwrap(),
-                vec![RepairType::HighestBlob(0, 0), RepairType::Orphan(0)]
+                FixService::generate_repairs(&block_buffer_pool, 0, 2).unwrap(),
+                vec![FixPlanType::HighestBlob(0, 0), FixPlanType::SingletonFix(0)]
             );
         }
         BlockBufferPool::remove_ledger_file(&block_buffer_pool_path).expect("Expected successful database destruction");
@@ -491,21 +491,21 @@ mod test {
                 .flat_map(|x| ((nth * x + 1) as u64..(nth * x + nth) as u64))
                 .collect();
 
-            let expected: Vec<RepairType> = (0..num_slots)
+            let expected: Vec<FixPlanType> = (0..num_slots)
                 .flat_map(|slot| {
                     missing_indexes_per_slot
                         .iter()
-                        .map(move |blob_index| RepairType::Blob(slot as u64, *blob_index))
+                        .map(move |blob_index| FixPlanType::Blob(slot as u64, *blob_index))
                 })
                 .collect();
 
             assert_eq!(
-                RepairService::generate_repairs(&block_buffer_pool, 0, std::usize::MAX).unwrap(),
+                FixService::generate_repairs(&block_buffer_pool, 0, std::usize::MAX).unwrap(),
                 expected
             );
 
             assert_eq!(
-                RepairService::generate_repairs(&block_buffer_pool, 0, expected.len() - 2).unwrap()[..],
+                FixService::generate_repairs(&block_buffer_pool, 0, expected.len() - 2).unwrap()[..],
                 expected[0..expected.len() - 2]
             );
         }
@@ -529,10 +529,10 @@ mod test {
             block_buffer_pool.update_blobs(&blobs).unwrap();
 
             // We didn't get the last blob for this slot, so ask for the highest blob for that slot
-            let expected: Vec<RepairType> = vec![RepairType::HighestBlob(0, num_entries_per_slot)];
+            let expected: Vec<FixPlanType> = vec![FixPlanType::HighestBlob(0, num_entries_per_slot)];
 
             assert_eq!(
-                RepairService::generate_repairs(&block_buffer_pool, 0, std::usize::MAX).unwrap(),
+                FixService::generate_repairs(&block_buffer_pool, 0, std::usize::MAX).unwrap(),
                 expected
             );
         }
@@ -557,22 +557,22 @@ mod test {
             // sides of the range)
             for start in 0..slots.len() {
                 for end in start..slots.len() {
-                    let mut repair_slot_range = RepairSlotRange::default();
+                    let mut repair_slot_range = FixSlotLength::default();
                     repair_slot_range.start = slots[start];
                     repair_slot_range.end = slots[end];
-                    let expected: Vec<RepairType> = (repair_slot_range.start
+                    let expected: Vec<FixPlanType> = (repair_slot_range.start
                         ..=repair_slot_range.end)
                         .map(|slot_index| {
                             if slots.contains(&(slot_index as u64)) {
-                                RepairType::Blob(slot_index as u64, 0)
+                                FixPlanType::Blob(slot_index as u64, 0)
                             } else {
-                                RepairType::HighestBlob(slot_index as u64, 0)
+                                FixPlanType::HighestBlob(slot_index as u64, 0)
                             }
                         })
                         .collect();
 
                     assert_eq!(
-                        RepairService::generate_repairs_in_range(
+                        FixService::generate_repairs_in_range(
                             &block_buffer_pool,
                             std::usize::MAX,
                             &repair_slot_range
@@ -606,18 +606,18 @@ mod test {
             }
 
             let end = 4;
-            let expected: Vec<RepairType> = vec![
-                RepairType::HighestBlob(end - 2, 0),
-                RepairType::HighestBlob(end - 1, 0),
-                RepairType::HighestBlob(end, 0),
+            let expected: Vec<FixPlanType> = vec![
+                FixPlanType::HighestBlob(end - 2, 0),
+                FixPlanType::HighestBlob(end - 1, 0),
+                FixPlanType::HighestBlob(end, 0),
             ];
 
-            let mut repair_slot_range = RepairSlotRange::default();
+            let mut repair_slot_range = FixSlotLength::default();
             repair_slot_range.start = 2;
             repair_slot_range.end = end;
 
             assert_eq!(
-                RepairService::generate_repairs_in_range(
+                FixService::generate_repairs_in_range(
                     &block_buffer_pool,
                     std::usize::MAX,
                     &repair_slot_range
@@ -661,7 +661,7 @@ mod test {
             // Test that only slots > root from fork1 were included
             let epoch_schedule = EpochSchedule::new(32, 32, false);
 
-            RepairService::get_completed_slots_past_root(
+            FixService::get_completed_slots_past_root(
                 &block_buffer_pool,
                 &mut full_slots,
                 root,
@@ -680,7 +680,7 @@ mod test {
                 .flat_map(|(blobs, _)| blobs)
                 .collect();
             block_buffer_pool.update_blobs(&fork3_blobs).unwrap();
-            RepairService::get_completed_slots_past_root(
+            FixService::get_completed_slots_past_root(
                 &block_buffer_pool,
                 &mut full_slots,
                 root,
@@ -739,7 +739,7 @@ mod test {
             ));
 
             while completed_slots.len() < num_slots as usize {
-                RepairService::update_epoch_slots(
+                FixService::update_epoch_slots(
                     Pubkey::default(),
                     root,
                     &mut root.clone(),
@@ -756,7 +756,7 @@ mod test {
             root = num_slots / 2;
             let (blobs, _) = make_slot_entries(num_slots + 2, num_slots + 1, entries_per_slot);
             block_buffer_pool.insert_data_blobs(&blobs).unwrap();
-            RepairService::update_epoch_slots(
+            FixService::update_epoch_slots(
                 Pubkey::default(),
                 root,
                 &mut 0,
@@ -765,7 +765,7 @@ mod test {
                 &completed_slots_receiver,
             );
             expected.insert(num_slots + 2);
-            RepairService::retain_slots_greater_than_root(&mut expected, root);
+            FixService::retain_slots_greater_than_root(&mut expected, root);
             assert_eq!(completed_slots, expected);
             writer.join().unwrap();
         }
@@ -789,7 +789,7 @@ mod test {
         completed_slots_sender
             .send(vec![newly_completed_slot])
             .unwrap();
-        RepairService::update_epoch_slots(
+        FixService::update_epoch_slots(
             my_pubkey.clone(),
             current_root,
             &mut current_root.clone(),
@@ -819,7 +819,7 @@ mod test {
 
         // Calling update again with no updates to either the roots or set of completed slots
         // should not update gossip
-        RepairService::update_epoch_slots(
+        FixService::update_epoch_slots(
             my_pubkey.clone(),
             current_root,
             &mut current_root,
@@ -837,7 +837,7 @@ mod test {
         sleep(Duration::from_millis(10));
         // Updating just the root again should update gossip (simulates replay phase updating root
         // after a slot has been signaled as completed)
-        RepairService::update_epoch_slots(
+        FixService::update_epoch_slots(
             my_pubkey.clone(),
             current_root + 1,
             &mut current_root,

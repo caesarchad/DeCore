@@ -85,17 +85,17 @@ impl Tvu {
             .clone();
 
         let Sockets {
-            repair: repair_socket,
+            repair: fix_socket,
             fetch: fetch_sockets,
             retransmit: retransmit_socket,
         } = sockets;
 
         let (blob_fetch_sender, blob_fetch_receiver) = channel();
 
-        let repair_socket = Arc::new(repair_socket);
+        let fix_socket = Arc::new(fix_socket);
         let mut blob_sockets: Vec<Arc<UdpSocket>> =
             fetch_sockets.into_iter().map(Arc::new).collect();
-        blob_sockets.push(repair_socket.clone());
+        blob_sockets.push(fix_socket.clone());
         let fetch_phase = BlobFetchPhase::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
 
         //TODO
@@ -107,7 +107,7 @@ impl Tvu {
             block_buffer_pool.clone(),
             &node_group_info,
             Arc::new(retransmit_socket),
-            repair_socket,
+            fix_socket,
             blob_fetch_receiver,
             &exit,
             genesis_transaction_seal,

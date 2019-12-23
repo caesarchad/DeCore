@@ -14,13 +14,10 @@ use std::sync::Arc;
 use morgan_helper::logHelper::*;
 use std::env::VarError;
 
-// Encrypt a file with multiple starting IV states, determined by ivecs.len()
-//
-// Then sample each block at the offsets provided by samples argument with sha256
-// and return the vec of sha states
+
 pub fn chacha_cbc_encrypt_file_many_keys(
-    block_buffer_pool: &Arc<BlockBufferPool>,
-    segment: u64,
+    blk_bfr_pl: &Arc<BlockBufferPool>,
+    sgmt: u64,
     ivecs: &mut [u8],
     samples: &[u64],
 ) -> io::Result<Vec<Hash>> {
@@ -39,8 +36,8 @@ pub fn chacha_cbc_encrypt_file_many_keys(
     let num_keys = ivecs.len() / CHACHA_BLOCK_SIZE;
     let mut sha_states = vec![0; num_keys * size_of::<Hash>()];
     let mut int_sha_states = vec![0; num_keys * 112];
-    let keys: Vec<u8> = vec![0; num_keys * CHACHA_KEY_SIZE]; // keys not used ATM, uniqueness comes from IV
-    let mut entry = segment;
+    let keys: Vec<u8> = vec![0; num_keys * CHACHA_KEY_SIZE]; 
+    let mut entry = sgmt;
     let mut total_entries = 0;
     let mut total_entry_len = 0;
     let mut time: f32 = 0.0;
@@ -48,11 +45,11 @@ pub fn chacha_cbc_encrypt_file_many_keys(
         chacha_init_sha_state(int_sha_states.as_mut_ptr(), num_keys as u32);
     }
     loop {
-        match block_buffer_pool.read_db_by_bytes(entry, SLOTS_PER_SEGMENT - total_entries, &mut buffer, 0) {
+        match blk_bfr_pl.read_db_by_bytes(entry, SLOTS_PER_SEGMENT - total_entries, &mut buffer, 0) {
             Ok((num_entries, entry_len)) => {
                 debug!(
                     "chacha_cuda: encrypting segment: {} num_entries: {} entry_len: {}",
-                    segment, num_entries, entry_len
+                    sgmt, num_entries, entry_len
                 );
                 if num_entries == 0 {
                     break;
@@ -78,14 +75,13 @@ pub fn chacha_cbc_encrypt_file_many_keys(
                 entry += num_entries;
                 debug!(
                     "total entries: {} entry: {} segment: {} entries_per_segment: {}",
-                    total_entries, entry, segment, SLOTS_PER_SEGMENT
+                    total_entries, entry,  sgmt, SLOTS_PER_SEGMENT
                 );
-                if (entry - segment) >= SLOTS_PER_SEGMENT {
+                if (entry - sgmt) >= SLOTS_PER_SEGMENT {
                     break;
                 }
             }
             Err(e) => {
-                // info!("{}", Info(format!("Error encrypting file: {:?}", e).to_string()));
                 let loginfo: String = format!("Error encrypting file: {:?}", e).to_string();
                 println!("{}",
                     printLn(

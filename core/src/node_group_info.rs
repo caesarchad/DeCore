@@ -21,7 +21,7 @@ use crate::gossip_error_type::NodeTbleErr;
 use crate::pull_from_gossip::NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag, EpochSlots, Vote};
 use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
-use crate::fix_missing_spot_service::RepairType;
+use crate::fix_missing_spot_service::FixPlanType;
 use crate::result::Result;
 use crate::staking_utils;
 use crate::streamer::{BlobReceiver, BlobSender};
@@ -914,7 +914,7 @@ impl NodeGroupInfo {
         Ok(out)
     }
 
-    pub fn repair_request(&self, repair_request: &RepairType) -> Result<(SocketAddr, Vec<u8>)> {
+    pub fn repair_request(&self, repair_request: &FixPlanType) -> Result<(SocketAddr, Vec<u8>)> {
         // find a peer that appears to be accepting replication, as indicated
         //  by a valid tvu port location
         let valid: Vec<_> = self.repair_peers();
@@ -925,7 +925,7 @@ impl NodeGroupInfo {
         let addr = valid[n].gossip; // send the request to the peer's gossip port
         let out = {
             match repair_request {
-                RepairType::Blob(slot, blob_index) => {
+                FixPlanType::Blob(slot, blob_index) => {
                     datapoint_debug!(
                         "node_group_info-repair",
                         ("repair-slot", *slot, i64),
@@ -933,7 +933,7 @@ impl NodeGroupInfo {
                     );
                     self.window_index_request_bytes(*slot, *blob_index)?
                 }
-                RepairType::HighestBlob(slot, blob_index) => {
+                FixPlanType::HighestBlob(slot, blob_index) => {
                     datapoint_debug!(
                         "node_group_info-repair_highest",
                         ("repair-highest-slot", *slot, i64),
@@ -941,7 +941,7 @@ impl NodeGroupInfo {
                     );
                     self.window_highest_index_request_bytes(*slot, *blob_index)?
                 }
-                RepairType::Orphan(slot) => {
+                FixPlanType::SingletonFix(slot) => {
                     datapoint_debug!("node_group_info-repair_orphan", ("repair-orphan", *slot, i64));
                     self.orphan_bytes(*slot)?
                 }
@@ -1792,7 +1792,7 @@ mod tests {
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::propagation_value::ContInfTblValueTag;
     use crate::packet::BLOB_HEADER_SIZE;
-    use crate::fix_missing_spot_service::RepairType;
+    use crate::fix_missing_spot_service::FixPlanType;
     use crate::result::Error;
     use crate::test_tx::test_tx;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -1869,7 +1869,7 @@ mod tests {
     fn window_index_request() {
         let me = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(me);
-        let rv = node_group_info.repair_request(&RepairType::Blob(0, 0));
+        let rv = node_group_info.repair_request(&FixPlanType::Blob(0, 0));
         assert_matches!(rv, Err(Error::NodeGroupInfoError(NodeGroupInfoError::NoPeers)));
 
         let gossip_addr = socketaddr!([127, 0, 0, 1], 1234);
@@ -1886,7 +1886,7 @@ mod tests {
         );
         node_group_info.insert_info(nxt.clone());
         let rv = node_group_info
-            .repair_request(&RepairType::Blob(0, 0))
+            .repair_request(&FixPlanType::Blob(0, 0))
             .unwrap();
         assert_eq!(nxt.gossip, gossip_addr);
         assert_eq!(rv.0, nxt.gossip);
@@ -1909,7 +1909,7 @@ mod tests {
         while !one || !two {
             //this randomly picks an option, so eventually it should pick both
             let rv = node_group_info
-                .repair_request(&RepairType::Blob(0, 0))
+                .repair_request(&FixPlanType::Blob(0, 0))
                 .unwrap();
             if rv.0 == gossip_addr {
                 one = true;

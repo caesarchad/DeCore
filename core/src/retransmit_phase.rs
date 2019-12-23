@@ -5,12 +5,12 @@ use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
 use crate::leader_arrange_cache::LeaderScheduleCache;
-use crate::fix_missing_spot_service::RepairStrategy;
+use crate::fix_missing_spot_service::FixPlan;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::staking_utils;
 use crate::streamer::BlobReceiver;
-use crate::spot_transmit_service::{should_retransmit_and_persist, WindowService};
+use crate::spot_transmit_service::{check_replay_blob, SpotTransmitService};
 use morgan_metricbot::{datapoint_info, inc_new_counter_error};
 use morgan_runtime::epoch_schedule::EpochSchedule;
 use morgan_interface::hash::Hash;
@@ -166,7 +166,7 @@ impl KVCategorizer for ErrorCategorizer {
 
 pub struct RetransmitPhase {
     thread_hdls: Vec<JoinHandle<()>>,
-    window_service: WindowService,
+    spot_service: SpotTransmitService,
 }
 
 impl RetransmitPhase {
@@ -178,7 +178,7 @@ impl RetransmitPhase {
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         retransmit_socket: Arc<UdpSocket>,
-        repair_socket: Arc<UdpSocket>,
+        fix_socket: Arc<UdpSocket>,
         fetch_phase_receiver: BlobReceiver,
         exit: &Arc<AtomicBool>,
         genesis_transaction_seal: &Hash,
@@ -195,30 +195,30 @@ impl RetransmitPhase {
             retransmit_receiver,
         );
 
-        let repair_strategy = RepairStrategy::RepairAll {
+        let fix_plan = FixPlan::FixAll {
             treasury_forks,
             completed_slots_receiver,
             epoch_schedule,
         };
         let leader_schedule_cache = leader_schedule_cache.clone();
-        let window_service = WindowService::new(
+        let spot_service = SpotTransmitService::new(
             block_buffer_pool,
             node_group_info.clone(),
             fetch_phase_receiver,
             retransmit_sender,
-            repair_socket,
+            fix_socket,
             exit,
-            repair_strategy,
+            fix_plan,
             genesis_transaction_seal,
             move |id, blob, working_treasury| {
-                should_retransmit_and_persist(blob, working_treasury, &leader_schedule_cache, id)
+                check_replay_blob(blob, working_treasury, &leader_schedule_cache, id)
             },
         );
 
         let thread_hdls = vec![t_retransmit];
         Self {
             thread_hdls,
-            window_service,
+            spot_service,
         }
     }
 }
@@ -230,7 +230,7 @@ impl Service for RetransmitPhase {
         for thread_hdl in self.thread_hdls {
             thread_hdl.join()?;
         }
-        self.window_service.join()?;
+        self.spot_service.join()?;
         Ok(())
     }
 }
