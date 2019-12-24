@@ -93,7 +93,7 @@ pub struct LocalNodeGroup {
     pub funding_keypair: Keypair,
     pub validator_config: ValidatorConfig,
     /// Entry point from which the rest of the network can be discovered
-    pub entry_point_info: ContactInfo,
+    pub connection_url_inf: ContactInfo,
     pub fullnode_infos: HashMap<Pubkey, ValidatorInfo>,
     pub listener_infos: HashMap<Pubkey, ValidatorInfo>,
     fullnodes: HashMap<Pubkey, Validator>,
@@ -172,7 +172,7 @@ impl LocalNodeGroup {
 
         let mut node_group = Self {
             funding_keypair: mint_keypair,
-            entry_point_info: leader_contact_info,
+            connection_url_inf: leader_contact_info,
             fullnodes,
             miners: vec![],
             genesis_ledger_path,
@@ -194,7 +194,7 @@ impl LocalNodeGroup {
         (0..config.observer_amnt).for_each(|_| node_group.add_validator(&listener_config, 0));
 
         find_node_group_host(
-            &node_group.entry_point_info.gossip,
+            &node_group.connection_url_inf.gossip,
             config.node_stakes.len() + config.observer_amnt as usize,
         )
         .unwrap();
@@ -204,7 +204,7 @@ impl LocalNodeGroup {
         }
 
         find_node_group_host(
-            &node_group.entry_point_info.gossip,
+            &node_group.connection_url_inf.gossip,
             config.node_stakes.len() + config.miner_amnt as usize,
         )
         .unwrap();
@@ -231,7 +231,7 @@ impl LocalNodeGroup {
 
     pub fn add_validator(&mut self, validator_config: &ValidatorConfig, stake: u64) {
         let client = create_client(
-            self.entry_point_info.client_facing_addr(),
+            self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
         );
 
@@ -293,7 +293,7 @@ impl LocalNodeGroup {
             &voting_keypair.pubkey(),
             &voting_keypair,
             &storage_keypair,
-            Some(&self.entry_point_info),
+            Some(&self.connection_url_inf),
             &validator_config,
         );
 
@@ -328,7 +328,7 @@ impl LocalNodeGroup {
         let storage_keypair = Arc::new(Keypair::new());
         let storage_pubkey = storage_keypair.pubkey();
         let client = create_client(
-            self.entry_point_info.client_facing_addr(),
+            self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
         );
 
@@ -347,7 +347,7 @@ impl LocalNodeGroup {
         let storage_miner = StorageMiner::new(
             &miner_ledger_path,
             storage_miner_node,
-            self.entry_point_info.clone(),
+            self.connection_url_inf.clone(),
             storage_miner_keypair,
             storage_keypair,
         )
@@ -375,7 +375,7 @@ impl LocalNodeGroup {
 
     pub fn transfer(&self, source_keypair: &Keypair, dest_pubkey: &Pubkey, difs: u64) -> u64 {
         let client = create_client(
-            self.entry_point_info.client_facing_addr(),
+            self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
         );
         Self::transfer_with_client(&client, source_keypair, dest_pubkey, difs)
@@ -562,8 +562,8 @@ impl NodeGroup for LocalNodeGroup {
         // Restart the node
         let fullnode_info = &self.fullnode_infos[&pubkey];
         let node = Node::new_localhost_with_pubkey(&fullnode_info.keypair.pubkey());
-        if pubkey == self.entry_point_info.id {
-            self.entry_point_info = node.info.clone();
+        if pubkey == self.connection_url_inf.id {
+            self.connection_url_inf = node.info.clone();
         }
         let restarted_node = Validator::new(
             node,

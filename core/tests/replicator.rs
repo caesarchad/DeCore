@@ -136,7 +136,7 @@ fn run_miner_startup_basic(num_nodes: usize, miner_amnt: usize) {
     let node_group = LocalNodeGroup::new(&config);
 
     let (node_group_hosts, node_group_miners) = find_node_group_host(
-        &node_group.entry_point_info.gossip,
+        &node_group.connection_url_inf.gossip,
         num_nodes + miner_amnt,
     )
     .unwrap();
@@ -202,7 +202,7 @@ fn test_storage_miner_startup_leader_hang() {
         let storage_miner_node = Node::new_localhost_with_pubkey(&storage_miner_keypair.pubkey());
 
         let fake_gossip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
-        let leader_info = ContactInfo::new_gossip_entry_point(&fake_gossip);
+        let leader_info = ContactInfo::new_gossip_connection_url(&fake_gossip);
 
         let storage_miner_res = StorageMiner::new(
             &miner_ledger_path,
@@ -256,7 +256,7 @@ fn test_storage_miner_startup_ledger_hang() {
     let storage_miner_res = StorageMiner::new(
         &miner_ledger_path,
         storage_miner_node,
-        node_group.entry_point_info.clone(),
+        node_group.connection_url_inf.clone(),
         bad_keys,
         storage_keypair,
     );
@@ -280,13 +280,13 @@ fn test_account_setup() {
     let node_group = LocalNodeGroup::new(&config);
 
     let _ = find_node_group_host(
-        &node_group.entry_point_info.gossip,
+        &node_group.connection_url_inf.gossip,
         num_nodes + miner_amnt as usize,
     )
     .unwrap();
     // now check that the node group actually has accounts for the storage-miner.
     let client = create_client(
-        node_group.entry_point_info.client_facing_addr(),
+        node_group.connection_url_inf.client_facing_addr(),
         FULLNODE_PORT_RANGE,
     );
     node_group.storage_miner_infos.iter().for_each(|(_, value)| {

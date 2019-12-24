@@ -227,7 +227,7 @@ impl StorageMiner {
         // info!("{}", Info(format!("Connecting to the cluster via {:?}", node_group_entrypoint).to_string()));
         println!("{}",
             printLn(
-                format!("Connecting to the node group on entry point {:?}", node_group_entrypoint).to_string(),
+                format!("Connecting to the node group on connection url {:?}", node_group_entrypoint).to_string(),
                 module_path!().to_string()
             )
         );

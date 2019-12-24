@@ -198,7 +198,7 @@ impl ContactInfo {
     }
 
     // Construct a ContactInfo that's only usable for gossip
-    pub fn new_gossip_entry_point(gossip_addr: &SocketAddr) -> Self {
+    pub fn new_gossip_connection_url(gossip_addr: &SocketAddr) -> Self {
         let daddr: SocketAddr = socketaddr!("0.0.0.0:0");
         Self::new(
             &Pubkey::default(),
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_entry_point() {
         let addr = socketaddr!("127.0.0.1:10");
-        let ci = ContactInfo::new_gossip_entry_point(&addr);
+        let ci = ContactInfo::new_gossip_connection_url(&addr);
         assert_eq!(ci.gossip, addr);
         assert!(ci.tvu.ip().is_unspecified());
         assert!(ci.transaction_digesting_module_via_blobs.ip().is_unspecified());

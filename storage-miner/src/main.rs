@@ -28,7 +28,7 @@ fn main() {
                 .value_name("HOST:PORT")
                 .takes_value(true)
                 .required(true)
-                .help("Rendezvous with the cluster at this entry point"),
+                .help("Rendezvous with the cluster at this connection url"),
         )
         .arg(
             Arg::with_name("ledger")
@@ -69,7 +69,7 @@ fn main() {
         Keypair::new()
     };
 
-    let entrypoint_addr = matches
+    let connection_url_addr = matches
         .value_of("entrypoint")
         .map(|entrypoint| {
             morgan_netutil::parse_host_port(entrypoint).expect("failed to parse entrypoint address")
@@ -78,7 +78,7 @@ fn main() {
 
     let gossip_addr = {
         let mut addr = socketaddr!([127, 0, 0, 1], 8700);
-        addr.set_ip(morgan_netutil::get_public_ip_addr(&entrypoint_addr).unwrap());
+        addr.set_ip(morgan_netutil::get_public_ip_addr(&connection_url_addr).unwrap());
         addr
     };
     let node =
@@ -90,7 +90,7 @@ fn main() {
         gossip_addr
     );
 
-    let entrypoint_info = ContactInfo::new_gossip_entry_point(&entrypoint_addr);
+    let entrypoint_info = ContactInfo::new_gossip_connection_url(&connection_url_addr);
     let mut storage_miner = StorageMiner::new(
         ledger_path,
         node,

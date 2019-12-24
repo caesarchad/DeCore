@@ -22,8 +22,8 @@ fn pubkey_validator(pubkey: String) -> Result<(), String> {
 fn main() -> Result<(), Box<dyn error::Error>> {
     env_logger::Builder::from_env(env_logger::Env::new().default_filter_or("morgan=info")).init();
 
-    let mut entrypoint_addr = SocketAddr::from(([127, 0, 0, 1], 10001));
-    let entrypoint_string = entrypoint_addr.to_string();
+    let mut connection_url_addr = SocketAddr::from(([127, 0, 0, 1], 10001));
+    let entrypoint_string = connection_url_addr.to_string();
     let matches = App::new(crate_name!())
         .about(crate_description!())
         .version(crate_version!())
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .value_name("HOST:PORT")
                 .takes_value(true)
                 .default_value(&entrypoint_string)
-                .help("Rendezvous with the cluster at this entry point"),
+                .help("Rendezvous with the cluster at this connection url"),
         )
         .subcommand(
             SubCommand::with_name("spy")
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .get_matches();
 
     if let Some(addr) = matches.value_of("entrypoint") {
-        entrypoint_addr = morgan_netutil::parse_host_port(addr).unwrap_or_else(|e| {
+        connection_url_addr = morgan_netutil::parse_host_port(addr).unwrap_or_else(|e| {
             eprintln!("failed to parse entrypoint address: {}", e);
             exit(1)
         });
@@ -125,8 +125,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             } else {
                 let mut addr = socketaddr_any!();
                 addr.set_ip(
-                    morgan_netutil::get_public_ip_addr(&entrypoint_addr).unwrap_or_else(|err| {
-                        eprintln!("failed to contact {}: {}", entrypoint_addr, err);
+                    morgan_netutil::get_public_ip_addr(&connection_url_addr).unwrap_or_else(|err| {
+                        eprintln!("failed to contact {}: {}", connection_url_addr, err);
                         exit(1)
                     }),
                 );
@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             };
 
             let (nodes, _storage_miners) = discover(
-                &entrypoint_addr,
+                &connection_url_addr,
                 num_nodes,
                 timeout,
                 pubkey,
@@ -174,7 +174,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .unwrap()
                 .parse::<Pubkey>()
                 .unwrap();
-            let (nodes, _storage_miners) = discover(&entrypoint_addr, None, None, Some(pubkey), None)?;
+            let (nodes, _storage_miners) = discover(&connection_url_addr, None, None, Some(pubkey), None)?;
             let node = nodes.iter().find(|x| x.id == pubkey).unwrap();
 
             if !ContactInfo::is_valid_address(&node.rpc) {

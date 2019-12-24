@@ -17,7 +17,7 @@ fullnode_usage() {
   cat <<EOF
 
 Fullnode Usage:
-usage: $0 [--blockstream PATH] [--init-complete-file FILE] [--label LABEL] [--stake DIFS] [--no-voting] [--rpc-port port] [rsync network path to bootstrap leader configuration] [cluster entry point]
+usage: $0 [--blockstream PATH] [--init-complete-file FILE] [--label LABEL] [--stake DIFS] [--no-voting] [--rpc-port port] [rsync network path to bootstrap leader configuration] [cluster connection url]
 
 Start a validator or a storage-miner
 
@@ -35,23 +35,23 @@ EOF
 }
 
 find_entrypoint() {
-  declare entrypoint entrypoint_address
+  declare entrypoint connection_url_address
   declare shift=0
 
   if [[ -z $1 ]]; then
     entrypoint="$MORGAN_ROOT"         # Default to local tree for rsync
-    entrypoint_address=127.0.0.1:10001 # Default to local entrypoint
+    connection_url_address=127.0.0.1:10001 # Default to local entrypoint
   elif [[ -z $2 ]]; then
     entrypoint=$1
-    entrypoint_address=$entrypoint:10001
+    connection_url_address=$entrypoint:10001
     shift=1
   else
     entrypoint=$1
-    entrypoint_address=$2
+    connection_url_address=$2
     shift=2
   fi
 
-  echo "$entrypoint" "$entrypoint_address" "$shift"
+  echo "$entrypoint" "$connection_url_address" "$shift"
 }
 
 rsync_url() { # adds the 'rsync://` prefix to URLs that need it
@@ -246,7 +246,7 @@ if [[ $node_type = storage-miner ]]; then
     fullnode_usage "$@"
   fi
 
-  read -r entrypoint entrypoint_address shift < <(find_entrypoint "${positional_args[@]}")
+  read -r entrypoint connection_url_address shift < <(find_entrypoint "${positional_args[@]}")
   shift "$shift"
 
   : "${identity_keypair_path:=$MORGAN_CONFIG_DIR/storage-miner-keypair$label.json}"
@@ -270,7 +270,7 @@ ledger path: $ledger_config_dir
 EOF
   # program=morgan-storage-miner
   program=$morgan_storage_miner
-  default_arg --entrypoint "$entrypoint_address"
+  default_arg --entrypoint "$connection_url_address"
   default_arg --identity "$identity_keypair_path"
   default_arg --storage-keypair "$storage_keypair_path"
   default_arg --ledger "$ledger_config_dir"
@@ -301,7 +301,7 @@ elif [[ $node_type = validator ]]; then
     fullnode_usage "$@"
   fi
 
-  read -r entrypoint entrypoint_address shift < <(find_entrypoint "${positional_args[@]}")
+  read -r entrypoint connection_url_address shift < <(find_entrypoint "${positional_args[@]}")
   shift "$shift"
 
   : "${identity_keypair_path:=$MORGAN_CONFIG_DIR/validator-keypair$label.json}"
@@ -325,8 +325,8 @@ elif [[ $node_type = validator ]]; then
   [[ -r "$stake_keypair_path" ]] || $morgan_keybot -o "$stake_keypair_path"
   [[ -r "$storage_keypair_path" ]] || $morgan_keybot -o "$storage_keypair_path"
 
-  default_arg --entrypoint "$entrypoint_address"
-  default_arg --rpc-drone-address "${entrypoint_address%:*}:11100"
+  default_arg --entrypoint "$connection_url_address"
+  default_arg --rpc-drone-address "${connection_url_address%:*}:11100"
 
   rsync_entrypoint_url=$(rsync_url "$entrypoint")
   echo $rsync_entrypoint_url
@@ -404,14 +404,14 @@ while true; do
 
   if ((stake)); then
     if [[ $node_type = validator ]]; then
-      setup_validator_accounts "${entrypoint_address%:*}" \
+      setup_validator_accounts "${connection_url_address%:*}" \
         "$identity_keypair_path" \
         "$vote_keypair_path" \
         "$stake_keypair_path" \
         "$storage_keypair_path" \
         "$stake"
     elif [[ $node_type = storage-miner ]]; then
-      setup_miner_account "${entrypoint_address%:*}" \
+      setup_miner_account "${connection_url_address%:*}" \
         "$identity_keypair_path" \
         "$storage_keypair_path" \
         "$stake"

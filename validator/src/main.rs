@@ -89,7 +89,7 @@ fn main() {
                 .long("entrypoint")
                 .value_name("HOST:PORT")
                 .takes_value(true)
-                .help("Rendezvous with the cluster at this entry point"),
+                .help("Rendezvous with the cluster at this connection url"),
         )
         .arg(
             Arg::with_name("no_voting")
@@ -221,11 +221,11 @@ fn main() {
         validator_config.account_paths = None;
     }
     let node_group_entrypoint = matches.value_of("entrypoint").map(|entrypoint| {
-        let entrypoint_addr = morgan_netutil::parse_host_port(entrypoint)
+        let connection_url_addr = morgan_netutil::parse_host_port(entrypoint)
             .expect("failed to parse entrypoint address");
-        gossip_addr.set_ip(morgan_netutil::get_public_ip_addr(&entrypoint_addr).unwrap());
+        gossip_addr.set_ip(morgan_netutil::get_public_ip_addr(&connection_url_addr).unwrap());
 
-        ContactInfo::new_gossip_entry_point(&entrypoint_addr)
+        ContactInfo::new_gossip_connection_url(&connection_url_addr)
     });
     let (_signer_service, _signer_addr) = if let Some(signer_addr) = matches.value_of("signer") {
         (

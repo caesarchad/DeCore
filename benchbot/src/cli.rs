@@ -8,7 +8,7 @@ use morgan_interface::signature::{read_keypair, Keypair, KeypairUtil};
 
 /// Holds the configuration for a single run of the benchmark
 pub struct Config {
-    pub entrypoint_addr: SocketAddr,
+    pub connection_url_addr: SocketAddr,
     pub drone_addr: SocketAddr,
     pub id: Keypair,
     pub threads: usize,
@@ -22,7 +22,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            entrypoint_addr: SocketAddr::from(([127, 0, 0, 1], 10001)),
+            connection_url_addr: SocketAddr::from(([127, 0, 0, 1], 10001)),
             drone_addr: SocketAddr::from(([127, 0, 0, 1], DRONE_PORT)),
             id: Keypair::new(),
             threads: 4,
@@ -45,7 +45,7 @@ pub fn build_args<'a, 'b>() -> App<'a, 'b> {
                 .long("entrypoint")
                 .value_name("HOST:PORT")
                 .takes_value(true)
-                .help("Rendezvous with the cluster at this entry point; defaults to 127.0.0.1:10001"),
+                .help("Rendezvous with the cluster at this connection url; defaults to 127.0.0.1:10001"),
         )
         .arg(
             Arg::with_name("drone")
@@ -117,7 +117,7 @@ pub fn extract_args<'a>(matches: &ArgMatches<'a>) -> Config {
     let mut args = Config::default();
 
     if let Some(addr) = matches.value_of("entrypoint") {
-        args.entrypoint_addr = morgan_netutil::parse_host_port(addr).unwrap_or_else(|e| {
+        args.connection_url_addr = morgan_netutil::parse_host_port(addr).unwrap_or_else(|e| {
             eprintln!("failed to parse entrypoint address: {}", e);
             exit(1)
         });

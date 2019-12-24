@@ -1,7 +1,7 @@
 use crate::block_buffer_pool::BlockBufferPool;
 /// NodeGroup independant integration tests
 ///
-/// All tests must start from an entry point and a funding keypair and
+/// All tests must start from an connection url and a funding keypair and
 /// discover the rest of the network.
 use crate::node_group_info::FULLNODE_PORT_RANGE;
 use crate::connection_info::ContactInfo;
@@ -34,11 +34,11 @@ const DEFAULT_SLOT_MILLIS: u64 = (DEFAULT_DROPS_PER_SLOT * 1000) / DEFAULT_NUM_D
 
 /// Spend and verify from every node in the network
 pub fn spend_and_verify_all_nodes(
-    entry_point_info: &ContactInfo,
+    connection_url_inf: &ContactInfo,
     funding_keypair: &Keypair,
     nodes: usize,
 ) {
-    let (node_group_hosts, _) = find_node_group_host(&entry_point_info.gossip, nodes).unwrap();
+    let (node_group_hosts, _) = find_node_group_host(&connection_url_inf.gossip, nodes).unwrap();
     assert!(node_group_hosts.len() >= nodes);
     for ingress_node in &node_group_hosts {
         let random_keypair = Keypair::new();
@@ -78,8 +78,8 @@ pub fn send_many_transactions(node: &ContactInfo, funding_keypair: &Keypair, num
     }
 }
 
-pub fn fullnode_exit(entry_point_info: &ContactInfo, nodes: usize) {
-    let (node_group_hosts, _) = find_node_group_host(&entry_point_info.gossip, nodes).unwrap();
+pub fn fullnode_exit(connection_url_inf: &ContactInfo, nodes: usize) {
+    let (node_group_hosts, _) = find_node_group_host(&connection_url_inf.gossip, nodes).unwrap();
     assert!(node_group_hosts.len() >= nodes);
     for node in &node_group_hosts {
         let client = create_client(node.client_facing_addr(), FULLNODE_PORT_RANGE);
@@ -183,15 +183,15 @@ pub fn sleep_n_epochs(
 }
 
 pub fn kill_entry_and_spend_and_verify_rest(
-    entry_point_info: &ContactInfo,
+    connection_url_inf: &ContactInfo,
     funding_keypair: &Keypair,
     nodes: usize,
     slot_millis: u64,
 ) {
     bitconch_logger::setup();
-    let (node_group_hosts, _) = find_node_group_host(&entry_point_info.gossip, nodes).unwrap();
+    let (node_group_hosts, _) = find_node_group_host(&connection_url_inf.gossip, nodes).unwrap();
     assert!(node_group_hosts.len() >= nodes);
-    let client = create_client(entry_point_info.client_facing_addr(), FULLNODE_PORT_RANGE);
+    let client = create_client(connection_url_inf.client_facing_addr(), FULLNODE_PORT_RANGE);
     let first_two_epoch_slots = MINIMUM_SLOT_LENGTH * 3;
 
     for ingress_node in &node_group_hosts {
@@ -219,10 +219,10 @@ pub fn kill_entry_and_spend_and_verify_rest(
             module_path!().to_string()
         )
     );
-    // info!("{}", Info(format!("killing entry point: {}", entry_point_info.id).to_string()));
+    // info!("{}", Info(format!("killing connection url: {}", connection_url_inf.id).to_string()));
     println!("{}",
         printLn(
-            format!("killing entry point: {}", entry_point_info.id).to_string(),
+            format!("killing connection url: {}", connection_url_inf.id).to_string(),
             module_path!().to_string()
         )
     );
@@ -245,7 +245,7 @@ pub fn kill_entry_and_spend_and_verify_rest(
         )
     );
     for ingress_node in &node_group_hosts {
-        if ingress_node.id == entry_point_info.id {
+        if ingress_node.id == connection_url_inf.id {
             continue;
         }
 
@@ -290,7 +290,7 @@ pub fn kill_entry_and_spend_and_verify_rest(
                 }
             };
 
-            match poll_all_nodes_for_signature(&entry_point_info, &node_group_hosts, &sig, confs) {
+            match poll_all_nodes_for_signature(&connection_url_inf, &node_group_hosts, &sig, confs) {
                 Err(e) => {
                     result = Err(e);
                 }
@@ -303,13 +303,13 @@ pub fn kill_entry_and_spend_and_verify_rest(
 }
 
 fn poll_all_nodes_for_signature(
-    entry_point_info: &ContactInfo,
+    connection_url_inf: &ContactInfo,
     node_group_hosts: &[ContactInfo],
     sig: &Signature,
     confs: usize,
 ) -> Result<(), TransportError> {
     for validator in node_group_hosts {
-        if validator.id == entry_point_info.id {
+        if validator.id == connection_url_inf.id {
             continue;
         }
         let client = create_client(validator.client_facing_addr(), FULLNODE_PORT_RANGE);

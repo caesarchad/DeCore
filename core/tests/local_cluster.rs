@@ -19,7 +19,7 @@ fn test_spend_and_verify_all_nodes_1() {
     let num_nodes = 1;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
     node_group_tests::spend_and_verify_all_nodes(
-        &local.entry_point_info,
+        &local.connection_url_inf,
         &local.funding_keypair,
         num_nodes,
     );
@@ -31,7 +31,7 @@ fn test_spend_and_verify_all_nodes_2() {
     let num_nodes = 2;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
     node_group_tests::spend_and_verify_all_nodes(
-        &local.entry_point_info,
+        &local.connection_url_inf,
         &local.funding_keypair,
         num_nodes,
     );
@@ -43,7 +43,7 @@ fn test_spend_and_verify_all_nodes_3() {
     let num_nodes = 3;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
     node_group_tests::spend_and_verify_all_nodes(
-        &local.entry_point_info,
+        &local.connection_url_inf,
         &local.funding_keypair,
         num_nodes,
     );
@@ -59,7 +59,7 @@ fn test_spend_and_verify_all_nodes_env_num_nodes() {
         .expect("could not parse NUM_NODES as a number");
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
     node_group_tests::spend_and_verify_all_nodes(
-        &local.entry_point_info,
+        &local.connection_url_inf,
         &local.funding_keypair,
         num_nodes,
     );
@@ -71,7 +71,7 @@ fn test_fullnode_exit_default_config_should_panic() {
     morgan_logger::setup();
     let num_nodes = 2;
     let local = LocalNodeGroup::new_with_equal_stakes(num_nodes, 10_000, 100);
-    node_group_tests::fullnode_exit(&local.entry_point_info, num_nodes);
+    node_group_tests::fullnode_exit(&local.connection_url_inf, num_nodes);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn test_fullnode_exit_2() {
         ..NodeGroupConfig::default()
     };
     let local = LocalNodeGroup::new(&config);
-    node_group_tests::fullnode_exit(&local.entry_point_info, num_nodes);
+    node_group_tests::fullnode_exit(&local.connection_url_inf, num_nodes);
 }
 
 // NodeGroup needs a supermajority to remain, so the minimum size for this test is 4
@@ -105,7 +105,7 @@ fn test_leader_failure_4() {
     };
     let local = LocalNodeGroup::new(&config);
     node_group_tests::kill_entry_and_spend_and_verify_rest(
-        &local.entry_point_info,
+        &local.connection_url_inf,
         &local.funding_keypair,
         num_nodes,
         config.drops_per_slot * config.waterclock_config.target_drop_duration.as_millis() as u64,
@@ -137,7 +137,7 @@ fn test_two_unbalanced_stakes() {
         num_slots_per_epoch,
     );
     node_group.close_preserve_ledgers();
-    let leader_pubkey = node_group.entry_point_info.id;
+    let leader_pubkey = node_group.connection_url_inf.id;
     let leader_ledger = node_group.fullnode_infos[&leader_pubkey].ledger_path.clone();
     node_group_tests::verify_ledger_drops(&leader_ledger, num_drops_per_slot as usize);
 }
@@ -154,10 +154,10 @@ fn test_forwarding() {
     };
     let node_group = LocalNodeGroup::new(&config);
 
-    let (node_group_hosts, _) = find_node_group_host(&node_group.entry_point_info.gossip, 2).unwrap();
+    let (node_group_hosts, _) = find_node_group_host(&node_group.connection_url_inf.gossip, 2).unwrap();
     assert!(node_group_hosts.len() >= 2);
 
-    let leader_pubkey = node_group.entry_point_info.id;
+    let leader_pubkey = node_group.connection_url_inf.id;
 
     let validator_info = node_group_hosts
         .iter()
@@ -195,7 +195,7 @@ fn test_restart_node() {
         DEFAULT_DROPS_PER_SLOT,
         candidate_each_round,
     );
-    node_group_tests::send_many_transactions(&node_group.entry_point_info, &node_group.funding_keypair, 1);
+    node_group_tests::send_many_transactions(&node_group.connection_url_inf, &node_group.funding_keypair, 1);
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn test_listener_startup() {
         ..NodeGroupConfig::default()
     };
     let node_group = LocalNodeGroup::new(&config);
-    let (node_group_hosts, _) = find_node_group_host(&node_group.entry_point_info.gossip, 4).unwrap();
+    let (node_group_hosts, _) = find_node_group_host(&node_group.connection_url_inf.gossip, 4).unwrap();
     assert_eq!(node_group_hosts.len(), 4);
 }
 

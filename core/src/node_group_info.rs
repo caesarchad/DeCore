@@ -2069,9 +2069,9 @@ mod tests {
         morgan_logger::setup();
         let contact_info = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(contact_info);
-        let network_entry_point =
-            ContactInfo::new_gossip_entry_point(&socketaddr!("127.0.0.1:1239"));
-        node_group_info.insert_info(network_entry_point);
+        let ntwk_connection_pnt =
+            ContactInfo::new_gossip_connection_url(&socketaddr!("127.0.0.1:1239"));
+        node_group_info.insert_info(ntwk_connection_pnt);
         assert!(node_group_info.leader_data().is_none());
     }
 
