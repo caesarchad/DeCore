@@ -242,6 +242,7 @@ impl<O: Options> SizeChecker<O> {
         self.options.restrain().add(size)
     }
 
+    // unrevised
     fn add_value<T>(&mut self, t: T) -> Result<()> {
         use std::mem::size_of_val;
         self.add_plain(size_of_val(&t) as u64)
@@ -452,6 +453,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -474,6 +476,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -496,6 +499,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -518,6 +522,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -548,6 +553,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -570,6 +576,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -592,6 +599,7 @@ where
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -614,6 +622,7 @@ impl<'a, O: Options> serde::ser::SerializeSeq for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -632,6 +641,7 @@ impl<'a, O: Options> serde::ser::SerializeTuple for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -650,6 +660,7 @@ impl<'a, O: Options> serde::ser::SerializeTupleStruct for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -668,6 +679,7 @@ impl<'a, O: Options> serde::ser::SerializeTupleVariant for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -694,6 +706,7 @@ impl<'a, O: Options + 'a> serde::ser::SerializeMap for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -712,6 +725,7 @@ impl<'a, O: Options> serde::ser::SerializeStruct for SizeCompound<'a, O> {
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -730,6 +744,7 @@ impl<'a, O: Options> serde::ser::SerializeStructVariant for SizeCompound<'a, O> 
         value.serialize(&mut *self.ser)
     }
 
+    // unrevised
     #[inline]
     fn end(self) -> Result<()> {
         Ok(())
@@ -743,6 +758,7 @@ const MAX_ONE_B: u32 = 0x80;
 const MAX_TWO_B: u32 = 0x800;
 const MAX_THREE_B: u32 = 0x10000;
 
+// unrevised
 fn encode_utf8(c: char) -> EncodeUtf8 {
     let code = c as u32;
     let mut buf = [0; 4];
@@ -774,6 +790,7 @@ struct EncodeUtf8 {
 }
 
 impl EncodeUtf8 {
+    // unrevised
     fn as_slice(&self) -> &[u8] {
         &self.buf[self.pos..]
     }

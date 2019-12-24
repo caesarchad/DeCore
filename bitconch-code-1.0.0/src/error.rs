@@ -23,6 +23,7 @@ pub enum ErrorKind {
 }
 
 impl StdError for ErrorKind {
+    // unrevised
     fn description(&self) -> &str {
         match *self {
             ErrorKind::Io(ref err) => error::Error::description(err),
@@ -41,6 +42,7 @@ impl StdError for ErrorKind {
         }
     }
 
+    // unrevised
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             ErrorKind::Io(ref err) => Some(err),
@@ -57,12 +59,14 @@ impl StdError for ErrorKind {
 }
 
 impl From<io::Error> for Error {
+    // unrevised
     fn from(err: io::Error) -> Error {
         ErrorKind::Io(err).into()
     }
 }
 
 impl fmt::Display for ErrorKind {
+    // unrevised
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ErrorKind::Io(ref ioerr) => write!(fmt, "io error: {}", ioerr),
@@ -86,12 +90,14 @@ impl fmt::Display for ErrorKind {
 }
 
 impl serde::de::Error for Error {
+    // unrevised
     fn custom<T: fmt::Display>(desc: T) -> Error {
         ErrorKind::Custom(desc.to_string()).into()
     }
 }
 
 impl serde::ser::Error for Error {
+    // unrevised
     fn custom<T: fmt::Display>(msg: T) -> Self {
         ErrorKind::Custom(msg.to_string()).into()
     }

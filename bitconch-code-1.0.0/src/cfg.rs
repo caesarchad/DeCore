@@ -28,10 +28,12 @@ pub(crate) trait OptionsExt: Options + Sized {
         WithOtherLimit::new(self, Bounded(restrain))
     }
 
+    // unrevised
     fn with_little_endian(self) -> WithOtherEndian<Self, LittleEndian> {
         WithOtherEndian::new(self)
     }
 
+    // unrevised
     fn with_big_endian(self) -> WithOtherEndian<Self, BigEndian> {
         WithOtherEndian::new(self)
     }
@@ -54,6 +56,7 @@ impl<'a, O: Options> Options for &'a mut O {
 impl<T: Options> OptionsExt for T {}
 
 impl DefaultOptions {
+    // unrevised
     fn new() -> DefaultOptions {
         DefaultOptions(Infinite)
     }
@@ -189,12 +192,14 @@ impl Config {
         self
     }
 
+    // unrevised
     #[inline(always)]
     pub fn little_endian(&mut self) -> &mut Self {
         self.endian = EndianOption::Little;
         self
     }
 
+    // unrevised
     #[inline(always)]
     pub fn big_endian(&mut self) -> &mut Self {
         self.endian = EndianOption::Big;
@@ -207,16 +212,19 @@ impl Config {
         self
     }
 
+    // unrevised
     #[inline(always)]
     pub fn serialize<T: ?Sized + serde::Serialize>(&self, t: &T) -> Result<Vec<u8>> {
         config_map!(self, opts => ::interior::serialize(t, opts))
     }
 
+    // unrevised
     #[inline(always)]
     pub fn serialized_size<T: ?Sized + serde::Serialize>(&self, t: &T) -> Result<u64> {
         config_map!(self, opts => ::interior::serialized_size(t, opts))
     }
 
+    // unrevised
     #[inline(always)]
     pub fn serialize_into<W: Write, T: ?Sized + serde::Serialize>(
         &self,
@@ -226,6 +234,7 @@ impl Config {
         config_map!(self, opts => ::interior::serialize_into(w, t, opts))
     }
 
+    // unrevised
     #[inline(always)]
     pub fn deserialize<'a, T: serde::Deserialize<'a>>(&self, bytes: &'a [u8]) -> Result<T> {
         config_map!(self, opts => ::interior::deserialize(bytes, opts))
@@ -266,6 +275,7 @@ impl Config {
         config_map!(self, opts => ::interior::de_via_specification(reader, opts))
     }
 
+    // unrevised
     #[doc(hidden)]
     pub fn with_deserializer<'a, A, R>(&self, reader: R, acceptor: A) -> A::Output
     where
@@ -278,6 +288,7 @@ impl Config {
         })
     }
 
+    // unrevised
     #[doc(hidden)]
     pub fn with_serializer<A, W>(&self, writer: W, acceptor: A) -> A::Output
     where

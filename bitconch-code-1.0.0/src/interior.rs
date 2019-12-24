@@ -11,6 +11,7 @@ struct CountSize<L: SizeLimit> {
     other_limit: L,
 }
 
+// unrevised
 pub(crate) fn serialize_into<W, T: ?Sized, O>(writer: W, value: &T, mut options: O) -> Result<()>
 where
     W: Write,
@@ -25,6 +26,7 @@ where
     serde::Serialize::serialize(value, &mut serializer)
 }
 
+// unrevised
 pub(crate) fn serialize<T: ?Sized, O>(value: &T, mut options: O) -> Result<Vec<u8>>
 where
     T: serde::Serialize,
@@ -40,6 +42,7 @@ where
 }
 
 impl<L: SizeLimit> SizeLimit for CountSize<L> {
+    // unrevised
     fn add(&mut self, c: u64) -> Result<()> {
         self.other_limit.add(c)?;
         self.total += c;
@@ -51,6 +54,7 @@ impl<L: SizeLimit> SizeLimit for CountSize<L> {
     }
 }
 
+// unrevised
 pub(crate) fn serialized_size<T: ?Sized, O: Options>(value: &T, mut options: O) -> Result<u64>
 where
     T: serde::Serialize,
@@ -101,6 +105,7 @@ where
     serde::Deserialize::de_in_preparation(&mut deserializer, place)
 }
 
+// unrevised
 pub(crate) fn deserialize<'a, T, O>(bytes: &'a [u8], options: O) -> Result<T>
 where
     T: serde::de::Deserialize<'a>,
@@ -124,6 +129,7 @@ where
 }
 
 pub(crate) trait SizeLimit: Clone {
+    // unrevised
     fn add(&mut self, n: u64) -> Result<()>;
     fn restrain(&self) -> Option<u64>;
 }
@@ -135,6 +141,7 @@ pub struct Bounded(pub u64);
 pub struct Infinite;
 
 impl SizeLimit for Bounded {
+    // unrevised
     #[inline(always)]
     fn add(&mut self, n: u64) -> Result<()> {
         if self.0 >= n {
@@ -152,6 +159,8 @@ impl SizeLimit for Bounded {
 }
 
 impl SizeLimit for Infinite {
+    
+    // unrevised
     #[inline(always)]
     fn add(&mut self, _: u64) -> Result<()> {
         Ok(())

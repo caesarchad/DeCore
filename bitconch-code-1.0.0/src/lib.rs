@@ -20,6 +20,7 @@ pub use error::{Error, ErrorKind, Result};
 #[doc(hidden)]
 pub trait DeserializerAcceptor<'a> {
     type Output;
+    // unrevised
     fn accept<T: serde::Deserializer<'a>>(self, T) -> Self::Output;
 }
 
@@ -29,11 +30,13 @@ pub trait SerializerAcceptor {
     fn accept<T: serde::Serializer>(self, T) -> Self::Output;
 }
 
+// unrevised
 #[inline(always)]
 pub fn config() -> Config {
     Config::new()
 }
 
+// unrevised
 pub fn serialize_into<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
 where
     W: std::io::Write,
@@ -42,6 +45,7 @@ where
     config().serialize_into(writer, value)
 }
 
+// unrevised
 pub fn serialize<T: ?Sized>(value: &T) -> Result<Vec<u8>>
 where
     T: serde::Serialize,
@@ -74,6 +78,7 @@ where
     config().de_in_preparation(reader, place)
 }
 
+// unrevised
 pub fn deserialize<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
     T: serde::de::Deserialize<'a>,
@@ -81,6 +86,7 @@ where
     config().deserialize(bytes)
 }
 
+// unrevised
 pub fn serialized_size<T: ?Sized>(value: &T) -> Result<u64>
 where
     T: serde::Serialize,
@@ -88,6 +94,7 @@ where
     config().serialized_size(value)
 }
 
+// unrevised
 #[doc(hidden)]
 pub fn with_deserializer<'a, A, R>(reader: R, acceptor: A) -> A::Output
 where
@@ -97,6 +104,7 @@ where
     config().with_deserializer(reader, acceptor)
 }
 
+// unrevised
 #[doc(hidden)]
 pub fn with_serializer<A, W>(writer: W, acceptor: A) -> A::Output
 where
