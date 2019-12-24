@@ -5,7 +5,7 @@ use crate::block_buffer_pool::BlockBufferPool;
 /// discover the rest of the network.
 use crate::node_group_info::FULLNODE_PORT_RANGE;
 use crate::connection_info::ContactInfo;
-use crate::entry_info::{Entry, EntrySlice};
+use crate::fiscal_statement_info::{Entry, EntrySlice};
 use crate::gossip_service::find_node_group_host;
 use crate::fork_selection::VOTE_THRESHOLD_DEPTH;
 use bitconch_client::slim_account_host::create_client;
@@ -94,7 +94,7 @@ pub fn fullnode_exit(entry_point_info: &ContactInfo, nodes: usize) {
 
 pub fn verify_ledger_drops(ledger_path: &str, drops_per_slot: usize) {
     let ledger = BlockBufferPool::open_ledger_file(ledger_path).unwrap();
-    let zeroth_slot = ledger.fetch_slot_entries(0, 0, None).unwrap();
+    let zeroth_slot = ledger.fetch_candidate_fscl_stmts(0, 0, None).unwrap();
     let last_id = zeroth_slot.last().unwrap().hash;
     let next_slots = ledger.fetch_slot_from(&[0]).unwrap().remove(&0).unwrap();
     let mut pending_slots: Vec<_> = next_slots
@@ -320,19 +320,19 @@ fn poll_all_nodes_for_signature(
 }
 
 
-fn get_and_verify_slot_entries(block_buffer_pool: &BlockBufferPool, slot: u64, last_entry: &Hash) -> Vec<Entry> {
-    let entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap();
-    assert!(entries.verify(last_entry));
+fn audit_candidate_fscl_stmts(block_buffer_pool: &BlockBufferPool, slot: u64, tail_fscl_stmt: &Hash) -> Vec<Entry> {
+    let entries = block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).unwrap();
+    assert!(entries.verify(tail_fscl_stmt));
     entries
 }
 
 fn verify_slot_drops(
     block_buffer_pool: &BlockBufferPool,
     slot: u64,
-    last_entry: &Hash,
+    tail_fscl_stmt: &Hash,
     expected_num_drops: Option<usize>,
 ) -> Hash {
-    let entries = get_and_verify_slot_entries(block_buffer_pool, slot, last_entry);
+    let entries = audit_candidate_fscl_stmts(block_buffer_pool, slot, tail_fscl_stmt);
     let num_drops: usize = entries.iter().map(|entry| entry.is_drop() as usize).sum();
     if let Some(expected_num_drops) = expected_num_drops {
         assert_eq!(num_drops, expected_num_drops);

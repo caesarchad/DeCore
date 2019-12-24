@@ -2,7 +2,7 @@
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::{NodeGroupInfo, NodeGroupInfoError, DATA_PLANE_FANOUT};
-use crate::entry_info::EntrySlice;
+use crate::fiscal_statement_info::FsclStmtSlc;
 use crate::expunge::CodingGenerator;
 use crate::packet::index_blobs_with_genesis;
 use crate::water_clock_recorder::WorkingTreasuryEntries;
@@ -32,7 +32,7 @@ pub enum BroadcastPhaseReturnType {
 
 #[derive(Default)]
 struct BroadcastStats {
-    num_entries: Vec<usize>,
+    fscl_stmt_cnt: Vec<usize>,
     run_elapsed: Vec<u64>,
     to_blobs_elapsed: Vec<u64>,
 }
@@ -57,7 +57,7 @@ impl Broadcast {
         let mut max_drop_height = treasury.max_drop_height();
 
         let run_start = Instant::now();
-        let mut num_entries = entries.len();
+        let mut fscl_stmt_cnt = entries.len();
         let mut ventries = Vec::new();
         let mut last_drop = entries.last().map(|v| v.1).unwrap_or(0);
         ventries.push(entries);
@@ -68,12 +68,12 @@ impl Broadcast {
                 // If the treasury changed, that implies the previous slot was interrupted and we do not have to
                 // broadcast its entries.
                 if same_treasury.slot() != treasury.slot() {
-                    num_entries = 0;
+                    fscl_stmt_cnt = 0;
                     ventries.clear();
                     treasury = same_treasury.clone();
                     max_drop_height = treasury.max_drop_height();
                 }
-                num_entries += entries.len();
+                fscl_stmt_cnt += entries.len();
                 last_drop = entries.last().map(|v| v.1).unwrap_or(0);
                 ventries.push(entries);
                 assert!(last_drop <= max_drop_height,);
@@ -93,7 +93,7 @@ impl Broadcast {
         // Layer 1, leader nodes are limited to the fanout size.
         broadcast_table.truncate(DATA_PLANE_FANOUT);
 
-        inc_new_counter_info!("broadcast_service-entries_received", num_entries);
+        inc_new_counter_info!("broadcast_service-entries_received", fscl_stmt_cnt);
 
         let to_blobs_start = Instant::now();
 
@@ -146,7 +146,7 @@ impl Broadcast {
         self.update_broadcast_stats(
             duration_as_ms(&broadcast_start.elapsed()),
             duration_as_ms(&run_start.elapsed()),
-            num_entries,
+            fscl_stmt_cnt,
             to_blobs_elapsed,
             blob_index,
         );
@@ -158,30 +158,30 @@ impl Broadcast {
         &mut self,
         broadcast_elapsed: u64,
         run_elapsed: u64,
-        num_entries: usize,
+        fscl_stmt_cnt: usize,
         to_blobs_elapsed: u64,
         blob_index: u64,
     ) {
         inc_new_counter_info!("broadcast_service-time_ms", broadcast_elapsed as usize);
 
-        self.stats.num_entries.push(num_entries);
+        self.stats.fscl_stmt_cnt.push(fscl_stmt_cnt);
         self.stats.to_blobs_elapsed.push(to_blobs_elapsed);
         self.stats.run_elapsed.push(run_elapsed);
-        if self.stats.num_entries.len() >= 16 {
+        if self.stats.fscl_stmt_cnt.len() >= 16 {
             // info!(
             //     "{}",
             //     Info(format!("broadcast: entries: {:?} blob times ms: {:?} broadcast times ms: {:?}",
-            //     self.stats.num_entries, self.stats.to_blobs_elapsed, self.stats.run_elapsed).to_string())
+            //     self.stats.fscl_stmt_cnt, self.stats.to_blobs_elapsed, self.stats.run_elapsed).to_string())
             // );
             let loginfo: String = format!("propagation: entries num: {:?} spot times ms: {:?} propagation times ms: {:?}",
-                self.stats.num_entries, self.stats.to_blobs_elapsed, self.stats.run_elapsed).to_string();
+                self.stats.fscl_stmt_cnt, self.stats.to_blobs_elapsed, self.stats.run_elapsed).to_string();
             println!("{}",
                 printLn(
                     loginfo,
                     module_path!().to_string()
                 )
             );
-            self.stats.num_entries.clear();
+            self.stats.fscl_stmt_cnt.clear();
             self.stats.to_blobs_elapsed.clear();
             self.stats.run_elapsed.clear();
         }
@@ -314,7 +314,7 @@ mod test {
     use super::*;
     use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
-    use crate::entry_info::create_drops;
+    use crate::fiscal_statement_info::create_drops;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
     use morgan_runtime::treasury::Treasury;

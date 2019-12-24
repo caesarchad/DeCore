@@ -1,7 +1,7 @@
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
-use crate::entry_info::{Entry, EntrySlice};
+use crate::fiscal_statement_info::{FsclStmt, FsclStmtSlc};
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use rayon::prelude::*;
 use morgan_metricbot::{datapoint, datapoint_error, inc_new_counter_debug};
@@ -26,11 +26,11 @@ fn first_err(results: &[Result<()>]) -> Result<()> {
     Ok(())
 }
 
-fn par_execute_entries(
+fn commit_fiscal_stmts_pipe(
     treasury: &Treasury,
-    entries: &[(&Entry, LockedAccountsResults<Transaction>)],
+    entries: &[(&FsclStmt, LockedAccountsResults<Transaction>)],
 ) -> Result<()> {
-    inc_new_counter_debug!("treasury-par_execute_entries-count", entries.len());
+    inc_new_counter_debug!("treasury-commit_fiscal_stmts_pipe-count", entries.len());
     let results: Vec<Result<()>> = entries
         .into_par_iter()
         .map(|(e, locked_accounts)| {
@@ -73,13 +73,13 @@ fn par_execute_entries(
 /// 2. Process the locked group in parallel
 /// 3. Register the `Drop` if it's available
 /// 4. Update the leader scheduler, goto 1
-pub fn process_entries(treasury: &Treasury, entries: &[Entry]) -> Result<()> {
+pub fn handle_fiscal_stmts(treasury: &Treasury, entries: &[FsclStmt]) -> Result<()> {
     // accumulator for entries that can be processed in parallel
     let mut mt_group = vec![];
     for entry in entries {
         if entry.is_drop() {
             // if its a _drop, execute the group and register the _drop
-            par_execute_entries(treasury, &mt_group)?;
+            commit_fiscal_stmts_pipe(treasury, &mt_group)?;
             mt_group = vec![];
             treasury.register_drop(&entry.hash);
             continue;
@@ -118,12 +118,12 @@ pub fn process_entries(treasury: &Treasury, entries: &[Entry]) -> Result<()> {
             } else {
                 // else we have an entry that conflicts with a prior entry
                 // execute the current queue and try to process this entry again
-                par_execute_entries(treasury, &mt_group)?;
+                commit_fiscal_stmts_pipe(treasury, &mt_group)?;
                 mt_group = vec![];
             }
         }
     }
-    par_execute_entries(treasury, &mt_group)?;
+    commit_fiscal_stmts_pipe(treasury, &mt_group)?;
     Ok(())
 }
 
@@ -214,7 +214,7 @@ pub fn process_block_buffer_pool(
         }
 
         // Fetch all entries for this slot
-        let mut entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).map_err(|err| {
+        let mut entries = block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).map_err(|err| {
             // warn!("Failed to load entries for slot {}: {:?}", slot, err);
             println!(
                 "{}",
@@ -274,7 +274,7 @@ pub fn process_block_buffer_pool(
                 return Err(BlockBufferPoolErr::LedgerVerificationFailed);
             }
 
-            process_entries(&treasury, &entries).map_err(|err| {
+            handle_fiscal_stmts(&treasury, &entries).map_err(|err| {
                 // warn!("Failed to process entries for slot {}: {:?}", slot, err);
                 println!(
                     "{}",
@@ -409,8 +409,8 @@ pub fn process_block_buffer_pool(
 pub mod tests {
     use super::*;
     use crate::block_buffer_pool::create_new_tmp_ledger;
-    use crate::block_buffer_pool::tests::entries_to_blobs;
-    use crate::entry_info::{create_drops, next_entry, next_entry_mut, Entry};
+    use crate::block_buffer_pool::tests::blob_vec_from_fscl_stmts;
+    use crate::fiscal_statement_info::{create_drops, next_entry, next_entry_mut, FsclStmt};
     use crate::genesis_utils::{
         create_genesis_block, create_genesis_block_with_leader, GenesisBlockInfo,
     };
@@ -432,7 +432,7 @@ pub mod tests {
         let entries = create_drops(drops_per_slot, last_entry_hash);
         let last_entry_hash = entries.last().unwrap().hash;
 
-        let blobs = entries_to_blobs(&entries, slot, parent_slot, true);
+        let blobs = blob_vec_from_fscl_stmts(&entries, slot, parent_slot, true);
         block_buffer_pool.insert_data_blobs(blobs.iter()).unwrap();
 
         last_entry_hash
@@ -475,7 +475,7 @@ pub mod tests {
             // throw away last one
             entries.pop();
 
-            let blobs = entries_to_blobs(&entries, slot, parent_slot, false);
+            let blobs = blob_vec_from_fscl_stmts(&entries, slot, parent_slot, false);
             block_buffer_pool.insert_data_blobs(blobs.iter()).unwrap();
         }
 
@@ -802,7 +802,7 @@ pub mod tests {
         );
 
         // Now ensure the TX is accepted despite pointing to the ID of an empty entry.
-        process_entries(&treasury, &slot_entries).unwrap();
+        handle_fiscal_stmts(&treasury, &slot_entries).unwrap();
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
     }
 
@@ -831,7 +831,7 @@ pub mod tests {
                 1,
                 transaction_seal,
             );
-            let entry = Entry::new(&last_entry_hash, 1, vec![tx]);
+            let entry = FsclStmt::new(&last_entry_hash, 1, vec![tx]);
             last_entry_hash = entry.hash;
             entries.push(entry);
 
@@ -844,7 +844,7 @@ pub mod tests {
                 42,
                 transaction_seal,
             );
-            let entry = Entry::new(&last_entry_hash, 1, vec![tx]);
+            let entry = FsclStmt::new(&last_entry_hash, 1, vec![tx]);
             last_entry_hash = entry.hash;
             entries.push(entry);
         }
@@ -855,7 +855,7 @@ pub mod tests {
         let block_buffer_pool =
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to successfully open database ledger");
         block_buffer_pool
-            .update_entries(1, 0, 0, genesis_block.drops_per_slot, &entries)
+            .update_fscl_stmts(1, 0, 0, genesis_block.drops_per_slot, &entries)
             .unwrap();
         let entry_height = genesis_block.drops_per_slot + entries.len() as u64;
         let (treasury_forks, treasury_forks_info, _) =
@@ -912,7 +912,7 @@ pub mod tests {
         // ensure treasury can process a _drop
         assert_eq!(treasury.drop_height(), 0);
         let _drop = next_entry(&genesis_block.hash(), 1, vec![]);
-        assert_eq!(process_entries(&treasury, &[_drop.clone()]), Ok(()));
+        assert_eq!(handle_fiscal_stmts(&treasury, &[_drop.clone()]), Ok(()));
         assert_eq!(treasury.drop_height(), 1);
     }
 
@@ -944,7 +944,7 @@ pub mod tests {
             treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
-        assert_eq!(process_entries(&treasury, &[entry_1, entry_2]), Ok(()));
+        assert_eq!(handle_fiscal_stmts(&treasury, &[entry_1, entry_2]), Ok(()));
         assert_eq!(treasury.get_balance(&keypair1.pubkey()), 2);
         assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
         assert_eq!(treasury.last_transaction_seal(), transaction_seal);
@@ -966,7 +966,7 @@ pub mod tests {
         assert_matches!(treasury.transfer(4, &mint_keypair, &keypair1.pubkey()), Ok(_));
         assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.pubkey()), Ok(_));
 
-        // construct an Entry whose 2nd transaction would cause a lock conflict with previous entry
+        // construct an FsclStmt whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
             &treasury.last_transaction_seal(),
             1,
@@ -998,7 +998,7 @@ pub mod tests {
         );
 
         assert_eq!(
-            process_entries(&treasury, &[entry_1_to_mint, entry_2_to_3_mint_to_1]),
+            handle_fiscal_stmts(&treasury, &[entry_1_to_mint, entry_2_to_3_mint_to_1]),
             Ok(())
         );
 
@@ -1025,7 +1025,7 @@ pub mod tests {
         assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.pubkey()), Ok(_));
         assert_matches!(treasury.transfer(4, &mint_keypair, &keypair4.pubkey()), Ok(_));
 
-        // construct an Entry whose 2nd transaction would cause a lock conflict with previous entry
+        // construct an FsclStmt whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
             &treasury.last_transaction_seal(),
             1,
@@ -1064,7 +1064,7 @@ pub mod tests {
             ],
         );
 
-        assert!(process_entries(
+        assert!(handle_fiscal_stmts(
             &treasury,
             &[entry_1_to_mint.clone(), entry_2_to_3_mint_to_1.clone()]
         )
@@ -1169,7 +1169,7 @@ pub mod tests {
         // keypair2=3
         // keypair3=3
 
-        assert!(process_entries(
+        assert!(handle_fiscal_stmts(
             &treasury,
             &[
                 entry_1_to_mint.clone(),
@@ -1179,7 +1179,7 @@ pub mod tests {
         )
         .is_err());
 
-        // last entry should have been aborted before par_execute_entries
+        // last entry should have been aborted before commit_fiscal_stmts_pipe
         assert_eq!(treasury.get_balance(&keypair1.pubkey()), 2);
         assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
         assert_eq!(treasury.get_balance(&keypair3.pubkey()), 2);
@@ -1230,7 +1230,7 @@ pub mod tests {
             treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
-        assert_eq!(process_entries(&treasury, &[entry_1, entry_2]), Ok(()));
+        assert_eq!(handle_fiscal_stmts(&treasury, &[entry_1, entry_2]), Ok(()));
         assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
         assert_eq!(treasury.get_balance(&keypair4.pubkey()), 1);
         assert_eq!(treasury.last_transaction_seal(), transaction_seal);
@@ -1283,7 +1283,7 @@ pub mod tests {
         );
         let entry_2 = next_entry(&_drop.hash, 1, vec![tx]);
         assert_eq!(
-            process_entries(&treasury, &[entry_1.clone(), _drop.clone(), entry_2.clone()]),
+            handle_fiscal_stmts(&treasury, &[entry_1.clone(), _drop.clone(), entry_2.clone()]),
             Ok(())
         );
         assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
@@ -1298,7 +1298,7 @@ pub mod tests {
         );
         let entry_3 = next_entry(&entry_2.hash, 1, vec![tx]);
         assert_eq!(
-            process_entries(&treasury, &[entry_3]),
+            handle_fiscal_stmts(&treasury, &[entry_3]),
             Err(TransactionError::AccountNotFound)
         );
     }
@@ -1379,7 +1379,7 @@ pub mod tests {
         );
 
         assert_eq!(
-            process_entries(&treasury, &[entry_1_to_mint]),
+            handle_fiscal_stmts(&treasury, &[entry_1_to_mint]),
             Err(TransactionError::AccountInUse)
         );
 
@@ -1390,7 +1390,7 @@ pub mod tests {
     #[test]
     #[ignore]
     fn test_process_entries_stress() {
-        // this test throws lots of rayon threads at process_entries()
+        // this test throws lots of rayon threads at handle_fiscal_stmts()
         //  finds bugs in very low-layer stuff
         morgan_logger::setup();
         let GenesisBlockInfo {
@@ -1434,7 +1434,7 @@ pub mod tests {
                     module_path!().to_string()
                 )
             );
-            process_entries(&treasury, &entries).expect("paying failed");
+            handle_fiscal_stmts(&treasury, &entries).expect("paying failed");
 
             let entries: Vec<_> = (0..NUM_TRANSFERS)
                 .map(|i| {
@@ -1459,10 +1459,10 @@ pub mod tests {
                     module_path!().to_string()
                 )
             );
-            process_entries(&treasury, &entries).expect("refunding failed");
+            handle_fiscal_stmts(&treasury, &entries).expect("refunding failed");
 
             // advance to next block
-            process_entries(
+            handle_fiscal_stmts(
                 &treasury,
                 &(0..treasury.drops_per_slot())
                     .map(|_| next_entry_mut(&mut hash, 1, vec![]))

@@ -50,10 +50,10 @@ pub fn chacha_cbc_encrypt_ledger(
 
     loop {
         match block_buffer_pool.read_db_by_bytes(0, SLOTS_PER_SEGMENT - total_entries, &mut buffer, entry) {
-            Ok((num_entries, entry_len)) => {
+            Ok((fscl_stmt_cnt, entry_len)) => {
                 debug!(
-                    "chacha: encrypting slice: {} num_entries: {} entry_len: {}",
-                    slice, num_entries, entry_len
+                    "chacha: encrypting slice: {} fscl_stmt_cnt: {} entry_len: {}",
+                    slice, fscl_stmt_cnt, entry_len
                 );
                 debug!("read {} bytes", entry_len);
                 let mut size = entry_len as usize;
@@ -81,8 +81,8 @@ pub fn chacha_cbc_encrypt_ledger(
                     return Err(res);
                 }
 
-                total_entries += num_entries;
-                entry += num_entries;
+                total_entries += fscl_stmt_cnt;
+                entry += fscl_stmt_cnt;
             }
             Err(e) => {
                 // info!("{}", Info(format!("Error encrypting file: {:?}", e).to_string()));
@@ -177,7 +177,7 @@ mod tests {
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
-    use crate::entry_info::Entry;
+    use crate::fiscal_statement_info::FsclStmt;
     use crate::create_keys::GenKeys;
     use morgan_interface::hash::{hash, Hash, Hasher};
     use morgan_interface::signature::KeypairUtil;
@@ -188,7 +188,7 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
-    fn make_tiny_deterministic_test_entries(num: usize) -> Vec<Entry> {
+    fn make_tiny_deterministic_test_entries(num: usize) -> Vec<FsclStmt> {
         let zero = Hash::default();
         let one = hash(&zero.as_ref());
 
@@ -200,7 +200,7 @@ mod tests {
         let mut num_hashes = 0;
         (0..num)
             .map(|_| {
-                Entry::new_mut(
+                FsclStmt::new_mut(
                     &mut id,
                     &mut num_hashes,
                     vec![system_transaction::create_user_account(
@@ -225,7 +225,7 @@ mod tests {
 
         let entries = make_tiny_deterministic_test_entries(32);
         block_buffer_pool
-            .update_entries(0, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let mut key = hex!(

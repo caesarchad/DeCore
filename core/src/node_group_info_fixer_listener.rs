@@ -478,7 +478,7 @@ impl Service for NodeGroupInfoFixListener {
 mod tests {
     use super::*;
     use crate::block_buffer_pool::fetch_interim_ledger_location;
-    use crate::block_buffer_pool::tests::make_many_slot_entries;
+    use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts_in_batch;
     use crate::node_group_info::Node;
     use crate::packet::{Blob, SharedBlob};
     use crate::streamer;
@@ -622,7 +622,7 @@ mod tests {
         let blobs_per_slot = 5;
         let num_slots = 10;
         assert_eq!(num_slots % 2, 0);
-        let (blobs, _) = make_many_slot_entries(0, num_slots, blobs_per_slot);
+        let (blobs, _) = compose_candidate_fscl_stmts_in_batch(0, num_slots, blobs_per_slot);
 
         // Write slots in the range [0, num_slots] to block_buffer_pool
         block_buffer_pool.insert_data_blobs(&blobs).unwrap();
@@ -700,7 +700,7 @@ mod tests {
 
         // Create blobs for first two epochs and write them to block_buffer_pool
         let total_slots = candidate_each_round * 2;
-        let (blobs, _) = make_many_slot_entries(0, total_slots, 1);
+        let (blobs, _) = compose_candidate_fscl_stmts_in_batch(0, total_slots, 1);
         block_buffer_pool.insert_data_blobs(&blobs).unwrap();
 
         // Write roots so that these slots will qualify to be sent by the repairman

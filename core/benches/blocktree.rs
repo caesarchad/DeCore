@@ -9,7 +9,7 @@ extern crate morgan;
 use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
-use morgan::entry_info::{make_large_test_entries, make_tiny_test_entries, EntrySlice};
+use morgan::fiscal_statement_info::{compose_b_fiscal_stmt, compose_s_fiscal_stmt_nohash, FsclStmtSlc};
 use morgan::packet::{Blob, BLOB_HEADER_SIZE};
 use test::Bencher;
 
@@ -47,8 +47,8 @@ fn setup_read_bench(
     slot: u64,
 ) {
     // Make some big and small entries
-    let mut entries = make_large_test_entries(num_large_blobs as usize);
-    entries.extend(make_tiny_test_entries(num_small_blobs as usize));
+    let mut entries = compose_b_fiscal_stmt(num_large_blobs as usize);
+    entries.extend(compose_s_fiscal_stmt_nohash(num_small_blobs as usize));
 
     // Convert the entries to blobs, write the blobs to the ledger
     let mut blobs = entries.to_blobs();
@@ -66,8 +66,8 @@ fn setup_read_bench(
 #[ignore]
 fn bench_write_small(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
-    let num_entries = 32 * 1024;
-    let entries = make_tiny_test_entries(num_entries);
+    let fscl_stmt_cnt = 32_678;
+    let entries = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
     let mut blobs = entries.to_blobs();
     for (index, b) in blobs.iter_mut().enumerate() {
         b.set_index(index as u64);
@@ -80,8 +80,8 @@ fn bench_write_small(bench: &mut Bencher) {
 #[ignore]
 fn bench_write_big(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
-    let num_entries = 32 * 1024;
-    let entries = make_large_test_entries(num_entries);
+    let fscl_stmt_cnt = 32_678;
+    let entries = compose_b_fiscal_stmt(fscl_stmt_cnt);
     let mut blobs = entries.to_blobs();
     for (index, b) in blobs.iter_mut().enumerate() {
         b.set_index(index as u64);
@@ -154,8 +154,8 @@ fn bench_insert_data_blob_small(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
-    let num_entries = 32 * 1024;
-    let entries = make_tiny_test_entries(num_entries);
+    let fscl_stmt_cnt = 32_678;
+    let entries = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
     let mut blobs = entries.to_blobs();
 
     blobs.shuffle(&mut thread_rng());
@@ -163,7 +163,7 @@ fn bench_insert_data_blob_small(bench: &mut Bencher) {
     bench.iter(move || {
         for blob in blobs.iter_mut() {
             let index = blob.index();
-            blob.set_index(index + num_entries as u64);
+            blob.set_index(index + fscl_stmt_cnt as u64);
         }
         block_buffer_pool.update_blobs(&blobs).unwrap();
     });
@@ -177,8 +177,8 @@ fn bench_insert_data_blob_big(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
-    let num_entries = 32 * 1024;
-    let entries = make_large_test_entries(num_entries);
+    let fscl_stmt_cnt = 32_678;
+    let entries = compose_b_fiscal_stmt(fscl_stmt_cnt);
     let mut shared_blobs = entries.to_shared_blobs();
     shared_blobs.shuffle(&mut thread_rng());
 
@@ -186,7 +186,7 @@ fn bench_insert_data_blob_big(bench: &mut Bencher) {
         for blob in shared_blobs.iter_mut() {
             let index = blob.read().unwrap().index();
             block_buffer_pool.record_public_objs(vec![blob.clone()]).unwrap();
-            blob.write().unwrap().set_index(index + num_entries as u64);
+            blob.write().unwrap().set_index(index + fscl_stmt_cnt as u64);
         }
     });
 

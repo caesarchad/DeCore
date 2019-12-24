@@ -1,6 +1,6 @@
 //! The `block_buffer_pool` module provides functions for parallel verification of the
 //! system wide clock.
-use crate::entry_info::Entry;
+use crate::fiscal_statement_info::FsclStmt;
 use crate::expunge::{self, Session};
 use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
 use crate::result::{Error, Result};
@@ -224,17 +224,17 @@ impl BlockBufferPool {
         self.insert_data_blobs(blobs)
     }
 
-    pub fn update_entries<I>(
+    pub fn update_fscl_stmts<I>(
         &self,
         start_slot: u64,
         num_drops_in_start_slot: u64,
         start_index: u64,
         drops_per_slot: u64,
-        entries: I,
+        fscl_stmts: I,
     ) -> Result<()>
     where
         I: IntoIterator,
-        I::Item: Borrow<Entry>,
+        I::Item: Borrow<FsclStmt>,
     {
         assert!(num_drops_in_start_slot < drops_per_slot);
         let mut remaining_drops_in_slot = drops_per_slot - num_drops_in_start_slot;
@@ -250,7 +250,7 @@ impl BlockBufferPool {
             }
         };
         // Find all the entries for start_slot
-        for entry in entries {
+        for stmt in fscl_stmts {
             if remaining_drops_in_slot == 0 {
                 current_slot += 1;
                 current_index = 0;
@@ -258,9 +258,9 @@ impl BlockBufferPool {
                 remaining_drops_in_slot = drops_per_slot;
             }
 
-            let mut b = entry.borrow().to_blob();
+            let mut b = stmt.borrow().to_blob();
 
-            if entry.borrow().is_drop() {
+            if stmt.borrow().is_drop() {
                 remaining_drops_in_slot -= 1;
                 if remaining_drops_in_slot == 0 {
                     b.set_is_last_in_slot();
@@ -682,13 +682,13 @@ impl BlockBufferPool {
     }
 
     /// Returns the entry vector for the slot starting with `blob_start_index`
-    pub fn fetch_slot_entries(
+    pub fn fetch_candidate_fscl_stmts(
         &self,
         slot: u64,
         blob_start_index: u64,
-        max_entries: Option<u64>,
-    ) -> Result<Vec<Entry>> {
-        self.fetch_slot_entries_by_blob_len(slot, blob_start_index, max_entries)
+        fscl_stmt_upper_bound: Option<u64>,
+    ) -> Result<Vec<FsclStmt>> {
+        self.fetch_max_candidate_fscl_stmts(slot, blob_start_index, fscl_stmt_upper_bound)
             .map(|x| x.0)
     }
 
@@ -698,11 +698,11 @@ impl BlockBufferPool {
     }
 
     /// Return an iterator for all the entries in the given file.
-    pub fn fetch_iterator(&self) -> Result<impl Iterator<Item = Entry>> {
-        use crate::entry_info::EntrySlice;
+    pub fn fetch_iterator(&self) -> Result<impl Iterator<Item = FsclStmt>> {
+        use crate::fiscal_statement_info::FsclStmtSlc;
         use std::collections::VecDeque;
 
-        struct EntryIterator {
+        struct FsclStmtScaner {
             db_iterator: Cursor<cf::DataColumn>,
 
             // TODO: remove me when replay_phase is iterating by block (BlockBufferPool)
@@ -716,33 +716,33 @@ impl BlockBufferPool {
             //   you have to hold the database open in order to iterate over it, and in order
             //   for db_iterator to be able to run Drop
             //    _block_buffer_pool: BlockBufferPool,
-            entries: VecDeque<Entry>,
+            fscl_stmts: VecDeque<FsclStmt>,
         }
 
-        impl Iterator for EntryIterator {
-            type Item = Entry;
+        impl Iterator for FsclStmtScaner {
+            type Item = FsclStmt;
 
-            fn next(&mut self) -> Option<Entry> {
-                if !self.entries.is_empty() {
-                    return Some(self.entries.pop_front().unwrap());
+            fn next(&mut self) -> Option<FsclStmt> {
+                if !self.fscl_stmts.is_empty() {
+                    return Some(self.fscl_stmts.pop_front().unwrap());
                 }
 
                 if self.db_iterator.valid() {
                     if let Some(value) = self.db_iterator.value_bytes() {
-                        if let Ok(next_entries) =
-                            deserialize::<Vec<Entry>>(&value[BLOB_HEADER_SIZE..])
+                        if let Ok(next_fiscal_statment) =
+                            deserialize::<Vec<FsclStmt>>(&value[BLOB_HEADER_SIZE..])
                         {
                             if let Some(transaction_seal) = self.transaction_seal {
-                                if !next_entries.verify(&transaction_seal) {
+                                if !next_fiscal_statment.verify(&transaction_seal) {
                                     return None;
                                 }
                             }
                             self.db_iterator.next();
-                            if next_entries.is_empty() {
+                            if next_fiscal_statment.is_empty() {
                                 return None;
                             }
-                            self.entries = VecDeque::from(next_entries);
-                            let entry = self.entries.pop_front().unwrap();
+                            self.fscl_stmts = VecDeque::from(next_fiscal_statment);
+                            let entry = self.fscl_stmts.pop_front().unwrap();
                             self.transaction_seal = Some(entry.hash);
                             return Some(entry);
                         }
@@ -754,26 +754,26 @@ impl BlockBufferPool {
         let mut db_iterator = self.db.cursor::<cf::DataColumn>()?;
 
         db_iterator.seek_to_first();
-        Ok(EntryIterator {
-            entries: VecDeque::new(),
+        Ok(FsclStmtScaner {
+            fscl_stmts: VecDeque::new(),
             db_iterator,
             transaction_seal: None,
         })
     }
 
-    pub fn fetch_slot_entries_by_blob_len(
+    pub fn fetch_max_candidate_fscl_stmts(
         &self,
         slot: u64,
         blob_start_index: u64,
-        max_entries: Option<u64>,
-    ) -> Result<(Vec<Entry>, usize)> {
+        fscl_stmt_upper_bound: Option<u64>,
+    ) -> Result<(Vec<FsclStmt>, usize)> {
         // Find the next consecutive block of blobs.
-        let consecutive_blobs = fetch_slot_continuous_blobs(
+        let consecutive_blobs = fetch_candidate_upper_bound_data(
             slot,
             &self.db,
             &HashMap::new(),
             blob_start_index,
-            max_entries,
+            fscl_stmt_upper_bound,
         )?;
         let num = consecutive_blobs.len();
         Ok((deserialize_blobs(&consecutive_blobs), num))
@@ -796,7 +796,7 @@ impl BlockBufferPool {
         Ok(result)
     }
 
-    pub fn fetch_entry_from_deserialized_blob(data: &[u8]) -> Result<Vec<Entry>> {
+    pub fn fetch_entry_from_deserialized_blob(data: &[u8]) -> Result<Vec<FsclStmt>> {
         let entries = deserialize(data)?;
         Ok(entries)
     }
@@ -914,7 +914,7 @@ fn put_blob_into_ledger<'a>(
 
     let new_consumed = {
         if slot_meta.consumed == blob_index {
-            let blob_datas = fetch_slot_continuous_blobs(
+            let blob_datas = fetch_candidate_upper_bound_data(
                 blob_slot,
                 db,
                 prev_inserted_blob_datas,
@@ -926,7 +926,7 @@ fn put_blob_into_ledger<'a>(
             )?;
 
             // Add one because we skipped this current blob when calling
-            // fetch_slot_continuous_blobs() earlier
+            // fetch_candidate_upper_bound_data() earlier
             slot_meta.consumed + blob_datas.len() as u64 + 1
         } else {
             slot_meta.consumed
@@ -1125,7 +1125,7 @@ fn find_slot_meta_in_cached_state<'a>(
 
 /// Returns the next consumed index and the number of drops in the new consumed
 /// range
-fn fetch_slot_continuous_blobs<'a>(
+fn fetch_candidate_upper_bound_data<'a>(
     slot: u64,
     db: &Database,
     prev_inserted_blob_datas: &HashMap<(u64, u64), &'a [u8]>,
@@ -1488,7 +1488,7 @@ fn restore(
     Ok((restored_data, recovered_coding))
 }
 
-fn deserialize_blobs<I>(blob_datas: &[I]) -> Vec<Entry>
+fn deserialize_blobs<I>(blob_datas: &[I]) -> Vec<FsclStmt>
 where
     I: Borrow<[u8]>,
 {
@@ -1527,15 +1527,15 @@ pub fn make_new_ledger_file(ledger_path: &str, genesis_block: &GenesisBlock) -> 
 
     // Fill slot 0 with drops that link back to the genesis_block to bootstrap the ledger.
     let block_buffer_pool = BlockBufferPool::open_ledger_file(ledger_path)?;
-    let entries = crate::entry_info::create_drops(drops_per_slot, genesis_block.hash());
-    block_buffer_pool.update_entries(0, 0, 0, drops_per_slot, &entries)?;
+    let entries = crate::fiscal_statement_info::create_drops(drops_per_slot, genesis_block.hash());
+    block_buffer_pool.update_fscl_stmts(0, 0, 0, drops_per_slot, &entries)?;
 
     Ok(entries.last().unwrap().hash)
 }
 
 pub fn source<'a, I>(ledger_path: &str, keypair: &Keypair, entries: I) -> Result<()>
 where
-    I: IntoIterator<Item = &'a Entry>,
+    I: IntoIterator<Item = &'a FsclStmt>,
 {
     let block_buffer_pool = BlockBufferPool::open_ledger_file(ledger_path)?;
 
@@ -1625,8 +1625,8 @@ pub fn tmp_copy_block_buffer(from: &str, name: &str) -> String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::entry_info::{
-        create_drops, make_tiny_test_entries, make_tiny_test_entries_from_hash, Entry, EntrySlice,
+    use crate::fiscal_statement_info::{
+        create_drops, compose_s_fiscal_stmt_nohash, compose_s_fiscal_stmt, FsclStmt, FsclStmtSlc,
     };
     use crate::expunge::{CodingGenerator, NUM_CODING, NUM_DATA};
     use crate::packet;
@@ -1653,7 +1653,7 @@ pub mod tests {
 
             let drops = create_drops(num_drops, Hash::default());
             ledger
-                .update_entries(0, 0, 0, drops_per_slot, drops.clone())
+                .update_fscl_stmts(0, 0, 0, drops_per_slot, drops.clone())
                 .unwrap();
 
             for i in 0..num_slots {
@@ -1674,13 +1674,13 @@ pub mod tests {
 
                 assert_eq!(
                     &drops[(i * drops_per_slot) as usize..((i + 1) * drops_per_slot) as usize],
-                    &ledger.fetch_slot_entries(i, 0, None).unwrap()[..]
+                    &ledger.fetch_candidate_fscl_stmts(i, 0, None).unwrap()[..]
                 );
             }
 
             // Simulate writing to the end of a slot with existing drops
             ledger
-                .update_entries(
+                .update_fscl_stmts(
                     num_slots,
                     drops_per_slot - 1,
                     drops_per_slot - 2,
@@ -1701,7 +1701,7 @@ pub mod tests {
             assert_eq!(
                 &drops[0..1],
                 &ledger
-                    .fetch_slot_entries(num_slots, drops_per_slot - 2, None)
+                    .fetch_candidate_fscl_stmts(num_slots, drops_per_slot - 2, None)
                     .unwrap()[..]
             );
 
@@ -1715,7 +1715,7 @@ pub mod tests {
 
             assert_eq!(
                 &drops[1..2],
-                &ledger.fetch_slot_entries(num_slots + 1, 0, None).unwrap()[..]
+                &ledger.fetch_candidate_fscl_stmts(num_slots + 1, 0, None).unwrap()[..]
             );
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).expect("Expected successful database destruction");
@@ -1770,7 +1770,7 @@ pub mod tests {
 
     #[test]
     fn test_read_blobs_bytes() {
-        let shared_blobs = make_tiny_test_entries(10).to_single_entry_shared_blobs();
+        let shared_blobs = compose_s_fiscal_stmt_nohash(10).one_stmt_shard_blbs();
         let slot = 0;
         packet::index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, slot, 0);
 
@@ -1835,10 +1835,10 @@ pub mod tests {
 
     #[test]
     fn test_insert_data_blobs_basic() {
-        let num_entries = 5;
-        assert!(num_entries > 1);
+        let fscl_stmt_cnt = 5;
+        assert!(fscl_stmt_cnt > 1);
 
-        let (blobs, entries) = make_slot_entries(0, 0, num_entries);
+        let (blobs, entries) = compose_candidate_fscl_stmts(0, 0, fscl_stmt_cnt);
 
         let ledger_path = fetch_interim_ledger_location("test_insert_data_blobs_basic");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
@@ -1846,21 +1846,21 @@ pub mod tests {
         // Insert last blob, we're missing the other blobs, so no consecutive
         // blobs starting from slot 0, index 0 should exist.
         ledger
-            .insert_data_blobs(once(&blobs[num_entries as usize - 1]))
+            .insert_data_blobs(once(&blobs[fscl_stmt_cnt as usize - 1]))
             .unwrap();
-        assert!(ledger.fetch_slot_entries(0, 0, None).unwrap().is_empty());
+        assert!(ledger.fetch_candidate_fscl_stmts(0, 0, None).unwrap().is_empty());
 
         let meta = ledger
             .meta(0)
             .unwrap()
             .expect("Expected new metadata object to be created");
-        assert!(meta.consumed == 0 && meta.received == num_entries);
+        assert!(meta.consumed == 0 && meta.received == fscl_stmt_cnt);
 
         // Insert the other blobs, check for consecutive returned entries
         ledger
-            .insert_data_blobs(&blobs[0..(num_entries - 1) as usize])
+            .insert_data_blobs(&blobs[0..(fscl_stmt_cnt - 1) as usize])
             .unwrap();
-        let result = ledger.fetch_slot_entries(0, 0, None).unwrap();
+        let result = ledger.fetch_candidate_fscl_stmts(0, 0, None).unwrap();
 
         assert_eq!(result, entries);
 
@@ -1868,10 +1868,10 @@ pub mod tests {
             .meta(0)
             .unwrap()
             .expect("Expected new metadata object to exist");
-        assert_eq!(meta.consumed, num_entries);
-        assert_eq!(meta.received, num_entries);
+        assert_eq!(meta.consumed, fscl_stmt_cnt);
+        assert_eq!(meta.received, fscl_stmt_cnt);
         assert_eq!(meta.parent_slot, 0);
-        assert_eq!(meta.last_index, num_entries - 1);
+        assert_eq!(meta.last_index, fscl_stmt_cnt - 1);
         assert!(meta.next_slots.is_empty());
         assert!(meta.is_connected);
 
@@ -1882,29 +1882,29 @@ pub mod tests {
 
     #[test]
     fn test_insert_data_blobs_reverse() {
-        let num_entries = 10;
-        let (blobs, entries) = make_slot_entries(0, 0, num_entries);
+        let fscl_stmt_cnt = 10;
+        let (blobs, entries) = compose_candidate_fscl_stmts(0, 0, fscl_stmt_cnt);
 
         let ledger_path = fetch_interim_ledger_location("test_insert_data_blobs_reverse");
         let ledger = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
         // Insert blobs in reverse, check for consecutive returned blobs
-        for i in (0..num_entries).rev() {
+        for i in (0..fscl_stmt_cnt).rev() {
             ledger.insert_data_blobs(once(&blobs[i as usize])).unwrap();
-            let result = ledger.fetch_slot_entries(0, 0, None).unwrap();
+            let result = ledger.fetch_candidate_fscl_stmts(0, 0, None).unwrap();
 
             let meta = ledger
                 .meta(0)
                 .unwrap()
                 .expect("Expected metadata object to exist");
             assert_eq!(meta.parent_slot, 0);
-            assert_eq!(meta.last_index, num_entries - 1);
+            assert_eq!(meta.last_index, fscl_stmt_cnt - 1);
             if i != 0 {
                 assert_eq!(result.len(), 0);
-                assert!(meta.consumed == 0 && meta.received == num_entries as u64);
+                assert!(meta.consumed == 0 && meta.received == fscl_stmt_cnt as u64);
             } else {
                 assert_eq!(result, entries);
-                assert!(meta.consumed == num_entries as u64 && meta.received == num_entries as u64);
+                assert!(meta.consumed == fscl_stmt_cnt as u64 && meta.received == fscl_stmt_cnt as u64);
             }
         }
 
@@ -1927,9 +1927,9 @@ pub mod tests {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
             // Write entries
-            let num_entries = 8;
-            let entries = make_tiny_test_entries(num_entries);
-            let mut blobs = entries.to_single_entry_blobs();
+            let fscl_stmt_cnt = 8;
+            let entries = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
+            let mut blobs = entries.one_stmt_blbs();
 
             for (i, b) in blobs.iter_mut().enumerate() {
                 b.set_index(1 << (i * 8));
@@ -1948,7 +1948,7 @@ pub mod tests {
             db_iterator.seek((slot, 1));
 
             // Iterate through ledger
-            for i in 0..num_entries {
+            for i in 0..fscl_stmt_cnt {
                 assert!(db_iterator.valid());
                 let (_, current_index) = db_iterator.key().expect("Expected a valid key");
                 assert_eq!(current_index, (1 as u64) << (i * 8));
@@ -1963,8 +1963,8 @@ pub mod tests {
         let block_buffer_pool_path = fetch_interim_ledger_location("test_get_slot_entries1");
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
-            let entries = make_tiny_test_entries(8);
-            let mut blobs = entries.clone().to_single_entry_blobs();
+            let entries = compose_s_fiscal_stmt_nohash(8);
+            let mut blobs = entries.clone().one_stmt_blbs();
             for (i, b) in blobs.iter_mut().enumerate() {
                 b.set_slot(1);
                 if i < 4 {
@@ -1978,12 +1978,12 @@ pub mod tests {
                 .expect("Expected successful write of blobs");
 
             assert_eq!(
-                block_buffer_pool.fetch_slot_entries(1, 2, None).unwrap()[..],
+                block_buffer_pool.fetch_candidate_fscl_stmts(1, 2, None).unwrap()[..],
                 entries[2..4],
             );
 
             assert_eq!(
-                block_buffer_pool.fetch_slot_entries(1, 12, None).unwrap()[..],
+                block_buffer_pool.fetch_candidate_fscl_stmts(1, 12, None).unwrap()[..],
                 entries[4..],
             );
         }
@@ -2000,9 +2000,9 @@ pub mod tests {
             let num_slots = 5 as u64;
             let mut index = 0;
             for slot in 0..num_slots {
-                let entries = make_tiny_test_entries(slot as usize + 1);
-                let last_entry = entries.last().unwrap().clone();
-                let mut blobs = entries.clone().to_single_entry_blobs();
+                let entries = compose_s_fiscal_stmt_nohash(slot as usize + 1);
+                let tail_fscl_stmt = entries.last().unwrap().clone();
+                let mut blobs = entries.clone().one_stmt_blbs();
                 for b in blobs.iter_mut() {
                     b.set_index(index);
                     b.set_slot(slot as u64);
@@ -2012,8 +2012,8 @@ pub mod tests {
                     .update_blobs(&blobs)
                     .expect("Expected successful write of blobs");
                 assert_eq!(
-                    block_buffer_pool.fetch_slot_entries(slot, index - 1, None).unwrap(),
-                    vec![last_entry],
+                    block_buffer_pool.fetch_candidate_fscl_stmts(slot, index - 1, None).unwrap(),
+                    vec![tail_fscl_stmt],
                 );
             }
         }
@@ -2029,14 +2029,14 @@ pub mod tests {
             let num_slots = 5 as u64;
             let blobs_per_slot = 5 as u64;
             let entry_serialized_size =
-                bincode::serialized_size(&make_tiny_test_entries(1)).unwrap();
+                bincode::serialized_size(&compose_s_fiscal_stmt_nohash(1)).unwrap();
             let entries_per_slot =
                 (blobs_per_slot * packet::BLOB_DATA_SIZE as u64) / entry_serialized_size;
 
             // Write entries
             for slot in 0..num_slots {
                 let mut index = 0;
-                let entries = make_tiny_test_entries(entries_per_slot as usize);
+                let entries = compose_s_fiscal_stmt_nohash(entries_per_slot as usize);
                 let mut blobs = entries.clone().to_blobs();
                 assert_eq!(blobs.len() as u64, blobs_per_slot);
                 for b in blobs.iter_mut() {
@@ -2047,7 +2047,7 @@ pub mod tests {
                 block_buffer_pool
                     .update_blobs(&blobs)
                     .expect("Expected successful write of blobs");
-                assert_eq!(block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap(), entries,);
+                assert_eq!(block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).unwrap(), entries,);
             }
         }
         BlockBufferPool::remove_ledger_file(&block_buffer_pool_path).expect("Expected successful database destruction");
@@ -2062,26 +2062,26 @@ pub mod tests {
                 let slot = i;
                 let parent_slot = if i == 0 { 0 } else { i - 1 };
                 // Write entries
-                let num_entries = 21 as u64 * (i + 1);
-                let (blobs, original_entries) = make_slot_entries(slot, parent_slot, num_entries);
+                let fscl_stmt_cnt = 21 as u64 * (i + 1);
+                let (blobs, original_entries) = compose_candidate_fscl_stmts(slot, parent_slot, fscl_stmt_cnt);
 
                 block_buffer_pool
                     .update_blobs(blobs.iter().skip(1).step_by(2))
                     .unwrap();
 
-                assert_eq!(block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap(), vec![]);
+                assert_eq!(block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).unwrap(), vec![]);
 
                 let meta = block_buffer_pool.meta(slot).unwrap().unwrap();
-                if num_entries % 2 == 0 {
-                    assert_eq!(meta.received, num_entries);
+                if fscl_stmt_cnt % 2 == 0 {
+                    assert_eq!(meta.received, fscl_stmt_cnt);
                 } else {
                     debug!("got here");
-                    assert_eq!(meta.received, num_entries - 1);
+                    assert_eq!(meta.received, fscl_stmt_cnt - 1);
                 }
                 assert_eq!(meta.consumed, 0);
                 assert_eq!(meta.parent_slot, parent_slot);
-                if num_entries % 2 == 0 {
-                    assert_eq!(meta.last_index, num_entries - 1);
+                if fscl_stmt_cnt % 2 == 0 {
+                    assert_eq!(meta.last_index, fscl_stmt_cnt - 1);
                 } else {
                     assert_eq!(meta.last_index, std::u64::MAX);
                 }
@@ -2089,15 +2089,15 @@ pub mod tests {
                 block_buffer_pool.update_blobs(blobs.iter().step_by(2)).unwrap();
 
                 assert_eq!(
-                    block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap(),
+                    block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).unwrap(),
                     original_entries,
                 );
 
                 let meta = block_buffer_pool.meta(slot).unwrap().unwrap();
-                assert_eq!(meta.received, num_entries);
-                assert_eq!(meta.consumed, num_entries);
+                assert_eq!(meta.received, fscl_stmt_cnt);
+                assert_eq!(meta.consumed, fscl_stmt_cnt);
                 assert_eq!(meta.parent_slot, parent_slot);
-                assert_eq!(meta.last_index, num_entries - 1);
+                assert_eq!(meta.last_index, fscl_stmt_cnt - 1);
             }
         }
 
@@ -2115,7 +2115,7 @@ pub mod tests {
             let num_duplicates = 2;
             let num_unique_entries = 10;
             let (original_entries, blobs) = {
-                let (blobs, entries) = make_slot_entries(0, 0, num_unique_entries);
+                let (blobs, entries) = compose_candidate_fscl_stmts(0, 0, num_unique_entries);
                 let entries: Vec<_> = entries
                     .into_iter()
                     .flat_map(|e| vec![e.clone(), e])
@@ -2133,7 +2133,7 @@ pub mod tests {
                 )
                 .unwrap();
 
-            assert_eq!(block_buffer_pool.fetch_slot_entries(0, 0, None).unwrap(), vec![]);
+            assert_eq!(block_buffer_pool.fetch_candidate_fscl_stmts(0, 0, None).unwrap(), vec![]);
 
             block_buffer_pool
                 .update_blobs(blobs.iter().step_by(num_duplicates as usize * 2))
@@ -2144,7 +2144,7 @@ pub mod tests {
                 .step_by(num_duplicates as usize)
                 .collect();
 
-            assert_eq!(block_buffer_pool.fetch_slot_entries(0, 0, None).unwrap(), expected,);
+            assert_eq!(block_buffer_pool.fetch_candidate_fscl_stmts(0, 0, None).unwrap(), expected,);
 
             let meta = block_buffer_pool.meta(0).unwrap().unwrap();
             assert_eq!(meta.consumed, num_unique_entries);
@@ -2156,16 +2156,16 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_genesis_and_entry_iterator() {
-        let entries = make_tiny_test_entries_from_hash(&Hash::default(), 10);
+    pub fn test_primal_iterator() {
+        let entries = compose_s_fiscal_stmt(&Hash::default(), 10);
 
-        let ledger_path = fetch_interim_ledger_location("test_genesis_and_entry_iterator");
+        let ledger_path = fetch_interim_ledger_location("test_primal_iterator");
         {
             source(&ledger_path, &Keypair::new(), &entries).unwrap();
 
             let ledger = BlockBufferPool::open_ledger_file(&ledger_path).expect("open failed");
 
-            let read_entries: Vec<Entry> =
+            let read_entries: Vec<FsclStmt> =
                 ledger.fetch_iterator().expect("fetch_iterator failed").collect();
             assert!(read_entries.verify(&Hash::default()));
             assert_eq!(entries, read_entries);
@@ -2174,9 +2174,9 @@ pub mod tests {
         BlockBufferPool::remove_ledger_file(&ledger_path).expect("Expected successful database destruction");
     }
     #[test]
-    pub fn test_entry_iterator_up_to_consumed() {
-        let entries = make_tiny_test_entries_from_hash(&Hash::default(), 3);
-        let ledger_path = fetch_interim_ledger_location("test_genesis_and_entry_iterator");
+    pub fn test_fiscal_stmt_to_pocket() {
+        let entries = compose_s_fiscal_stmt(&Hash::default(), 3);
+        let ledger_path = fetch_interim_ledger_location("test_primal_iterator");
         {
             // put entries except last 2 into ledger
             source(&ledger_path, &Keypair::new(), &entries[..entries.len() - 2]).unwrap();
@@ -2188,7 +2188,7 @@ pub mod tests {
             // | | | | | | | |    | |
             // +-+-+-+-+-+-+-+    +-+
             ledger
-                .update_entries(
+                .update_fscl_stmts(
                     0u64,
                     0,
                     (entries.len() - 1) as u64,
@@ -2197,7 +2197,7 @@ pub mod tests {
                 )
                 .unwrap();
 
-            let read_entries: Vec<Entry> =
+            let read_entries: Vec<FsclStmt> =
                 ledger.fetch_iterator().expect("fetch_iterator failed").collect();
             assert!(read_entries.verify(&Hash::default()));
 
@@ -2217,7 +2217,7 @@ pub mod tests {
 
         let entries_per_slot = 10;
         // Create entries for slot 0
-        let (blobs, _) = make_slot_entries(0, 0, entries_per_slot);
+        let (blobs, _) = compose_candidate_fscl_stmts(0, 0, entries_per_slot);
 
         // Insert second blob, but we're missing the first blob, so no consecutive
         // blobs starting from slot 0, index 0 should exist.
@@ -2244,7 +2244,7 @@ pub mod tests {
         let mut blobs: Vec<Blob> = vec![];
         let mut missing_blobs = vec![];
         for slot in 1..num_slots + 1 {
-            let (mut slot_blobs, _) = make_slot_entries(slot, slot - 1, entries_per_slot);
+            let (mut slot_blobs, _) = compose_candidate_fscl_stmts(slot, slot - 1, entries_per_slot);
             let missing_blob = slot_blobs.remove(slot as usize - 1);
             blobs.extend(slot_blobs);
             missing_blobs.push(missing_blob);
@@ -2258,7 +2258,7 @@ pub mod tests {
         // should get no updates
         let blobs: Vec<_> = (1..num_slots + 1)
             .flat_map(|slot| {
-                let (mut blob, _) = make_slot_entries(slot, slot - 1, 1);
+                let (mut blob, _) = compose_candidate_fscl_stmts(slot, slot - 1, 1);
                 blob[0].set_index(2 * num_slots as u64);
                 blob
             })
@@ -2298,7 +2298,7 @@ pub mod tests {
         let entries_per_slot = 10;
 
         // Create blobs for slot 0
-        let (blobs, _) = make_slot_entries(0, 0, entries_per_slot);
+        let (blobs, _) = compose_candidate_fscl_stmts(0, 0, entries_per_slot);
 
         // Insert all but the first blob in the slot, should not be considered complete
         ledger
@@ -2364,7 +2364,7 @@ pub mod tests {
         let (ref blobs0, _) = all_blobs[0];
         let (ref blobs1, _) = all_blobs[1];
         let (ref blobs2, _) = all_blobs[2];
-        let (ref blobs3, _) = make_slot_entries(disconnected_slot, 1, entries_per_slot);
+        let (ref blobs3, _) = compose_candidate_fscl_stmts(disconnected_slot, 1, entries_per_slot);
 
         let mut all_blobs: Vec<_> = vec![blobs0, blobs1, blobs2, blobs3]
             .into_iter()
@@ -2389,7 +2389,7 @@ pub mod tests {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
             // Construct the blobs
-            let (blobs, _) = make_many_slot_entries(0, num_slots, entries_per_slot);
+            let (blobs, _) = compose_candidate_fscl_stmts_in_batch(0, num_slots, entries_per_slot);
 
             // 1) Write to the first slot
             block_buffer_pool
@@ -2463,7 +2463,7 @@ pub mod tests {
                         slot - 1
                     }
                 };
-                let (slot_blobs, _) = make_slot_entries(slot, parent_slot, entries_per_slot);
+                let (slot_blobs, _) = compose_candidate_fscl_stmts(slot, parent_slot, entries_per_slot);
 
                 if slot % 2 == 1 {
                     slots.extend(slot_blobs);
@@ -2533,7 +2533,7 @@ pub mod tests {
             let entries_per_slot = 2;
             assert!(entries_per_slot > 1);
 
-            let (blobs, _) = make_many_slot_entries(0, num_slots, entries_per_slot);
+            let (blobs, _) = compose_candidate_fscl_stmts_in_batch(0, num_slots, entries_per_slot);
 
             // Write the blobs such that every 3rd slot has a gap in the beginning
             for (slot, slot_drops) in blobs.chunks(entries_per_slot as usize).enumerate() {
@@ -2620,7 +2620,7 @@ pub mod tests {
             let entries_per_slot = NUM_DATA as u64;
             assert!(entries_per_slot > 1);
 
-            let (mut blobs, _) = make_many_slot_entries(0, num_slots, entries_per_slot);
+            let (mut blobs, _) = compose_candidate_fscl_stmts_in_batch(0, num_slots, entries_per_slot);
 
             // Insert tree one slot at a time in a random order
             let mut slots: Vec<_> = (0..num_slots).collect();
@@ -2752,7 +2752,7 @@ pub mod tests {
 
             // Create blobs and entries
             let entries_per_slot = 1;
-            let (blobs, _) = make_many_slot_entries(0, 3, entries_per_slot);
+            let (blobs, _) = compose_candidate_fscl_stmts_in_batch(0, 3, entries_per_slot);
 
             // Write slot 2, which chains to slot 1. We're missing slot 0,
             // so slot 1 is the orphan
@@ -2781,8 +2781,8 @@ pub mod tests {
 
             // Write some slot that also chains to existing slots and orphan,
             // nothing should change
-            let blob4 = &make_slot_entries(4, 0, 1).0[0];
-            let blob5 = &make_slot_entries(5, 1, 1).0[0];
+            let blob4 = &compose_candidate_fscl_stmts(4, 0, 1).0[0];
+            let blob5 = &compose_candidate_fscl_stmts(5, 1, 1).0[0];
             block_buffer_pool.update_blobs(vec![blob4, blob5]).unwrap();
             assert_eq!(block_buffer_pool.fetch_singletons(None), vec![0]);
 
@@ -2807,10 +2807,10 @@ pub mod tests {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
             // Create blobs and entries
-            let num_entries = 20 as u64;
+            let fscl_stmt_cnt = 20 as u64;
             let mut entries = vec![];
             let mut blobs = vec![];
-            for slot in 0..num_entries {
+            for slot in 0..fscl_stmt_cnt {
                 let parent_slot = {
                     if slot == 0 {
                         0
@@ -2819,7 +2819,7 @@ pub mod tests {
                     }
                 };
 
-                let (mut blob, entry) = make_slot_entries(slot, parent_slot, 1);
+                let (mut blob, entry) = compose_candidate_fscl_stmts(slot, parent_slot, 1);
                 blob[0].set_index(slot);
                 blobs.extend(blob);
                 entries.extend(entry);
@@ -2829,15 +2829,15 @@ pub mod tests {
             if should_bulk_write {
                 block_buffer_pool.update_blobs(blobs.iter()).unwrap();
             } else {
-                for i in 0..num_entries {
+                for i in 0..fscl_stmt_cnt {
                     let i = i as usize;
                     block_buffer_pool.update_blobs(&blobs[i..i + 1]).unwrap();
                 }
             }
 
-            for i in 0..num_entries - 1 {
+            for i in 0..fscl_stmt_cnt - 1 {
                 assert_eq!(
-                    block_buffer_pool.fetch_slot_entries(i, i, None).unwrap()[0],
+                    block_buffer_pool.fetch_candidate_fscl_stmts(i, i, None).unwrap()[0],
                     entries[i as usize]
                 );
 
@@ -2865,8 +2865,8 @@ pub mod tests {
         // Write entries
         let gap = 10;
         assert!(gap > 3);
-        let num_entries = 10;
-        let mut blobs = make_tiny_test_entries(num_entries).to_single_entry_blobs();
+        let fscl_stmt_cnt = 10;
+        let mut blobs = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt).one_stmt_blbs();
         for (i, b) in blobs.iter_mut().enumerate() {
             b.set_index(i as u64 * gap);
             b.set_slot(slot);
@@ -2915,7 +2915,7 @@ pub mod tests {
             &expected[..expected.len() - 1],
         );
 
-        for i in 0..num_entries as u64 {
+        for i in 0..fscl_stmt_cnt as u64 {
             for j in 0..i {
                 let expected: Vec<u64> = (j..i)
                     .flat_map(|k| {
@@ -2954,7 +2954,7 @@ pub mod tests {
         assert_eq!(block_buffer_pool.search_absent_data_indexes(slot, 4, 3, 1), empty);
         assert_eq!(block_buffer_pool.search_absent_data_indexes(slot, 1, 2, 0), empty);
 
-        let mut blobs = make_tiny_test_entries(2).to_single_entry_blobs();
+        let mut blobs = compose_s_fiscal_stmt_nohash(2).one_stmt_blbs();
 
         const ONE: u64 = 1;
         const OTHER: u64 = 4;
@@ -2992,8 +2992,8 @@ pub mod tests {
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
         // Write entries
-        let num_entries = 10;
-        let shared_blobs = make_tiny_test_entries(num_entries).to_single_entry_shared_blobs();
+        let fscl_stmt_cnt = 10;
+        let shared_blobs = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt).one_stmt_shard_blbs();
 
         crate::packet::index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, slot, 0);
 
@@ -3002,7 +3002,7 @@ pub mod tests {
         block_buffer_pool.update_blobs(blobs).unwrap();
 
         let empty: Vec<u64> = vec![];
-        for i in 0..num_entries as u64 {
+        for i in 0..fscl_stmt_cnt as u64 {
             for j in 0..i {
                 assert_eq!(
                     block_buffer_pool.search_absent_data_indexes(slot, j, i, (i - j) as usize),
@@ -3017,7 +3017,7 @@ pub mod tests {
 
     #[test]
     pub fn test_should_insert_blob() {
-        let (mut blobs, _) = make_slot_entries(0, 0, 20);
+        let (mut blobs, _) = compose_candidate_fscl_stmts(0, 0, 20);
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -3076,7 +3076,7 @@ pub mod tests {
 
     #[test]
     pub fn test_insert_multiple_is_last() {
-        let (mut blobs, _) = make_slot_entries(0, 0, 20);
+        let (mut blobs, _) = compose_candidate_fscl_stmts(0, 0, 20);
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
@@ -3186,7 +3186,7 @@ pub mod tests {
             let num_blobs = NUM_DATA as u64 * 2;
             let slot = 0;
 
-            let (blobs, _) = make_slot_entries(slot, 0, num_blobs);
+            let (blobs, _) = compose_candidate_fscl_stmts(slot, 0, num_blobs);
             let shared_blobs: Vec<_> = blobs
                 .iter()
                 .cloned()
@@ -3301,7 +3301,7 @@ pub mod tests {
 
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
             let num_sets = 3;
-            let data_blobs = make_slot_entries(slot, 0, num_sets * NUM_DATA as u64)
+            let data_blobs = compose_candidate_fscl_stmts(slot, 0, num_sets * NUM_DATA as u64)
                 .0
                 .into_iter()
                 .map(Blob::into)
@@ -3379,7 +3379,7 @@ pub mod tests {
             morgan_logger::setup();
             let ledger_path = fetch_interim_ledger_location!();
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
-            let data_blobs = make_slot_entries(SLOT, 0, NUM_DATA as u64)
+            let data_blobs = compose_candidate_fscl_stmts(SLOT, 0, NUM_DATA as u64)
                 .0
                 .into_iter()
                 .map(Blob::into)
@@ -3612,13 +3612,13 @@ pub mod tests {
         }
     }
 
-    pub fn entries_to_blobs(
-        entries: &Vec<Entry>,
+    pub fn blob_vec_from_fscl_stmts(
+        fscl_stmts: &Vec<FsclStmt>,
         slot: u64,
         parent_slot: u64,
         is_full_slot: bool,
     ) -> Vec<Blob> {
-        let mut blobs = entries.clone().to_single_entry_blobs();
+        let mut blobs = fscl_stmts.clone().one_stmt_blbs();
         for (i, b) in blobs.iter_mut().enumerate() {
             b.set_index(i as u64);
             b.set_slot(slot);
@@ -3630,39 +3630,39 @@ pub mod tests {
         blobs
     }
 
-    pub fn make_slot_entries(
+    pub fn compose_candidate_fscl_stmts(
         slot: u64,
         parent_slot: u64,
-        num_entries: u64,
-    ) -> (Vec<Blob>, Vec<Entry>) {
-        let entries = make_tiny_test_entries(num_entries as usize);
-        let blobs = entries_to_blobs(&entries, slot, parent_slot, true);
-        (blobs, entries)
+        fscl_stmt_cnt: u64,
+    ) -> (Vec<Blob>, Vec<FsclStmt>) {
+        let fscl_stmts = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt as usize);
+        let blobs = blob_vec_from_fscl_stmts(&fscl_stmts, slot, parent_slot, true);
+        (blobs, fscl_stmts)
     }
 
-    pub fn make_many_slot_entries(
+    pub fn compose_candidate_fscl_stmts_in_batch(
         start_slot: u64,
         num_slots: u64,
-        entries_per_slot: u64,
-    ) -> (Vec<Blob>, Vec<Entry>) {
+        stmts_per_slot: u64,
+    ) -> (Vec<Blob>, Vec<FsclStmt>) {
         let mut blobs = vec![];
-        let mut entries = vec![];
+        let mut fscl_stmts = vec![];
         for slot in start_slot..start_slot + num_slots {
             let parent_slot = if slot == 0 { 0 } else { slot - 1 };
 
-            let (slot_blobs, slot_entries) = make_slot_entries(slot, parent_slot, entries_per_slot);
+            let (slot_blobs, slot_fscl_stmts) = compose_candidate_fscl_stmts(slot, parent_slot, stmts_per_slot);
             blobs.extend(slot_blobs);
-            entries.extend(slot_entries);
+            fscl_stmts.extend(slot_fscl_stmts);
         }
 
-        (blobs, entries)
+        (blobs, fscl_stmts)
     }
 
     // Create blobs for slots that have a parent-child relationship defined by the input `chain`
     pub fn make_chaining_slot_entries(
         chain: &[u64],
         entries_per_slot: u64,
-    ) -> Vec<(Vec<Blob>, Vec<Entry>)> {
+    ) -> Vec<(Vec<Blob>, Vec<FsclStmt>)> {
         let mut slots_blobs_and_entries = vec![];
         for (i, slot) in chain.iter().enumerate() {
             let parent_slot = {
@@ -3675,7 +3675,7 @@ pub mod tests {
                 }
             };
 
-            let result = make_slot_entries(*slot, parent_slot, entries_per_slot);
+            let result = compose_candidate_fscl_stmts(*slot, parent_slot, entries_per_slot);
             slots_blobs_and_entries.push(result);
         }
 

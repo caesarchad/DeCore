@@ -11,7 +11,7 @@
 //! * recorded entry must be >= WorkingTreasury::min_drop_height && entry must be < WorkingTreasury::max_drop_height
 //!
 use crate::block_buffer_pool::BlockBufferPool;
-use crate::entry_info::Entry;
+use crate::fiscal_statement_info::FsclStmt;
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::leader_arrange_utils;
 use crate::water_clock::WaterClock;
@@ -36,7 +36,7 @@ pub enum WaterClockRecorderErr {
     MinHeightNotReached,
 }
 
-pub type WorkingTreasuryEntries = (Arc<Treasury>, Vec<(Entry, u64)>);
+pub type WorkingTreasuryEntries = (Arc<Treasury>, Vec<(FsclStmt, u64)>);
 
 #[derive(Clone)]
 pub struct WorkingTreasury {
@@ -51,7 +51,7 @@ pub struct WaterClockRecorder {
     clear_treasury_signal: Option<SyncSender<bool>>,
     start_slot: u64,
     start_drop: u64,
-    drop_cache: Vec<(Entry, u64)>,
+    drop_cache: Vec<(FsclStmt, u64)>,
     working_treasury: Option<WorkingTreasury>,
     sender: Sender<WorkingTreasuryEntries>,
     start_leader_at_drop: Option<u64>,
@@ -329,8 +329,9 @@ impl WaterClockRecorder {
                 return;
             }
 
-            let entry = Entry {
+            let entry = FsclStmt {
                 num_hashes: waterclock_entry.num_hashes,
+                //mark_seal: 19,
                 hash: waterclock_entry.hash,
                 transactions: vec![],
             };
@@ -374,8 +375,9 @@ impl WaterClockRecorder {
                     0,
                     1000
                 );
-                let entry = Entry {
+                let entry = FsclStmt {
                     num_hashes: waterclock_entry.num_hashes,
+                    //mark_seal: 19,
                     hash: waterclock_entry.hash,
                     transactions,
                 };
@@ -438,7 +440,7 @@ impl WaterClockRecorder {
 
     /// A recorder to synchronize Water Clock with the following data structures
     /// * treasury - the LastId's queue is updated on `_drop` and `record` events
-    /// * sender - the Entry channel that outputs to the ledger
+    /// * sender - the FsclStmt channel that outputs to the ledger
     pub fn new(
         drop_height: u64,
         last_entry_hash: Hash,

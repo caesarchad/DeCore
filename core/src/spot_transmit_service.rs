@@ -252,7 +252,7 @@ mod test {
     use crate::treasury_forks::TreasuryForks;
     use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::{NodeGroupInfo, Node};
-    use crate::entry_info::{make_consecutive_blobs, make_tiny_test_entries, EntrySlice};
+    use crate::fiscal_statement_info::{make_consecutive_blobs, compose_s_fiscal_stmt_nohash, FsclStmtSlc};
     use crate::genesis_utils::create_genesis_block_with_leader;
     use crate::packet::{index_blobs, Blob};
     use crate::service::Service;
@@ -270,8 +270,8 @@ mod test {
     fn test_process_blob() {
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap());
-        let num_entries = 10;
-        let original_entries = make_tiny_test_entries(num_entries);
+        let fscl_stmt_cnt = 10;
+        let original_entries = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
         let shared_blobs = original_entries.clone().to_shared_blobs();
 
         index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, 0, 0);
@@ -281,7 +281,7 @@ mod test {
         }
 
         assert_eq!(
-            block_buffer_pool.fetch_slot_entries(0, 0, None).unwrap(),
+            block_buffer_pool.fetch_candidate_fscl_stmts(0, 0, None).unwrap(),
             original_entries
         );
 

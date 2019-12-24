@@ -1788,7 +1788,7 @@ fn report_time_spent(label: &str, time: &Duration, extra: &str) {
 mod tests {
     use super::*;
     use crate::block_buffer_pool::fetch_interim_ledger_location;
-    use crate::block_buffer_pool::tests::make_many_slot_entries;
+    use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts_in_batch;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::propagation_value::ContInfTblValueTag;
     use crate::packet::BLOB_HEADER_SIZE;
@@ -2038,7 +2038,7 @@ mod tests {
             assert!(rv.is_empty());
 
             // Create slots 1, 2, 3 with 5 blobs apiece
-            let (blobs, _) = make_many_slot_entries(1, 3, 5);
+            let (blobs, _) = compose_candidate_fscl_stmts_in_batch(1, 3, 5);
 
             block_buffer_pool
                 .update_blobs(&blobs)

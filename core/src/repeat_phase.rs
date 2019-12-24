@@ -5,7 +5,7 @@ use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::block_buffer_pool_processor;
 use crate::node_group_info::NodeGroupInfo;
-use crate::entry_info::{Entry, EntrySlice};
+use crate::fiscal_statement_info::{FsclStmt, FsclStmtSlc};
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::leader_arrange_utils;
 use crate::fork_selection::{LockStack, StakeLockout};
@@ -58,14 +58,14 @@ pub struct RepeatPhase {
 
 #[derive(Default)]
 struct ForkProgress {
-    last_entry: Hash,
+    tail_fscl_stmt: Hash,
     num_blobs: usize,
     started_ms: u64,
 }
 impl ForkProgress {
-    pub fn new(last_entry: Hash) -> Self {
+    pub fn new(tail_fscl_stmt: Hash) -> Self {
         Self {
-            last_entry,
+            tail_fscl_stmt,
             num_blobs: 0,
             started_ms: timing::timestamp(),
         }
@@ -549,47 +549,47 @@ impl RepeatPhase {
         treasury: &Treasury,
         block_buffer_pool: &BlockBufferPool,
         progress: &mut HashMap<u64, ForkProgress>,
-    ) -> Result<(Vec<Entry>, usize)> {
+    ) -> Result<(Vec<FsclStmt>, usize)> {
         let treasury_slot = treasury.slot();
         let treasury_progress = &mut progress
             .entry(treasury_slot)
             .or_insert(ForkProgress::new(treasury.last_transaction_seal()));
-        block_buffer_pool.fetch_slot_entries_by_blob_len(treasury_slot, treasury_progress.num_blobs as u64, None)
+        block_buffer_pool.fetch_max_candidate_fscl_stmts(treasury_slot, treasury_progress.num_blobs as u64, None)
     }
 
     fn replay_entries_into_treasury(
         treasury: &Treasury,
-        entries: Vec<Entry>,
+        entries: Vec<FsclStmt>,
         progress: &mut HashMap<u64, ForkProgress>,
         num: usize,
     ) -> Result<()> {
         let treasury_progress = &mut progress
             .entry(treasury.slot())
             .or_insert(ForkProgress::new(treasury.last_transaction_seal()));
-        let result = Self::verify_and_process_entries(&treasury, &entries, &treasury_progress.last_entry);
+        let result = Self::verify_and_process_entries(&treasury, &entries, &treasury_progress.tail_fscl_stmt);
         treasury_progress.num_blobs += num;
-        if let Some(last_entry) = entries.last() {
-            treasury_progress.last_entry = last_entry.hash;
+        if let Some(tail_fscl_stmt) = entries.last() {
+            treasury_progress.tail_fscl_stmt = tail_fscl_stmt.hash;
         }
         result
     }
 
     pub fn verify_and_process_entries(
         treasury: &Treasury,
-        entries: &[Entry],
-        last_entry: &Hash,
+        entries: &[FsclStmt],
+        tail_fscl_stmt: &Hash,
     ) -> Result<()> {
-        if !entries.verify(last_entry) {
+        if !entries.verify(tail_fscl_stmt) {
             trace!(
                 "entry verification failed {} {} {} {}",
                 entries.len(),
                 treasury.drop_height(),
-                last_entry,
+                tail_fscl_stmt,
                 treasury.last_transaction_seal()
             );
             return Err(Error::BlobError(BlobError::VerificationFailed));
         }
-        block_buffer_pool_processor::process_entries(treasury, entries)?;
+        block_buffer_pool_processor::handle_fiscal_stmts(treasury, entries)?;
 
         Ok(())
     }

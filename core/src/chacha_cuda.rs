@@ -46,12 +46,12 @@ pub fn chacha_cbc_encrypt_file_many_keys(
     }
     loop {
         match blk_bfr_pl.read_db_by_bytes(entry, SLOTS_PER_SEGMENT - total_entries, &mut buffer, 0) {
-            Ok((num_entries, entry_len)) => {
+            Ok((fscl_stmt_cnt, entry_len)) => {
                 debug!(
-                    "chacha_cuda: encrypting segment: {} num_entries: {} entry_len: {}",
-                    sgmt, num_entries, entry_len
+                    "chacha_cuda: encrypting segment: {} fscl_stmt_cnt: {} entry_len: {}",
+                    sgmt, fscl_stmt_cnt, entry_len
                 );
-                if num_entries == 0 {
+                if fscl_stmt_cnt == 0 {
                     break;
                 }
                 let entry_len_usz = entry_len as usize;
@@ -71,8 +71,8 @@ pub fn chacha_cbc_encrypt_file_many_keys(
                 }
 
                 total_entry_len += entry_len;
-                total_entries += num_entries;
-                entry += num_entries;
+                total_entries += fscl_stmt_cnt;
+                entry += fscl_stmt_cnt;
                 debug!(
                     "total entries: {} entry: {} segment: {} entries_per_segment: {}",
                     total_entries, entry,  sgmt, SLOTS_PER_SEGMENT
@@ -145,7 +145,7 @@ mod tests {
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
     use crate::chacha_cuda::chacha_cbc_encrypt_file_many_keys;
-    use crate::entry_info::make_tiny_test_entries;
+    use crate::fiscal_statement_info::compose_s_fiscal_stmt_nohash;
     use crate::cloner::sample_file;
     use morgan_interface::hash::Hash;
     use std::fs::{remove_dir_all, remove_file};
@@ -156,14 +156,14 @@ mod tests {
     fn test_encrypt_file_many_keys_single() {
         morgan_logger::setup();
 
-        let entries = make_tiny_test_entries(32);
+        let entries = compose_s_fiscal_stmt_nohash(32);
         let ledger_dir = "test_encrypt_file_many_keys_single";
         let ledger_path = fetch_interim_ledger_location(ledger_dir);
         let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
 
         block_buffer_pool
-            .update_entries(0, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let out_path = Path::new("test_chacha_encrypt_file_many_keys_single_output.txt.enc");
@@ -192,13 +192,13 @@ mod tests {
     fn test_encrypt_file_many_keys_multiple_keys() {
         morgan_logger::setup();
 
-        let entries = make_tiny_test_entries(32);
+        let entries = compose_s_fiscal_stmt_nohash(32);
         let ledger_dir = "test_encrypt_file_many_keys_multiple";
         let ledger_path = fetch_interim_ledger_location(ledger_dir);
         let drops_per_slot = 16;
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .update_entries(0, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(0, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let out_path = Path::new("test_chacha_encrypt_file_many_keys_multiple_output.txt.enc");

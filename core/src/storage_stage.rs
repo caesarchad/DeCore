@@ -156,7 +156,7 @@ impl StoragePhase {
                     let mut last_root = 0;
                     loop {
                         if let Some(ref some_block_buffer) = block_buffer_pool {
-                            if let Err(e) = Self::process_entries(
+                            if let Err(e) = Self::handle_fiscal_stmts(
                                 &storage_keypair,
                                 &storage_state_inner,
                                 &slot_rcvr,
@@ -173,10 +173,10 @@ impl StoragePhase {
                                     }
                                     Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                                     _ => {
-                                        // info!("{}", Info(format!("Error from process_entries: {:?}", e).to_string())),
+                                        // info!("{}", Info(format!("Error from handle_fiscal_stmts: {:?}", e).to_string())),
                                         println!("{}",
                                             printLn(
-                                                format!("Error from process_entries: {:?}", e).to_string(),
+                                                format!("Error from handle_fiscal_stmts: {:?}", e).to_string(),
                                                 module_path!().to_string()
                                             )
                                         );
@@ -463,7 +463,7 @@ impl StoragePhase {
         }
     }
 
-    fn process_entries(
+    fn handle_fiscal_stmts(
         storage_keypair: &Arc<Keypair>,
         storage_state: &Arc<RwLock<StorageStateInner>>,
         slot_rcvr: &Receiver<Vec<u64>>,
@@ -482,7 +482,7 @@ impl StoragePhase {
                 *slot_count += 1;
                 *last_root = slot;
 
-                if let Ok(entries) = block_buffer_pool.fetch_slot_entries(slot, 0, None) {
+                if let Ok(entries) = block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None) {
                     for entry in &entries {
                         // Go through the transactions, find proofs, and use them to update
                         // the storage_keys with their signatures
@@ -583,7 +583,7 @@ mod tests {
     use crate::block_buffer_pool::{create_new_tmp_ledger, BlockBufferPool};
     use crate::node_group_info::NodeGroupInfo;
     use crate::connection_info::ContactInfo;
-    use crate::entry_info::{make_tiny_test_entries, Entry};
+    use crate::fiscal_statement_info::{compose_s_fiscal_stmt_nohash, FsclStmt};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::service::Service;
     use rayon::prelude::*;
@@ -644,13 +644,13 @@ mod tests {
         let drops_per_slot = genesis_block.drops_per_slot;
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
-        let entries = make_tiny_test_entries(64);
+        let entries = compose_s_fiscal_stmt_nohash(64);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         let slot = 1;
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
         block_buffer_pool
-            .update_entries(slot, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(slot, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         let node_group_info = test_node_group_info(&keypair.pubkey());
@@ -679,7 +679,7 @@ mod tests {
         let rooted_slots = (slot..slot + SLOTS_PER_SEGMENT + 1)
             .map(|i| {
                 block_buffer_pool
-                    .update_entries(i, 0, 0, drops_per_slot, &entries)
+                    .update_fscl_stmts(i, 0, 0, drops_per_slot, &entries)
                     .unwrap();
                 i
             })
@@ -737,10 +737,10 @@ mod tests {
         let drops_per_slot = genesis_block.drops_per_slot;;
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
-        let entries = make_tiny_test_entries(128);
+        let entries = compose_s_fiscal_stmt_nohash(128);
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
         block_buffer_pool
-            .update_entries(1, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
@@ -778,9 +778,9 @@ mod tests {
         let mining_proof_tx = Transaction::new_u_opcodes(vec![mining_proof_ix]);
         let mining_txs = vec![mining_proof_tx];
 
-        let proof_entries = vec![Entry::new(&Hash::default(), 1, mining_txs)];
+        let proof_entries = vec![FsclStmt::new(&Hash::default(), 1, mining_txs)];
         block_buffer_pool
-            .update_entries(2, 0, 0, drops_per_slot, &proof_entries)
+            .update_fscl_stmts(2, 0, 0, drops_per_slot, &proof_entries)
             .unwrap();
         slot_sender.send(vec![2]).unwrap();
 

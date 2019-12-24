@@ -426,7 +426,7 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let treasury_client = TreasuryClient::new(treasury);
         treasury_client
-            .transfer(50, &alice_keypair, &mallory_pubkey)
+            .online_transfer(50, &alice_keypair, &mallory_pubkey)
             .unwrap();
 
         // Erroneously sign transaction with recipient account key

@@ -32,7 +32,7 @@ pub mod node_group;
 pub mod node_group_info;
 pub mod node_group_info_fixer_listener;
 pub mod node_group_tests;
-pub mod entry_info;
+pub mod fiscal_statement_info;
 pub mod expunge;
 pub mod fetch_phase;
 pub mod create_keys;

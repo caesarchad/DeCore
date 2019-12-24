@@ -165,7 +165,7 @@ impl LdrSchBufferPoolList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_buffer_pool::tests::make_slot_entries;
+    use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts;
     use crate::genesis_utils::create_genesis_block;
     use crate::genesis_utils::{
         create_genesis_block_with_leader, GenesisBlockInfo, BOOTSTRAP_LEADER_DIFS,
@@ -331,7 +331,7 @@ mod tests {
 
             // Write a blob into slot 2 that chains to slot 1,
             // but slot 1 is empty so should not be skipped
-            let (blobs, _) = make_slot_entries(2, 1, 1);
+            let (blobs, _) = compose_candidate_fscl_stmts(2, 1, 1);
             block_buffer_pool.update_blobs(&blobs[..]).unwrap();
             assert_eq!(
                 cache.next_leader_slot(&pubkey, 0, &treasury, Some(&block_buffer_pool)),
@@ -339,7 +339,7 @@ mod tests {
             );
 
             // Write a blob into slot 1
-            let (blobs, _) = make_slot_entries(1, 0, 1);
+            let (blobs, _) = compose_candidate_fscl_stmts(1, 0, 1);
 
             // Check that slot 1 and 2 are skipped
             block_buffer_pool.update_blobs(&blobs[..]).unwrap();

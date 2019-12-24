@@ -80,14 +80,14 @@ impl BlockstreamService {
                     break;
                 }
                 if let Err(e) =
-                    Self::process_entries(&slot_full_receiver, &block_buffer_pool, &mut blockstream)
+                    Self::handle_fiscal_stmts(&slot_full_receiver, &block_buffer_pool, &mut blockstream)
                 {
                     match e {
                         Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => break,
                         Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                         _ => {
-                            // info!("{}", Info(format!("Error from process_entries: {:?}", e).to_string())),
-                            let loginfo: String = format!("Error from process_entries: {:?}", e).to_string();
+                            // info!("{}", Info(format!("Error from handle_fiscal_stmts: {:?}", e).to_string())),
+                            let loginfo: String = format!("Error from handle_fiscal_stmts: {:?}", e).to_string();
                             println!("{}",
                                 printLn(
                                     loginfo,
@@ -101,7 +101,7 @@ impl BlockstreamService {
             .unwrap();
         Self { t_blockstream }
     }
-    fn process_entries(
+    fn handle_fiscal_stmts(
         slot_full_receiver: &Receiver<(u64, Pubkey)>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         blockstream: &mut Blockstream,
@@ -109,7 +109,7 @@ impl BlockstreamService {
         let timeout = Duration::new(1, 0);
         let (slot, slot_leader) = slot_full_receiver.recv_timeout(timeout)?;
 
-        let entries = block_buffer_pool.fetch_slot_entries(slot, 0, None).unwrap();
+        let entries = block_buffer_pool.fetch_candidate_fscl_stmts(slot, 0, None).unwrap();
         let block_buffer_meta = block_buffer_pool.meta(slot).unwrap().unwrap();
         let _parent_slot = if slot == 0 {
             None
@@ -131,7 +131,7 @@ impl BlockstreamService {
                 drop_height += 1;
             }
             blockstream
-                .emit_entry_event(slot, drop_height, &slot_leader, &entry)
+                .emit_fscl_stmt_event(slot, drop_height, &slot_leader, &entry)
                 .unwrap_or_else(|e| {
                     debug!("Blockstream error: {:?}, {:?}", e, blockstream.output);
                 });
@@ -159,7 +159,7 @@ impl Service for BlockstreamService {
 mod test {
     use super::*;
     use crate::block_buffer_pool::create_new_tmp_ledger;
-    use crate::entry_info::{create_drops, Entry};
+    use crate::fiscal_statement_info::{create_drops, FsclStmt};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use bincode::{deserialize, serialize};
     use chrono::{DateTime, FixedOffset};
@@ -200,7 +200,7 @@ mod test {
             1,
             Hash::default(),
         );
-        let entry = Entry::new(&mut transaction_seal, 1, vec![tx]);
+        let entry = FsclStmt::new(&mut transaction_seal, 1, vec![tx]);
         transaction_seal = entry.hash;
         entries.push(entry);
         let final_drop = create_drops(1, transaction_seal);
@@ -210,11 +210,11 @@ mod test {
         let expected_drop_heights = [5, 6, 7, 8, 8, 9];
 
         block_buffer_pool
-            .update_entries(1, 0, 0, drops_per_slot, &entries)
+            .update_fscl_stmts(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
         slot_full_sender.send((1, leader_pubkey)).unwrap();
-        BlockstreamService::process_entries(
+        BlockstreamService::handle_fiscal_stmts(
             &slot_full_receiver,
             &Arc::new(block_buffer_pool),
             &mut blockstream,
@@ -241,13 +241,14 @@ mod test {
             assert_eq!(height, expected_drop_heights[i]);
             let entry_obj = json["entry"].clone();
             let tx = entry_obj["transactions"].as_array().unwrap();
-            let entry: Entry;
+            let entry: FsclStmt;
             if tx.len() == 0 {
                 entry = serde_json::from_value(entry_obj).unwrap();
             } else {
                 let entry_json = entry_obj.as_object().unwrap();
-                entry = Entry {
+                entry = FsclStmt {
                     num_hashes: entry_json.get("num_hashes").unwrap().as_u64().unwrap(),
+                    ////mark_seal: 19,
                     hash: serde_json::from_value(entry_json.get("hash").unwrap().clone()).unwrap(),
                     transactions: entry_json
                         .get("transactions")

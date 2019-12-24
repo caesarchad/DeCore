@@ -413,7 +413,7 @@ impl Service for FixService {
 mod test {
     use super::*;
     use crate::block_buffer_pool::tests::{
-        make_chaining_slot_entries, make_many_slot_entries, make_slot_entries,
+        make_chaining_slot_entries, compose_candidate_fscl_stmts_in_batch, compose_candidate_fscl_stmts,
     };
     use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::node_group_info::Node;
@@ -430,8 +430,8 @@ mod test {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
             // Create some orphan slots
-            let (mut blobs, _) = make_slot_entries(1, 0, 1);
-            let (blobs2, _) = make_slot_entries(5, 2, 1);
+            let (mut blobs, _) = compose_candidate_fscl_stmts(1, 0, 1);
+            let (blobs2, _) = compose_candidate_fscl_stmts(5, 2, 1);
             blobs.extend(blobs2);
             block_buffer_pool.update_blobs(&blobs).unwrap();
             assert_eq!(
@@ -453,7 +453,7 @@ mod test {
         {
             let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
 
-            let (blobs, _) = make_slot_entries(2, 0, 1);
+            let (blobs, _) = compose_candidate_fscl_stmts(2, 0, 1);
 
             // Write this blob to slot 2, should chain to slot 0, which we haven't received
             // any blobs for
@@ -480,7 +480,7 @@ mod test {
 
             // Create some blobs
             let (blobs, _) =
-                make_many_slot_entries(0, num_slots as u64, num_entries_per_slot as u64);
+                compose_candidate_fscl_stmts_in_batch(0, num_slots as u64, num_entries_per_slot as u64);
 
             // write every nth blob
             let blobs_to_write: Vec<_> = blobs.iter().step_by(nth as usize).collect();
@@ -521,7 +521,7 @@ mod test {
             let num_entries_per_slot = 10;
 
             // Create some blobs
-            let (mut blobs, _) = make_slot_entries(0, 0, num_entries_per_slot as u64);
+            let (mut blobs, _) = compose_candidate_fscl_stmts(0, 0, num_entries_per_slot as u64);
 
             // Remove is_last flag on last blob
             blobs.last_mut().unwrap().set_flags(0);
@@ -600,7 +600,7 @@ mod test {
             // Create some blobs in slots 0..num_slots
             for i in start..start + num_slots {
                 let parent = if i > 0 { i - 1 } else { 0 };
-                let (blobs, _) = make_slot_entries(i, parent, num_entries_per_slot as u64);
+                let (blobs, _) = compose_candidate_fscl_stmts(i, parent, num_entries_per_slot as u64);
 
                 block_buffer_pool.update_blobs(&blobs).unwrap();
             }
@@ -754,7 +754,7 @@ mod test {
 
             // Update with new root, should filter out the slots <= root
             root = num_slots / 2;
-            let (blobs, _) = make_slot_entries(num_slots + 2, num_slots + 1, entries_per_slot);
+            let (blobs, _) = compose_candidate_fscl_stmts(num_slots + 2, num_slots + 1, entries_per_slot);
             block_buffer_pool.insert_data_blobs(&blobs).unwrap();
             FixService::update_epoch_slots(
                 Pubkey::default(),

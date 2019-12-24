@@ -2,7 +2,7 @@
 //! local unix socket, to provide client services such as a block explorer with
 //! real-time access to entries.
 
-use crate::entry_info::Entry;
+use crate::fiscal_statement_info::FsclStmt;
 use crate::result::Result;
 use bincode::serialize;
 use chrono::{SecondsFormat, Utc};
@@ -18,25 +18,25 @@ use log::*;
 use morgan_helper::logHelper::*;
 use std::{ops::Range, thread, time::Duration};
 
-pub trait EntryWriter: std::fmt::Debug {
+pub trait FiscSatementWriter: std::fmt::Debug {
     fn write(&self, payload: String) -> Result<()>;
 }
 
 #[derive(Debug, Default)]
-pub struct EntryVec {
+pub struct FiscStmtVector {
     values: RefCell<Vec<String>>,
 }
 
-impl EntryWriter for EntryVec {
+impl FiscSatementWriter for FiscStmtVector {
     fn write(&self, payload: String) -> Result<()> {
         self.values.borrow_mut().push(payload);
         Ok(())
     }
 }
 
-impl EntryVec {
+impl FiscStmtVector {
     pub fn new() -> Self {
-        EntryVec {
+        FiscStmtVector {
             values: RefCell::new(Vec::new()),
         }
     }
@@ -47,13 +47,13 @@ impl EntryVec {
 }
 
 #[derive(Debug)]
-pub struct EntrySocket {
+pub struct FiscStmtCandidate {
     socket: String,
 }
 
 const MESSAGE_TERMINATOR: &str = "\n";
 
-impl EntryWriter for EntrySocket {
+impl FiscSatementWriter for FiscStmtCandidate {
     fn write(&self, payload: String) -> Result<()> {
         let mut socket = UnixStream::connect(Path::new(&self.socket))?;
         socket.write_all(payload.as_bytes())?;
@@ -64,12 +64,12 @@ impl EntryWriter for EntrySocket {
 }
 
 pub trait BlockstreamEvents {
-    fn emit_entry_event(
+    fn emit_fscl_stmt_event(
         &self,
         slot: u64,
         drop_height: u64,
         leader_pubkey: &Pubkey,
-        entries: &Entry,
+        entries: &FsclStmt,
     ) -> Result<()>;
     fn emit_block_event(
         &self,
@@ -81,7 +81,7 @@ pub trait BlockstreamEvents {
 }
 
 #[derive(Debug)]
-pub struct Blockstream<T: EntryWriter> {
+pub struct Blockstream<T: FiscSatementWriter> {
     pub output: T,
 }
 
@@ -120,21 +120,21 @@ pub fn get_free_port(range: Range<u16>) -> Option<u16> {
 
 impl<T> BlockstreamEvents for Blockstream<T>
 where
-    T: EntryWriter,
+    T: FiscSatementWriter,
 {
-    fn emit_entry_event(
+    fn emit_fscl_stmt_event(
         &self,
         slot: u64,
         drop_height: u64,
         leader_pubkey: &Pubkey,
-        entry: &Entry,
+        stmt: &FsclStmt,
     ) -> Result<()> {
-        let transactions: Vec<Vec<u8>> = serialize_transactions(entry);
+        let transactions: Vec<Vec<u8>> = serialize_transactions(stmt);
         let mut be_vote_tx = false;
         // ignore transaction's length entry
         if transactions.len() > 0 {
             // ignore entry.transaction.message's account_keys contain Vote111111111111111111111111111111111111111
-            for tx in &entry.transactions {
+            for tx in &stmt.transactions {
                 for key in &tx.message.account_keys {
                     if key.to_string() == "Vote111111111111111111111111111111111111111" {
                         be_vote_tx = true;
@@ -144,8 +144,8 @@ where
             }
             if be_vote_tx == false {
                 let stream_entry = json!({
-                    "num_hashes": entry.num_hashes,
-                    "hash": entry.hash,
+                    "num_hashes": stmt.num_hashes,
+                    "hash": stmt.hash,
                     "transactions": transactions
                 });
                 let json_entry = serde_json::to_string(&stream_entry)?;
@@ -157,11 +157,11 @@ where
                     leader_pubkey,
                     json_entry,
                 );
-                // error!("{}", Error(format!("entry event: {:?}", entry).to_string()));
+                // error!("{}", Error(format!("fscl stmt event: {:?}", entry).to_string()));
                 println!(
                     "{}",
                     Error(
-                        format!("entry event: {:?}", entry).to_string(),
+                        format!("fscl stmt event: {:?}", stmt).to_string(),
                         module_path!().to_string()
                     )
                 );
@@ -200,22 +200,22 @@ where
     }
 }
 
-pub type SocketBlockstream = Blockstream<EntrySocket>;
+pub type SocketBlockstream = Blockstream<FiscStmtCandidate>;
 
 impl SocketBlockstream {
     pub fn new(socket: String) -> Self {
         Blockstream {
-            output: EntrySocket { socket },
+            output: FiscStmtCandidate { socket },
         }
     }
 }
 
-pub type MockBlockstream = Blockstream<EntryVec>;
+pub type MockBlockstream = Blockstream<FiscStmtVector>;
 
 impl MockBlockstream {
     pub fn new(_: String) -> Self {
         Blockstream {
-            output: EntryVec::new(),
+            output: FiscStmtVector::new(),
         }
     }
 
@@ -224,7 +224,7 @@ impl MockBlockstream {
     }
 }
 
-fn serialize_transactions(entry: &Entry) -> Vec<Vec<u8>> {
+fn serialize_transactions(entry: &FsclStmt) -> Vec<Vec<u8>> {
     entry
         .transactions
         .iter()
@@ -235,7 +235,7 @@ fn serialize_transactions(entry: &Entry) -> Vec<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::entry_info::Entry;
+    use crate::fiscal_statement_info::FsclStmt;
     use chrono::{DateTime, FixedOffset};
     use serde_json::Value;
     use morgan_interface::hash::Hash;
@@ -245,7 +245,7 @@ mod test {
 
     #[test]
     fn test_serialize_transactions() {
-        let entry = Entry::new(&Hash::default(), 1, vec![]);
+        let entry = FsclStmt::new(&Hash::default(), 1, vec![]);
         let empty_vec: Vec<Vec<u8>> = vec![];
         assert_eq!(serialize_transactions(&entry), empty_vec);
 
@@ -255,7 +255,7 @@ mod test {
         let tx1 = system_transaction::transfer(&keypair1, &keypair0.pubkey(), 2, Hash::default());
         let serialized_tx0 = serialize(&tx0).unwrap();
         let serialized_tx1 = serialize(&tx1).unwrap();
-        let entry = Entry::new(&Hash::default(), 1, vec![tx0, tx1]);
+        let entry = FsclStmt::new(&Hash::default(), 1, vec![tx0, tx1]);
         assert_eq!(
             serialize_transactions(&entry),
             vec![serialized_tx0, serialized_tx1]
@@ -283,10 +283,10 @@ mod test {
                     .unwrap();
                 curr_slot += 1;
             }
-            let entry = Entry::new(&mut transaction_seal, 1, vec![]); // just drops
+            let entry = FsclStmt::new(&mut transaction_seal, 1, vec![]); // just drops
             transaction_seal = entry.hash;
             blockstream
-                .emit_entry_event(curr_slot, drop_height, &leader_pubkey, &entry)
+                .emit_fscl_stmt_event(curr_slot, drop_height, &leader_pubkey, &entry)
                 .unwrap();
             expected_entries.push(entry.clone());
             entries.push(entry);
@@ -321,7 +321,7 @@ mod test {
                     let slot = json["s"].as_u64().unwrap();
                     matched_slots.insert(slot);
                     let entry_obj = json["entry"].clone();
-                    let entry: Entry = serde_json::from_value(entry_obj).unwrap();
+                    let entry: FsclStmt = serde_json::from_value(entry_obj).unwrap();
 
                     assert_eq!(entry, expected_entries[j]);
                     matched_entries += 1;

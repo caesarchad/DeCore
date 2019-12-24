@@ -3,8 +3,8 @@
 //! can do its processing in parallel with signature verification on the GPU.
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
-use crate::entry_info;
-use crate::entry_info::{hash_transactions, Entry};
+use crate::fiscal_statement_info;
+use crate::fiscal_statement_info::{seal_block, FsclStmt};
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::packet;
 use crate::packet::{Packet, Packets};
@@ -398,7 +398,7 @@ impl TreasuryPhase {
                 "treasury_phase-record_transactions",
                 processed_transactions.len()
             );
-            let hash = hash_transactions(&processed_transactions);
+            let hash = seal_block(&processed_transactions);
             // record and unlock will unlock all the successful transactions
             waterclock.lock()
                 .unwrap()
@@ -507,10 +507,10 @@ impl TreasuryPhase {
         let mut unprocessed_txs = vec![];
         while chunk_start != transactions.len() {
             let chunk_end = chunk_start
-                + entry_info::num_will_fit(
+                + fiscal_statement_info::is_bound(
                     &transactions[chunk_start..],
                     packet::BLOB_DATA_SIZE as u64,
-                    &Entry::serialized_to_blob_size,
+                    &FsclStmt::serialized_to_blob_size,
                 );
 
             let (result, unprocessed_txs_in_chunk) = Self::process_and_record_transactions(
@@ -855,7 +855,7 @@ mod tests {
     use super::*;
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::node_group_info::Node;
-    use crate::entry_info::EntrySlice;
+    use crate::fiscal_statement_info::FsclStmtSlc;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::packet::to_packets;
     use crate::water_clock_recorder::WorkingTreasury;
@@ -1023,7 +1023,7 @@ mod tests {
             treasury.process_transaction(&fund_tx).unwrap();
             //receive entries + drops
             for _ in 0..10 {
-                let ventries: Vec<Vec<Entry>> = entry_receiver
+                let ventries: Vec<Vec<FsclStmt>> = entry_receiver
                     .iter()
                     .map(|x| x.1.into_iter().map(|e| e.0).collect())
                     .collect();
@@ -1059,7 +1059,7 @@ mod tests {
         morgan_logger::setup();
         // In this attack we'll demonstrate that a verifier can interpret the ledger
         // differently if either the server doesn't signal the ledger to add an
-        // Entry OR if the verifier tries to parallelize across multiple Entries.
+        // FsclStmt OR if the verifier tries to parallelize across multiple Entries.
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,

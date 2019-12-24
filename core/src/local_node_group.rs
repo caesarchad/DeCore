@@ -92,7 +92,7 @@ pub struct LocalNodeGroup {
     /// Keypair with funding to participate in the network
     pub funding_keypair: Keypair,
     pub validator_config: ValidatorConfig,
-    /// Entry point from which the rest of the network can be discovered
+    /// FsclStmt point from which the rest of the network can be discovered
     pub entry_point_info: ContactInfo,
     pub fullnode_infos: HashMap<Pubkey, ValidatorInfo>,
     pub listener_infos: HashMap<Pubkey, ValidatorInfo>,

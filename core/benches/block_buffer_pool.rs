@@ -9,7 +9,7 @@ extern crate morgan;
 use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
-use morgan::entry_info::{make_large_test_entries, make_tiny_test_entries, EntrySlice};
+use morgan::fiscal_statement_info::{compose_b_fiscal_stmt, compose_s_fiscal_stmt_nohash, FsclStmtSlc};
 use morgan::packet::{Blob, BLOB_HEADER_SIZE};
 use test::Bencher;
 
@@ -47,11 +47,11 @@ fn setup_read_bench(
     slot: u64,
 ) {
     // Make some big and small entries
-    let mut entries = make_large_test_entries(num_large_blobs as usize);
-    entries.extend(make_tiny_test_entries(num_small_blobs as usize));
+    let mut fscl_stmts = compose_b_fiscal_stmt(num_large_blobs as usize);
+    fscl_stmts.extend(compose_s_fiscal_stmt_nohash(num_small_blobs as usize));
 
     // Convert the entries to blobs, write the blobs to the ledger
-    let mut blobs = entries.to_blobs();
+    let mut blobs = fscl_stmts.to_blobs();
     for (index, b) in blobs.iter_mut().enumerate() {
         b.set_index(index as u64);
         b.set_slot(slot);
@@ -66,9 +66,9 @@ fn setup_read_bench(
 #[ignore]
 fn bench_write_small(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
-    let num_entries = 32 * 1024;
-    let entries = make_tiny_test_entries(num_entries);
-    let mut blobs = entries.to_blobs();
+    let fscl_stmt_cnt = 32_678;
+    let fscl_stmts = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
+    let mut blobs = fscl_stmts.to_blobs();
     for (index, b) in blobs.iter_mut().enumerate() {
         b.set_index(index as u64);
     }
@@ -80,8 +80,8 @@ fn bench_write_small(bench: &mut Bencher) {
 #[ignore]
 fn bench_write_big(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
-    let num_entries = 32 * 1024;
-    let entries = make_large_test_entries(num_entries);
+    let fscl_stmt_cnt = 32_678;
+    let entries = compose_b_fiscal_stmt(fscl_stmt_cnt);
     let mut blobs = entries.to_blobs();
     for (index, b) in blobs.iter_mut().enumerate() {
         b.set_index(index as u64);
@@ -125,13 +125,13 @@ fn bench_read_random(bench: &mut Bencher) {
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
 
     // Insert some big and small blobs into the ledger
-    let num_small_blobs = 32 * 1024;
-    let num_large_blobs = 32 * 1024;
+    let num_small_blobs = 64 * 1024;
+    let num_large_blobs = 64 * 1024;
     let total_blobs = num_small_blobs + num_large_blobs;
     let slot = 0;
     setup_read_bench(&mut block_buffer_pool, num_small_blobs, num_large_blobs, slot);
 
-    let num_reads = total_blobs / 15;
+    let num_reads = total_blobs / 30;
 
     // Generate a num_reads sized random sample of indexes in range [0, total_blobs - 1],
     // simulating random reads
@@ -154,16 +154,16 @@ fn bench_insert_data_blob_small(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
-    let num_entries = 32 * 1024;
-    let entries = make_tiny_test_entries(num_entries);
-    let mut blobs = entries.to_blobs();
+    let fscl_stmt_cnt = 32_678;
+    let fscl_stmts = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
+    let mut blobs = fscl_stmts.to_blobs();
 
     blobs.shuffle(&mut thread_rng());
 
     bench.iter(move || {
         for blob in blobs.iter_mut() {
             let index = blob.index();
-            blob.set_index(index + num_entries as u64);
+            blob.set_index(index + fscl_stmt_cnt as u64);
         }
         block_buffer_pool.update_blobs(&blobs).unwrap();
     });
@@ -177,16 +177,16 @@ fn bench_insert_data_blob_big(bench: &mut Bencher) {
     let ledger_path = fetch_interim_ledger_location!();
     let block_buffer_pool =
         BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger");
-    let num_entries = 32 * 1024;
-    let entries = make_large_test_entries(num_entries);
-    let mut shared_blobs = entries.to_shared_blobs();
+    let fscl_stmt_cnt = 32_678;
+    let fscl_stmts = compose_b_fiscal_stmt(fscl_stmt_cnt);
+    let mut shared_blobs = fscl_stmts.to_shared_blobs();
     shared_blobs.shuffle(&mut thread_rng());
 
     bench.iter(move || {
         for blob in shared_blobs.iter_mut() {
             let index = blob.read().unwrap().index();
             block_buffer_pool.record_public_objs(vec![blob.clone()]).unwrap();
-            blob.write().unwrap().set_index(index + num_entries as u64);
+            blob.write().unwrap().set_index(index + fscl_stmt_cnt as u64);
         }
     });
 
