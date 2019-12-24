@@ -16,16 +16,16 @@ pub(crate) trait Options {
     type Limit: SizeLimit + 'static;
     type Endian: ByteOrder + 'static;
 
-    fn limit(&mut self) -> &mut Self::Limit;
+    fn restrain(&mut self) -> &mut Self::Limit;
 }
 
 pub(crate) trait OptionsExt: Options + Sized {
-    fn with_no_limit(self) -> WithOtherLimit<Self, Infinite> {
+    fn with_no_restrict(self) -> WithOtherLimit<Self, Infinite> {
         WithOtherLimit::new(self, Infinite)
     }
 
-    fn with_limit(self, limit: u64) -> WithOtherLimit<Self, Bounded> {
-        WithOtherLimit::new(self, Bounded(limit))
+    fn with_restrict(self, restrain: u64) -> WithOtherLimit<Self, Bounded> {
+        WithOtherLimit::new(self, Bounded(restrain))
     }
 
     fn with_little_endian(self) -> WithOtherEndian<Self, LittleEndian> {
@@ -36,7 +36,7 @@ pub(crate) trait OptionsExt: Options + Sized {
         WithOtherEndian::new(self)
     }
 
-    fn with_native_endian(self) -> WithOtherEndian<Self, NativeEndian> {
+    fn with_local_endian(self) -> WithOtherEndian<Self, NativeEndian> {
         WithOtherEndian::new(self)
     }
 }
@@ -46,8 +46,8 @@ impl<'a, O: Options> Options for &'a mut O {
     type Endian = O::Endian;
 
     #[inline(always)]
-    fn limit(&mut self) -> &mut Self::Limit {
-        (*self).limit()
+    fn restrain(&mut self) -> &mut Self::Limit {
+        (*self).restrain()
     }
 }
 
@@ -64,7 +64,7 @@ impl Options for DefaultOptions {
     type Endian = LittleEndian;
 
     #[inline(always)]
-    fn limit(&mut self) -> &mut Infinite {
+    fn restrain(&mut self) -> &mut Infinite {
         &mut self.0
     }
 }
@@ -93,10 +93,10 @@ enum EndianOption {
 /// The purpose of byte-limiting is to prevent Denial-Of-Service attacks whereby malicious attackers get bincode
 /// deserialization to crash your process by allocating too much memory or keeping a connection open for too long.
 ///
-/// When a byte limit is set, bincode will return `Err` on any deserialization that goes over the limit, or any
-/// serialization that goes over the limit.
+/// When a byte restrain is set, bincode will return `Err` on any deserialization that goes over the restrain, or any
+/// serialization that goes over the restrain.
 pub struct Config {
-    limit: LimitOption,
+    restrain: LimitOption,
     endian: EndianOption,
 }
 
@@ -112,10 +112,10 @@ pub(crate) struct WithOtherEndian<O: Options, E: ByteOrder> {
 
 impl<O: Options, L: SizeLimit> WithOtherLimit<O, L> {
     #[inline(always)]
-    pub(crate) fn new(options: O, limit: L) -> WithOtherLimit<O, L> {
+    pub(crate) fn new(options: O, restrain: L) -> WithOtherLimit<O, L> {
         WithOtherLimit {
             _options: options,
-            new_limit: limit,
+            new_limit: restrain,
         }
     }
 }
@@ -135,8 +135,8 @@ impl<O: Options, E: ByteOrder + 'static> Options for WithOtherEndian<O, E> {
     type Endian = E;
 
     #[inline(always)]
-    fn limit(&mut self) -> &mut O::Limit {
-        self.options.limit()
+    fn restrain(&mut self) -> &mut O::Limit {
+        self.options.restrain()
     }
 }
 
@@ -144,37 +144,37 @@ impl<O: Options, L: SizeLimit + 'static> Options for WithOtherLimit<O, L> {
     type Limit = L;
     type Endian = O::Endian;
 
-    fn limit(&mut self) -> &mut L {
+    fn restrain(&mut self) -> &mut L {
         &mut self.new_limit
     }
 }
 
 macro_rules! config_map {
     ($self:expr, $opts:ident => $call:expr) => {
-        match ($self.limit, $self.endian) {
+        match ($self.restrain, $self.endian) {
             (Unlimited, Little) => {
-                let $opts = DefaultOptions::new().with_no_limit().with_little_endian();
+                let $opts = DefaultOptions::new().with_no_restrict().with_little_endian();
                 $call
             }
             (Unlimited, Big) => {
-                let $opts = DefaultOptions::new().with_no_limit().with_big_endian();
+                let $opts = DefaultOptions::new().with_no_restrict().with_big_endian();
                 $call
             }
             (Unlimited, Native) => {
-                let $opts = DefaultOptions::new().with_no_limit().with_native_endian();
+                let $opts = DefaultOptions::new().with_no_restrict().with_local_endian();
                 $call
             }
 
             (Limited(l), Little) => {
-                let $opts = DefaultOptions::new().with_limit(l).with_little_endian();
+                let $opts = DefaultOptions::new().with_restrict(l).with_little_endian();
                 $call
             }
             (Limited(l), Big) => {
-                let $opts = DefaultOptions::new().with_limit(l).with_big_endian();
+                let $opts = DefaultOptions::new().with_restrict(l).with_big_endian();
                 $call
             }
             (Limited(l), Native) => {
-                let $opts = DefaultOptions::new().with_limit(l).with_native_endian();
+                let $opts = DefaultOptions::new().with_restrict(l).with_local_endian();
                 $call
             }
         }
@@ -185,23 +185,23 @@ impl Config {
     #[inline(always)]
     pub(crate) fn new() -> Config {
         Config {
-            limit: LimitOption::Unlimited,
+            restrain: LimitOption::Unlimited,
             endian: EndianOption::Little,
         }
     }
 
-    /// Sets the byte limit to be unlimited.
+    /// Sets the byte restrain to be unlimited.
     /// This is the default.
     #[inline(always)]
-    pub fn no_limit(&mut self) -> &mut Self {
-        self.limit = LimitOption::Unlimited;
+    pub fn no_restrict(&mut self) -> &mut Self {
+        self.restrain = LimitOption::Unlimited;
         self
     }
 
-    /// Sets the byte limit to `limit`.
+    /// Sets the byte restrain to `restrain`.
     #[inline(always)]
-    pub fn limit(&mut self, limit: u64) -> &mut Self {
-        self.limit = LimitOption::Limited(limit);
+    pub fn restrain(&mut self, restrain: u64) -> &mut Self {
+        self.restrain = LimitOption::Limited(restrain);
         self
     }
 
@@ -222,7 +222,7 @@ impl Config {
 
     /// Sets the endianness to the the machine-native endianness
     #[inline(always)]
-    pub fn native_endian(&mut self) -> &mut Self {
+    pub fn local_endian(&mut self) -> &mut Self {
         self.endian = EndianOption::Native;
         self
     }
@@ -241,7 +241,7 @@ impl Config {
 
     /// Serializes an object directly into a `Writer` using this configuration
     ///
-    /// If the serialization would take more bytes than allowed by the size limit, an error
+    /// If the serialization would take more bytes than allowed by the size restrain, an error
     /// is returned and *no bytes* will be written into the `Writer`
     #[inline(always)]
     pub fn serialize_into<W: Write, T: ?Sized + serde::Serialize>(
@@ -261,46 +261,46 @@ impl Config {
     /// TODO: document
     #[doc(hidden)]
     #[inline(always)]
-    pub fn deserialize_in_place<'a, R, T>(&self, reader: R, place: &mut T) -> Result<()>
+    pub fn de_in_preparation<'a, R, T>(&self, reader: R, place: &mut T) -> Result<()>
     where
         R: BincodeRead<'a>,
         T: serde::de::Deserialize<'a>,
     {
-        config_map!(self, opts => ::internal::deserialize_in_place(reader, opts, place))
+        config_map!(self, opts => ::internal::de_in_preparation(reader, opts, place))
     }
 
     /// Deserializes a slice of bytes with state `seed` using this configuration.
     #[inline(always)]
-    pub fn deserialize_seed<'a, T: serde::de::DeserializeSeed<'a>>(
+    pub fn de_source<'a, T: serde::de::DeserializeSeed<'a>>(
         &self,
         seed: T,
         bytes: &'a [u8],
     ) -> Result<T::Value> {
-        config_map!(self, opts => ::internal::deserialize_seed(seed, bytes, opts))
+        config_map!(self, opts => ::internal::de_source(seed, bytes, opts))
     }
 
     /// Deserializes an object directly from a `Read`er using this configuration
     ///
     /// If this returns an `Error`, `reader` may be in an invalid state.
     #[inline(always)]
-    pub fn deserialize_from<R: Read, T: serde::de::DeserializeOwned>(
+    pub fn de_via<R: Read, T: serde::de::DeserializeOwned>(
         &self,
         reader: R,
     ) -> Result<T> {
-        config_map!(self, opts => ::internal::deserialize_from(reader, opts))
+        config_map!(self, opts => ::internal::de_via(reader, opts))
     }
 
     /// Deserializes an object from a custom `BincodeRead`er using the default configuration.
-    /// It is highly recommended to use `deserialize_from` unless you need to implement
+    /// It is highly recommended to use `de_via` unless you need to implement
     /// `BincodeRead` for performance reasons.
     ///
     /// If this returns an `Error`, `reader` may be in an invalid state.
     #[inline(always)]
-    pub fn deserialize_from_custom<'a, R: BincodeRead<'a>, T: serde::de::DeserializeOwned>(
+    pub fn de_via_specification<'a, R: BincodeRead<'a>, T: serde::de::DeserializeOwned>(
         &self,
         reader: R,
     ) -> Result<T> {
-        config_map!(self, opts => ::internal::deserialize_from_custom(reader, opts))
+        config_map!(self, opts => ::internal::de_via_specification(reader, opts))
     }
 
     /// Executes the acceptor with a serde::Deserializer instance.

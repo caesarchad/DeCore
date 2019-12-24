@@ -8,15 +8,15 @@ use std::io;
 /// implementing a custom `BincodeRead`.
 pub trait BincodeRead<'storage>: io::Read {
     /// Forwards reading `length` bytes of a string on to the serde reader.
-    fn forward_read_str<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_string<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>;
 
     /// Return the first `length` bytes of the internal byte buffer.
-    fn get_byte_buffer(&mut self, length: usize) -> Result<Vec<u8>>;
+    fn fetch_byte_buf(&mut self, length: usize) -> Result<Vec<u8>>;
 
     /// Forwards reading `length` bytes on to the serde reader.
-    fn forward_read_bytes<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_octets<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>;
 }
@@ -77,7 +77,7 @@ impl<R: io::Read> io::Read for IoReader<R> {
 
 impl<'storage> SliceReader<'storage> {
     #[inline(always)]
-    fn unexpected_eof() -> Box<::ErrorKind> {
+    fn unanticipated_eof() -> Box<::ErrorKind> {
         return Box::new(::ErrorKind::Io(io::Error::new(
             io::ErrorKind::UnexpectedEof,
             "",
@@ -87,13 +87,13 @@ impl<'storage> SliceReader<'storage> {
 
 impl<'storage> BincodeRead<'storage> for SliceReader<'storage> {
     #[inline(always)]
-    fn forward_read_str<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_string<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>,
     {
         use ErrorKind;
         if length > self.slice.len() {
-            return Err(SliceReader::unexpected_eof());
+            return Err(SliceReader::unanticipated_eof());
         }
 
         let string = match ::std::str::from_utf8(&self.slice[..length]) {
@@ -106,9 +106,9 @@ impl<'storage> BincodeRead<'storage> for SliceReader<'storage> {
     }
 
     #[inline(always)]
-    fn get_byte_buffer(&mut self, length: usize) -> Result<Vec<u8>> {
+    fn fetch_byte_buf(&mut self, length: usize) -> Result<Vec<u8>> {
         if length > self.slice.len() {
-            return Err(SliceReader::unexpected_eof());
+            return Err(SliceReader::unanticipated_eof());
         }
 
         let r = &self.slice[..length];
@@ -117,12 +117,12 @@ impl<'storage> BincodeRead<'storage> for SliceReader<'storage> {
     }
 
     #[inline(always)]
-    fn forward_read_bytes<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_octets<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>,
     {
         if length > self.slice.len() {
-            return Err(SliceReader::unexpected_eof());
+            return Err(SliceReader::unanticipated_eof());
         }
 
         let r = visitor.visit_borrowed_bytes(&self.slice[..length]);
@@ -135,7 +135,7 @@ impl<R> IoReader<R>
 where
     R: io::Read,
 {
-    fn fill_buffer(&mut self, length: usize) -> Result<()> {
+    fn fill_buf(&mut self, length: usize) -> Result<()> {
         let current_length = self.temp_buffer.len();
         if length > current_length {
             self.temp_buffer.reserve_exact(length - current_length);
@@ -154,11 +154,11 @@ impl<R> BincodeRead<'static> for IoReader<R>
 where
     R: io::Read,
 {
-    fn forward_read_str<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_string<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'static>,
     {
-        self.fill_buffer(length)?;
+        self.fill_buf(length)?;
 
         let string = match ::std::str::from_utf8(&self.temp_buffer[..]) {
             Ok(s) => s,
@@ -169,16 +169,16 @@ where
         r
     }
 
-    fn get_byte_buffer(&mut self, length: usize) -> Result<Vec<u8>> {
-        self.fill_buffer(length)?;
+    fn fetch_byte_buf(&mut self, length: usize) -> Result<Vec<u8>> {
+        self.fill_buf(length)?;
         Ok(::std::mem::replace(&mut self.temp_buffer, Vec::new()))
     }
 
-    fn forward_read_bytes<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
+    fn forward_extract_octets<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'static>,
     {
-        self.fill_buffer(length)?;
+        self.fill_buf(length)?;
         let r = visitor.visit_bytes(&self.temp_buffer[..]);
         r
     }

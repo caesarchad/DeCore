@@ -27,10 +27,10 @@ pub enum ErrorKind {
     /// Returned if the deserializer attempts to deserialize the tag of an enum that is
     /// not in the expected ranges
     InvalidTagEncoding(usize),
-    /// Serde has a deserialize_any method that lets the format hint to the
+    /// Serde has a de_whatever method that lets the format hint to the
     /// object which route to take in deserializing.
     DeserializeAnyNotSupported,
-    /// If (de)serializing a message takes more than the provided size limit, this
+    /// If (de)serializing a message takes more than the provided size restrain, this
     /// error is returned.
     SizeLimit,
     /// Bincode can not encode sequences of unknown length (like iterators).
@@ -51,9 +51,9 @@ impl StdError for ErrorKind {
                 "Bincode can only encode sequences and maps that have a knowable size ahead of time"
             }
             ErrorKind::DeserializeAnyNotSupported => {
-                "Bincode doesn't support serde::Deserializer::deserialize_any"
+                "Bincode doesn't support serde::Deserializer::de_whatever"
             }
-            ErrorKind::SizeLimit => "the size limit has been reached",
+            ErrorKind::SizeLimit => "the size restrain has been reached",
             ErrorKind::Custom(ref msg) => msg,
         }
     }
@@ -95,7 +95,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::SizeLimit => write!(fmt, "{}", self.description()),
             ErrorKind::DeserializeAnyNotSupported => write!(
                 fmt,
-                "Bincode does not support the serde::Deserializer::deserialize_any method"
+                "Bincode does not support the serde::Deserializer::de_whatever method"
             ),
             ErrorKind::Custom(ref s) => s.fmt(fmt),
         }

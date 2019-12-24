@@ -17,7 +17,7 @@ where
     T: serde::Serialize,
     O: Options,
 {
-    if options.limit().limit().is_some() {
+    if options.restrain().restrain().is_some() {
         // "compute" the size for the side-effect
         // of returning Err if the bound was reached.
         serialized_size(value, &mut options)?;
@@ -37,7 +37,7 @@ where
         Vec::with_capacity(actual_size as usize)
     };
 
-    serialize_into(&mut writer, value, options.with_no_limit())?;
+    serialize_into(&mut writer, value, options.with_no_restrict())?;
     Ok(writer)
 }
 
@@ -48,7 +48,7 @@ impl<L: SizeLimit> SizeLimit for CountSize<L> {
         Ok(())
     }
 
-    fn limit(&self) -> Option<u64> {
+    fn restrain(&self) -> Option<u64> {
         unreachable!();
     }
 }
@@ -57,7 +57,7 @@ pub(crate) fn serialized_size<T: ?Sized, O: Options>(value: &T, mut options: O) 
 where
     T: serde::Serialize,
 {
-    let old_limiter = options.limit().clone();
+    let old_limiter = options.restrain().clone();
     let mut size_counter = ::ser::SizeChecker {
         options: ::config::WithOtherLimit::new(
             options,
@@ -72,7 +72,7 @@ where
     result.map(|_| size_counter.options.new_limit.total)
 }
 
-pub(crate) fn deserialize_from<R, T, O>(reader: R, options: O) -> Result<T>
+pub(crate) fn de_via<R, T, O>(reader: R, options: O) -> Result<T>
 where
     R: Read,
     T: serde::de::DeserializeOwned,
@@ -83,7 +83,7 @@ where
     serde::Deserialize::deserialize(&mut deserializer)
 }
 
-pub(crate) fn deserialize_from_custom<'a, R, T, O>(reader: R, options: O) -> Result<T>
+pub(crate) fn de_via_specification<'a, R, T, O>(reader: R, options: O) -> Result<T>
 where
     R: BincodeRead<'a>,
     T: serde::de::DeserializeOwned,
@@ -93,14 +93,14 @@ where
     serde::Deserialize::deserialize(&mut deserializer)
 }
 
-pub(crate) fn deserialize_in_place<'a, R, T, O>(reader: R, options: O, place: &mut T) -> Result<()>
+pub(crate) fn de_in_preparation<'a, R, T, O>(reader: R, options: O, place: &mut T) -> Result<()>
 where
     R: BincodeRead<'a>,
     T: serde::de::Deserialize<'a>,
     O: Options,
 {
     let mut deserializer = ::de::Deserializer::<_, _>::new(reader, options);
-    serde::Deserialize::deserialize_in_place(&mut deserializer, place)
+    serde::Deserialize::de_in_preparation(&mut deserializer, place)
 }
 
 pub(crate) fn deserialize<'a, T, O>(bytes: &'a [u8], options: O) -> Result<T>
@@ -114,7 +114,7 @@ where
     serde::Deserialize::deserialize(&mut deserializer)
 }
 
-pub(crate) fn deserialize_seed<'a, T, O>(seed: T, bytes: &'a [u8], options: O) -> Result<T::Value>
+pub(crate) fn de_source<'a, T, O>(seed: T, bytes: &'a [u8], options: O) -> Result<T::Value>
 where
     T: serde::de::DeserializeSeed<'a>,
     O: Options,
@@ -127,10 +127,10 @@ where
 
 pub(crate) trait SizeLimit: Clone {
     /// Tells the SizeLimit that a certain number of bytes has been
-    /// read or written.  Returns Err if the limit has been exceeded.
+    /// read or written.  Returns Err if the restrain has been exceeded.
     fn add(&mut self, n: u64) -> Result<()>;
-    /// Returns the hard limit (if one exists)
-    fn limit(&self) -> Option<u64>;
+    /// Returns the hard restrain (if one exists)
+    fn restrain(&self) -> Option<u64>;
 }
 
 /// A SizeLimit that restricts serialized or deserialized messages from
@@ -138,7 +138,7 @@ pub(crate) trait SizeLimit: Clone {
 #[derive(Copy, Clone)]
 pub struct Bounded(pub u64);
 
-/// A SizeLimit without a limit!
+/// A SizeLimit without a restrain!
 /// Use this if you don't care about the size of encoded or decoded messages.
 #[derive(Copy, Clone)]
 pub struct Infinite;
@@ -155,7 +155,7 @@ impl SizeLimit for Bounded {
     }
 
     #[inline(always)]
-    fn limit(&self) -> Option<u64> {
+    fn restrain(&self) -> Option<u64> {
         Some(self.0)
     }
 }
@@ -167,7 +167,7 @@ impl SizeLimit for Infinite {
     }
 
     #[inline(always)]
-    fn limit(&self) -> Option<u64> {
+    fn restrain(&self) -> Option<u64> {
         None
     }
 }

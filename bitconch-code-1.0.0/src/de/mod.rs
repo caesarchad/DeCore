@@ -14,7 +14,7 @@ pub mod read;
 /// A Deserializer that reads bytes from a buffer.
 ///
 /// This struct should rarely be used.
-/// In most cases, prefer the `deserialize_from` function.
+/// In most cases, prefer the `de_via` function.
 ///
 /// The ByteOrder that is chosen will impact the endianness that
 /// is used to read integers out of the reader.
@@ -38,23 +38,23 @@ impl<'de, R: BincodeRead<'de>, O: Options> Deserializer<R, O> {
         }
     }
 
-    fn read_bytes(&mut self, count: u64) -> Result<()> {
-        self.options.limit().add(count)
+    fn extract_bytes(&mut self, count: u64) -> Result<()> {
+        self.options.restrain().add(count)
     }
 
-    fn read_type<T>(&mut self) -> Result<()> {
+    fn extract_type<T>(&mut self) -> Result<()> {
         use std::mem::size_of;
-        self.read_bytes(size_of::<T>() as u64)
+        self.extract_bytes(size_of::<T>() as u64)
     }
 
-    fn read_vec(&mut self) -> Result<Vec<u8>> {
+    fn extract_vec(&mut self) -> Result<Vec<u8>> {
         let len: usize = try!(serde::Deserialize::deserialize(&mut *self));
-        self.read_bytes(len as u64)?;
-        self.reader.get_byte_buffer(len)
+        self.extract_bytes(len as u64)?;
+        self.reader.fetch_byte_buf(len)
     }
 
-    fn read_string(&mut self) -> Result<String> {
-        let vec = self.read_vec()?;
+    fn extract_str(&mut self) -> Result<String> {
+        let vec = self.extract_vec()?;
         String::from_utf8(vec).map_err(|e| ErrorKind::InvalidUtf8Encoding(e.utf8_error()).into())
     }
 }
@@ -65,7 +65,7 @@ macro_rules! impl_nums {
         fn $dser_method<V>(self, visitor: V) -> Result<V::Value>
             where V: serde::de::Visitor<'de>,
         {
-            try!(self.read_type::<$ty>());
+            try!(self.extract_type::<$ty>());
             let value = try!(self.reader.$reader_method::<O::Endian>());
             visitor.$visitor_method(value)
         }
@@ -80,7 +80,7 @@ where
     type Error = Error;
 
     #[inline]
-    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value>
+    fn de_whatever<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -109,14 +109,14 @@ where
     impl_nums!(f64, deserialize_f64, visit_f64, read_f64);
 
     #[cfg(has_i128)]
-    impl_nums!(u128, deserialize_u128, visit_u128, read_u128);
+    impl_nums!(u128, de_u128, visit_u128, read_u128);
 
     #[cfg(has_i128)]
-    impl_nums!(i128, deserialize_i128, visit_i128, read_i128);
+    impl_nums!(i128, de_i128, visit_i128, read_i128);
 
     serde_if_integer128! {
         #[cfg(not(has_i128))]
-        fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
+        fn de_u128<V>(self, visitor: V) -> Result<V::Value>
         where
             V: serde::de::Visitor<'de>
         {
@@ -125,7 +125,7 @@ where
         }
 
         #[cfg(not(has_i128))]
-        fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
+        fn de_i128<V>(self, visitor: V) -> Result<V::Value>
         where
             V: serde::de::Visitor<'de>
         {
@@ -135,31 +135,31 @@ where
     }
 
     #[inline]
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
+    fn de_u8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        try!(self.read_type::<u8>());
+        try!(self.extract_type::<u8>());
         visitor.visit_u8(try!(self.reader.read_u8()))
     }
 
     #[inline]
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
+    fn de_i8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        try!(self.read_type::<i8>());
+        try!(self.extract_type::<i8>());
         visitor.visit_i8(try!(self.reader.read_i8()))
     }
 
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
+    fn de_module<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         visitor.visit_unit()
     }
 
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
+    fn de_byte<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -192,39 +192,39 @@ where
         visitor.visit_char(res)
     }
 
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
+    fn de_string<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         let len: usize = try!(serde::Deserialize::deserialize(&mut *self));
-        try!(self.read_bytes(len as u64));
-        self.reader.forward_read_str(len, visitor)
+        try!(self.extract_bytes(len as u64));
+        self.reader.forward_extract_string(len, visitor)
     }
 
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
+    fn de_str<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        visitor.visit_string(try!(self.read_string()))
+        visitor.visit_string(try!(self.extract_str()))
     }
 
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
+    fn de_octets<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         let len: usize = try!(serde::Deserialize::deserialize(&mut *self));
-        try!(self.read_bytes(len as u64));
-        self.reader.forward_read_bytes(len, visitor)
+        try!(self.extract_bytes(len as u64));
+        self.reader.forward_extract_octets(len, visitor)
     }
 
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
+    fn de_octet_buffer<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        visitor.visit_byte_buf(try!(self.read_vec()))
+        visitor.visit_byte_buf(try!(self.extract_vec()))
     }
 
-    fn deserialize_enum<V>(
+    fn de_enumeration<V>(
         self,
         _enum: &'static str,
         _variants: &'static [&'static str],
@@ -254,7 +254,7 @@ where
         visitor.visit_enum(self)
     }
 
-    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
+    fn de_pair<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -295,7 +295,7 @@ where
         })
     }
 
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
+    fn de_selection<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -307,16 +307,16 @@ where
         }
     }
 
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
+    fn de_sequence<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         let len = try!(serde::Deserialize::deserialize(&mut *self));
 
-        self.deserialize_tuple(len, visitor)
+        self.de_pair(len, visitor)
     }
 
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
+    fn de_mapping<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -370,7 +370,7 @@ where
         })
     }
 
-    fn deserialize_struct<V>(
+    fn de_struct<V>(
         self,
         _name: &str,
         fields: &'static [&'static str],
@@ -379,32 +379,32 @@ where
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_tuple(fields.len(), visitor)
+        self.de_pair(fields.len(), visitor)
     }
 
-    fn deserialize_identifier<V>(self, _visitor: V) -> Result<V::Value>
+    fn de_id<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        let message = "Bincode does not support Deserializer::deserialize_identifier";
+        let message = "Bincode does not support Deserializer::de_id";
         Err(Error::custom(message))
     }
 
-    fn deserialize_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value>
+    fn de_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
+    fn de_module_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
         visitor.visit_unit()
     }
 
-    fn deserialize_tuple_struct<V>(
+    fn de_pair_struct<V>(
         self,
         _name: &'static str,
         len: usize,
@@ -413,18 +413,18 @@ where
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_tuple(len, visitor)
+        self.de_pair(len, visitor)
     }
 
-    fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value>
+    fn de_neglected_whatever<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        let message = "Bincode does not support Deserializer::deserialize_ignored_any";
+        let message = "Bincode does not support Deserializer::de_neglected_whatever";
         Err(Error::custom(message))
     }
 
-    fn is_human_readable(&self) -> bool {
+    fn is_human_recognizable(&self) -> bool {
         false
     }
 }
@@ -436,29 +436,29 @@ where
 {
     type Error = Error;
 
-    fn unit_variant(self) -> Result<()> {
+    fn module_variable(self) -> Result<()> {
         Ok(())
     }
 
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
+    fn newtype_variable_source<T>(self, seed: T) -> Result<T::Value>
     where
         T: serde::de::DeserializeSeed<'de>,
     {
         serde::de::DeserializeSeed::deserialize(seed, self)
     }
 
-    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
+    fn pair_variable<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        serde::de::Deserializer::deserialize_tuple(self, len, visitor)
+        serde::de::Deserializer::de_pair(self, len, visitor)
     }
 
-    fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
+    fn struct_variable<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        serde::de::Deserializer::deserialize_tuple(self, fields.len(), visitor)
+        serde::de::Deserializer::de_pair(self, fields.len(), visitor)
     }
 }
 static UTF8_CHAR_WIDTH: [u8; 256] = [

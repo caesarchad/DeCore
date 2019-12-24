@@ -70,7 +70,7 @@ pub trait SerializerAcceptor {
 ///
 /// ### Default Configuration:
 ///
-/// | Byte limit | Endianness |
+/// | Byte restrain | Endianness |
 /// |------------|------------|
 /// | Unlimited  | Little     |
 #[inline(always)]
@@ -80,7 +80,7 @@ pub fn config() -> Config {
 
 /// Serializes an object directly into a `Writer` using the default configuration.
 ///
-/// If the serialization would take more bytes than allowed by the size limit, an error
+/// If the serialization would take more bytes than allowed by the size restrain, an error
 /// is returned and *no bytes* will be written into the `Writer`.
 pub fn serialize_into<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
 where
@@ -101,37 +101,37 @@ where
 /// Deserializes an object directly from a `Read`er using the default configuration.
 ///
 /// If this returns an `Error`, `reader` may be in an invalid state.
-pub fn deserialize_from<R, T>(reader: R) -> Result<T>
+pub fn de_via<R, T>(reader: R) -> Result<T>
 where
     R: std::io::Read,
     T: serde::de::DeserializeOwned,
 {
-    config().deserialize_from(reader)
+    config().de_via(reader)
 }
 
 /// Deserializes an object from a custom `BincodeRead`er using the default configuration.
-/// It is highly recommended to use `deserialize_from` unless you need to implement
+/// It is highly recommended to use `de_via` unless you need to implement
 /// `BincodeRead` for performance reasons.
 ///
 /// If this returns an `Error`, `reader` may be in an invalid state.
-pub fn deserialize_from_custom<'a, R, T>(reader: R) -> Result<T>
+pub fn de_via_specification<'a, R, T>(reader: R) -> Result<T>
 where
     R: de::read::BincodeRead<'a>,
     T: serde::de::DeserializeOwned,
 {
-    config().deserialize_from_custom(reader)
+    config().de_via_specification(reader)
 }
 
 /// Only use this if you know what you're doing.
 ///
 /// This is part of the public API.
 #[doc(hidden)]
-pub fn deserialize_in_place<'a, R, T>(reader: R, place: &mut T) -> Result<()>
+pub fn de_in_preparation<'a, R, T>(reader: R, place: &mut T) -> Result<()>
 where
     T: serde::de::Deserialize<'a>,
     R: BincodeRead<'a>,
 {
-    config().deserialize_in_place(reader, place)
+    config().de_in_preparation(reader, place)
 }
 
 /// Deserializes a slice of bytes into an instance of `T` using the default configuration.
