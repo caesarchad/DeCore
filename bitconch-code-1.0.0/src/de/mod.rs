@@ -1,15 +1,15 @@
-use config::Options;
+use cfg::Options;
 use std::io::Read;
 
-use self::read::BincodeRead;
+use self::extract::BincodeRead;
 use byteorder::ReadBytesExt;
-use internal::SizeLimit;
+use interior::SizeLimit;
 use serde;
 use serde::de::Error as DeError;
 use serde::de::IntoDeserializer;
 use {Error, ErrorKind, Result};
 
-pub mod read;
+pub mod extract;
 
 /// A Deserializer that reads bytes from a buffer.
 ///

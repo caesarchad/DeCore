@@ -1,8 +1,8 @@
 use serde;
 use std::io::{Read, Write};
 
-use config::{Options, OptionsExt};
-use de::read::BincodeRead;
+use cfg::{Options, OptionsExt};
+use de::extract::BincodeRead;
 use {ErrorKind, Result};
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ where
 {
     let old_limiter = options.restrain().clone();
     let mut size_counter = ::ser::SizeChecker {
-        options: ::config::WithOtherLimit::new(
+        options: ::cfg::WithOtherLimit::new(
             options,
             CountSize {
                 total: 0,
@@ -78,7 +78,7 @@ where
     T: serde::de::DeserializeOwned,
     O: Options,
 {
-    let reader = ::de::read::IoReader::new(reader);
+    let reader = ::de::extract::IoReader::new(reader);
     let mut deserializer = ::de::Deserializer::<_, O>::new(reader, options);
     serde::Deserialize::deserialize(&mut deserializer)
 }
@@ -108,8 +108,8 @@ where
     T: serde::de::Deserialize<'a>,
     O: Options,
 {
-    let reader = ::de::read::SliceReader::new(bytes);
-    let options = ::config::WithOtherLimit::new(options, Infinite);
+    let reader = ::de::extract::SliceReader::new(bytes);
+    let options = ::cfg::WithOtherLimit::new(options, Infinite);
     let mut deserializer = ::de::Deserializer::new(reader, options);
     serde::Deserialize::deserialize(&mut deserializer)
 }
@@ -119,8 +119,8 @@ where
     T: serde::de::DeserializeSeed<'a>,
     O: Options,
 {
-    let reader = ::de::read::SliceReader::new(bytes);
-    let options = ::config::WithOtherLimit::new(options, Infinite);
+    let reader = ::de::extract::SliceReader::new(bytes);
+    let options = ::cfg::WithOtherLimit::new(options, Infinite);
     let mut deserializer = ::de::Deserializer::new(reader, options);
     seed.deserialize(&mut deserializer)
 }

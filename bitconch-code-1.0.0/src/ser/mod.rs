@@ -5,9 +5,9 @@ use serde;
 
 use byteorder::WriteBytesExt;
 
-use super::internal::SizeLimit;
+use super::interior::SizeLimit;
 use super::{Error, ErrorKind, Result};
-use config::Options;
+use cfg::Options;
 
 /// An Serializer that encodes values directly into a Writer.
 ///

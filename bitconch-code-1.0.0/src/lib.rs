@@ -32,14 +32,14 @@ extern crate byteorder;
 #[macro_use]
 extern crate serde;
 
-mod config;
+mod cfg;
 mod de;
 mod error;
-mod internal;
+mod interior;
 mod ser;
 
-pub use config::Config;
-pub use de::read::{BincodeRead, IoReader, SliceReader};
+pub use cfg::Config;
+pub use de::extract::{BincodeRead, IoReader, SliceReader};
 pub use error::{Error, ErrorKind, Result};
 
 /// An object that implements this trait can be passed a
@@ -116,7 +116,7 @@ where
 /// If this returns an `Error`, `reader` may be in an invalid state.
 pub fn de_via_specification<'a, R, T>(reader: R) -> Result<T>
 where
-    R: de::read::BincodeRead<'a>,
+    R: de::extract::BincodeRead<'a>,
     T: serde::de::DeserializeOwned,
 {
     config().de_via_specification(reader)
