@@ -19,8 +19,8 @@ pub struct GenesisBlock {
     pub epoch_warmup: bool,
     pub fee_calculator: GasCost,
     pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
-    pub slots_per_epoch: u64,
-    pub stakers_slot_offset: u64,
+    pub candidate_each_round: u64,
+    pub stake_place_holder: u64,
     pub drops_per_slot: u64,
     pub waterclock_config: WaterClockConfig,
 }
@@ -53,8 +53,8 @@ impl GenesisBlock {
             epoch_warmup: true,
             fee_calculator: GasCost::default(),
             builtin_opcode_handlers: builtin_opcode_handlers.to_vec(),
-            slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
-            stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
+            candidate_each_round: DEFAULT_SLOTS_PER_EPOCH,
+            stake_place_holder: DEFAULT_SLOTS_PER_EPOCH,
             drops_per_slot: DEFAULT_DROPS_PER_SLOT,
             waterclock_config: WaterClockConfig::default(),
         }

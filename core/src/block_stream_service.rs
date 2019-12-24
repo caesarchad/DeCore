@@ -11,6 +11,14 @@ use crate::block_buffer_pool::BlockBufferPool;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use morgan_interface::pubkey::Pubkey;
+use morgan_interface::constants::{
+    QUALIFIER,
+    ORGANIZATION,
+    APPLICATION,
+    KEYS_DIRECTORY,
+    N3H_BINARIES_DIRECTORY,
+    DNA_EXTENSION,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::Arc;
@@ -23,12 +31,7 @@ pub struct BlockstreamService {
     t_blockstream: JoinHandle<()>,
 }
 
-pub const QUALIFIER: &str = "org";
-pub const ORGANIZATION: &str = "holochain";
-pub const APPLICATION: &str = "holochain";
-pub const KEYS_DIRECTORY: &str = "keys";
-pub const N3H_BINARIES_DIRECTORY: &str = "n3h-binaries";
-pub const DNA_EXTENSION: &str = "dna.json";
+
 
 
 pub fn project_root() -> Option<directories::ProjectDirs> {

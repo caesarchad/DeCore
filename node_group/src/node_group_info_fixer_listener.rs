@@ -8,7 +8,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use bitconch_metricbot::datapoint;
-use bitconch_runtime::epoch_schedule::EpochSchedule;
+use bitconch_runtime::epoch_schedule::RoundPlan;
 use bitconch_interface::pubkey::Pubkey;
 use std::cmp;
 use std::collections::HashMap;
@@ -81,7 +81,7 @@ impl NodeGroupInfoFixListener {
         block_buffer_pool: &Arc<BlockBufferPool>,
         exit: &Arc<AtomicBool>,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
-        epoch_schedule: EpochSchedule,
+        epoch_schedule: RoundPlan,
     ) -> Self {
         let exit = exit.clone();
         let block_buffer_pool = block_buffer_pool.clone();
@@ -112,7 +112,7 @@ impl NodeGroupInfoFixListener {
         peer_roots: &mut HashMap<Pubkey, (u64, u64)>,
         exit: &Arc<AtomicBool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-        epoch_schedule: &EpochSchedule,
+        epoch_schedule: &RoundPlan,
     ) -> Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
         let my_pubkey = node_group_info.read().unwrap().id();
@@ -204,7 +204,7 @@ impl NodeGroupInfoFixListener {
         socket: &UdpSocket,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         my_gossiped_root: &mut u64,
-        epoch_schedule: &EpochSchedule,
+        epoch_schedule: &RoundPlan,
     ) -> Result<()> {
         for (repairee_pubkey, repairee_epoch_slots) in repairees {
             let repairee_root = repairee_epoch_slots.root;
@@ -259,7 +259,7 @@ impl NodeGroupInfoFixListener {
         socket: &UdpSocket,
         repairee_tvu: &SocketAddr,
         num_slots_to_repair: usize,
-        epoch_schedule: &EpochSchedule,
+        epoch_schedule: &RoundPlan,
     ) -> Result<()> {
         let slot_iter = block_buffer_pool.based_slot_repeater(repairee_epoch_slots.root + 1);
 
@@ -653,7 +653,7 @@ mod tests {
         let eligible_repairmen_refs: Vec<_> = eligible_repairmen.iter().collect();
 
         // Have all the repairman send the repairs
-        let epoch_schedule = EpochSchedule::new(32, 16, false);
+        let epoch_schedule = RoundPlan::new(32, 16, false);
         let num_missing_slots = num_slots / 2;
         for repairman_pubkey in &eligible_repairmen {
             NodeGroupInfoFixListener::serve_repairs_to_repairee(
@@ -694,18 +694,18 @@ mod tests {
     fn test_no_repair_past_confirmed_epoch() {
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&block_buffer_pool_path).unwrap();
-        let stakers_slot_offset = 16;
-        let slots_per_epoch = stakers_slot_offset * 2;
-        let epoch_schedule = EpochSchedule::new(slots_per_epoch, stakers_slot_offset, false);
+        let stake_place_holder = 16;
+        let candidate_each_round = stake_place_holder * 2;
+        let epoch_schedule = RoundPlan::new(candidate_each_round, stake_place_holder, false);
 
         // Create blobs for first two epochs and write them to block_buffer_pool
-        let total_slots = slots_per_epoch * 2;
+        let total_slots = candidate_each_round * 2;
         let (blobs, _) = make_many_slot_entries(0, total_slots, 1);
         block_buffer_pool.insert_data_blobs(&blobs).unwrap();
 
         // Write roots so that these slots will qualify to be sent by the repairman
         block_buffer_pool.set_genesis(0, 0).unwrap();
-        block_buffer_pool.set_genesis(slots_per_epoch * 2 - 1, 0).unwrap();
+        block_buffer_pool.set_genesis(candidate_each_round * 2 - 1, 0).unwrap();
 
         // Set up my information
         let my_pubkey = Pubkey::new_rand();
@@ -721,7 +721,7 @@ mod tests {
         // Thus, no repairmen should send any blobs to this repairee b/c this repairee
         // already has all the slots for which they have a confirmed leader schedule
         let repairee_root = 0;
-        let repairee_slots: BTreeSet<_> = (0..=slots_per_epoch).collect();
+        let repairee_slots: BTreeSet<_> = (0..=candidate_each_round).collect();
         let repairee_epoch_slots =
             EpochSlots::new(mock_repairee.id, repairee_root, repairee_slots.clone(), 1);
 
@@ -742,10 +742,10 @@ mod tests {
         sleep(Duration::from_millis(1000));
         assert!(mock_repairee.receiver.try_recv().is_err());
 
-        // Set the root to stakers_slot_offset, now epoch 2 should be confirmed, so the repairee
+        // Set the root to stake_place_holder, now epoch 2 should be confirmed, so the repairee
         // is now eligible to get slots from epoch 2:
         let repairee_epoch_slots =
-            EpochSlots::new(mock_repairee.id, stakers_slot_offset, repairee_slots, 1);
+            EpochSlots::new(mock_repairee.id, stake_place_holder, repairee_slots, 1);
         NodeGroupInfoFixListener::serve_repairs_to_repairee(
             &my_pubkey,
             total_slots - 1,

@@ -472,7 +472,7 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use crate::test_tx::test_tx;
     use morgan_interface::hash::hash;
-    use morgan_interface::timing::DEFAULT_DROPS_PER_SLOT;
+    use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
     use std::sync::mpsc::sync_channel;
 
     #[test]

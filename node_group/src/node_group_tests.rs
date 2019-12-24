@@ -166,10 +166,10 @@ pub fn sleep_n_epochs(
     num_epochs: f64,
     config: &WaterClockConfig,
     drops_per_slot: u64,
-    slots_per_epoch: u64,
+    candidate_each_round: u64,
 ) {
     let num_drops_per_second = (1000 / duration_as_ms(&config.target_drop_duration)) as f64;
-    let num_drops_to_sleep = num_epochs * drops_per_slot as f64 * slots_per_epoch as f64;
+    let num_drops_to_sleep = num_epochs * drops_per_slot as f64 * candidate_each_round as f64;
     let secs = ((num_drops_to_sleep + num_drops_per_second - 1.0) / num_drops_per_second) as u64;
     // warn!("sleep_n_epochs: {} seconds", secs);
     println!(

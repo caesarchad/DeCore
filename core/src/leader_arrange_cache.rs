@@ -2,7 +2,7 @@ use crate::block_buffer_pool::BlockBufferPool;
 use crate::leader_arrange::LeaderSchedule;
 use crate::leader_arrange_utils;
 use morgan_runtime::treasury::Treasury;
-use morgan_runtime::epoch_schedule::EpochSchedule;
+use morgan_runtime::epoch_schedule::RoundPlan;
 use morgan_interface::pubkey::Pubkey;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -15,7 +15,7 @@ const MAX_SCHEDULES: usize = 10;
 pub struct LdrSchBufferPoolList {
     // Map from an epoch to a leader schedule for that epoch
     pub cached_schedules: RwLock<CachedSchedules>,
-    epoch_schedule: EpochSchedule,
+    epoch_schedule: RoundPlan,
     max_epoch: RwLock<u64>,
 }
 
@@ -24,7 +24,7 @@ impl LdrSchBufferPoolList {
         Self::new(*treasury.epoch_schedule(), treasury.slot())
     }
 
-    pub fn new(epoch_schedule: EpochSchedule, root: u64) -> Self {
+    pub fn new(epoch_schedule: RoundPlan, root: u64) -> Self {
         let cache = Self {
             cached_schedules: RwLock::new((HashMap::new(), VecDeque::new())),
             epoch_schedule,
@@ -101,11 +101,11 @@ impl LdrSchBufferPoolList {
     fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Treasury) -> Option<Pubkey> {
         let cache_result = self.slot_leader_at_no_compute(slot);
         // Forbid asking for slots in an unconfirmed epoch
-        let treasury_epoch = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
-        if treasury_epoch > *self.max_epoch.read().unwrap() {
+        let treasury_round = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
+        if treasury_round > *self.max_epoch.read().unwrap() {
             debug!(
                 "Requested leader in slot: {} of unconfirmed epoch: {}",
-                slot, treasury_epoch
+                slot, treasury_round
             );
             return None;
         }
@@ -172,7 +172,7 @@ mod tests {
     };
     use crate::staking_utils::tests::setup_vote_and_stake_accounts;
     use morgan_runtime::treasury::Treasury;
-    use morgan_runtime::epoch_schedule::{EpochSchedule, MINIMUM_SLOT_LENGTH};
+    use morgan_runtime::epoch_schedule::{RoundPlan, MINIMUM_SLOT_LENGTH};
     use std::sync::mpsc::channel;
     use std::sync::Arc;
     use std::thread::Builder;
@@ -221,8 +221,8 @@ mod tests {
     }
 
     fn run_thread_race() {
-        let slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
-        let epoch_schedule = EpochSchedule::new(slots_per_epoch, slots_per_epoch / 2, true);
+        let candidate_each_round = MINIMUM_SLOT_LENGTH as u64;
+        let epoch_schedule = RoundPlan::new(candidate_each_round, candidate_each_round / 2, true);
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let cache = Arc::new(LdrSchBufferPoolList::new(epoch_schedule, treasury.slot()));
@@ -282,7 +282,7 @@ mod tests {
         assert_eq!(
             cache.next_leader_slot(
                 &pubkey,
-                2 * genesis_block.slots_per_epoch - 1, // no schedule generated for epoch 2
+                2 * genesis_block.candidate_each_round - 1, // no schedule generated for epoch 2
                 &treasury,
                 None
             ),
@@ -352,7 +352,7 @@ mod tests {
             assert_eq!(
                 cache.next_leader_slot(
                     &pubkey,
-                    2 * genesis_block.slots_per_epoch - 1, // no schedule generated for epoch 2
+                    2 * genesis_block.candidate_each_round - 1, // no schedule generated for epoch 2
                     &treasury,
                     Some(&block_buffer_pool)
                 ),
@@ -414,7 +414,7 @@ mod tests {
         let mut index = 0;
         while schedule[index] != node_pubkey {
             index += 1;
-            assert_ne!(index, genesis_block.slots_per_epoch);
+            assert_ne!(index, genesis_block.candidate_each_round);
         }
         expected_slot += index;
 

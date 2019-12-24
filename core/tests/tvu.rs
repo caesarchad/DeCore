@@ -82,7 +82,7 @@ fn test_replay() {
         ..
     } = create_genesis_block_with_leader(mint_balance, &leader.info.id, leader_balance);
     genesis_block.drops_per_slot = 160;
-    genesis_block.slots_per_epoch = MINIMUM_SLOT_LENGTH as u64;
+    genesis_block.candidate_each_round = MINIMUM_SLOT_LENGTH as u64;
     let (block_buffer_pool_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
     let tvu_addr = target1.info.tvu;

@@ -37,3 +37,9 @@ pub const MAX_TRANSACTION_FORWARDING_DELAY: usize = 4;
 /// More delay is expected if CUDA is not enabled (as signature verification takes longer)
 #[cfg(not(feature = "cuda"))]
 pub const MAX_TRANSACTION_FORWARDING_DELAY: usize = 12;
+pub const QUALIFIER: &str = "org";
+pub const ORGANIZATION: &str = "bitconch-core";
+pub const APPLICATION: &str = "bitconch-core";
+pub const KEYS_DIRECTORY: &str = "keys";
+pub const N3H_BINARIES_DIRECTORY: &str = "n3h-binaries";
+pub const DNA_EXTENSION: &str = "dna.json";

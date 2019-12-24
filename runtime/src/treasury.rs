@@ -6,7 +6,7 @@ use crate::accounts::{AccountLockType, Accounts};
 use crate::accounts_db::{ErrorCounters, OpCodeAcct, OpCodeMounter};
 use crate::accounts_index::Fork;
 use crate::transaction_seal_queue::TransactionSealQueue;
-use crate::epoch_schedule::EpochSchedule;
+use crate::epoch_schedule::RoundPlan;
 use crate::locked_accounts_results::LockedAccountsResults;
 use crate::message_processor::{MessageHandler, HandleOpCode};
 use crate::stakes::Stakes;
@@ -87,7 +87,7 @@ pub struct Treasury {
     pub fee_calculator: GasCost,
 
     /// initialized from genesis
-    epoch_schedule: EpochSchedule,
+    epoch_schedule: RoundPlan,
 
     /// cache of vote_account and stake_account state for this fork
     stakes: RwLock<Stakes>,
@@ -235,7 +235,7 @@ impl Treasury {
         }
     }
 
-    pub fn epoch_schedule(&self) -> &EpochSchedule {
+    pub fn epoch_schedule(&self) -> &RoundPlan {
         &self.epoch_schedule
     }
 
@@ -292,9 +292,9 @@ impl Treasury {
         // make treasury 0 votable
         self.is_delta.store(true, Ordering::Relaxed);
 
-        self.epoch_schedule = EpochSchedule::new(
-            genesis_block.slots_per_epoch,
-            genesis_block.stakers_slot_offset,
+        self.epoch_schedule = RoundPlan::new(
+            genesis_block.candidate_each_round,
+            genesis_block.stake_place_holder,
             genesis_block.epoch_warmup,
         );
 
@@ -949,7 +949,7 @@ impl Treasury {
         self.epoch_schedule.get_slots_in_epoch(epoch)
     }
 
-    /// returns the epoch for which this treasury's stakers_slot_offset and slot would
+    /// returns the epoch for which this treasury's stake_place_holder and slot would
     ///  need to cache stakers
     pub fn get_stakers_epoch(&self, slot: u64) -> u64 {
         self.epoch_schedule.get_stakers_epoch(slot)
@@ -994,9 +994,9 @@ impl Treasury {
     }
 
     /// given a slot, return the epoch and offset into the epoch this slot falls
-    /// e.g. with a fixed number for slots_per_epoch, the calculation is simply:
+    /// e.g. with a fixed number for candidate_each_round, the calculation is simply:
     ///
-    ///  ( slot/slots_per_epoch, slot % slots_per_epoch )
+    ///  ( slot/candidate_each_round, slot % candidate_each_round )
     ///
     pub fn get_epoch_and_slot_index(&self, slot: u64) -> (u64, u64) {
         self.epoch_schedule.get_epoch_and_slot_index(slot)
@@ -1667,8 +1667,8 @@ mod tests {
         //  this says: "vote_accounts for epoch X should be generated at slot index 3 in epoch X-2...
         const SLOTS_PER_EPOCH: u64 = MINIMUM_SLOT_LENGTH as u64;
         const STAKERS_SLOT_OFFSET: u64 = SLOTS_PER_EPOCH * 3 - 3;
-        genesis_block.slots_per_epoch = SLOTS_PER_EPOCH;
-        genesis_block.stakers_slot_offset = STAKERS_SLOT_OFFSET;
+        genesis_block.candidate_each_round = SLOTS_PER_EPOCH;
+        genesis_block.stake_place_holder = STAKERS_SLOT_OFFSET;
         genesis_block.epoch_warmup = false; // allows me to do the normal division stuff below
 
         let parent = Arc::new(Treasury::new(&genesis_block));
@@ -1749,7 +1749,7 @@ mod tests {
 
         assert_eq!(treasury.get_slots_in_epoch(0), MINIMUM_SLOT_LENGTH as u64);
         assert_eq!(treasury.get_slots_in_epoch(2), (MINIMUM_SLOT_LENGTH * 4) as u64);
-        assert_eq!(treasury.get_slots_in_epoch(5000), genesis_block.slots_per_epoch);
+        assert_eq!(treasury.get_slots_in_epoch(5000), genesis_block.candidate_each_round);
     }
 
     #[test]
@@ -1758,8 +1758,8 @@ mod tests {
         // (1 * 7 * 24 * 4500u64).next_power_of_two();
 
         // test values between MINIMUM_SLOT_LEN and MINIMUM_SLOT_LEN * 16, should cover a good mix
-        for slots_per_epoch in MINIMUM_SLOT_LENGTH as u64..=MINIMUM_SLOT_LENGTH as u64 * 16 {
-            let epoch_schedule = EpochSchedule::new(slots_per_epoch, slots_per_epoch / 2, true);
+        for candidate_each_round in MINIMUM_SLOT_LENGTH as u64..=MINIMUM_SLOT_LENGTH as u64 * 16 {
+            let epoch_schedule = RoundPlan::new(candidate_each_round, candidate_each_round / 2, true);
 
             assert_eq!(epoch_schedule.get_first_slot_in_epoch(0), 0);
             assert_eq!(
@@ -1770,7 +1770,7 @@ mod tests {
             let mut last_stakers = 0;
             let mut last_epoch = 0;
             let mut last_slots_in_epoch = MINIMUM_SLOT_LENGTH as u64;
-            for slot in 0..(2 * slots_per_epoch) {
+            for slot in 0..(2 * candidate_each_round) {
                 // verify that stakers_epoch is continuous over the warmup
                 // and into the first normal epoch
 
@@ -1790,11 +1790,11 @@ mod tests {
                     assert_eq!(epoch_schedule.get_last_slot_in_epoch(epoch - 1), slot - 1);
 
                     // verify that slots in an epoch double continuously
-                    //   until they reach slots_per_epoch
+                    //   until they reach candidate_each_round
 
                     let slots_in_epoch = epoch_schedule.get_slots_in_epoch(epoch);
                     if slots_in_epoch != last_slots_in_epoch {
-                        if slots_in_epoch != slots_per_epoch {
+                        if slots_in_epoch != candidate_each_round {
                             assert_eq!(slots_in_epoch, last_slots_in_epoch * 2);
                         }
                     }
@@ -1808,7 +1808,7 @@ mod tests {
             assert!(last_stakers != 0); // t
             assert!(last_epoch != 0);
             // assert that we got to "normal" mode
-            assert!(last_slots_in_epoch == slots_per_epoch);
+            assert!(last_slots_in_epoch == candidate_each_round);
         }
     }
 

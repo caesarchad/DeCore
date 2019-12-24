@@ -414,7 +414,7 @@ pub mod tests {
     use crate::genesis_utils::{
         create_genesis_block, create_genesis_block_with_leader, GenesisBlockInfo,
     };
-    use morgan_runtime::epoch_schedule::EpochSchedule;
+    use morgan_runtime::epoch_schedule::RoundPlan;
     use morgan_interface::hash::Hash;
     use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::pubkey::Pubkey;
@@ -1479,7 +1479,7 @@ pub mod tests {
     fn get_epoch_schedule(
         genesis_block: &GenesisBlock,
         account_paths: Option<String>,
-    ) -> EpochSchedule {
+    ) -> RoundPlan {
         let treasury = Treasury::new_with_paths(&genesis_block, account_paths);
         treasury.epoch_schedule().clone()
     }

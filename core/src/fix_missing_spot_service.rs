@@ -9,7 +9,7 @@ use crate::node_group_info_fixer_listener::NodeGroupInfoFixListener;
 use crate::result::Result;
 use crate::service::Service;
 use morgan_metricbot::datapoint_info;
-use morgan_runtime::epoch_schedule::EpochSchedule;
+use morgan_runtime::epoch_schedule::RoundPlan;
 use morgan_interface::pubkey::Pubkey;
 use std::collections::BTreeSet;
 use std::net::UdpSocket;
@@ -32,7 +32,7 @@ pub enum FixPlan {
     FixAll {
         treasury_forks: Arc<RwLock<TreasuryForks>>,
         completed_slots_receiver: CompletedSlotsReceiver,
-        epoch_schedule: EpochSchedule,
+        epoch_schedule: RoundPlan,
     },
 }
 
@@ -310,7 +310,7 @@ impl FixService {
         block_buffer_pool: &BlockBufferPool,
         slots_in_gossip: &mut BTreeSet<u64>,
         root: u64,
-        epoch_schedule: &EpochSchedule,
+        epoch_schedule: &RoundPlan,
     ) {
         let last_confirmed_epoch = epoch_schedule.get_stakers_epoch(root);
         let last_epoch_slot = epoch_schedule.get_last_slot_in_epoch(last_confirmed_epoch);
@@ -334,7 +334,7 @@ impl FixService {
         block_buffer_pool: &BlockBufferPool,
         slots_in_gossip: &mut BTreeSet<u64>,
         root: u64,
-        epoch_schedule: &EpochSchedule,
+        epoch_schedule: &RoundPlan,
         node_group_info: &RwLock<NodeGroupInfo>,
     ) {
         Self::get_completed_slots_past_root(block_buffer_pool, slots_in_gossip, root, epoch_schedule);
@@ -659,7 +659,7 @@ mod test {
             block_buffer_pool.update_blobs(&fork2_incomplete_blobs).unwrap();
 
             // Test that only slots > root from fork1 were included
-            let epoch_schedule = EpochSchedule::new(32, 32, false);
+            let epoch_schedule = RoundPlan::new(32, 32, false);
 
             FixService::get_completed_slots_past_root(
                 &block_buffer_pool,

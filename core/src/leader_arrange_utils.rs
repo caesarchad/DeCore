@@ -116,7 +116,7 @@ mod tests {
         let leader_schedule = LeaderSchedule::new(
             &pubkeys_and_stakes,
             seed,
-            genesis_block.slots_per_epoch,
+            genesis_block.candidate_each_round,
             NUM_CONSECUTIVE_LEADER_SLOTS,
         );
 

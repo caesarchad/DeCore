@@ -210,7 +210,7 @@ mod tests {
         let mallory_keypair = Keypair::new();
         let mallory_pubkey = mallory_keypair.pubkey();
         treasury_client
-            .transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
             budget_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
@@ -259,7 +259,7 @@ mod tests {
         let mallory_keypair = Keypair::new();
         let mallory_pubkey = mallory_keypair.pubkey();
         treasury_client
-            .transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
             budget_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
@@ -385,7 +385,7 @@ mod tests {
         let mallory_keypair = Keypair::new();
         let mallory_pubkey = mallory_keypair.pubkey();
         treasury_client
-            .transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
 

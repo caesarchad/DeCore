@@ -65,8 +65,8 @@ pub struct NodeGroupConfig {
     /// The total difs available to the node group
     pub node_group_difs: u64,
     pub drops_per_slot: u64,
-    pub slots_per_epoch: u64,
-    pub stakers_slot_offset: u64,
+    pub candidate_each_round: u64,
+    pub stake_place_holder: u64,
     pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
     pub waterclock_config: WaterClockConfig,
 }
@@ -80,8 +80,8 @@ impl Default for NodeGroupConfig {
             node_stakes: vec![],
             node_group_difs: 0,
             drops_per_slot: DEFAULT_DROPS_PER_SLOT,
-            slots_per_epoch: DEFAULT_SLOTS_PER_EPOCH,
-            stakers_slot_offset: DEFAULT_SLOTS_PER_EPOCH,
+            candidate_each_round: DEFAULT_SLOTS_PER_EPOCH,
+            stake_place_holder: DEFAULT_SLOTS_PER_EPOCH,
             builtin_opcode_handlers: vec![],
             waterclock_config: WaterClockConfig::default(),
         }
@@ -134,8 +134,8 @@ impl LocalNodeGroup {
         let storage_keypair = Keypair::new();
         genesis_block.add_storage_controller(&storage_keypair.pubkey());
         genesis_block.drops_per_slot = config.drops_per_slot;
-        genesis_block.slots_per_epoch = config.slots_per_epoch;
-        genesis_block.stakers_slot_offset = config.stakers_slot_offset;
+        genesis_block.candidate_each_round = config.candidate_each_round;
+        genesis_block.stake_place_holder = config.stake_place_holder;
         genesis_block.waterclock_config = config.waterclock_config.clone();
         genesis_block
             .builtin_opcode_handlers
@@ -615,7 +615,7 @@ mod test {
             node_stakes: vec![3; NUM_NODES],
             node_group_difs: 100,
             drops_per_slot: 8,
-            slots_per_epoch: MINIMUM_SLOT_LENGTH as u64,
+            candidate_each_round: MINIMUM_SLOT_LENGTH as u64,
             ..NodeGroupConfig::default()
         };
         let node_group = LocalNodeGroup::new(&config);

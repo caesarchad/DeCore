@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .help("The number of drops in a slot"),
         )
         .arg(
-            Arg::with_name("slots_per_epoch")
+            Arg::with_name("candidate_each_round")
                 .long("slots-per-epoch")
                 .value_name("SLOTS")
                 .takes_value(true)
@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     genesis_block.fee_calculator.difs_per_signature =
         value_t_or_exit!(matches, "difs_per_signature", u64);
     genesis_block.drops_per_slot = value_t_or_exit!(matches, "drops_per_slot", u64);
-    genesis_block.slots_per_epoch = value_t_or_exit!(matches, "slots_per_epoch", u64);
+    genesis_block.candidate_each_round = value_t_or_exit!(matches, "candidate_each_round", u64);
     genesis_block.waterclock_config.target_drop_duration =
         Duration::from_millis(value_t_or_exit!(matches, "target_drop_duration", u64));
 

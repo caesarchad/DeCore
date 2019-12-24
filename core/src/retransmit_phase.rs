@@ -12,7 +12,7 @@ use crate::staking_utils;
 use crate::streamer::BlobReceiver;
 use crate::spot_transmit_service::{check_replay_blob, SpotTransmitService};
 use morgan_metricbot::{datapoint_info, inc_new_counter_error};
-use morgan_runtime::epoch_schedule::EpochSchedule;
+use morgan_runtime::epoch_schedule::RoundPlan;
 use morgan_interface::hash::Hash;
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
@@ -38,9 +38,9 @@ fn retransmit(
     datapoint_info!("retransmit-phase", ("count", blobs.len(), i64));
 
     let r_treasury = treasury_forks.read().unwrap().working_treasury();
-    let treasury_epoch = r_treasury.get_stakers_epoch(r_treasury.slot());
+    let treasury_round = r_treasury.get_stakers_epoch(r_treasury.slot());
     let (neighbors, children) = compute_retransmit_peers(
-        staking_utils::staked_nodes_at_epoch(&r_treasury, treasury_epoch).as_ref(),
+        staking_utils::staked_nodes_at_epoch(&r_treasury, treasury_round).as_ref(),
         node_group_info,
         DATA_PLANE_FANOUT,
     );
@@ -183,7 +183,7 @@ impl RetransmitPhase {
         exit: &Arc<AtomicBool>,
         genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
-        epoch_schedule: EpochSchedule,
+        epoch_schedule: RoundPlan,
     ) -> Self {
         let (retransmit_sender, retransmit_receiver) = channel();
 

@@ -1,7 +1,8 @@
 use bincode::serialize;
 use morgan_interface::pubkey::Pubkey;
+//use morgan_interface::rpc_port;
 #[cfg(test)]
-use morgan_interface::rpc_port;
+use morgan_interface::constants::{DEFAULT_RPC_PORT,DEFAULT_RPC_PUBSUB_PORT};
 #[cfg(test)]
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::signature::{Signable, Signature};
@@ -175,8 +176,8 @@ impl ContactInfo {
         let gossip_addr = next_port(&bind_addr, 1);
         let tvu_addr = next_port(&bind_addr, 2);
         let transaction_digesting_module_via_blobs_addr = next_port(&bind_addr, 3);
-        let rpc_addr = SocketAddr::new(bind_addr.ip(), constants::DEFAULT_RPC_PORT);
-        let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), constants::DEFAULT_RPC_PUBSUB_PORT);
+        let rpc_addr = SocketAddr::new(bind_addr.ip(), DEFAULT_RPC_PORT);
+        let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), DEFAULT_RPC_PUBSUB_PORT);
         Self::new(
             pubkey,
             gossip_addr,
