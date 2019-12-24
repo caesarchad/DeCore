@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 #![doc(html_root_url = "https://docs.rs/bincode/1.1.4")]
 #![crate_name = "bincode"]
 #![crate_type = "rlib"]
@@ -18,7 +16,6 @@ mod ser;
 pub use cfg::Config;
 pub use de::extract::{BincodeRead, IoReader, SliceReader};
 pub use error::{Error, ErrorKind, Result};
-
 
 #[doc(hidden)]
 pub trait DeserializerAcceptor<'a> {

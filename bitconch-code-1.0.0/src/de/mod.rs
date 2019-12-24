@@ -155,6 +155,7 @@ where
 
         let mut buf = [0u8; 4];
 
+        // Look at the first byte to see how many bytes must be read
         let _ = try!(self.reader.read_exact(&mut buf[..1]));
         let width = utf8_char_width(buf[0]);
         if width == 1 {
