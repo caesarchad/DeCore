@@ -18,7 +18,7 @@ use crate::fetch_spot_phase::BlobFetchPhase;
 use crate::block_stream_service::BlockstreamService;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::NodeGroupInfo;
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::repeat_phase::RepeatPhase;
 use crate::retransmit_phase::RetransmitPhase;
@@ -70,7 +70,7 @@ impl Tvu {
         ledger_signal_receiver: Receiver<bool>,
         subscriptions: &Arc<RpcSubscriptions>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
         exit: &Arc<AtomicBool>,
         genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,
@@ -268,7 +268,7 @@ pub mod tests {
             create_test_recorder(&treasury, &block_buffer_pool);
         let voting_keypair = Keypair::new();
         let storage_keypair = Arc::new(Keypair::new());
-        let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
+        let leader_schedule_cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
         let tvu = Tvu::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),

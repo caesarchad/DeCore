@@ -4,7 +4,7 @@
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::fix_missing_spot_service::FixPlan;
 use crate::result::{Error, Result};
 use crate::service::Service;
@@ -24,7 +24,7 @@ use std::time::Duration;
 
 fn retransmit(
     treasury_forks: &Arc<RwLock<TreasuryForks>>,
-    leader_schedule_cache: &Arc<LeaderScheduleCache>,
+    leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     r: &BlobReceiver,
     sock: &UdpSocket,
@@ -68,7 +68,7 @@ fn retransmit(
 fn retransmitter(
     sock: Arc<UdpSocket>,
     treasury_forks: Arc<RwLock<TreasuryForks>>,
-    leader_schedule_cache: &Arc<LeaderScheduleCache>,
+    leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     node_group_info: Arc<RwLock<NodeGroupInfo>>,
     r: BlobReceiver,
 ) -> JoinHandle<()> {
@@ -174,7 +174,7 @@ impl RetransmitPhase {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         treasury_forks: Arc<RwLock<TreasuryForks>>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         retransmit_socket: Arc<UdpSocket>,

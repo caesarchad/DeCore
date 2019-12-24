@@ -2,7 +2,7 @@
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::{Entry, EntrySlice};
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use rayon::prelude::*;
 use morgan_metricbot::{datapoint, datapoint_error, inc_new_counter_debug};
 use morgan_runtime::treasury::Treasury;
@@ -134,15 +134,19 @@ pub struct TreasuryForksInfo {
 }
 
 #[derive(Debug)]
-pub enum BlocktreeProcessorError {
+pub enum BlockBufferPoolErr {
     LedgerVerificationFailed,
+    OutOfSyncError,
+    BadDateTime,
+    IllActor,
 }
 
 pub fn process_block_buffer_pool(
     genesis_block: &GenesisBlock,
     block_buffer_pool: &BlockBufferPool,
     account_paths: Option<String>,
-) -> result::Result<(TreasuryForks, Vec<TreasuryForksInfo>, LeaderScheduleCache), BlocktreeProcessorError> {
+    transaction_seal_marker:u64,
+) -> result::Result<(TreasuryForks, Vec<TreasuryForksInfo>, LdrSchBufferPoolList), BlockBufferPoolErr> {
     let now = Instant::now();
     // info!("{}", Info(format!("processing ledger...").to_string()));
     let loginfo: String = format!("processing ledger...").to_string();
@@ -171,7 +175,7 @@ pub fn process_block_buffer_pool(
                         module_path!().to_string()
                     )
                 );
-                BlocktreeProcessorError::LedgerVerificationFailed
+                BlockBufferPoolErr::LedgerVerificationFailed
             })?
             .unwrap();
 
@@ -179,8 +183,16 @@ pub fn process_block_buffer_pool(
     };
 
     block_buffer_pool.set_genesis(0, 0).expect("Couldn't set first root");
+    
+    let leader_schedule_cache = {
+        if transaction_seal_marker > 0 {
+            LdrSchBufferPoolList::new(*pending_slots[0].2.epoch_schedule(), 0)
+        } else {
+            LdrSchBufferPoolList::new(*pending_slots[0].2.epoch_schedule(), 32)   
+        }
+    };
+    
 
-    let leader_schedule_cache = LeaderScheduleCache::new(*pending_slots[0].2.epoch_schedule(), 0);
 
     let mut fork_info = vec![];
     let mut last_status_report = Instant::now();
@@ -211,7 +223,7 @@ pub fn process_block_buffer_pool(
                     module_path!().to_string()
                 )
             );
-            BlocktreeProcessorError::LedgerVerificationFailed
+            BlockBufferPoolErr::LedgerVerificationFailed
         })?;
 
         if slot == 0 {
@@ -227,7 +239,7 @@ pub fn process_block_buffer_pool(
                         module_path!().to_string()
                     )
                 );
-                return Err(BlocktreeProcessorError::LedgerVerificationFailed);
+                return Err(BlockBufferPoolErr::LedgerVerificationFailed);
             }
             let entry0 = entries.remove(0);
             if !(entry0.is_drop() && entry0.verify(&last_entry_hash)) {
@@ -239,7 +251,7 @@ pub fn process_block_buffer_pool(
                         module_path!().to_string()
                     )
                 );
-                return Err(BlocktreeProcessorError::LedgerVerificationFailed);
+                return Err(BlockBufferPoolErr::LedgerVerificationFailed);
             }
             last_entry_hash = entry0.hash;
             entry_height += 1;
@@ -259,7 +271,7 @@ pub fn process_block_buffer_pool(
                         module_path!().to_string()
                     )
                 );
-                return Err(BlocktreeProcessorError::LedgerVerificationFailed);
+                return Err(BlockBufferPoolErr::LedgerVerificationFailed);
             }
 
             process_entries(&treasury, &entries).map_err(|err| {
@@ -271,7 +283,7 @@ pub fn process_block_buffer_pool(
                         module_path!().to_string()
                     )
                 );
-                BlocktreeProcessorError::LedgerVerificationFailed
+                BlockBufferPoolErr::LedgerVerificationFailed
             })?;
 
             last_entry_hash = entries.last().unwrap().hash;
@@ -311,7 +323,7 @@ pub fn process_block_buffer_pool(
                             module_path!().to_string()
                         )
                     );
-                    BlocktreeProcessorError::LedgerVerificationFailed
+                    BlockBufferPoolErr::LedgerVerificationFailed
                 })?
                 .unwrap();
 
@@ -350,12 +362,6 @@ pub fn process_block_buffer_pool(
 
     let (treasuries, treasury_forks_info): (Vec<_>, Vec<_>) = fork_info.into_iter().unzip();
     let treasury_forks = TreasuryForks::new_from_treasuries(&treasuries, root);
-    // info!(
-    //     "{}",
-    //     Info(format!("processing ledger...complete in {}ms, forks={}...",
-    //     duration_as_ms(&now.elapsed()),
-    //     treasury_forks_info.len()).to_string())
-    // );
     let loginfo: String = format!("processing ledger...complete in {}ms, forks={}...",
         duration_as_ms(&now.elapsed()),
         treasury_forks_info.len()).to_string();
@@ -365,10 +371,6 @@ pub fn process_block_buffer_pool(
             module_path!().to_string()
         )
     );
-    // info!(
-    //     "{}",
-    //     Info(format!("---------------------------leader_schedule_cache--------------------------------").to_string())
-    // );
     let loginfo: String = format!("~~~~~~~~~~~~~~~~~~~~~~~~~~~leader Arrange Cache~~~~~~~~~~~~~~~~~~~~~~~~~~~").to_string();
     println!("{}",
         printLn(
@@ -481,7 +483,7 @@ pub mod tests {
         fill_block_buffer_pool_slot_with_drops(&block_buffer_pool, drops_per_slot, 2, 1, transaction_seal);
 
         let (mut _treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1);
         assert_eq!(
@@ -553,7 +555,7 @@ pub mod tests {
         block_buffer_pool.set_genesis(4, 0).unwrap();
 
         let (treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1); // One fork, other one is ignored b/c not a descendant of the root
 
@@ -641,7 +643,7 @@ pub mod tests {
         block_buffer_pool.set_genesis(1, 0).unwrap();
 
         let (treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 2); // There are two forks
         assert_eq!(
@@ -721,7 +723,7 @@ pub mod tests {
 
         // Check that we can properly restart the ledger / leader scheduler doesn't fail
         let (treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1); // There is one fork
         assert_eq!(
@@ -857,7 +859,7 @@ pub mod tests {
             .unwrap();
         let entry_height = genesis_block.drops_per_slot + entries.len() as u64;
         let (treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1);
         assert_eq!(treasury_forks.root(), 0);
@@ -888,7 +890,7 @@ pub mod tests {
 
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
         let (treasury_forks, treasury_forks_info, _) =
-            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None).unwrap();
+            process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32).unwrap();
 
         assert_eq!(treasury_forks_info.len(), 1);
         assert_eq!(

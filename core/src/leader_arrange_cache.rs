@@ -12,14 +12,14 @@ type CachedSchedules = (HashMap<u64, Arc<LeaderSchedule>>, VecDeque<u64>);
 const MAX_SCHEDULES: usize = 10;
 
 #[derive(Default)]
-pub struct LeaderScheduleCache {
+pub struct LdrSchBufferPoolList {
     // Map from an epoch to a leader schedule for that epoch
     pub cached_schedules: RwLock<CachedSchedules>,
     epoch_schedule: EpochSchedule,
     max_epoch: RwLock<u64>,
 }
 
-impl LeaderScheduleCache {
+impl LdrSchBufferPoolList {
     pub fn new_from_treasury(treasury: &Treasury) -> Self {
         Self::new(*treasury.epoch_schedule(), treasury.slot())
     }
@@ -183,7 +183,7 @@ mod tests {
     fn test_slot_leader_at() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Treasury::new(&genesis_block);
-        let cache = LeaderScheduleCache::new_from_treasury(&treasury);
+        let cache = LdrSchBufferPoolList::new_from_treasury(&treasury);
 
         // Nothing in the cache, should return None
         assert!(cache.slot_leader_at(treasury.slot(), None).is_none());
@@ -202,7 +202,7 @@ mod tests {
             cached_schedules.insert(i as u64, Arc::new(LeaderSchedule::default()));
             order.push_back(i as u64);
         }
-        LeaderScheduleCache::retain_latest(&mut cached_schedules, &mut order);
+        LdrSchBufferPoolList::retain_latest(&mut cached_schedules, &mut order);
         assert_eq!(cached_schedules.len(), MAX_SCHEDULES);
         let mut keys: Vec<_> = cached_schedules.keys().cloned().collect();
         keys.sort();
@@ -225,7 +225,7 @@ mod tests {
         let epoch_schedule = EpochSchedule::new(slots_per_epoch, slots_per_epoch / 2, true);
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let cache = Arc::new(LeaderScheduleCache::new(epoch_schedule, treasury.slot()));
+        let cache = Arc::new(LdrSchBufferPoolList::new(epoch_schedule, treasury.slot()));
 
         let num_threads = 10;
         let (threads, senders): (Vec<_>, Vec<_>) = (0..num_threads)
@@ -271,7 +271,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Treasury::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
+        let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         assert_eq!(
             cache.slot_leader_at(treasury.slot(), Some(&treasury)).unwrap(),
@@ -312,7 +312,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Treasury::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
+        let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
         let ledger_path = fetch_interim_ledger_location!();
         {
             let block_buffer_pool = Arc::new(
@@ -382,7 +382,7 @@ mod tests {
         genesis_block.epoch_warmup = false;
 
         let treasury = Treasury::new(&genesis_block);
-        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
+        let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         // Create new vote account
         let node_pubkey = Pubkey::new_rand();
@@ -428,7 +428,7 @@ mod tests {
     fn test_schedule_for_unconfirmed_epoch() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(2);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let cache = LeaderScheduleCache::new_from_treasury(&treasury);
+        let cache = LdrSchBufferPoolList::new_from_treasury(&treasury);
 
         assert_eq!(*cache.max_epoch.read().unwrap(), 1);
 

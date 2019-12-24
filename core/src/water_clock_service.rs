@@ -103,7 +103,7 @@ mod tests {
     use super::*;
     use crate::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use crate::leader_arrange_cache::LeaderScheduleCache;
+    use crate::leader_arrange_cache::LdrSchBufferPoolList;
     use crate::water_clock_recorder::WorkingTreasury;
     use crate::result::Result;
     use crate::test_tx::test_tx;
@@ -133,7 +133,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &waterclock_config,
             );
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));

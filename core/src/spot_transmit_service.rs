@@ -3,7 +3,7 @@
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
 use crate::fix_missing_spot_service::{FixService, FixPlan};
 use crate::result::{Error, Result};
@@ -72,7 +72,7 @@ fn handle_data_blob(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPoo
 pub fn check_replay_blob(
     blob: &Blob,
     treasury: Option<Arc<Treasury>>,
-    leader_schedule_cache: &Arc<LeaderScheduleCache>,
+    leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     my_pubkey: &Pubkey,
 ) -> bool {
     let slot_leader_pubkey = match treasury {
@@ -296,7 +296,7 @@ mod test {
         let treasury = Arc::new(Treasury::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
-        let cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury));
+        let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         let mut blob = Blob::default();
         blob.set_id(&leader_pubkey);

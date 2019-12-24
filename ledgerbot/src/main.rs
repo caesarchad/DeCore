@@ -111,7 +111,7 @@ fn main() {
             }
             stdout().write_all(b"\n]}\n").expect("close array");
         }
-        ("verify", _) => match process_block_buffer_pool(&genesis_block, &block_buffer_pool, None) {
+        ("verify", _) => match process_block_buffer_pool(&genesis_block, &block_buffer_pool, None,32) {
             Ok((_treasury_forks, treasury_forks_info, _)) => {
                 println!("{:?}", treasury_forks_info);
             }

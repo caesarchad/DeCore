@@ -12,7 +12,7 @@
 //!
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::entry_info::Entry;
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::leader_arrange_utils;
 use crate::water_clock::WaterClock;
 use crate::result::{Error, Result};
@@ -59,7 +59,7 @@ pub struct WaterClockRecorder {
      max_last_leader_grace_drops: u64,
     id: Pubkey,
     block_buffer_pool: Arc<BlockBufferPool>,
-    leader_schedule_cache: Arc<LeaderScheduleCache>,
+    leader_schedule_cache: Arc<LdrSchBufferPoolList>,
     waterclock_config: Arc<WaterClockConfig>,
     drops_per_slot: u64,
 }
@@ -399,7 +399,7 @@ impl WaterClockRecorder {
         id: &Pubkey,
         block_buffer_pool: &Arc<BlockBufferPool>,
         clear_treasury_signal: Option<SyncSender<bool>>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
         waterclock_config: &Arc<WaterClockConfig>,
     ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         let waterclock = Arc::new(Mutex::new(WaterClock::new(
@@ -447,7 +447,7 @@ impl WaterClockRecorder {
         drops_per_slot: u64,
         id: &Pubkey,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
         waterclock_config: &Arc<WaterClockConfig>,
     ) -> (Self, Receiver<WorkingTreasuryEntries>) {
         Self::new_with_clear_signal(
@@ -491,7 +491,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -518,7 +518,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -544,7 +544,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -572,7 +572,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -606,7 +606,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -652,7 +652,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -696,7 +696,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -734,7 +734,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -774,7 +774,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -821,7 +821,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -865,7 +865,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -900,7 +900,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -933,7 +933,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -965,7 +965,7 @@ mod tests {
                 DEFAULT_DROPS_PER_SLOT,
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder._drop();
@@ -997,7 +997,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
             let drops_per_slot = treasury.drops_per_slot();
@@ -1031,7 +1031,7 @@ mod tests {
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
                 Some(sender),
-                &Arc::new(LeaderScheduleCache::default()),
+                &Arc::new(LdrSchBufferPoolList::default()),
                 &Arc::new(WaterClockConfig::default()),
             );
             waterclock_recorder.set_treasury(&treasury);
@@ -1063,7 +1063,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -1109,7 +1109,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 
@@ -1271,7 +1271,7 @@ mod tests {
                 treasury.drops_per_slot(),
                 &Pubkey::default(),
                 &Arc::new(block_buffer_pool),
-                &Arc::new(LeaderScheduleCache::new_from_treasury(&treasury)),
+                &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
             );
 

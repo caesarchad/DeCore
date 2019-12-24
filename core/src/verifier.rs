@@ -7,7 +7,7 @@ use crate::block_buffer_pool_processor::{self, TreasuryForksInfo};
 use crate::node_group_info::{NodeGroupInfo, Node};
 use crate::connection_info::ContactInfo;
 use crate::gossip_service::{find_node_group_host, GossipService};
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::water_clock_service::WaterClockService;
 use crate::rpc::JsonRpcConfig;
@@ -338,7 +338,7 @@ pub fn new_treasuries_from_block_buffer(
     BlockBufferPool,
     Receiver<bool>,
     CompletedSlotsReceiver,
-    LeaderScheduleCache,
+    LdrSchBufferPoolList,
     WaterClockConfig,
 ) {
     let genesis_block =
@@ -349,7 +349,7 @@ pub fn new_treasuries_from_block_buffer(
             .expect("Expected to successfully open database ledger");
 
     let (treasury_forks, treasury_forks_info, leader_schedule_cache) =
-        block_buffer_pool_processor::process_block_buffer_pool(&genesis_block, &block_buffer_pool, account_paths)
+        block_buffer_pool_processor::process_block_buffer_pool(&genesis_block, &block_buffer_pool, account_paths, 32)
             .expect("process_block_buffer_pool failed");
 
     (

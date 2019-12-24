@@ -6,7 +6,7 @@ use crate::block_buffer_pool::BlockBufferPool;
 use crate::block_buffer_pool_processor;
 use crate::node_group_info::NodeGroupInfo;
 use crate::entry_info::{Entry, EntrySlice};
-use crate::leader_arrange_cache::LeaderScheduleCache;
+use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::leader_arrange_utils;
 use crate::fork_selection::{LockStack, StakeLockout};
 use crate::packet::BlobError;
@@ -85,7 +85,7 @@ impl RepeatPhase {
         ledger_signal_receiver: Receiver<bool>,
         subscriptions: &Arc<RpcSubscriptions>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) -> (Self, Receiver<(u64, Pubkey)>, Receiver<Vec<u64>>)
     where
         T: 'static + KeypairUtil + Send + Sync,
@@ -221,7 +221,7 @@ impl RepeatPhase {
         waterclock_slot: u64,
         reached_leader_drop: bool,
         grace_drops: u64,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) {
         trace!("{} checking waterclock slot {}", my_pubkey, waterclock_slot);
         if treasury_forks.read().unwrap().get(waterclock_slot).is_none() {
@@ -312,7 +312,7 @@ impl RepeatPhase {
         voting_keypair: &Option<Arc<T>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
         root_slot_sender: &Sender<Vec<u64>>,
     ) -> Result<()>
     where
@@ -371,7 +371,7 @@ impl RepeatPhase {
         treasury: &Arc<Treasury>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         drops_per_slot: u64,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) {
         let next_leader_slot =
             leader_schedule_cache.next_leader_slot(&my_pubkey, treasury.slot(), &treasury, Some(block_buffer_pool));
@@ -623,7 +623,7 @@ impl RepeatPhase {
     fn generate_new_treasury_forks(
         block_buffer_pool: &BlockBufferPool,
         forks: &mut TreasuryForks,
-        leader_schedule_cache: &Arc<LeaderScheduleCache>,
+        leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) {
         // Find the next slot that chains to the old slot
         let frozen_treasuries = forks.frozen_treasuries();
@@ -689,7 +689,7 @@ mod test {
 
             let genesis_block = create_genesis_block(10_000).genesis_block;
             let treasury0 = Treasury::new(&genesis_block);
-            let leader_schedule_cache = Arc::new(LeaderScheduleCache::new_from_treasury(&treasury0));
+            let leader_schedule_cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury0));
             let mut treasury_forks = TreasuryForks::new(0, treasury0);
             treasury_forks.working_treasury().freeze();
 
