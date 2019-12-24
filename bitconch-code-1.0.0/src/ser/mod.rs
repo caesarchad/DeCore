@@ -9,20 +9,12 @@ use super::interior::SizeLimit;
 use super::{Error, ErrorKind, Result};
 use cfg::Options;
 
-/// An Serializer that encodes values directly into a Writer.
-///
-/// The specified byte-order will impact the endianness that is
-/// used during the encoding.
-///
-/// This struct should not be used often.
-/// For most cases, prefer the `encode_into` function.
 pub(crate) struct Serializer<W, O: Options> {
     writer: W,
     _options: O,
 }
 
 impl<W: Write, O: Options> Serializer<W, O> {
-    /// Creates a new Serializer with the given `Write`r.
     pub fn new(w: W, options: O) -> Serializer<W, O> {
         Serializer {
             writer: w,

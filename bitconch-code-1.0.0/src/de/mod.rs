@@ -11,26 +11,12 @@ use {Error, ErrorKind, Result};
 
 pub mod extract;
 
-/// A Deserializer that reads bytes from a buffer.
-///
-/// This struct should rarely be used.
-/// In most cases, prefer the `de_via` function.
-///
-/// The ByteOrder that is chosen will impact the endianness that
-/// is used to read integers out of the reader.
-///
-/// ```ignore
-/// let d = Deserializer::new(&mut some_reader, SizeLimit::new());
-/// serde::Deserialize::deserialize(&mut deserializer);
-/// let bytes_read = d.bytes_read();
-/// ```
 pub(crate) struct Deserializer<R, O: Options> {
     reader: R,
     options: O,
 }
 
 impl<'de, R: BincodeRead<'de>, O: Options> Deserializer<R, O> {
-    /// Creates a new Deserializer with a given `Read`er and a size_limit.
     pub(crate) fn new(r: R, options: O) -> Deserializer<R, O> {
         Deserializer {
             reader: r,
@@ -169,7 +155,6 @@ where
 
         let mut buf = [0u8; 4];
 
-        // Look at the first byte to see how many bytes must be read
         let _ = try!(self.reader.read_exact(&mut buf[..1]));
         let width = utf8_char_width(buf[0]);
         if width == 1 {
@@ -480,7 +465,6 @@ static UTF8_CHAR_WIDTH: [u8; 256] = [
     4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 0xFF
 ];
 
-// This function is a copy of core::str::utf8_char_width
 fn utf8_char_width(b: u8) -> usize {
     UTF8_CHAR_WIDTH[b as usize] as usize
 }

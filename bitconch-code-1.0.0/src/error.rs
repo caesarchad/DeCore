@@ -5,37 +5,20 @@ use std::{error, fmt};
 
 use serde;
 
-/// The result of a serialization or deserialization operation.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
-/// An error that can be produced during (de)serializing.
 pub type Error = Box<ErrorKind>;
 
-/// The kind of error that can be produced during a serialization or deserialization.
 #[derive(Debug)]
 pub enum ErrorKind {
-    /// If the error stems from the reader/writer that is being used
-    /// during (de)serialization, that error will be stored and returned here.
     Io(io::Error),
-    /// Returned if the deserializer attempts to deserialize a string that is not valid utf8
     InvalidUtf8Encoding(Utf8Error),
-    /// Returned if the deserializer attempts to deserialize a bool that was
-    /// not encoded as either a 1 or a 0
     InvalidBoolEncoding(u8),
-    /// Returned if the deserializer attempts to deserialize a char that is not in the correct format.
     InvalidCharEncoding,
-    /// Returned if the deserializer attempts to deserialize the tag of an enum that is
-    /// not in the expected ranges
     InvalidTagEncoding(usize),
-    /// Serde has a de_whatever method that lets the format hint to the
-    /// object which route to take in deserializing.
     DeserializeAnyNotSupported,
-    /// If (de)serializing a message takes more than the provided size restrain, this
-    /// error is returned.
     SizeLimit,
-    /// Bincode can not encode sequences of unknown length (like iterators).
     SequenceMustHaveLength,
-    /// A custom error message from Serde.
     Custom(String),
 }
 

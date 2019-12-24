@@ -2,34 +2,23 @@ use error::Result;
 use serde;
 use std::io;
 
-/// An optional Read trait for advanced Bincode usage.
-///
-/// It is highly recommended to use bincode with `io::Read` or `&[u8]` before
-/// implementing a custom `BincodeRead`.
 pub trait BincodeRead<'storage>: io::Read {
-    /// Forwards reading `length` bytes of a string on to the serde reader.
     fn forward_extract_string<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>;
 
-    /// Return the first `length` bytes of the internal byte buffer.
     fn fetch_byte_buf(&mut self, length: usize) -> Result<Vec<u8>>;
 
-    /// Forwards reading `length` bytes on to the serde reader.
     fn forward_extract_octets<V>(&mut self, length: usize, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'storage>;
 }
 
-/// A BincodeRead implementation for byte slices
-/// NOT A PART OF THE STABLE PUBLIC API
 #[doc(hidden)]
 pub struct SliceReader<'storage> {
     slice: &'storage [u8],
 }
 
-/// A BincodeRead implementation for io::Readers
-/// NOT A PART OF THE STABLE PUBLIC API
 #[doc(hidden)]
 pub struct IoReader<R> {
     reader: R,
@@ -37,14 +26,12 @@ pub struct IoReader<R> {
 }
 
 impl<'storage> SliceReader<'storage> {
-    /// Constructs a slice reader
     pub fn new(bytes: &'storage [u8]) -> SliceReader<'storage> {
         SliceReader { slice: bytes }
     }
 }
 
 impl<R> IoReader<R> {
-    /// Constructs an IoReadReader
     pub fn new(r: R) -> IoReader<R> {
         IoReader {
             reader: r,

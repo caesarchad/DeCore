@@ -18,8 +18,6 @@ where
     O: Options,
 {
     if options.restrain().restrain().is_some() {
-        // "compute" the size for the side-effect
-        // of returning Err if the bound was reached.
         serialized_size(value, &mut options)?;
     }
 
@@ -126,20 +124,13 @@ where
 }
 
 pub(crate) trait SizeLimit: Clone {
-    /// Tells the SizeLimit that a certain number of bytes has been
-    /// read or written.  Returns Err if the restrain has been exceeded.
     fn add(&mut self, n: u64) -> Result<()>;
-    /// Returns the hard restrain (if one exists)
     fn restrain(&self) -> Option<u64>;
 }
 
-/// A SizeLimit that restricts serialized or deserialized messages from
-/// exceeding a certain byte length.
 #[derive(Copy, Clone)]
 pub struct Bounded(pub u64);
 
-/// A SizeLimit without a restrain!
-/// Use this if you don't care about the size of encoded or decoded messages.
 #[derive(Copy, Clone)]
 pub struct Infinite;
 
