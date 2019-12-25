@@ -18,7 +18,7 @@ use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{hash, Hash};
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::signature::{read_keypair, KeypairUtil};
-use morgan_interface::system_program;
+use morgan_interface::sys_controller;
 use morgan_interface::timing;
 use morgan_interface::constants;
 use morgan_stake_api::stake_state;
@@ -192,12 +192,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             // the mint
             (
                 mint_keypair.pubkey(),
-                Account::new(difs, 0, 0, &system_program::id()),
+                Account::new(difs, 0, 0, &sys_controller::id()),
             ),
             // node needs an account to issue votes from
             (
                 bootstrap_leader_keypair.pubkey(),
-                Account::new(1, 0, 0, &system_program::id()),
+                Account::new(1, 0, 0, &sys_controller::id()),
             ),
             // where votes go to
             (bootstrap_vote_keypair.pubkey(), vote_account),
@@ -267,7 +267,7 @@ mod tests {
         let ids = [
             (
                 "11111111111111111111111111111111",
-                morgan_interface::system_program::id(),
+                morgan_interface::sys_controller::id(),
             ),
             (
                 "NativeLoader1111111111111111111111111111111",
@@ -313,7 +313,7 @@ mod tests {
     fn test_program_id_uniqueness() {
         let mut unique = HashSet::new();
         let ids = vec![
-            morgan_interface::system_program::id(),
+            morgan_interface::sys_controller::id(),
             morgan_interface::bultin_mounter::id(),
             morgan_interface::bvm_controller::id(),
             morgan_bvm_script::id(),

@@ -303,7 +303,7 @@ pub mod tests {
     use jsonrpc_pubsub::typed::Subscriber;
     use morgan_bvm_script;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use tokio::prelude::{Async, Stream};
 
     #[test]
@@ -317,7 +317,7 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = system_transaction::create_account(
+        let tx = sys_controller::create_account(
             &mint_keypair,
             &alice.pubkey(),
             transaction_seal,
@@ -373,7 +373,7 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = system_transaction::create_account(
+        let tx = sys_controller::create_account(
             &mint_keypair,
             &alice.pubkey(),
             transaction_seal,
@@ -427,7 +427,7 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = system_transaction::transfer(&mint_keypair, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&mint_keypair, &alice.pubkey(), 20, transaction_seal);
         let signature = tx.signatures[0];
         treasury_forks
             .write()

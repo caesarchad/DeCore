@@ -423,7 +423,7 @@ mod tests {
     use morgan_interface::opcodes::OpCode;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     fn create_sample_payment(keypair: &Keypair, hash: Hash) -> Transaction {
@@ -460,8 +460,8 @@ mod tests {
 
         // First, verify entries
         let keypair = Keypair::new();
-        let tx0 = system_transaction::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
-        let tx1 = system_transaction::create_user_account(&keypair, &keypair.pubkey(), 1, zero);
+        let tx0 = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
+        let tx1 = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 1, zero);
         let mut e0 = FsclStmt::new(&zero, 0, vec![tx0.clone(), tx1.clone()]);
         assert!(e0.verify(&zero));
 
@@ -511,7 +511,7 @@ mod tests {
     fn test_next_entry_panic() {
         let zero = Hash::default();
         let keypair = Keypair::new();
-        let tx = system_transaction::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
+        let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
         next_entry(&zero, 0, vec![tx]);
     }
 
@@ -519,7 +519,7 @@ mod tests {
     fn test_serialized_to_blob_size() {
         let zero = Hash::default();
         let keypair = Keypair::new();
-        let tx = system_transaction::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
+        let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
         let entry = next_entry(&zero, 1, vec![tx.clone()]);
         assert_eq!(
             FsclStmt::serialized_to_blob_size(&[tx]),

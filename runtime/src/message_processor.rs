@@ -5,7 +5,7 @@ use morgan_interface::opcodes::{EncodedOpCodes, OpCodeErr};
 use morgan_interface::opcodes_utils;
 use morgan_interface::message::Message;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::system_program;
+use morgan_interface::sys_controller;
 use morgan_interface::transaction::TransactionError;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -64,7 +64,7 @@ fn check_opcode(
     // Verify the transaction
 
     // Make sure that program_id is still the same or this was just assigned by the system program
-    if *pre_program_id != account.owner && !system_program::check_id(&program_id) {
+    if *pre_program_id != account.owner && !sys_controller::check_id(&program_id) {
         return Err(OpCodeErr::ModifiedProgramId);
     }
     // For accounts unassigned to the program, the individual balance of each accounts cannot decrease.
@@ -73,7 +73,7 @@ fn check_opcode(
     }
     // For accounts unassigned to the program, the data may not change.
     if *program_id != account.owner
-        && !system_program::check_id(&program_id)
+        && !sys_controller::check_id(&program_id)
         && pre_data != &account.data[..]
     {
         return Err(OpCodeErr::ExternalAccountDataModified);
@@ -94,7 +94,7 @@ pub struct MessageHandler {
 impl Default for MessageHandler {
     fn default() -> Self {
         let opcode_handler: Vec<(Pubkey, HandleOpCode)> = vec![(
-            system_program::id(),
+            sys_controller::id(),
             sys_opcode_handler::handle_opcode,
         )];
 
@@ -291,7 +291,7 @@ mod tests {
             check_opcode(&ix, &pre, 0, &[], &Account::new(0, 0, 0, post))
         }
 
-        let system_program_id = system_program::id();
+        let system_program_id = sys_controller::id();
         let alice_program_id = Pubkey::new_rand();
         let mallory_program_id = Pubkey::new_rand();
 
@@ -315,7 +315,7 @@ mod tests {
             check_opcode(&program_id, &alice_program_id, 0, &[42], &account)
         }
 
-        let system_program_id = system_program::id();
+        let system_program_id = sys_controller::id();
         let mallory_program_id = Pubkey::new_rand();
 
         assert_eq!(

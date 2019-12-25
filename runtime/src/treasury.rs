@@ -25,7 +25,7 @@ use morgan_interface::bultin_mounter;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, Signature};
 use morgan_interface::syscall::slot_hashes::{self, SlotHashes};
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::timing::{duration_as_ms, duration_as_us,};
 use morgan_interface::constants::MAX_RECENT_TRANSACTION_SEALS;
 use morgan_interface::transaction::{Result, Transaction, TransactionError};
@@ -301,7 +301,7 @@ impl Treasury {
         // Add native programs mandatory for the MessageHandler to function
         self.register_native_instruction_processor(
             "morgan_system_program",
-            &morgan_interface::system_program::id(),
+            &morgan_interface::sys_controller::id(),
         );
         self.register_native_instruction_processor(
             "morgan_bpf_loader",
@@ -802,7 +802,7 @@ impl Treasury {
     /// `n` difs where `transaction_seal` is the last Entry ID observed by the client.
     pub fn transfer(&self, n: u64, keypair: &Keypair, to: &Pubkey) -> Result<Signature> {
         let transaction_seal = self.last_transaction_seal();
-        let tx = system_transaction::create_user_account(keypair, to, n, transaction_seal);
+        let tx = sys_controller::create_user_account(keypair, to, n, transaction_seal);
         let signature = tx.signatures[0];
         self.process_transaction(&tx).map(|_| signature)
     }
@@ -1040,7 +1040,7 @@ mod tests {
     use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_opcode;
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_vote_api::vote_opcode;
     use morgan_vote_api::vote_state::VoteState;
 
@@ -1090,8 +1090,8 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
-        let t1 = system_transaction::transfer(&mint_keypair, &key1, 1, genesis_block.hash());
-        let t2 = system_transaction::transfer(&mint_keypair, &key2, 1, genesis_block.hash());
+        let t1 = sys_controller::transfer(&mint_keypair, &key1, 1, genesis_block.hash());
+        let t2 = sys_controller::transfer(&mint_keypair, &key2, 1, genesis_block.hash());
         let res = treasury.process_transactions(&vec![t1.clone(), t2.clone()]);
         assert_eq!(res.len(), 2);
         assert_eq!(res[0], Ok(()));
@@ -1159,7 +1159,7 @@ mod tests {
         let dest = Keypair::new();
 
         // genesis with 0 program context
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &dest.pubkey(),
             2,
@@ -1282,7 +1282,7 @@ mod tests {
         let key2 = Keypair::new();
 
         let tx =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 2, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 2, genesis_block.hash());
         let initial_balance = treasury.get_balance(&leader);
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(treasury.get_balance(&leader), initial_balance + 3);
@@ -1290,7 +1290,7 @@ mod tests {
         assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 100 - 5);
 
         treasury.fee_calculator.difs_per_signature = 1;
-        let tx = system_transaction::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+        let tx = sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
 
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(treasury.get_balance(&leader), initial_balance + 4);
@@ -1300,8 +1300,8 @@ mod tests {
 
         // verify that an OpCodeErr collects fees, too
         let mut tx =
-            system_transaction::transfer(&mint_keypair, &key2.pubkey(), 1, genesis_block.hash());
-        // send a bogus instruction to system_program, cause an instruction error
+            sys_controller::transfer(&mint_keypair, &key2.pubkey(), 1, genesis_block.hash());
+        // send a bogus instruction to sys_controller, cause an instruction error
         tx.message.instructions[0].data[0] = 40;
 
         treasury.process_transaction(&tx)
@@ -1323,9 +1323,9 @@ mod tests {
 
         let key = Keypair::new();
         let tx1 =
-            system_transaction::transfer(&mint_keypair, &key.pubkey(), 2, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key.pubkey(), 2, genesis_block.hash());
         let tx2 =
-            system_transaction::transfer(&mint_keypair, &key.pubkey(), 5, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key.pubkey(), 5, genesis_block.hash());
 
         let results = vec![
             Ok(()),
@@ -1348,13 +1348,13 @@ mod tests {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
         let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
-        let tx0 = system_transaction::create_user_account(
+        let tx0 = sys_controller::create_user_account(
             &mint_keypair,
             &keypair.pubkey(),
             2,
             genesis_block.hash(),
         );
-        let tx1 = system_transaction::create_user_account(
+        let tx1 = sys_controller::create_user_account(
             &keypair,
             &mint_keypair.pubkey(),
             1,
@@ -1378,9 +1378,9 @@ mod tests {
         // Fund additional payers
         treasury.transfer(3, &mint_keypair, &payer0.pubkey()).unwrap();
         treasury.transfer(3, &mint_keypair, &payer1.pubkey()).unwrap();
-        let tx0 = system_transaction::transfer(&mint_keypair, &recipient, 1, genesis_block.hash());
-        let tx1 = system_transaction::transfer(&payer0, &recipient, 1, genesis_block.hash());
-        let tx2 = system_transaction::transfer(&payer1, &recipient, 1, genesis_block.hash());
+        let tx0 = sys_controller::transfer(&mint_keypair, &recipient, 1, genesis_block.hash());
+        let tx1 = sys_controller::transfer(&payer0, &recipient, 1, genesis_block.hash());
+        let tx2 = sys_controller::transfer(&payer1, &recipient, 1, genesis_block.hash());
         let txs = vec![tx0, tx1, tx2];
         let results = treasury.process_transactions(&txs);
 
@@ -1405,7 +1405,7 @@ mod tests {
         let alice = Keypair::new();
         let bob = Keypair::new();
 
-        let tx1 = system_transaction::create_user_account(
+        let tx1 = sys_controller::create_user_account(
             &mint_keypair,
             &alice.pubkey(),
             1,
@@ -1445,7 +1445,7 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
 
         let tx =
-            system_transaction::transfer(&mint_keypair, &keypair.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &keypair.pubkey(), 1, genesis_block.hash());
 
         let mut tx_invalid_program_index = tx.clone();
         tx_invalid_program_index.message.instructions[0].program_ids_index = 42;
@@ -1470,7 +1470,7 @@ mod tests {
 
         treasury.transfer(1, &mint_keypair, &key1.pubkey()).unwrap();
         assert_eq!(treasury.get_balance(&key1.pubkey()), 1);
-        let tx = system_transaction::transfer(&key1, &key1.pubkey(), 1, genesis_block.hash());
+        let tx = sys_controller::transfer(&key1, &key1.pubkey(), 1, genesis_block.hash());
         let res = treasury.process_transactions(&vec![tx.clone()]);
         assert_eq!(res.len(), 1);
         assert_eq!(treasury.get_balance(&key1.pubkey()), 1);
@@ -1505,7 +1505,7 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
         assert_eq!(parent.process_transaction(&tx), Ok(()));
         let treasury = new_from_parent(&parent);
         assert_eq!(
@@ -1523,10 +1523,10 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
         assert_eq!(parent.process_transaction(&tx), Ok(()));
         let treasury = new_from_parent(&parent);
-        let tx = system_transaction::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+        let tx = sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(parent.get_signature_status(&tx.signatures[0]), None);
     }
@@ -1589,7 +1589,7 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx_transfer_mint_to_1 =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
         trace!("parent process tx ");
         assert_eq!(parent.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         trace!("done parent process tx ");
@@ -1609,7 +1609,7 @@ mod tests {
 
         assert_eq!(treasury.transaction_count(), parent.transaction_count());
         let tx_transfer_1_to_2 =
-            system_transaction::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_1_to_2), Ok(()));
         assert_eq!(treasury.transaction_count(), 2);
         assert_eq!(parent.transaction_count(), 1);
@@ -1818,7 +1818,7 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let key1 = Keypair::new();
         let tx_transfer_mint_to_1 =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         assert_eq!(treasury.is_delta.load(Ordering::Relaxed), true);
     }
@@ -1832,7 +1832,7 @@ mod tests {
 
         // Set is_delta to true
         let tx_transfer_mint_to_1 =
-            system_transaction::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         assert_eq!(treasury.is_votable(), false);
 
@@ -1856,7 +1856,7 @@ mod tests {
 
         // transfer a token
         assert_eq!(
-            treasury1.process_transaction(&system_transaction::transfer(
+            treasury1.process_transaction(&sys_controller::transfer(
                 &mint_keypair,
                 &Keypair::new().pubkey(),
                 1,
@@ -1956,7 +1956,7 @@ mod tests {
 
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
-        let fail_tx = system_transaction::create_user_account(
+        let fail_tx = sys_controller::create_user_account(
             &keypair1,
             &keypair2.pubkey(),
             1,

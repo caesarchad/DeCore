@@ -6,7 +6,7 @@ use crate::hash::{hash, Hash};
 use crate::waterclock_config::WaterClockConfig;
 use crate::pubkey::Pubkey;
 use crate::signature::{Keypair, KeypairUtil};
-use crate::system_program;
+use crate::sys_controller;
 use crate::constants::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_DROPS_PER_SLOT};
 use std::fs::File;
 use std::io::Write;
@@ -33,7 +33,7 @@ pub fn create_genesis_block(difs: u64) -> (GenesisBlock, Keypair) {
             &Pubkey::default(),
             &[(
                 mint_keypair.pubkey(),
-                Account::new(difs, 0, 0, &system_program::id()),
+                Account::new(difs, 0, 0, &sys_controller::id()),
             )],
             &[],
         ),

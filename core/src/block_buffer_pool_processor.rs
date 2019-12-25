@@ -419,7 +419,7 @@ pub mod tests {
     use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
 
     pub fn fill_block_buffer_pool_slot_with_drops(
@@ -788,7 +788,7 @@ pub mod tests {
         let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
         let slot_entries = create_drops(genesis_block.drops_per_slot - 1, genesis_block.hash());
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair.pubkey(),
             1,
@@ -825,7 +825,7 @@ pub mod tests {
         for _ in 0..deducted_from_mint {
             // Transfer one token from the mint to a random account
             let keypair = Keypair::new();
-            let tx = system_transaction::create_user_account(
+            let tx = sys_controller::create_user_account(
                 &mint_keypair,
                 &keypair.pubkey(),
                 1,
@@ -838,7 +838,7 @@ pub mod tests {
             // Add a second Transaction that will produce a
             // OpCodeErr<0, ResultWithNegativeDifs> error when processed
             let keypair2 = Keypair::new();
-            let tx = system_transaction::create_user_account(
+            let tx = sys_controller::create_user_account(
                 &keypair,
                 &keypair2.pubkey(),
                 42,
@@ -930,14 +930,14 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
 
         // ensure treasury can process 2 entries that have a common account and no _drop is registered
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
             2,
             treasury.last_transaction_seal(),
         );
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             2,
@@ -970,7 +970,7 @@ pub mod tests {
         let entry_1_to_mint = next_entry(
             &treasury.last_transaction_seal(),
             1,
-            vec![system_transaction::create_user_account(
+            vec![sys_controller::create_user_account(
                 &keypair1,
                 &mint_keypair.pubkey(),
                 1,
@@ -982,13 +982,13 @@ pub mod tests {
             &entry_1_to_mint.hash,
             1,
             vec![
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
@@ -1030,13 +1030,13 @@ pub mod tests {
             &treasury.last_transaction_seal(),
             1,
             vec![
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     1,
                     treasury.last_transaction_seal(),
                 ),
-                system_transaction::transfer(
+                sys_controller::transfer(
                     &keypair4,
                     &keypair4.pubkey(),
                     1,
@@ -1049,13 +1049,13 @@ pub mod tests {
             &entry_1_to_mint.hash,
             1,
             vec![
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
@@ -1111,7 +1111,7 @@ pub mod tests {
         let entry_1_to_mint = next_entry(
             &treasury.last_transaction_seal(),
             1,
-            vec![system_transaction::transfer(
+            vec![sys_controller::transfer(
                 &keypair1,
                 &mint_keypair.pubkey(),
                 1,
@@ -1127,13 +1127,13 @@ pub mod tests {
             &entry_1_to_mint.hash,
             1,
             vec![
-                system_transaction::create_user_account(
+                sys_controller::create_user_account(
                     &keypair2,
                     &keypair3.pubkey(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
-                system_transaction::transfer(
+                sys_controller::transfer(
                     &keypair1,
                     &mint_keypair.pubkey(),
                     2,
@@ -1150,13 +1150,13 @@ pub mod tests {
             &entry_2_to_3_and_1_to_mint.hash,
             1,
             vec![
-                system_transaction::transfer(
+                sys_controller::transfer(
                     &keypair1,
                     &keypair3.pubkey(),
                     1,
                     treasury.last_transaction_seal(),
                 ),
-                system_transaction::transfer(
+                sys_controller::transfer(
                     &keypair1,
                     &keypair2.pubkey(),
                     1,
@@ -1199,14 +1199,14 @@ pub mod tests {
         let keypair4 = Keypair::new();
 
         //load accounts
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
             1,
             treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             1,
@@ -1216,14 +1216,14 @@ pub mod tests {
 
         // ensure treasury can process 2 entries that do not have a common account and no _drop is registered
         let transaction_seal = treasury.last_transaction_seal();
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &keypair1,
             &keypair3.pubkey(),
             1,
             treasury.last_transaction_seal(),
         );
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &keypair2,
             &keypair4.pubkey(),
             1,
@@ -1250,14 +1250,14 @@ pub mod tests {
         let keypair4 = Keypair::new();
 
         //load accounts
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
             1,
             treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             1,
@@ -1272,10 +1272,10 @@ pub mod tests {
 
         // ensure treasury can process 2 entries that do not have a common account and _drop is registered
         let tx =
-            system_transaction::create_user_account(&keypair2, &keypair3.pubkey(), 1, transaction_seal);
+            sys_controller::create_user_account(&keypair2, &keypair3.pubkey(), 1, transaction_seal);
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let _drop = next_entry(&entry_1.hash, 1, vec![]);
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &keypair1,
             &keypair4.pubkey(),
             1,
@@ -1290,7 +1290,7 @@ pub mod tests {
         assert_eq!(treasury.get_balance(&keypair4.pubkey()), 1);
 
         // ensure that an error is returned for an empty account (keypair2)
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &keypair2,
             &keypair3.pubkey(),
             1,
@@ -1330,7 +1330,7 @@ pub mod tests {
 
         // Make sure other errors don't update the signature cache
         let tx =
-            system_transaction::create_user_account(&mint_keypair, &pubkey, 1000, Hash::default());
+            sys_controller::create_user_account(&mint_keypair, &pubkey, 1000, Hash::default());
         let signature = tx.signatures[0];
 
         // Should fail with transaction_seal not found
@@ -1356,13 +1356,13 @@ pub mod tests {
         let treasury = Treasury::new(&genesis_block);
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
-        let success_tx = system_transaction::create_user_account(
+        let success_tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair1.pubkey(),
             1,
             treasury.last_transaction_seal(),
         );
-        let fail_tx = system_transaction::create_user_account(
+        let fail_tx = sys_controller::create_user_account(
             &mint_keypair,
             &keypair2.pubkey(),
             2,
@@ -1417,7 +1417,7 @@ pub mod tests {
                     next_entry_mut(
                         &mut hash,
                         0,
-                        vec![system_transaction::transfer(
+                        vec![sys_controller::transfer(
                             &keypairs[i],
                             &keypairs[i + NUM_TRANSFERS].pubkey(),
                             1,
@@ -1441,7 +1441,7 @@ pub mod tests {
                     next_entry_mut(
                         &mut hash,
                         0,
-                        vec![system_transaction::transfer(
+                        vec![sys_controller::transfer(
                             &keypairs[i + NUM_TRANSFERS],
                             &keypairs[i].pubkey(),
                             1,

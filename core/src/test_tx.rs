@@ -2,15 +2,14 @@ use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::EncodedOpCodes;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode::SysOpCode;
-use morgan_interface::system_program;
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::transaction::Transaction;
 
 pub fn test_tx() -> Transaction {
     let keypair1 = Keypair::new();
     let pubkey1 = keypair1.pubkey();
     let zero = Hash::default();
-    system_transaction::create_user_account(&keypair1, &pubkey1, 42, zero)
+    sys_controller::create_user_account(&keypair1, &pubkey1, 42, zero)
 }
 
 pub fn test_multisig_tx() -> Transaction {
@@ -22,7 +21,7 @@ pub fn test_multisig_tx() -> Transaction {
 
     let transfer_instruction = SysOpCode::Transfer { difs };
 
-    let program_ids = vec![system_program::id(), morgan_bvm_script::id()];
+    let program_ids = vec![sys_controller::id(), morgan_bvm_script::id()];
 
     let instructions = vec![EncodedOpCodes::new(
         0,

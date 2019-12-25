@@ -863,7 +863,7 @@ mod tests {
     use itertools::Itertools;
     use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
     use std::sync::mpsc::channel;
     use std::thread::sleep;
@@ -976,7 +976,7 @@ mod tests {
 
             // fund another account so we can send 2 good transactions in a single batch.
             let keypair = Keypair::new();
-            let fund_tx = system_transaction::create_user_account(
+            let fund_tx = sys_controller::create_user_account(
                 &mint_keypair,
                 &keypair.pubkey(),
                 2,
@@ -986,16 +986,16 @@ mod tests {
 
             // good tx
             let to = Pubkey::new_rand();
-            let tx = system_transaction::create_user_account(&mint_keypair, &to, 1, start_hash);
+            let tx = sys_controller::create_user_account(&mint_keypair, &to, 1, start_hash);
 
             // good tx, but no verify
             let to2 = Pubkey::new_rand();
-            let tx_no_ver = system_transaction::create_user_account(&keypair, &to2, 2, start_hash);
+            let tx_no_ver = sys_controller::create_user_account(&keypair, &to2, 2, start_hash);
 
             // bad tx, AccountNotFound
             let keypair = Keypair::new();
             let to3 = Pubkey::new_rand();
-            let tx_anf = system_transaction::create_user_account(&keypair, &to3, 1, start_hash);
+            let tx_anf = sys_controller::create_user_account(&keypair, &to3, 1, start_hash);
 
             // send 'em over
             let packets = to_packets(&[tx_no_ver, tx_anf, tx]);
@@ -1069,7 +1069,7 @@ mod tests {
 
         // Process a batch that includes a transaction that receives two difs.
         let alice = Keypair::new();
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &mint_keypair,
             &alice.pubkey(),
             2,
@@ -1084,7 +1084,7 @@ mod tests {
         verified_sender.send(packets).unwrap();
 
         // Process a second batch that spends one of those difs.
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &alice,
             &mint_keypair.pubkey(),
             1,
@@ -1189,8 +1189,8 @@ mod tests {
             let pubkey2 = Pubkey::new_rand();
 
             let transactions = vec![
-                system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-                system_transaction::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
+                sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+                sys_controller::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
             ];
 
             let mut results = vec![Ok(()), Ok(())];
@@ -1248,41 +1248,41 @@ mod tests {
 
         let transactions = vec![
             None,
-            Some(system_transaction::transfer(
+            Some(sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 1,
                 genesis_block.hash(),
             )),
-            Some(system_transaction::transfer(
+            Some(sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 1,
                 genesis_block.hash(),
             )),
-            Some(system_transaction::transfer(
-                &mint_keypair,
-                &pubkey,
-                1,
-                genesis_block.hash(),
-            )),
-            None,
-            None,
-            Some(system_transaction::transfer(
+            Some(sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 1,
                 genesis_block.hash(),
             )),
             None,
-            Some(system_transaction::transfer(
+            None,
+            Some(sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 1,
                 genesis_block.hash(),
             )),
             None,
-            Some(system_transaction::transfer(
+            Some(sys_controller::transfer(
+                &mint_keypair,
+                &pubkey,
+                1,
+                genesis_block.hash(),
+            )),
+            None,
+            Some(sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 1,
@@ -1293,12 +1293,12 @@ mod tests {
         ];
 
         let filtered_transactions = vec![
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
         ];
 
         assert_eq!(
@@ -1328,12 +1328,12 @@ mod tests {
         let pubkey = Pubkey::new_rand();
 
         let transactions = vec![
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
         ];
 
         assert_eq!(
@@ -1470,7 +1470,7 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let pubkey = Pubkey::new_rand();
 
-        let transactions = vec![system_transaction::transfer(
+        let transactions = vec![sys_controller::transfer(
             &mint_keypair,
             &pubkey,
             1,
@@ -1525,7 +1525,7 @@ mod tests {
 
             assert_eq!(done, true);
 
-            let transactions = vec![system_transaction::transfer(
+            let transactions = vec![sys_controller::transfer(
                 &mint_keypair,
                 &pubkey,
                 2,
@@ -1561,8 +1561,8 @@ mod tests {
         let pubkey1 = Pubkey::new_rand();
 
         let transactions = vec![
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&mint_keypair, &pubkey1, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey1, 1, genesis_block.hash()),
         ];
 
         let working_treasury = WorkingTreasury {

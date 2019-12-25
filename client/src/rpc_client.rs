@@ -549,7 +549,7 @@ mod tests {
     use serde_json::Number;
     use morgan_logger;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
     use std::sync::mpsc::channel;
     use std::thread;
@@ -656,7 +656,7 @@ mod tests {
         let key = Keypair::new();
         let to = Pubkey::new_rand();
         let transaction_seal = Hash::default();
-        let tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
+        let tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
 
         let signature = rpc_client.send_transaction(&tx);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -705,7 +705,7 @@ mod tests {
         let key = Keypair::new();
         let to = Pubkey::new_rand();
         let transaction_seal = Hash::default();
-        let mut tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
+        let mut tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
 
         let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&key]);
         result.unwrap();
@@ -728,8 +728,8 @@ mod tests {
         let transaction_seal: Hash = "HUu3LwEzGRsUkuJS121jzkPJW39Kq62pXCTmTa1F9jDL"
             .parse()
             .unwrap();
-        let prev_tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
-        let mut tx = system_transaction::create_user_account(&key, &to, 50, transaction_seal);
+        let prev_tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
+        let mut tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
 
         rpc_client.resign_transaction(&mut tx, &[&key]).unwrap();
 

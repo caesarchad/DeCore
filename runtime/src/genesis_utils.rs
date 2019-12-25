@@ -2,7 +2,7 @@ use morgan_interface::account::Account;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_program;
+use morgan_interface::sys_controller;
 use morgan_stake_api::stake_state;
 use morgan_vote_api::vote_state;
 
@@ -35,13 +35,13 @@ pub fn create_genesis_block_with_leader(
         &[
             (
                 mint_keypair.pubkey(),
-                Account::new(mint_difs, 0, 0, &system_program::id()),
+                Account::new(mint_difs, 0, 0, &sys_controller::id()),
             ),
             // node needs an account to issue votes and storage proofs from, this will require
             //  airdrops at some point to cover fees...
             (
                 *bootstrap_leader_pubkey,
-                Account::new(42, 0, 0, &system_program::id()),
+                Account::new(42, 0, 0, &sys_controller::id()),
             ),
             // where votes go to
             (voting_keypair.pubkey(), vote_account),

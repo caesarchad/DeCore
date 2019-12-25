@@ -10,7 +10,7 @@ use morgan_interface::account_host::AccountHost;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::timing::timestamp;
 use morgan_interface::timing::{duration_as_ms, duration_as_s};
 use morgan_interface::transaction::Transaction;
@@ -239,7 +239,7 @@ fn generate_txs(
         .par_iter()
         .map(|(id, keypair)| {
             (
-                system_transaction::create_user_account(id, &keypair.pubkey(), 1, *transaction_seal),
+                sys_controller::create_user_account(id, &keypair.pubkey(), 1, *transaction_seal),
                 timestamp(),
             )
         })

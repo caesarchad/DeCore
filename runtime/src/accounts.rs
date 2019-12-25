@@ -15,7 +15,7 @@ use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::bultin_mounter;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_program;
+use morgan_interface::sys_controller;
 use morgan_interface::transaction::Result;
 use morgan_interface::transaction::{Transaction, TransactionError};
 use std::borrow::Borrow;
@@ -192,7 +192,7 @@ impl Accounts {
             if called_accounts.is_empty() || called_accounts[0].difs == 0 {
                 error_counters.account_not_found += 1;
                 Err(TransactionError::AccountNotFound)
-            } else if called_accounts[0].owner != system_program::id() {
+            } else if called_accounts[0].owner != sys_controller::id() {
                 error_counters.invalid_account_for_fee += 1;
                 Err(TransactionError::InvalidAccountForFee)
             } else if called_accounts[0].difs < fee {

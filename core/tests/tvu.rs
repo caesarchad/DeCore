@@ -19,7 +19,7 @@ use morgan::transaction_verify_centre::{Sockets, BlazeUnit};
 use morgan::verifier;
 use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use std::fs::remove_dir_all;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -153,7 +153,7 @@ fn test_replay() {
             let entry0 = next_entry_mut(&mut cur_hash, i, vec![]);
             let entry_drop0 = next_entry_mut(&mut cur_hash, i + 1, vec![]);
 
-            let tx0 = system_transaction::create_user_account(
+            let tx0 = sys_controller::create_user_account(
                 &mint_keypair,
                 &bob_keypair.pubkey(),
                 transfer_amount,

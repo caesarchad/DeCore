@@ -293,8 +293,7 @@ mod tests {
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_program;
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::{self, Transaction};
     use std::sync::RwLock;
     use std::thread::sleep;
@@ -336,7 +335,7 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
 
         // Test signature subscriptions
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let session = create_session();
         let (subscriber, _id_receiver, mut receiver) =
@@ -375,7 +374,7 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
         io.extend_with(rpc.to_delegate());
 
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"signatureSubscribe","params":["{}"]}}"#,
             tx.signatures[0].to_string()
@@ -436,7 +435,7 @@ mod tests {
             None,
         );
 
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &alice,
             &contract_funds.pubkey(),
             51,
@@ -485,7 +484,7 @@ mod tests {
             assert_eq!(serde_json::to_string(&expected).unwrap(), response);
         }
 
-        let tx = system_transaction::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
+        let tx = sys_controller::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
         let ix = sc_opcode::apply_signature(
@@ -563,7 +562,7 @@ mod tests {
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
         rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
 
-        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
         treasury_forks
             .write()
             .unwrap()
@@ -592,7 +591,7 @@ mod tests {
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
         rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
 
-        let tx = system_transaction::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
         treasury_forks
             .write()
             .unwrap()
@@ -616,7 +615,7 @@ mod tests {
            "method": "accountNotification",
            "params": {
                "result": {
-                   "owner": system_program::id(),
+                   "owner": sys_controller::id(),
                    "difs": 100,
                    "reputations": 0,
                    "data": [],

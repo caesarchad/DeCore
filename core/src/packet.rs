@@ -634,7 +634,7 @@ mod tests {
     use rand::Rng;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use std::io;
     use std::io::Write;
     use std::net::{SocketAddr, UdpSocket};
@@ -680,7 +680,7 @@ mod tests {
     fn test_to_packets() {
         let keypair = Keypair::new();
         let hash = Hash::new(&[1; 32]);
-        let tx = system_transaction::create_user_account(&keypair, &keypair.pubkey(), 1, hash);
+        let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 1, hash);
         let rv = to_packets(&vec![tx.clone(); 1]);
         assert_eq!(rv.len(), 1);
         assert_eq!(rv[0].packets.len(), 1);

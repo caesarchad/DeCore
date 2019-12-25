@@ -56,7 +56,7 @@ mod tests {
     use crate::genesis_utils::{create_genesis_block_with_leader, GenesisBlockInfo};
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
 
     #[test]
     fn test_account_locks() {
@@ -120,8 +120,8 @@ mod tests {
         let pubkey2 = Pubkey::new_rand();
 
         let txs = vec![
-            system_transaction::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            system_transaction::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
         ];
 
         (treasury, txs)

@@ -20,7 +20,7 @@ use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::Signature;
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::timing::{duration_as_ms, timestamp,};
 use morgan_interface::constants::{DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,};
 use std::iter;
@@ -104,7 +104,7 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
-    let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
+    let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     trace!("txs: {}", txes);
     let transactions: Vec<_> = (0..txes)
         .into_par_iter()
@@ -121,7 +121,7 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
         .collect();
     // fund all the accounts
     transactions.iter().for_each(|tx| {
-        let fund = system_transaction::transfer(
+        let fund = sys_controller::transfer(
             &mint_keypair,
             &tx.message.account_keys[0],
             mint_total / txes as u64,
@@ -215,7 +215,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
     let to_pubkey = Pubkey::new_rand();
-    let dummy = system_transaction::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
+    let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     let transactions: Vec<_> = (0..txes)
         .into_par_iter()
         .map(|_| {
@@ -247,7 +247,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         })
         .collect();
     transactions.iter().for_each(|tx| {
-        let fund = system_transaction::transfer(
+        let fund = sys_controller::transfer(
             &mint_keypair,
             &tx.message.account_keys[0],
             mint_total / txes as u64,

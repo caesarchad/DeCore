@@ -15,7 +15,7 @@ use morgan_interface::message::Message;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::constants::DEFAULT_SLOTS_PER_EPOCH;
 use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use morgan_interface::transaction::Transaction;
@@ -389,7 +389,7 @@ impl LocalNodeGroup {
     ) -> u64 {
         trace!("getting leader transaction_seal");
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
-        let mut tx = system_transaction::create_user_account(
+        let mut tx = sys_controller::create_user_account(
             &source_keypair,
             dest_pubkey,
             difs,

@@ -3,7 +3,7 @@ use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::sys_opcode::{SystemError, SysOpCode};
-use morgan_interface::system_program;
+use morgan_interface::sys_controller;
 
 const FROM_ACCOUNT_INDEX: usize = 0;
 const TO_ACCOUNT_INDEX: usize = 1;
@@ -15,13 +15,13 @@ fn create_system_account(
     space: u64,
     program_id: &Pubkey,
 ) -> Result<(), SystemError> {
-    if !system_program::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
+    if !sys_controller::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
         debug!("CreateAccount: invalid account[from] owner");
         Err(SystemError::SourceNotSystemAccount)?;
     }
 
     if !keyed_accounts[TO_ACCOUNT_INDEX].account.data.is_empty()
-        || !system_program::check_id(&keyed_accounts[TO_ACCOUNT_INDEX].account.owner)
+        || !sys_controller::check_id(&keyed_accounts[TO_ACCOUNT_INDEX].account.owner)
     {
         debug!(
             "CreateAccount: invalid argument; account {} already in use",
@@ -51,13 +51,13 @@ fn create_system_account_with_reputation(
     space: u64,
     program_id: &Pubkey,
 ) -> Result<(), SystemError> {
-    if !system_program::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
+    if !sys_controller::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
         debug!("CreateAccount: invalid account[from] owner");
         Err(SystemError::SourceNotSystemAccount)?;
     }
 
     if !keyed_accounts[TO_ACCOUNT_INDEX].account.data.is_empty()
-        || !system_program::check_id(&keyed_accounts[TO_ACCOUNT_INDEX].account.owner)
+        || !sys_controller::check_id(&keyed_accounts[TO_ACCOUNT_INDEX].account.owner)
     {
         debug!(
             "CreateAccount: invalid argument; account {} already in use",
@@ -148,7 +148,7 @@ pub fn handle_opcode(
                 program_id,
             } => create_system_account_with_reputation(keyed_accounts, reputations, space, &program_id),
             SysOpCode::Assign { program_id } => {
-                if !system_program::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
+                if !sys_controller::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
                     Err(OpCodeErr::IncorrectProgramId)?;
                 }
                 assign_account_to_program(keyed_accounts, &program_id)
@@ -174,14 +174,14 @@ mod tests {
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::opcodes::{AccountMeta, OpCode, OpCodeErr};
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_program;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
 
     #[test]
     fn test_create_system_account() {
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &system_program::id());
+        let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
         let to = Pubkey::new_rand();
         let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
@@ -207,7 +207,7 @@ mod tests {
     fn test_create_system_account_with_reputation() {
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(2, 100, 0, &system_program::id());
+        let mut from_account = Account::new(2, 100, 0, &sys_controller::id());
 
         let to = Pubkey::new_rand();
         let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
@@ -232,7 +232,7 @@ mod tests {
         // Attempt to create account with more difs than remaining in from_account
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &system_program::id());
+        let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
         let to = Pubkey::new_rand();
         let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
@@ -254,7 +254,7 @@ mod tests {
         // Attempt to create account with more reputations than remaining in from_account
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(0, 100, 0, &system_program::id());
+        let mut from_account = Account::new(0, 100, 0, &sys_controller::id());
 
         let to = Pubkey::new_rand();
         let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
@@ -277,7 +277,7 @@ mod tests {
         // Attempt to create system account in account already owned by another program
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &system_program::id());
+        let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
         let original_program_owner = Pubkey::new(&[5; 32]);
         let owned_key = Pubkey::new_rand();
@@ -300,7 +300,7 @@ mod tests {
         // Attempt to create system account in account with populated data
         let new_program_owner = Pubkey::new(&[9; 32]);
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &system_program::id());
+        let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
         let populated_key = Pubkey::new_rand();
         let mut populated_account = Account {
@@ -343,7 +343,7 @@ mod tests {
         let new_program_owner = Pubkey::new(&[9; 32]);
 
         let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &system_program::id());
+        let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
         let mut keyed_accounts = [KeyedAccount::new(&from, true, &mut from_account)];
         assign_account_to_program(&mut keyed_accounts, &new_program_owner).unwrap();
         let from_owner = from_account.owner;
@@ -356,7 +356,7 @@ mod tests {
             program_id: another_program_owner,
         };
         let data = serialize(&instruction).unwrap();
-        let result = handle_opcode(&system_program::id(), &mut keyed_accounts, &data, 0);
+        let result = handle_opcode(&sys_controller::id(), &mut keyed_accounts, &data, 0);
         assert_eq!(result, Err(OpCodeErr::IncorrectProgramId));
         assert_eq!(from_account.owner, new_program_owner);
     }
@@ -436,7 +436,7 @@ mod tests {
             AccountMeta::new(mallory_pubkey, true),
         ];
         let malicious_instruction = OpCode::new(
-            system_program::id(),
+            sys_controller::id(),
             &SysOpCode::Transfer { difs: 10 },
             account_metas,
         );

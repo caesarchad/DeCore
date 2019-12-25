@@ -15,7 +15,7 @@ use bitconch_interface::message::Message;
 use bitconch_interface::waterclock_config::WaterClockConfig;
 use bitconch_interface::pubkey::Pubkey;
 use bitconch_interface::signature::{Keypair, KeypairUtil};
-use bitconch_interface::system_transaction;
+use bitconch_interface::sys_controller;
 use bitconch_interface::constants::DEFAULT_SLOTS_PER_EPOCH;
 use bitconch_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use bitconch_interface::transaction::Transaction;
@@ -389,7 +389,7 @@ impl LocalNodeGroup {
     ) -> u64 {
         trace!("getting leader transaction_seal");
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
-        let mut tx = system_transaction::create_user_account(
+        let mut tx = sys_controller::create_user_account(
             &source_keypair,
             dest_pubkey,
             difs,

@@ -1,7 +1,7 @@
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::transaction::Transaction;
 use std::io::{Error, ErrorKind};
 use std::net::SocketAddr;
@@ -18,6 +18,6 @@ pub fn request_airdrop_transaction(
     let key = Keypair::new();
     let to = Pubkey::new_rand();
     let transaction_seal = Hash::default();
-    let tx = system_transaction::create_user_account(&key, &to, difs, transaction_seal);
+    let tx = sys_controller::create_user_account(&key, &to, difs, transaction_seal);
     Ok(tx)
 }

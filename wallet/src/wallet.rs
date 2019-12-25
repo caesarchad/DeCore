@@ -24,7 +24,7 @@ use morgan_interface::message::Message;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::signature::{read_keypair, Keypair, KeypairUtil, Signature};
 use morgan_interface::sys_opcode::SystemError;
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::transaction::{Transaction, TransactionError};
 use morgan_stake_api::stake_opcode;
 use morgan_storage_api::storage_opcode;
@@ -750,7 +750,7 @@ fn process_deploy(
         )
     })?;
 
-    let mut tx = system_transaction::create_account(
+    let mut tx = sys_controller::create_account(
         &config.keypair,
         &program_id.pubkey(),
         transaction_seal,
@@ -811,7 +811,7 @@ fn process_pay(
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
 
     if timestamp == None && *witnesses == None {
-        let mut tx = system_transaction::transfer(&config.keypair, to, difs, transaction_seal);
+        let mut tx = sys_controller::transfer(&config.keypair, to, difs, transaction_seal);
         let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&config.keypair]);
         let signature_str = log_instruction_custom_error::<SystemError>(result)?;
         Ok(signature_str.to_string())

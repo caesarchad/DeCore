@@ -7,7 +7,7 @@ use morgan::verifier::new_validator_for_tests;
 use morgan_client::rpc_client::get_rpc_request_str;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
 use std::time::Duration;
@@ -45,7 +45,7 @@ fn test_rpc_send_tx() {
             module_path!().to_string()
         )
     );
-    let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+    let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
     let serial_tx = serialize(&tx).unwrap();
 
     let client = reqwest::Client::new();

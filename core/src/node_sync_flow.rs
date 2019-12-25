@@ -240,7 +240,7 @@ mod test {
     use serde_json::Value;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use std::collections::HashSet;
 
     #[test]
@@ -251,8 +251,8 @@ mod test {
 
         let keypair0 = Keypair::new();
         let keypair1 = Keypair::new();
-        let tx0 = system_transaction::transfer(&keypair0, &keypair1.pubkey(), 1, Hash::default());
-        let tx1 = system_transaction::transfer(&keypair1, &keypair0.pubkey(), 2, Hash::default());
+        let tx0 = sys_controller::transfer(&keypair0, &keypair1.pubkey(), 1, Hash::default());
+        let tx1 = sys_controller::transfer(&keypair1, &keypair0.pubkey(), 2, Hash::default());
         let serialized_tx0 = serialize(&tx0).unwrap();
         let serialized_tx1 = serialize(&tx1).unwrap();
         let entry = FsclStmt::new(&Hash::default(), 1, vec![tx0, tx1]);

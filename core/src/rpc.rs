@@ -640,7 +640,7 @@ mod tests {
     use morgan_interface::hash::{hash, Hash};
     use morgan_interface::opcodes::OpCodeErr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
     use std::thread;
 
@@ -652,10 +652,10 @@ mod tests {
         let exit = Arc::new(AtomicBool::new(false));
 
         let transaction_seal = treasury.confirmed_last_transaction_seal();
-        let tx = system_transaction::transfer(&alice, pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, pubkey, 20, transaction_seal);
         treasury.process_transaction(&tx).expect("process transaction");
 
-        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
         let _ = treasury.process_transaction(&tx);
 
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
@@ -695,7 +695,7 @@ mod tests {
         );
         thread::spawn(move || {
             let transaction_seal = treasury.confirmed_last_transaction_seal();
-            let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+            let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
             treasury.process_transaction(&tx).expect("process transaction");
         })
         .join()
@@ -822,7 +822,7 @@ mod tests {
     fn test_rpc_confirm_tx() {
         let bob_pubkey = Pubkey::new_rand();
         let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"confirmTxn","params":["{}"]}}"#,
@@ -841,7 +841,7 @@ mod tests {
     fn test_rpc_get_signature_status() {
         let bob_pubkey = Pubkey::new_rand();
         let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
@@ -861,7 +861,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on unprocessed tx
-        let tx = system_transaction::transfer(&alice, &bob_pubkey, 10, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_pubkey, 10, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -880,7 +880,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on a TransactionError
-        let tx = system_transaction::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -997,7 +997,7 @@ mod tests {
 
     #[test]
     fn test_rpc_verify_signature() {
-        let tx = system_transaction::transfer(&Keypair::new(), &Pubkey::new_rand(), 20, hash(&[0]));
+        let tx = sys_controller::transfer(&Keypair::new(), &Pubkey::new_rand(), 20, hash(&[0]));
         assert_eq!(
             verify_signature(&tx.signatures[0].to_string()).unwrap(),
             tx.signatures[0]

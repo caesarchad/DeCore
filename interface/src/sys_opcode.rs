@@ -2,7 +2,7 @@ use log::*;
 use crate::opcodes::{AccountMeta, OpCode};
 use crate::opcodes_utils::DecodeError;
 use crate::pubkey::Pubkey;
-use crate::system_program;
+use crate::sys_controller;
 use num_derive::FromPrimitive;
 use morgan_helper::logHelper::*;
 
@@ -78,7 +78,7 @@ pub fn create_account(
     ];
     let reputations = 0;
     OpCode::new(
-        system_program::id(),
+        sys_controller::id(),
         &SysOpCode::CreateAccount {
             difs,
             reputations,
@@ -108,7 +108,7 @@ pub fn create_account_with_reputation(
         )
     );
     OpCode::new(
-        system_program::id(),
+        sys_controller::id(),
         &SysOpCode::CreateAccountWithReputation {
             reputations,
             space,
@@ -120,13 +120,13 @@ pub fn create_account_with_reputation(
 
 /// Create and sign a transaction to create a system account
 pub fn create_user_account(from_pubkey: &Pubkey, to_pubkey: &Pubkey, difs: u64) -> OpCode {
-    let program_id = system_program::id();
+    let program_id = sys_controller::id();
     create_account(from_pubkey, to_pubkey, difs, 0, &program_id)
 }
 
 /// Create and sign a transaction to create a system account with reputation
 pub fn create_user_account_with_reputation(from_pubkey: &Pubkey, to_pubkey: &Pubkey, reputations: u64) -> OpCode {
-    let program_id = system_program::id();
+    let program_id = sys_controller::id();
     // info!("{}", Info(format!("create_user_account_with_reputation to : {:?}", to_pubkey).to_string()));
     println!("{}",
         printLn(
@@ -140,7 +140,7 @@ pub fn create_user_account_with_reputation(from_pubkey: &Pubkey, to_pubkey: &Pub
 pub fn assign(from_pubkey: &Pubkey, program_id: &Pubkey) -> OpCode {
     let account_metas = vec![AccountMeta::new(*from_pubkey, true)];
     OpCode::new(
-        system_program::id(),
+        sys_controller::id(),
         &SysOpCode::Assign {
             program_id: *program_id,
         },
@@ -154,7 +154,7 @@ pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, difs: u64) -> OpCode {
         AccountMeta::new(*to_pubkey, false),
     ];
     OpCode::new(
-        system_program::id(),
+        sys_controller::id(),
         &SysOpCode::Transfer { difs },
         account_metas,
     )
@@ -166,7 +166,7 @@ pub fn transfer_reputations(from_pubkey: &Pubkey, to_pubkey: &Pubkey, reputation
         AccountMeta::new(*to_pubkey, false),
     ];
     OpCode::new(
-        system_program::id(),
+        sys_controller::id(),
         &SysOpCode::TransferReputations { reputations },
         account_metas,
     )

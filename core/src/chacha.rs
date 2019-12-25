@@ -181,7 +181,7 @@ mod tests {
     use morgan_interface::keymaker::ChaKeys;
     use morgan_interface::hash::{hash, Hash, Hasher};
     use morgan_interface::signature::KeypairUtil;
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use std::fs::remove_file;
     use std::fs::File;
     use std::io::Read;
@@ -203,7 +203,7 @@ mod tests {
                 FsclStmt::new_mut(
                     &mut id,
                     &mut num_hashes,
-                    vec![system_transaction::create_user_account(
+                    vec![sys_controller::create_user_account(
                         &keypair,
                         &keypair.pubkey(),
                         1,

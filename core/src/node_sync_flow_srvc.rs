@@ -166,7 +166,7 @@ mod test {
     use serde_json::Value;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_interface::system_transaction;
+    use morgan_interface::sys_controller;
     use std::sync::mpsc::channel;
 
     #[test]
@@ -194,7 +194,7 @@ mod test {
 
         let keypair = Keypair::new();
         let mut transaction_seal = entries[3].hash;
-        let tx = system_transaction::create_user_account(
+        let tx = sys_controller::create_user_account(
             &keypair,
             &keypair.pubkey(),
             1,

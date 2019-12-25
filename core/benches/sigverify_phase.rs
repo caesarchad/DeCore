@@ -11,7 +11,7 @@ use morgan::signature_verify_phase ::SigVerifyPhase;
 use morgan::test_tx::test_tx;
 use morgan_interface::hash::Hash;
 use morgan_interface::signature::{Keypair, KeypairUtil};
-use morgan_interface::system_transaction;
+use morgan_interface::sys_controller;
 use morgan_interface::timing::duration_as_ms;
 use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
@@ -39,7 +39,7 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
             .into_iter()
             .map(|_| {
                 let amount = thread_rng().gen();
-                let tx = system_transaction::transfer(
+                let tx = sys_controller::transfer(
                     &from_keypair,
                     &to_keypair.pubkey(),
                     amount,

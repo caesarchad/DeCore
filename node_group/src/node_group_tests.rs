@@ -14,7 +14,7 @@ use bitconch_interface::account_host::OnlineAccount;
 use bitconch_interface::hash::Hash;
 use bitconch_interface::waterclock_config::WaterClockConfig;
 use bitconch_interface::signature::{Keypair, KeypairUtil, Signature};
-use bitconch_interface::system_transaction;
+use bitconch_interface::sys_controller;
 use bitconch_interface::timing::duration_as_ms;
 use bitconch_interface::constants::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT,
     NUM_CONSECUTIVE_LEADER_SLOTS,};
@@ -49,7 +49,7 @@ pub fn spend_and_verify_all_nodes(
         assert!(bal > 0);
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut transaction =
-            system_transaction::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
+            sys_controller::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
         let confs = VOTE_THRESHOLD_DEPTH + 1;
         let sig = client
             .retry_transfer_until_confirmed(&funding_keypair, &mut transaction, 5, confs)
@@ -71,7 +71,7 @@ pub fn send_many_transactions(node: &ContactInfo, funding_keypair: &Keypair, num
         assert!(bal > 0);
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut transaction =
-            system_transaction::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
+            sys_controller::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
         client
             .retry_transfer(&funding_keypair, &mut transaction, 5)
             .unwrap();
@@ -265,7 +265,7 @@ pub fn kill_entry_and_spend_and_verify_rest(
 
             let random_keypair = Keypair::new();
             let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
-            let mut transaction = system_transaction::transfer(
+            let mut transaction = sys_controller::transfer(
                 &funding_keypair,
                 &random_keypair.pubkey(),
                 1,
