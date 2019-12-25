@@ -23,5 +23,5 @@ morgan-helper = { path = "../../helper", version = "0.1.0"     }
 morgan-runtime = { path = "../../runtime", version = "0.15.3"     }
 
 [lib]
-name = "morgan_budget_api"
+name = "morgan_bvm_script"
 crate-type = ["lib"]

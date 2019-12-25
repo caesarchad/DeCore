@@ -120,7 +120,7 @@ mod tests {
     const DROPS_IN_SEGMENT: u64 = SLOTS_PER_SEGMENT * DEFAULT_DROPS_PER_SLOT;
 
     fn test_instruction(
-        ix: &Instruction,
+        ix: &OpCode,
         program_accounts: &mut [Account],
         drop_height: u64,
     ) -> Result<(), OpCodeErr> {
@@ -572,7 +572,7 @@ mod tests {
         let storage_transaction_seal = hash(&[x2]);
 
         treasury_client
-            .transfer(10, &mint_keypair, &miner_pubkey)
+            .online_transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
         let message = Message::new(storage_opcode::create_miner_storage_account(

@@ -155,7 +155,7 @@ mod tests {
         );
     }
 
-    fn handle_opcode(instruction: &Instruction) -> Result<(), OpCodeErr> {
+    fn handle_opcode(instruction: &OpCode) -> Result<(), OpCodeErr> {
         let mut accounts = vec![];
         for _ in 0..instruction.accounts.len() {
             accounts.push(Account::default());
