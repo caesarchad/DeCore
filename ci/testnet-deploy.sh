@@ -20,7 +20,7 @@ tarChannelOrTag=edge
 delete=false
 enableGpu=false
 bootDiskType=""
-blockstreamer=false
+node_sync_agent=false
 deployUpdateManifest=true
 fetchLogs=true
 maybeHashesPerDrop=
@@ -48,7 +48,7 @@ Deploys a CD testnet
                                  (default: $tarChannelOrTag)
    -n [number]          - Number of additional full nodes (default: $additionalFullNodeCount)
    -c [number]          - Number of client bencher nodes (default: $clientNodeCount)
-   -u                   - Include a Blockstreamer (default: $blockstreamer)
+   -u                   - Include a NodeSyncAgent (default: $node_sync_agent)
    -P                   - Use public network IP addresses (default: $publicNetwork)
    -G                   - Enable GPU, and set count/type of GPUs to use (e.g n1-standard-16 --accelerator count=2,type=nvidia-tesla-v100)
    -g                   - Enable GPU (default: $enableGpu)
@@ -156,7 +156,7 @@ while getopts "h?p:Pn:c:t:gG:a:Dd:rusxz:p:C:Sfew" opt "${shortArgs[@]}"; do
     failOnValidatorBootupFailure=false
     ;;
   u)
-    blockstreamer=true
+    node_sync_agent=true
     ;;
   S)
     stopNetwork=true
@@ -228,7 +228,7 @@ if ! $skipCreate; then
   # shellcheck disable=SC2206
   create_args+=(${zone_args[@]})
 
-  if $blockstreamer; then
+  if $node_sync_agent; then
     create_args+=(-u)
   fi
 

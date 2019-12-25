@@ -17,11 +17,11 @@ fullnode_usage() {
   cat <<EOF
 
 Fullnode Usage:
-usage: $0 [--blockstream PATH] [--init-complete-file FILE] [--label LABEL] [--stake DIFS] [--no-voting] [--rpc-port port] [rsync network path to bootstrap leader configuration] [cluster connection url]
+usage: $0 [--nodesyncflow PATH] [--init-complete-file FILE] [--label LABEL] [--stake DIFS] [--no-voting] [--rpc-port port] [rsync network path to bootstrap leader configuration] [cluster connection url]
 
 Start a validator or a storage-miner
 
-  --blockstream PATH        - open blockstream at this unix domain socket location
+  --nodesyncflow PATH        - open nodesyncflow at this unix domain socket location
   --init-complete-file FILE - create this file, if it doesn't already exist, once node initialization is complete
   --label LABEL             - Append the given label to the configuration files, useful when running
                               multiple fullnodes in the same workspace
@@ -196,7 +196,7 @@ while [[ -n $1 ]]; do
     elif [[ $1 = --poll-for-new-genesis-block ]]; then
       poll_for_new_genesis_block=1
       shift
-    elif [[ $1 = --blockstream ]]; then
+    elif [[ $1 = --nodesyncflow ]]; then
       stake=0
       args+=("$1" "$2")
       shift 2

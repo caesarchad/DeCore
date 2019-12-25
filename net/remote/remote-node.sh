@@ -93,7 +93,7 @@ local|tar)
     nohup ./multinode-demo/validator.sh --bootstrap-leader "${args[@]}" > fullnode.log 2>&1 &
     sleep 1
     ;;
-  validator|blockstreamer)
+  validator|node_sync_agent)
     net/scripts/rsync-retry.sh -vPrc "$entrypointIp":~/.cargo/bin/ ~/.cargo/bin/
 
     if [[ -e /dev/nvidia0 && -x ~/.cargo/bin/morgan-validator-cuda ]]; then
@@ -106,9 +106,9 @@ local|tar)
       --gossip-port 10001
       --rpc-port 10099
     )
-    if [[ $nodeType = blockstreamer ]]; then
+    if [[ $nodeType = node_sync_agent ]]; then
       args+=(
-        --blockstream /tmp/morgan-blockstream.sock
+        --nodesyncflow /tmp/morgan-nodesyncflow.sock
         --no-voting
         --stake 0
       )
@@ -122,9 +122,9 @@ local|tar)
       ./multinode-demo/clear-config.sh
     fi
 
-    if [[ $nodeType = blockstreamer ]]; then
+    if [[ $nodeType = node_sync_agent ]]; then
       # Sneak the mint-keypair.json from the bootstrap leader and run another drone
-      # with it on the blockstreamer node.  Typically the blockstreamer node has
+      # with it on the node_sync_agent node.  Typically the node_sync_agent node has
       # a static IP/DNS name for hosting the blockexplorer web app, and is
       # a location that somebody would expect to be able to airdrop from
       scp "$entrypointIp":~/morgan/config-local/mint-keypair.json config-local/

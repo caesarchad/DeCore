@@ -37,7 +37,7 @@ use morgan_helper::logHelper::*;
 pub struct ValidatorConfig {
     pub sigverify_disabled: bool,
     pub voting_disabled: bool,
-    pub blockstream: Option<String>,
+    pub nodesyncflow: Option<String>,
     pub storage_rotate_count: u64,
     pub account_paths: Option<String>,
     pub rpc_config: JsonRpcConfig,
@@ -51,7 +51,7 @@ impl Default for ValidatorConfig {
         Self {
             sigverify_disabled: false,
             voting_disabled: false,
-            blockstream: None,
+            nodesyncflow: None,
             storage_rotate_count: NUM_HASHES_FOR_STORAGE_ROTATE,
             account_paths: None,
             rpc_config: JsonRpcConfig::default(),
@@ -268,7 +268,7 @@ impl Validator {
             block_buffer_pool.clone(),
             config.storage_rotate_count,
             &storage_state,
-            config.blockstream.as_ref(),
+            config.nodesyncflow.as_ref(),
             ledger_signal_receiver,
             &subscriptions,
             &waterclock_recorder,

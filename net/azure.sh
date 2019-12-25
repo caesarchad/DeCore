@@ -55,7 +55,7 @@ esac
 prefix=testnet-dev-${USER//[^A-Za-z0-9]/}
 additionalFullNodeCount=5
 clientNodeCount=1
-blockstreamer=false
+node_sync_agent=false
 fullNodeBootDiskSizeInGb=1000
 clientBootDiskSizeInGb=75
 externalNodes=false
@@ -95,7 +95,7 @@ Manage testnet instances
    -z [zone]        - Zone(s) for the nodes (default: $(cloud_DefaultZone))
                       If specified multiple times, the fullnodes will be evenly
                       distributed over all specified zones and
-                      client/blockstreamer nodes will be created in the first
+                      client/node_sync_agent nodes will be created in the first
                       zone
    -x               - append to the existing configuration instead of creating a
                       new configuration
@@ -104,12 +104,12 @@ Manage testnet instances
  create-specific options:
    -n [number]      - Number of additional fullnodes (default: $additionalFullNodeCount)
    -c [number]      - Number of client nodes (default: $clientNodeCount)
-   -u               - Include a Blockstreamer (default: $blockstreamer)
+   -u               - Include a NodeSyncAgent (default: $node_sync_agent)
    -P               - Use public network IP addresses (default: $publicNetwork)
    -g               - Enable GPU (default: $enableGpu)
    -G               - Enable GPU, and set count/type of GPUs to use
                       (e.g $gpuBootstrapLeaderMachineType)
-   -a [address]     - Address to be be assigned to the Blockstreamer if present,
+   -a [address]     - Address to be be assigned to the NodeSyncAgent if present,
                       otherwise the bootstrap fullnode.
                       * For GCE, [address] is the "name" of the desired External
                         IP Address.
@@ -177,7 +177,7 @@ while getopts "h?p:Pn:c:z:gG:a:d:uxf" opt; do
     bootDiskType=$OPTARG
     ;;
   u)
-    blockstreamer=true
+    node_sync_agent=true
     ;;
   x)
     externalNodes=true
@@ -462,13 +462,13 @@ EOF
   }
 
   if $externalNodes; then
-    echo "Let's not reset the current blockstream configuration"
+    echo "Let's not reset the current nodesyncflow configuration"
   else
     echo "blockstreamerIpList=()" >> "$configFile"
     echo "blockstreamerIpListPrivate=()" >> "$configFile"
   fi
-  echo "Looking for blockstreamer instances..."
-  cloud_FindInstances "$prefix-blockstreamer"
+  echo "Looking for node_sync_agent instances..."
+  cloud_FindInstances "$prefix-node_sync_agent"
   [[ ${#instances[@]} -eq 0 ]] || {
     cloud_ForEachInstance recordInstanceIp true blockstreamerIpList
   }
@@ -526,7 +526,7 @@ create)
   Bootstrap leader = $bootstrapLeaderMachineType (GPU=$enableGpu)
   Additional fullnodes = $additionalFullNodeCount x $fullNodeMachineType
   Client(s) = $clientNodeCount x $clientMachineType
-  Blockstreamer = $blockstreamer
+  NodeSyncAgent = $node_sync_agent
 ========================================================================================
 
 EOF
@@ -606,7 +606,7 @@ touch /.instance-startup-complete
 
 EOF
 
-  if $blockstreamer; then
+  if $node_sync_agent; then
     blockstreamerAddress=$customAddress
   else
     bootstrapLeaderAddress=$customAddress
@@ -653,8 +653,8 @@ EOF
       "$startupScript" "" "$bootDiskType"
   fi
 
-  if $blockstreamer; then
-    cloud_CreateInstances "$prefix" "$prefix-blockstreamer" "1" \
+  if $node_sync_agent; then
+    cloud_CreateInstances "$prefix" "$prefix-node_sync_agent" "1" \
       "$enableGpu" "$blockstreamerMachineType" "${zones[0]}" "$fullNodeBootDiskSizeInGb" \
       "$startupScript" "$blockstreamerAddress" "$bootDiskType"
   fi
@@ -699,7 +699,7 @@ info)
     ipAddress=${blockstreamerIpList[$i]}
     ipAddressPrivate=${blockstreamerIpListPrivate[$i]}
     zone=${blockstreamerIpListZone[$i]}
-    printNode blockstreamer "$ipAddress" "$ipAddressPrivate" "$zone"
+    printNode node_sync_agent "$ipAddress" "$ipAddressPrivate" "$zone"
   done
   ;;
 *)

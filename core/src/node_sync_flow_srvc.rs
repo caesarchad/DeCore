@@ -1,12 +1,12 @@
-//! The `blockstream_service` implements optional streaming of entries and block metadata
-//! using the `blockstream` module, providing client services such as a block explorer with
+//! The `nodesync_srvc` implements optional streaming of entries and block metadata
+//! using the `nodesyncflow` module, providing client services such as a block explorer with
 //! real-time access to entries.
 
-use crate::block_stream::BlockstreamEvents;
+use crate::node_sync_flow::NodeSyncEvents;
 #[cfg(test)]
-use crate::block_stream::MockBlockstream as Blockstream;
+use crate::node_sync_flow::FakeNodeSync as NodeSyncFlow;
 #[cfg(not(test))]
-use crate::block_stream::SocketBlockstream as Blockstream;
+use crate::node_sync_flow::SocketNodeSync as NodeSyncFlow;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::result::{Error, Result};
 use crate::service::Service;
@@ -27,8 +27,8 @@ use std::time::Duration;
 use morgan_helper::logHelper::*;
 use std::path::PathBuf;
 
-pub struct BlockstreamService {
-    t_blockstream: JoinHandle<()>,
+pub struct NodeSyncSrvc {
+    nodesync_thread: JoinHandle<()>,
 }
 
 
@@ -63,24 +63,24 @@ pub fn n3h_binaries_directory() -> PathBuf {
     data_root().join(N3H_BINARIES_DIRECTORY)
 }
 
-impl BlockstreamService {
+impl NodeSyncSrvc {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         slot_full_receiver: Receiver<(u64, Pubkey)>,
         block_buffer_pool: Arc<BlockBufferPool>,
-        blockstream_socket: String,
+        node_sync_socket: String,
         exit: &Arc<AtomicBool>,
     ) -> Self {
-        let mut blockstream = Blockstream::new(blockstream_socket);
+        let mut nodesyncflow = NodeSyncFlow::new(node_sync_socket);
         let exit = exit.clone();
-        let t_blockstream = Builder::new()
-            .name("morgan-blockstream".to_string())
+        let nodesync_thread = Builder::new()
+            .name("morgan-nodesyncflow".to_string())
             .spawn(move || loop {
                 if exit.load(Ordering::Relaxed) {
                     break;
                 }
                 if let Err(e) =
-                    Self::handle_fiscal_stmts(&slot_full_receiver, &block_buffer_pool, &mut blockstream)
+                    Self::handle_fiscal_stmts(&slot_full_receiver, &block_buffer_pool, &mut nodesyncflow)
                 {
                     match e {
                         Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => break,
@@ -99,12 +99,12 @@ impl BlockstreamService {
                 }
             })
             .unwrap();
-        Self { t_blockstream }
+        Self { nodesync_thread }
     }
     fn handle_fiscal_stmts(
         slot_full_receiver: &Receiver<(u64, Pubkey)>,
         block_buffer_pool: &Arc<BlockBufferPool>,
-        blockstream: &mut Blockstream,
+        nodesyncflow: &mut NodeSyncFlow,
     ) -> Result<()> {
         let timeout = Duration::new(1, 0);
         let (slot, slot_leader) = slot_full_receiver.recv_timeout(timeout)?;
@@ -130,16 +130,16 @@ impl BlockstreamService {
             if entry.is_drop() {
                 drop_height += 1;
             }
-            blockstream
+            nodesyncflow
                 .emit_fscl_stmt_event(slot, drop_height, &slot_leader, &entry)
                 .unwrap_or_else(|e| {
-                    debug!("Blockstream error: {:?}, {:?}", e, blockstream.output);
+                    debug!("NodeSyncFlow error: {:?}, {:?}", e, nodesyncflow.output);
                 });
             if i == entries.len() - 1 {
-                blockstream
+                nodesyncflow
                     .emit_block_event(slot, drop_height, &slot_leader, entry.hash)
                     .unwrap_or_else(|e| {
-                        debug!("Blockstream error: {:?}, {:?}", e, blockstream.output);
+                        debug!("NodeSyncFlow error: {:?}, {:?}", e, nodesyncflow.output);
                     });
             }
         }
@@ -147,11 +147,11 @@ impl BlockstreamService {
     }
 }
 
-impl Service for BlockstreamService {
+impl Service for NodeSyncSrvc {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
-        self.t_blockstream.join()
+        self.nodesync_thread.join()
     }
 }
 
@@ -183,8 +183,8 @@ mod test {
         let (ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
         let block_buffer_pool = BlockBufferPool::open_ledger_file(&ledger_path).unwrap();
 
-        // Set up blockstream
-        let mut blockstream = Blockstream::new("test_stream".to_string());
+        // Set up nodesyncflow
+        let mut nodesyncflow = NodeSyncFlow::new("test_stream".to_string());
 
         // Set up dummy channel to receive a full-slot notification
         let (slot_full_sender, slot_full_receiver) = channel();
@@ -214,15 +214,15 @@ mod test {
             .unwrap();
 
         slot_full_sender.send((1, leader_pubkey)).unwrap();
-        BlockstreamService::handle_fiscal_stmts(
+        NodeSyncSrvc::handle_fiscal_stmts(
             &slot_full_receiver,
             &Arc::new(block_buffer_pool),
-            &mut blockstream,
+            &mut nodesyncflow,
         )
         .unwrap();
-        assert_eq!(blockstream.entries().len(), 7);
+        assert_eq!(nodesyncflow.entries().len(), 7);
 
-        let (entry_events, block_events): (Vec<Value>, Vec<Value>) = blockstream
+        let (entry_events, block_events): (Vec<Value>, Vec<Value>) = nodesyncflow
             .entries()
             .iter()
             .map(|item| {

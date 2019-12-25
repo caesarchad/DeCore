@@ -15,7 +15,7 @@
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
 use crate::fetch_spot_phase::BlobFetchPhase;
-use crate::block_stream_service::BlockstreamService;
+use crate::node_sync_flow_srvc::NodeSyncSrvc;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
 use crate::node_group_info::NodeGroupInfo;
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
@@ -38,7 +38,7 @@ pub struct BlazeUnit {
     fetch_phase: BlobFetchPhase,
     retransmit_phase: RetransmitPhase,
     replay_phase: RepeatPhase,
-    blockstream_service: Option<BlockstreamService>,
+    nodesync_srvc: Option<NodeSyncSrvc>,
     storage_stage: StoragePhase,
 }
 
@@ -66,7 +66,7 @@ impl BlazeUnit {
         block_buffer_pool: Arc<BlockBufferPool>,
         storage_rotate_count: u64,
         storage_state: &StorageState,
-        blockstream: Option<&String>,
+        nodesyncflow: Option<&String>,
         ledger_signal_receiver: Receiver<bool>,
         subscriptions: &Arc<RpcSubscriptions>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
@@ -129,14 +129,14 @@ impl BlazeUnit {
             leader_schedule_cache,
         );
 
-        let blockstream_service = if blockstream.is_some() {
-            let blockstream_service = BlockstreamService::new(
+        let nodesync_srvc = if nodesyncflow.is_some() {
+            let nodesync_srvc = NodeSyncSrvc::new(
                 slot_full_receiver,
                 block_buffer_pool.clone(),
-                blockstream.unwrap().to_string(),
+                nodesyncflow.unwrap().to_string(),
                 &exit,
             );
-            Some(blockstream_service)
+            Some(nodesync_srvc)
         } else {
             None
         };
@@ -157,7 +157,7 @@ impl BlazeUnit {
             fetch_phase,
             retransmit_phase,
             replay_phase,
-            blockstream_service,
+            nodesync_srvc,
             storage_stage,
         }
     }
@@ -170,8 +170,8 @@ impl Service for BlazeUnit {
         self.retransmit_phase.join()?;
         self.fetch_phase.join()?;
         self.storage_stage.join()?;
-        if self.blockstream_service.is_some() {
-            self.blockstream_service.unwrap().join()?;
+        if self.nodesync_srvc.is_some() {
+            self.nodesync_srvc.unwrap().join()?;
         }
         self.replay_phase.join()?;
         Ok(())

@@ -1,4 +1,4 @@
-//! The `blockstream` module provides a method for streaming entries out via a
+//! The `nodesyncflow` module provides a method for streaming entries out via a
 //! local unix socket, to provide client services such as a block explorer with
 //! real-time access to entries.
 
@@ -63,7 +63,7 @@ impl FiscSatementWriter for FiscStmtCandidate {
     }
 }
 
-pub trait BlockstreamEvents {
+pub trait NodeSyncEvents {
     fn emit_fscl_stmt_event(
         &self,
         slot: u64,
@@ -81,7 +81,7 @@ pub trait BlockstreamEvents {
 }
 
 #[derive(Debug)]
-pub struct Blockstream<T: FiscSatementWriter> {
+pub struct NodeSyncFlow<T: FiscSatementWriter> {
     pub output: T,
 }
 
@@ -118,7 +118,7 @@ pub fn get_free_port(range: Range<u16>) -> Option<u16> {
     None
 }
 
-impl<T> BlockstreamEvents for Blockstream<T>
+impl<T> NodeSyncEvents for NodeSyncFlow<T>
 where
     T: FiscSatementWriter,
 {
@@ -143,12 +143,12 @@ where
                 }
             }
             if be_vote_tx == false {
-                let stream_entry = json!({
+                let stmt_flow = json!({
                     "num_hashes": stmt.num_hashes,
                     "hash": stmt.hash,
                     "transactions": transactions
                 });
-                let json_entry = serde_json::to_string(&stream_entry)?;
+                let json_entry = serde_json::to_string(&stmt_flow)?;
                 let payload = format!(
                     r#"{{"dt":"{}","t":"entry","s":{},"h":{},"l":"{:?}","entry":{}}}"#,
                     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
@@ -200,21 +200,21 @@ where
     }
 }
 
-pub type SocketBlockstream = Blockstream<FiscStmtCandidate>;
+pub type SocketNodeSync = NodeSyncFlow<FiscStmtCandidate>;
 
-impl SocketBlockstream {
+impl SocketNodeSync {
     pub fn new(socket: String) -> Self {
-        Blockstream {
+        NodeSyncFlow {
             output: FiscStmtCandidate { socket },
         }
     }
 }
 
-pub type MockBlockstream = Blockstream<FiscStmtVector>;
+pub type FakeNodeSync = NodeSyncFlow<FiscStmtVector>;
 
-impl MockBlockstream {
+impl FakeNodeSync {
     pub fn new(_: String) -> Self {
-        Blockstream {
+        NodeSyncFlow {
             output: FiscStmtVector::new(),
         }
     }
@@ -264,7 +264,7 @@ mod test {
 
     #[test]
     fn test_blockstream() -> () {
-        let blockstream = MockBlockstream::new("test_stream".to_string());
+        let nodesyncflow = FakeNodeSync::new("test_stream".to_string());
         let drops_per_slot = 5;
 
         let mut transaction_seal = Hash::default();
@@ -278,14 +278,14 @@ mod test {
 
         for drop_height in drop_height_initial..=drop_height_final {
             if drop_height == 5 {
-                blockstream
+                nodesyncflow
                     .emit_block_event(curr_slot, drop_height - 1, &leader_pubkey, transaction_seal)
                     .unwrap();
                 curr_slot += 1;
             }
             let entry = FsclStmt::new(&mut transaction_seal, 1, vec![]); // just drops
             transaction_seal = entry.hash;
-            blockstream
+            nodesyncflow
                 .emit_fscl_stmt_event(curr_slot, drop_height, &leader_pubkey, &entry)
                 .unwrap();
             expected_entries.push(entry.clone());
@@ -293,7 +293,7 @@ mod test {
         }
 
         assert_eq!(
-            blockstream.entries().len() as u64,
+            nodesyncflow.entries().len() as u64,
             // one entry per drop (0..=N+2) is +3, plus one block
             drops_per_slot + 3 + 1
         );
@@ -303,7 +303,7 @@ mod test {
         let mut matched_slots = HashSet::new();
         let mut matched_blocks = HashSet::new();
 
-        for item in blockstream.entries() {
+        for item in nodesyncflow.entries() {
             let json: Value = serde_json::from_str(&item).unwrap();
             let dt_str = json["dt"].as_str().unwrap();
 

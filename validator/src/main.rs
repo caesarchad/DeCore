@@ -31,11 +31,11 @@ fn main() {
     let matches = App::new(crate_name!()).about(crate_description!())
         .version(crate_version!())
         .arg(
-            Arg::with_name("blockstream")
-                .long("blockstream")
+            Arg::with_name("nodesyncflow")
+                .long("nodesyncflow")
                 .takes_value(true)
                 .value_name("UNIX DOMAIN SOCKET")
-                .help("Open blockstream at this unix domain socket location")
+                .help("Open nodesyncflow at this unix domain socket location")
         )
         .arg(
             Arg::with_name("identity")
@@ -238,7 +238,7 @@ fn main() {
         (Some(signer_service), signer_addr)
     };
     let init_complete_file = matches.value_of("init_complete_file");
-    validator_config.blockstream = matches.value_of("blockstream").map(ToString::to_string);
+    validator_config.nodesyncflow = matches.value_of("nodesyncflow").map(ToString::to_string);
 
     let keypair = Arc::new(keypair);
     let mut node = Node::new_with_external_ip(&keypair.pubkey(), &gossip_addr, dynamic_port_range);

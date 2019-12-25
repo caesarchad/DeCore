@@ -228,10 +228,10 @@ annotate() {
 }
 
 annotateBlockexplorerUrl() {
-  declare blockstreamer=${blockstreamerIpList[0]}
+  declare node_sync_agent=${blockstreamerIpList[0]}
 
-  if [[ -n $blockstreamer ]]; then
-    annotate --style info --context blockexplorer-url "Block explorer: http://$blockstreamer/"
+  if [[ -n $node_sync_agent ]]; then
+    annotate --style info --context blockexplorer-url "Block explorer: http://$node_sync_agent/"
   fi
 }
 
@@ -384,7 +384,7 @@ sanity() {
 
   declare ok=true
   declare bootstrapLeader=${fullnodeIpList[0]}
-  declare blockstreamer=${blockstreamerIpList[0]}
+  declare node_sync_agent=${blockstreamerIpList[0]}
 
   annotateBlockexplorerUrl
 
@@ -397,14 +397,14 @@ sanity() {
   ) || ok=false
   $ok || exit 1
 
-  if [[ -n $blockstreamer ]]; then
-    # If there's a blockstreamer node run a reduced sanity check on it as well
-    echo "--- Sanity: $blockstreamer"
+  if [[ -n $node_sync_agent ]]; then
+    # If there's a node_sync_agent node run a reduced sanity check on it as well
+    echo "--- Sanity: $node_sync_agent"
     (
       set -x
       # shellcheck disable=SC2029 # remote-client.sh args are expanded on client side intentionally
-      ssh "${sshOptions[@]}" "$blockstreamer" \
-        "./morgan/net/remote/remote-sanity.sh $blockstreamer $sanityExtraArgs -o noLedgerVerify -o noValidatorSanity \"$RUST_LOG\""
+      ssh "${sshOptions[@]}" "$node_sync_agent" \
+        "./morgan/net/remote/remote-sanity.sh $node_sync_agent $sanityExtraArgs -o noLedgerVerify -o noValidatorSanity \"$RUST_LOG\""
     ) || ok=false
     $ok || exit 1
   fi
@@ -479,7 +479,7 @@ start() {
   declare loopCount=0
   for ipAddress in "${fullnodeIpList[@]}" - "${blockstreamerIpList[@]}"; do
     if [[ $ipAddress = - ]]; then
-      nodeType=blockstreamer
+      nodeType=node_sync_agent
       continue
     fi
     if $updateNodes; then
@@ -571,7 +571,7 @@ start() {
   echo
   echo "+++ Deployment Successful"
   echo "Bootstrap leader deployment took $bootstrapNodeDeployTime seconds"
-  echo "Additional fullnode deployment (${#fullnodeIpList[@]} full nodes, ${#blockstreamerIpList[@]} blockstreamer nodes) took $additionalNodeDeployTime seconds"
+  echo "Additional fullnode deployment (${#fullnodeIpList[@]} full nodes, ${#blockstreamerIpList[@]} node_sync_agent nodes) took $additionalNodeDeployTime seconds"
   echo "Client deployment (${#clientIpList[@]} instances) took $clientDeployTime seconds"
   echo "Network start logs in $netLogDir"
 }

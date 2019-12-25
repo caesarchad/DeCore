@@ -29,9 +29,9 @@ $ok || {
   exit 1
 }
 
-blockstreamSocket=/tmp/morgan-blockstream.sock # Default to location used by the block explorer
+blockstreamSocket=/tmp/morgan-nodesyncflow.sock # Default to location used by the block explorer
 while [[ -n $1 ]]; do
-  if [[ $1 = --blockstream ]]; then
+  if [[ $1 = --nodesyncflow ]]; then
     blockstreamSocket=$2
     shift 2
   else
@@ -83,7 +83,7 @@ args=(
   --rpc-drone-address 127.0.0.1:11100
 )
 if [[ -n $blockstreamSocket ]]; then
-  args+=(--blockstream "$blockstreamSocket")
+  args+=(--nodesyncflow "$blockstreamSocket")
 fi
 morgan-validator "${args[@]}" &
 validator=$!

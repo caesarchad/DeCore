@@ -25,8 +25,8 @@ pub mod push_to_gossip;
 pub mod propagation_value;
 #[macro_use]
 pub mod block_buffer_pool;
-pub mod block_stream;
-pub mod block_stream_service;
+pub mod node_sync_flow;
+pub mod node_sync_flow_srvc;
 pub mod block_buffer_pool_processor;
 pub mod node_group;
 pub mod node_group_info;
