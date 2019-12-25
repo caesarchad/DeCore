@@ -17,7 +17,7 @@ dirs = "1.0.5"
 log = "0.4.2"
 num-traits = "0.2"
 serde_json = "1.0.39"
-morgan-budget-api = { path = "../controllers/budget_api", version = "0.15.3"     }
+morgan-bvm-script = { path = "../controllers/bvm_script", version = "0.15.3"     }
 morgan-client = { path = "../client", version = "0.15.3"     }
 morgan-tokenbot = { path = "../tokenbot", version = "0.15.3"     }
 morgan-logger = { path = "../logger", version = "0.15.3"     }

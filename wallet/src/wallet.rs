@@ -5,8 +5,8 @@ use num_traits::FromPrimitive;
 use serde_json;
 use serde_json::json;
 use morgan_budget_api;
-use morgan_budget_api::budget_opcode;
-use morgan_budget_api::budget_state::BudgetError;
+use morgan_budget_api::sc_opcode;
+use morgan_budget_api::script_state::BudgetError;
 use morgan_client::account_host_err::ClientError;
 use morgan_client::rpc_client::RpcClient;
 #[cfg(not(test))]
@@ -73,8 +73,8 @@ pub enum WalletCommand {
     ),
     // TimeElapsed(to, process_id, timestamp)
     TimeElapsed(Pubkey, Pubkey, DateTime<Utc>),
-    // Witness(to, process_id)
-    Witness(Pubkey, Pubkey),
+    // Endorsement(to, process_id)
+    Endorsement(Pubkey, Pubkey),
 }
 
 #[derive(Debug, Clone)]
@@ -337,7 +337,7 @@ pub fn parse_command(
         ("send-signature", Some(sig_matches)) => {
             let to = pubkey_of(&sig_matches, "to").unwrap();
             let process_id = pubkey_of(&sig_matches, "process_id").unwrap();
-            Ok(WalletCommand::Witness(to, process_id))
+            Ok(WalletCommand::Endorsement(to, process_id))
         }
         ("send-timestamp", Some(timestamp_matches)) => {
             let to = pubkey_of(&timestamp_matches, "to").unwrap();
@@ -825,7 +825,7 @@ fn process_pay(
         let contract_state = Keypair::new();
 
         // Initializing contract
-        let ixs = budget_opcode::on_date(
+        let ixs = sc_opcode::on_date(
             &config.keypair.pubkey(),
             to,
             &contract_state.pubkey(),
@@ -857,7 +857,7 @@ fn process_pay(
         let contract_state = Keypair::new();
 
         // Initializing contract
-        let ixs = budget_opcode::when_signed(
+        let ixs = sc_opcode::when_signed(
             &config.keypair.pubkey(),
             to,
             &contract_state.pubkey(),
@@ -881,7 +881,7 @@ fn process_pay(
 
 fn process_cancel(rpc_client: &RpcClient, config: &WalletConfig, pubkey: &Pubkey) -> ProcessResult {
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ix = budget_opcode::apply_signature(
+    let ix = sc_opcode::apply_signature(
         &config.keypair.pubkey(),
         pubkey,
         &config.keypair.pubkey(),
@@ -913,7 +913,7 @@ fn process_time_elapsed(
 
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
 
-    let ix = budget_opcode::apply_timestamp(&config.keypair.pubkey(), pubkey, to, dt);
+    let ix = sc_opcode::apply_timestamp(&config.keypair.pubkey(), pubkey, to, dt);
     let mut tx = Transaction::new_s_opcodes(&[&config.keypair], vec![ix], transaction_seal);
     let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&config.keypair]);
     let signature_str = log_instruction_custom_error::<BudgetError>(result)?;
@@ -935,7 +935,7 @@ fn process_witness(
     }
 
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ix = budget_opcode::apply_signature(&config.keypair.pubkey(), pubkey, to);
+    let ix = sc_opcode::apply_signature(&config.keypair.pubkey(), pubkey, to);
     let mut tx = Transaction::new_s_opcodes(&[&config.keypair], vec![ix], transaction_seal);
     let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&config.keypair]);
     let signature_str = log_instruction_custom_error::<BudgetError>(result)?;
@@ -1113,7 +1113,7 @@ pub fn process_command(config: &WalletConfig) -> ProcessResult {
         }
 
         // Apply witness signature to contract
-        WalletCommand::Witness(to, pubkey) => {
+        WalletCommand::Endorsement(to, pubkey) => {
             process_witness(&rpc_client, config, drone_addr, &to, &pubkey)
         }
     }
@@ -1871,7 +1871,7 @@ mod tests {
             WalletCommand::Pay(50, pubkey, None, None, None, None)
         );
 
-        // Test Pay Subcommand w/ Witness
+        // Test Pay Subcommand w/ Endorsement
         let test_pay_multiple_witnesses = test_commands.clone().get_matches_from(vec![
             "test",
             "pay",
@@ -1924,7 +1924,7 @@ mod tests {
         ]);
         assert_eq!(
             parse_command(&pubkey, &test_send_signature).unwrap(),
-            WalletCommand::Witness(pubkey, pubkey)
+            WalletCommand::Endorsement(pubkey, pubkey)
         );
         let test_pay_multiple_witnesses = test_commands.clone().get_matches_from(vec![
             "test",
@@ -2076,7 +2076,7 @@ mod tests {
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
         let witness = Pubkey::new_rand();
-        config.command = WalletCommand::Witness(bob_pubkey, witness);
+        config.command = WalletCommand::Endorsement(bob_pubkey, witness);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
@@ -2090,7 +2090,7 @@ mod tests {
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
         let witness = Pubkey::new_rand();
-        config.command = WalletCommand::Witness(bob_pubkey, witness);
+        config.command = WalletCommand::Endorsement(bob_pubkey, witness);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 

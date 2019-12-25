@@ -1,5 +1,5 @@
-use crate::budget_expr::BudgetExpr;
-use crate::budget_state::BudgetState;
+use crate::bvm_script::BvmScript;
+use crate::script_state::BudgetState;
 use crate::id;
 use bincode::serialized_size;
 use chrono::prelude::{DateTime, Utc};
@@ -11,16 +11,16 @@ use morgan_interface::sys_opcode;
 /// A smart contract.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Contract {
-    /// The number of difs allocated to the `BudgetExpr` and any transaction fees.
+    /// The number of difs allocated to the `BvmScript` and any transaction fees.
     pub difs: u64,
-    pub budget_expr: BudgetExpr,
+    pub bvm_script: BvmScript,
 }
 
 /// An instruction to progress the smart contract.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum SmarContractOpCode {
-    /// Declare and instantiate `BudgetExpr`.
-    InitializeAccount(BudgetExpr),
+    /// Declare and instantiate `BvmScript`.
+    InitializeAccount(BvmScript),
 
     /// Tell a payment plan acknowledge the given `DateTime` has past.
     ApplyTimestamp(DateTime<Utc>),
@@ -30,9 +30,9 @@ pub enum SmarContractOpCode {
     ApplySignature,
 }
 
-fn initialize_account(contract: &Pubkey, expr: BudgetExpr) -> OpCode {
+fn initialize_account(contract: &Pubkey, expr: BvmScript) -> OpCode {
     let mut keys = vec![];
-    if let BudgetExpr::Pay(payment) = &expr {
+    if let BvmScript::Pay(payment) = &expr {
         keys.push(AccountMeta::new(payment.to, false));
     }
     keys.push(AccountMeta::new(*contract, false));
@@ -43,7 +43,7 @@ pub fn create_account(
     from: &Pubkey,
     contract: &Pubkey,
     difs: u64,
-    expr: BudgetExpr,
+    expr: BvmScript,
 ) -> Vec<OpCode> {
     if !expr.verify(difs) {
         panic!("invalid budget expression");
@@ -58,7 +58,7 @@ pub fn create_account(
 /// Create a new payment script.
 pub fn payment(from: &Pubkey, to: &Pubkey, difs: u64) -> Vec<OpCode> {
     let contract = Pubkey::new_rand();
-    let expr = BudgetExpr::new_payment(difs, to);
+    let expr = BvmScript::new_payment(difs, to);
     create_account(from, &contract, difs, expr)
 }
 
@@ -72,7 +72,7 @@ pub fn on_date(
     cancelable: Option<Pubkey>,
     difs: u64,
 ) -> Vec<OpCode> {
-    let expr = BudgetExpr::new_cancelable_future_payment(dt, dt_pubkey, difs, to, cancelable);
+    let expr = BvmScript::new_cancelable_future_payment(dt, dt_pubkey, difs, to, cancelable);
     create_account(from, contract, difs, expr)
 }
 
@@ -85,7 +85,7 @@ pub fn when_signed(
     cancelable: Option<Pubkey>,
     difs: u64,
 ) -> Vec<OpCode> {
-    let expr = BudgetExpr::new_cancelable_authorized_payment(witness, difs, to, cancelable);
+    let expr = BvmScript::new_cancelable_authorized_payment(witness, difs, to, cancelable);
     create_account(from, contract, difs, expr)
 }
 
@@ -119,7 +119,7 @@ pub fn apply_signature(from: &Pubkey, contract: &Pubkey, to: &Pubkey) -> OpCode 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::budget_expr::BudgetExpr;
+    use crate::bvm_script::BvmScript;
 
     #[test]
     fn test_budget_instruction_verify() {
@@ -134,7 +134,7 @@ mod tests {
         let alice_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let budget_pubkey = Pubkey::new_rand();
-        let expr = BudgetExpr::new_payment(2, &bob_pubkey);
+        let expr = BvmScript::new_payment(2, &bob_pubkey);
         create_account(&alice_pubkey, &budget_pubkey, 1, expr);
     }
 
@@ -144,7 +144,7 @@ mod tests {
         let alice_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let budget_pubkey = Pubkey::new_rand();
-        let expr = BudgetExpr::new_payment(1, &bob_pubkey);
+        let expr = BvmScript::new_payment(1, &bob_pubkey);
         create_account(&alice_pubkey, &budget_pubkey, 2, expr);
     }
 }

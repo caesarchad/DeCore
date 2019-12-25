@@ -1,5 +1,5 @@
 [package]
-name = "morgan-budget-api"
+name = "morgan-bvm-script"
 version = "0.15.3"
 description = "Morgan Budget program API"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]

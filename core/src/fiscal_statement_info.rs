@@ -8,7 +8,7 @@ use crate::result::Result;
 use bincode::{deserialize, serialized_size};
 use chrono::prelude::Utc;
 use rayon::prelude::*;
-use morgan_budget_api::budget_opcode;
+use morgan_budget_api::sc_opcode;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::transaction::Transaction;
@@ -350,7 +350,7 @@ pub fn compose_s_fiscal_stmt(start: &Hash, num: usize) -> Vec<FsclStmt> {
     let mut num_hashes = 0;
     (0..num)
         .map(|_| {
-            let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+            let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
             let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], *start);
             FsclStmt::new_mut(&mut hash, &mut num_hashes, vec![tx])
         })
@@ -369,7 +369,7 @@ pub fn compose_b_fiscal_stmt(fscl_stmt_cnt: usize) -> Vec<FsclStmt> {
     let keypair = Keypair::new();
     let pubkey = keypair.pubkey();
 
-    let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+    let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
     let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], one);
 
     let serialized_size = serialized_size(&tx).unwrap();
@@ -428,19 +428,19 @@ mod tests {
 
     fn create_sample_payment(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ixs = budget_opcode::payment(&pubkey, &pubkey, 1);
+        let ixs = sc_opcode::payment(&pubkey, &pubkey, 1);
         Transaction::new_s_opcodes(&[keypair], ixs, hash)
     }
 
     fn create_sample_timestamp(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ix = budget_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+        let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
         Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 
     fn create_sample_apply_signature(keypair: &Keypair, hash: Hash) -> Transaction {
         let pubkey = keypair.pubkey();
-        let ix = budget_opcode::apply_signature(&pubkey, &pubkey, &pubkey);
+        let ix = sc_opcode::apply_signature(&pubkey, &pubkey, &pubkey);
         Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 

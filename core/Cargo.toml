@@ -61,7 +61,7 @@ prost = "0.5.0"
 hex = "0.3.2"
 directories = "2.0.2"
 
-morgan-budget-api = { path = "../controllers/budget_api", version = "0.15.3"     }
+morgan-bvm-script = { path = "../controllers/bvm_script", version = "0.15.3"     }
 morgan-budget-controller = { path = "../controllers/budget_controller", version = "0.15.3"     }
 morgan-client = { path = "../client", version = "0.15.3"     }
 morgan-tokenbot = { path = "../tokenbot", version = "0.15.3"     }

@@ -1,7 +1,7 @@
-pub mod budget_expr;
-pub mod budget_opcode;
-pub mod budget_processor;
-pub mod budget_state;
+pub mod bvm_script;
+pub mod sc_opcode;
+pub mod sc_handler;
+pub mod script_state;
 
 const BUDGET_PROGRAM_ID: [u8; 32] = [
     2, 203, 81, 223, 225, 24, 34, 35, 203, 214, 138, 130, 144, 208, 35, 77, 63, 16, 87, 51, 47,

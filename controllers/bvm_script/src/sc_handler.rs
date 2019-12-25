@@ -1,7 +1,7 @@
 //! budget program
-use crate::budget_expr::Witness;
-use crate::budget_opcode::SmarContractOpCode;
-use crate::budget_state::{BudgetError, BudgetState};
+use crate::bvm_script::Endorsement;
+use crate::sc_opcode::SmarContractOpCode;
+use crate::script_state::{BudgetError, BudgetState};
 use bincode::deserialize;
 use chrono::prelude::{DateTime, Utc};
 use log::*;
@@ -10,23 +10,23 @@ use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::pubkey::Pubkey;
 use morgan_helper::logHelper::*;
 
-/// Process a Witness Signature. Any payment plans waiting on this signature
+/// Process a Endorsement Signature. Any payment plans waiting on this signature
 /// will progress one step.
 fn apply_signature(
-    budget_state: &mut BudgetState,
+    script_state: &mut BudgetState,
     keyed_accounts: &mut [KeyedAccount],
 ) -> Result<(), BudgetError> {
     let mut final_payment = None;
-    if let Some(ref mut expr) = budget_state.pending_budget {
+    if let Some(ref mut expr) = script_state.pending_budget {
         let key = keyed_accounts[0].signer_key().unwrap();
-        expr.apply_witness(&Witness::Signature, key);
+        expr.apply_witness(&Endorsement::Signature, key);
         final_payment = expr.final_payment();
     }
 
     if let Some(payment) = final_payment {
         if let Some(key) = keyed_accounts[0].signer_key() {
             if &payment.to == key {
-                budget_state.pending_budget = None;
+                script_state.pending_budget = None;
                 keyed_accounts[1].account.difs -= payment.difs;
                 keyed_accounts[0].account.difs += payment.difs;
                 return Ok(());
@@ -36,26 +36,26 @@ fn apply_signature(
             trace!("destination missing");
             return Err(BudgetError::DestinationMissing);
         }
-        budget_state.pending_budget = None;
+        script_state.pending_budget = None;
         keyed_accounts[1].account.difs -= payment.difs;
         keyed_accounts[2].account.difs += payment.difs;
     }
     Ok(())
 }
 
-/// Process a Witness Timestamp. Any payment plans waiting on this timestamp
+/// Process a Endorsement Timestamp. Any payment plans waiting on this timestamp
 /// will progress one step.
 fn apply_timestamp(
-    budget_state: &mut BudgetState,
+    script_state: &mut BudgetState,
     keyed_accounts: &mut [KeyedAccount],
     dt: DateTime<Utc>,
 ) -> Result<(), BudgetError> {
     // Check to see if any timelocked transactions can be completed.
     let mut final_payment = None;
 
-    if let Some(ref mut expr) = budget_state.pending_budget {
+    if let Some(ref mut expr) = script_state.pending_budget {
         let key = keyed_accounts[0].signer_key().unwrap();
-        expr.apply_witness(&Witness::Timestamp(dt), key);
+        expr.apply_witness(&Endorsement::Timestamp(dt), key);
         final_payment = expr.final_payment();
     }
 
@@ -64,7 +64,7 @@ fn apply_timestamp(
             trace!("destination missing");
             return Err(BudgetError::DestinationMissing);
         }
-        budget_state.pending_budget = None;
+        script_state.pending_budget = None;
         keyed_accounts[1].account.difs -= payment.difs;
         keyed_accounts[2].account.difs += payment.difs;
     }
@@ -104,17 +104,17 @@ pub fn handle_opcode(
                 trace!("contract already exists");
                 return Err(OpCodeErr::AccountAlreadyInitialized);
             }
-            let mut budget_state = BudgetState::default();
-            budget_state.pending_budget = Some(expr);
-            budget_state.initialized = true;
-            budget_state.serialize(&mut keyed_accounts[0].account.data)
+            let mut script_state = BudgetState::default();
+            script_state.pending_budget = Some(expr);
+            script_state.initialized = true;
+            script_state.serialize(&mut keyed_accounts[0].account.data)
         }
         SmarContractOpCode::ApplyTimestamp(dt) => {
-            let mut budget_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
-            if !budget_state.is_pending() {
+            let mut script_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
+            if !script_state.is_pending() {
                 return Ok(()); // Nothing to do here.
             }
-            if !budget_state.initialized {
+            if !script_state.initialized {
                 trace!("contract is uninitialized");
                 return Err(OpCodeErr::UninitializedAccount);
             }
@@ -122,17 +122,17 @@ pub fn handle_opcode(
                 return Err(OpCodeErr::MissingRequiredSignature);
             }
             trace!("apply timestamp");
-            apply_timestamp(&mut budget_state, keyed_accounts, dt)
+            apply_timestamp(&mut script_state, keyed_accounts, dt)
                 .map_err(|e| OpCodeErr::CustomError(e as u32))?;
             trace!("apply timestamp committed");
-            budget_state.serialize(&mut keyed_accounts[1].account.data)
+            script_state.serialize(&mut keyed_accounts[1].account.data)
         }
         SmarContractOpCode::ApplySignature => {
-            let mut budget_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
-            if !budget_state.is_pending() {
+            let mut script_state = BudgetState::deserialize(&keyed_accounts[1].account.data)?;
+            if !script_state.is_pending() {
                 return Ok(()); // Nothing to do here.
             }
-            if !budget_state.initialized {
+            if !script_state.initialized {
                 trace!("contract is uninitialized");
                 return Err(OpCodeErr::UninitializedAccount);
             }
@@ -140,10 +140,10 @@ pub fn handle_opcode(
                 return Err(OpCodeErr::MissingRequiredSignature);
             }
             trace!("apply signature");
-            apply_signature(&mut budget_state, keyed_accounts)
+            apply_signature(&mut script_state, keyed_accounts)
                 .map_err(|e| OpCodeErr::CustomError(e as u32))?;
             trace!("apply signature committed");
-            budget_state.serialize(&mut keyed_accounts[1].account.data)
+            script_state.serialize(&mut keyed_accounts[1].account.data)
         }
     }
 }
@@ -151,7 +151,7 @@ pub fn handle_opcode(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::budget_opcode;
+    use crate::sc_opcode;
     use crate::id;
     use morgan_runtime::treasury::Treasury;
     use morgan_runtime::treasury_client::TreasuryClient;
@@ -175,7 +175,7 @@ mod tests {
         let treasury_client = TreasuryClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
         let bob_pubkey = Pubkey::new_rand();
-        let instructions = budget_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
+        let instructions = sc_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
         let message = Message::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
@@ -193,7 +193,7 @@ mod tests {
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let witness = Pubkey::new_rand();
-        let instructions = budget_opcode::when_signed(
+        let instructions = sc_opcode::when_signed(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -213,7 +213,7 @@ mod tests {
             .online_transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
-            budget_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            sc_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
         let mut message = Message::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
@@ -241,7 +241,7 @@ mod tests {
         let budget_pubkey = Pubkey::new_rand();
         let bob_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
-        let instructions = budget_opcode::on_date(
+        let instructions = sc_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -262,7 +262,7 @@ mod tests {
             .online_transfer(1, &alice_keypair, &mallory_pubkey)
             .unwrap();
         let instruction =
-            budget_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            sc_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
         let mut message = Message::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
@@ -289,7 +289,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let mallory_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
-        let instructions = budget_opcode::on_date(
+        let instructions = sc_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -309,12 +309,12 @@ mod tests {
             .get_account_data(&budget_pubkey)
             .unwrap()
             .unwrap();
-        let budget_state = BudgetState::deserialize(&contract_account).unwrap();
-        assert!(budget_state.is_pending());
+        let script_state = BudgetState::deserialize(&contract_account).unwrap();
+        assert!(script_state.is_pending());
 
         // Attack! Try to payout to mallory_pubkey
         let instruction =
-            budget_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
+            sc_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
         assert_eq!(
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
@@ -333,13 +333,13 @@ mod tests {
             .get_account_data(&budget_pubkey)
             .unwrap()
             .unwrap();
-        let budget_state = BudgetState::deserialize(&contract_account).unwrap();
-        assert!(budget_state.is_pending());
+        let script_state = BudgetState::deserialize(&contract_account).unwrap();
+        assert!(script_state.is_pending());
 
         // Now, acknowledge the time in the condition occurred and
         // that pubkey's funds are now available.
         let instruction =
-            budget_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            sc_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
@@ -358,7 +358,7 @@ mod tests {
         let bob_pubkey = Pubkey::new_rand();
         let dt = Utc::now();
 
-        let instructions = budget_opcode::on_date(
+        let instructions = sc_opcode::on_date(
             &alice_pubkey,
             &bob_pubkey,
             &budget_pubkey,
@@ -378,8 +378,8 @@ mod tests {
             .get_account_data(&budget_pubkey)
             .unwrap()
             .unwrap();
-        let budget_state = BudgetState::deserialize(&contract_account).unwrap();
-        assert!(budget_state.is_pending());
+        let script_state = BudgetState::deserialize(&contract_account).unwrap();
+        assert!(script_state.is_pending());
 
         // Attack! try to put the difs into the wrong account with cancel
         let mallory_keypair = Keypair::new();
@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
 
         let instruction =
-            budget_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            sc_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
         treasury_client
             .snd_online_instruction(&mallory_keypair, instruction)
             .unwrap();
@@ -401,7 +401,7 @@ mod tests {
 
         // Now, cancel the transaction. mint gets her funds back
         let instruction =
-            budget_opcode::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
+            sc_opcode::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();

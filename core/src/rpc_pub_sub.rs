@@ -289,7 +289,7 @@ mod tests {
     use jsonrpc_core::Response;
     use jsonrpc_pubsub::{PubSubHandler, Session};
     use morgan_budget_api;
-    use morgan_budget_api::budget_opcode;
+    use morgan_budget_api::sc_opcode;
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -444,7 +444,7 @@ mod tests {
         );
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
 
-        let ixs = budget_opcode::when_signed(
+        let ixs = sc_opcode::when_signed(
             &contract_funds.pubkey(),
             &bob_pubkey,
             &contract_state.pubkey(),
@@ -488,7 +488,7 @@ mod tests {
         let tx = system_transaction::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
-        let ix = budget_opcode::apply_signature(
+        let ix = sc_opcode::apply_signature(
             &witness.pubkey(),
             &contract_state.pubkey(),
             &bob_pubkey,

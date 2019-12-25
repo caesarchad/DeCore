@@ -1,7 +1,7 @@
-//! The `budget_expr` module provides a domain-specific language for pa&yment plans. Users create BudgetExpr objects that
-//! are given to an interpreter. The interpreter listens for `Witness` transactions,
+//! The `bvm_script` module provides a domain-specific language for pa&yment plans. Users create BvmScript objects that
+//! are given to an interpreter. The interpreter listens for `Endorsement` transactions,
 //! which it uses to reduce the payment plan. When the budget is reduced to a
-//! `Payment`, the payment is executed.
+//! `AcctOp`, the payment is executed.
 
 use chrono::prelude::*;
 use serde_derive::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::mem;
 
 /// The types of events a payment plan can process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum Witness {
+pub enum Endorsement {
     /// The current time.
     Timestamp(DateTime<Utc>),
 
@@ -20,7 +20,7 @@ pub enum Witness {
 
 /// Some amount of difs that should be sent to the `to` `Pubkey`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct Payment {
+pub struct AcctOp {
     /// Amount to be paid.
     pub difs: u64,
 
@@ -28,22 +28,22 @@ pub struct Payment {
     pub to: Pubkey,
 }
 
-/// A data type representing a `Witness` that the payment plan is waiting on.
+/// A data type representing a `Endorsement` that the payment plan is waiting on.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum Condition {
-    /// Wait for a `Timestamp` `Witness` at or after the given `DateTime`.
+pub enum Switch {
+    /// Wait for a `Timestamp` `Endorsement` at or after the given `DateTime`.
     Timestamp(DateTime<Utc>, Pubkey),
 
-    /// Wait for a `Signature` `Witness` from `Pubkey`.
+    /// Wait for a `Signature` `Endorsement` from `Pubkey`.
     Signature(Pubkey),
 }
 
-impl Condition {
-    /// Return true if the given Witness satisfies this Condition.
-    pub fn is_satisfied(&self, witness: &Witness, from: &Pubkey) -> bool {
+impl Switch {
+    /// Return true if the given Endorsement satisfies this Switch.
+    pub fn is_satisfied(&self, witness: &Endorsement, from: &Pubkey) -> bool {
         match (self, witness) {
-            (Condition::Signature(pubkey), Witness::Signature) => pubkey == from,
-            (Condition::Timestamp(dt, pubkey), Witness::Timestamp(last_time)) => {
+            (Switch::Signature(pubkey), Endorsement::Signature) => pubkey == from,
+            (Switch::Timestamp(dt, pubkey), Endorsement::Timestamp(last_time)) => {
                 pubkey == from && dt <= last_time
             }
             _ => false,
@@ -54,31 +54,31 @@ impl Condition {
 /// A data type representing a payment plan.
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum BudgetExpr {
+pub enum BvmScript {
     /// Make a payment.
-    Pay(Payment),
+    Pay(AcctOp),
 
     /// Make a payment after some condition.
-    After(Condition, Box<BudgetExpr>),
+    After(Switch, Box<BvmScript>),
 
     /// Either make a payment after one condition or a different payment after another
     /// condition, which ever condition is satisfied first.
-    Or((Condition, Box<BudgetExpr>), (Condition, Box<BudgetExpr>)),
+    Or((Switch, Box<BvmScript>), (Switch, Box<BvmScript>)),
 
     /// Make a payment after both of two conditions are satisfied
-    And(Condition, Condition, Box<BudgetExpr>),
+    And(Switch, Switch, Box<BvmScript>),
 }
 
-impl BudgetExpr {
+impl BvmScript {
     /// Create the simplest budget - one that pays `difs` to Pubkey.
     pub fn new_payment(difs: u64, to: &Pubkey) -> Self {
-        BudgetExpr::Pay(Payment { difs, to: *to })
+        BvmScript::Pay(AcctOp { difs, to: *to })
     }
 
     /// Create a budget that pays `difs` to `to` after being witnessed by `from`.
     pub fn new_authorized_payment(from: &Pubkey, difs: u64, to: &Pubkey) -> Self {
-        BudgetExpr::After(
-            Condition::Signature(*from),
+        BvmScript::After(
+            Switch::Signature(*from),
             Box::new(Self::new_payment(difs, to)),
         )
     }
@@ -95,14 +95,14 @@ impl BudgetExpr {
             return Self::new_authorized_payment(witness, difs, to);
         }
         let from = from.unwrap();
-        BudgetExpr::Or(
+        BvmScript::Or(
             (
-                Condition::Signature(*witness),
-                Box::new(BudgetExpr::new_payment(difs, to)),
+                Switch::Signature(*witness),
+                Box::new(BvmScript::new_payment(difs, to)),
             ),
             (
-                Condition::Signature(from),
-                Box::new(BudgetExpr::new_payment(difs, &from)),
+                Switch::Signature(from),
+                Box::new(BvmScript::new_payment(difs, &from)),
             ),
         )
     }
@@ -114,9 +114,9 @@ impl BudgetExpr {
         difs: u64,
         to: &Pubkey,
     ) -> Self {
-        BudgetExpr::And(
-            Condition::Signature(*from0),
-            Condition::Signature(*from1),
+        BvmScript::And(
+            Switch::Signature(*from0),
+            Switch::Signature(*from1),
             Box::new(Self::new_payment(difs, to)),
         )
     }
@@ -129,8 +129,8 @@ impl BudgetExpr {
         difs: u64,
         to: &Pubkey,
     ) -> Self {
-        BudgetExpr::After(
-            Condition::Timestamp(dt, *dt_pubkey),
+        BvmScript::After(
+            Switch::Timestamp(dt, *dt_pubkey),
             Box::new(Self::new_payment(difs, to)),
         )
     }
@@ -148,22 +148,22 @@ impl BudgetExpr {
             return Self::new_future_payment(dt, dt_pubkey, difs, to);
         }
         let from = from.unwrap();
-        BudgetExpr::Or(
+        BvmScript::Or(
             (
-                Condition::Timestamp(dt, *dt_pubkey),
+                Switch::Timestamp(dt, *dt_pubkey),
                 Box::new(Self::new_payment(difs, to)),
             ),
             (
-                Condition::Signature(from),
+                Switch::Signature(from),
                 Box::new(Self::new_payment(difs, &from)),
             ),
         )
     }
 
-    /// Return Payment if the budget requires no additional Witnesses.
-    pub fn final_payment(&self) -> Option<Payment> {
+    /// Return AcctOp if the budget requires no additional Witnesses.
+    pub fn final_payment(&self) -> Option<AcctOp> {
         match self {
-            BudgetExpr::Pay(payment) => Some(payment.clone()),
+            BvmScript::Pay(payment) => Some(payment.clone()),
             _ => None,
         }
     }
@@ -171,11 +171,11 @@ impl BudgetExpr {
     /// Return true if the budget spends exactly `spendable_difs`.
     pub fn verify(&self, spendable_difs: u64) -> bool {
         match self {
-            BudgetExpr::Pay(payment) => payment.difs == spendable_difs,
-            BudgetExpr::After(_, sub_expr) | BudgetExpr::And(_, _, sub_expr) => {
+            BvmScript::Pay(payment) => payment.difs == spendable_difs,
+            BvmScript::After(_, sub_expr) | BvmScript::And(_, _, sub_expr) => {
                 sub_expr.verify(spendable_difs)
             }
-            BudgetExpr::Or(a, b) => {
+            BvmScript::Or(a, b) => {
                 a.1.verify(spendable_difs) && b.1.verify(spendable_difs)
             }
         }
@@ -183,22 +183,22 @@ impl BudgetExpr {
 
     /// Apply a witness to the budget to see if the budget can be reduced.
     /// If so, modify the budget in-place.
-    pub fn apply_witness(&mut self, witness: &Witness, from: &Pubkey) {
+    pub fn apply_witness(&mut self, witness: &Endorsement, from: &Pubkey) {
         let new_expr = match self {
-            BudgetExpr::After(cond, sub_expr) if cond.is_satisfied(witness, from) => {
+            BvmScript::After(cond, sub_expr) if cond.is_satisfied(witness, from) => {
                 Some(sub_expr.clone())
             }
-            BudgetExpr::Or((cond, sub_expr), _) if cond.is_satisfied(witness, from) => {
+            BvmScript::Or((cond, sub_expr), _) if cond.is_satisfied(witness, from) => {
                 Some(sub_expr.clone())
             }
-            BudgetExpr::Or(_, (cond, sub_expr)) if cond.is_satisfied(witness, from) => {
+            BvmScript::Or(_, (cond, sub_expr)) if cond.is_satisfied(witness, from) => {
                 Some(sub_expr.clone())
             }
-            BudgetExpr::And(cond0, cond1, sub_expr) => {
+            BvmScript::And(cond0, cond1, sub_expr) => {
                 if cond0.is_satisfied(witness, from) {
-                    Some(Box::new(BudgetExpr::After(cond1.clone(), sub_expr.clone())))
+                    Some(Box::new(BvmScript::After(cond1.clone(), sub_expr.clone())))
                 } else if cond1.is_satisfied(witness, from) {
-                    Some(Box::new(BudgetExpr::After(cond0.clone(), sub_expr.clone())))
+                    Some(Box::new(BvmScript::After(cond0.clone(), sub_expr.clone())))
                 } else {
                     None
                 }
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn test_signature_satisfied() {
         let from = Pubkey::default();
-        assert!(Condition::Signature(from).is_satisfied(&Witness::Signature, &from));
+        assert!(Switch::Signature(from).is_satisfied(&Endorsement::Signature, &from));
     }
 
     #[test]
@@ -226,9 +226,9 @@ mod tests {
         let dt1 = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
         let dt2 = Utc.ymd(2014, 11, 14).and_hms(10, 9, 8);
         let from = Pubkey::default();
-        assert!(Condition::Timestamp(dt1, from).is_satisfied(&Witness::Timestamp(dt1), &from));
-        assert!(Condition::Timestamp(dt1, from).is_satisfied(&Witness::Timestamp(dt2), &from));
-        assert!(!Condition::Timestamp(dt2, from).is_satisfied(&Witness::Timestamp(dt1), &from));
+        assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
+        assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt2), &from));
+        assert!(!Switch::Timestamp(dt2, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
     }
 
     #[test]
@@ -236,11 +236,11 @@ mod tests {
         let dt = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
         let from = Pubkey::default();
         let to = Pubkey::default();
-        assert!(BudgetExpr::new_payment(42, &to).verify(42));
-        assert!(BudgetExpr::new_authorized_payment(&from, 42, &to).verify(42));
-        assert!(BudgetExpr::new_future_payment(dt, &from, 42, &to).verify(42));
+        assert!(BvmScript::new_payment(42, &to).verify(42));
+        assert!(BvmScript::new_authorized_payment(&from, 42, &to).verify(42));
+        assert!(BvmScript::new_future_payment(dt, &from, 42, &to).verify(42));
         assert!(
-            BudgetExpr::new_cancelable_future_payment(dt, &from, 42, &to, Some(from)).verify(42)
+            BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from)).verify(42)
         );
     }
 
@@ -249,9 +249,9 @@ mod tests {
         let from = Pubkey::default();
         let to = Pubkey::default();
 
-        let mut expr = BudgetExpr::new_authorized_payment(&from, 42, &to);
-        expr.apply_witness(&Witness::Signature, &from);
-        assert_eq!(expr, BudgetExpr::new_payment(42, &to));
+        let mut expr = BvmScript::new_authorized_payment(&from, 42, &to);
+        expr.apply_witness(&Endorsement::Signature, &from);
+        assert_eq!(expr, BvmScript::new_payment(42, &to));
     }
 
     #[test]
@@ -260,9 +260,9 @@ mod tests {
         let from = Pubkey::new_rand();
         let to = Pubkey::new_rand();
 
-        let mut expr = BudgetExpr::new_future_payment(dt, &from, 42, &to);
-        expr.apply_witness(&Witness::Timestamp(dt), &from);
-        assert_eq!(expr, BudgetExpr::new_payment(42, &to));
+        let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
+        expr.apply_witness(&Endorsement::Timestamp(dt), &from);
+        assert_eq!(expr, BvmScript::new_payment(42, &to));
     }
 
     #[test]
@@ -273,9 +273,9 @@ mod tests {
         let from = Pubkey::new_rand();
         let to = Pubkey::new_rand();
 
-        let mut expr = BudgetExpr::new_future_payment(dt, &from, 42, &to);
+        let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
         let orig_expr = expr.clone();
-        expr.apply_witness(&Witness::Timestamp(dt), &to); // <-- Attack!
+        expr.apply_witness(&Endorsement::Timestamp(dt), &to); // <-- Attack!
         assert_eq!(expr, orig_expr);
     }
 
@@ -285,13 +285,13 @@ mod tests {
         let from = Pubkey::default();
         let to = Pubkey::default();
 
-        let mut expr = BudgetExpr::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
-        expr.apply_witness(&Witness::Timestamp(dt), &from);
-        assert_eq!(expr, BudgetExpr::new_payment(42, &to));
+        let mut expr = BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
+        expr.apply_witness(&Endorsement::Timestamp(dt), &from);
+        assert_eq!(expr, BvmScript::new_payment(42, &to));
 
-        let mut expr = BudgetExpr::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
-        expr.apply_witness(&Witness::Signature, &from);
-        assert_eq!(expr, BudgetExpr::new_payment(42, &from));
+        let mut expr = BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
+        expr.apply_witness(&Endorsement::Signature, &from);
+        assert_eq!(expr, BvmScript::new_payment(42, &from));
     }
     #[test]
     fn test_2_2_multisig_payment() {
@@ -299,9 +299,9 @@ mod tests {
         let from1 = Pubkey::new_rand();
         let to = Pubkey::default();
 
-        let mut expr = BudgetExpr::new_2_2_multisig_payment(&from0, &from1, 42, &to);
-        expr.apply_witness(&Witness::Signature, &from0);
-        assert_eq!(expr, BudgetExpr::new_authorized_payment(&from1, 42, &to));
+        let mut expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
+        expr.apply_witness(&Endorsement::Signature, &from0);
+        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
     }
 
     #[test]
@@ -311,12 +311,12 @@ mod tests {
         let from2 = Pubkey::new_rand();
         let to = Pubkey::default();
 
-        let expr = BudgetExpr::new_2_2_multisig_payment(&from0, &from1, 42, &to);
-        let mut expr = BudgetExpr::After(Condition::Signature(from2), Box::new(expr));
+        let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
+        let mut expr = BvmScript::After(Switch::Signature(from2), Box::new(expr));
 
-        expr.apply_witness(&Witness::Signature, &from2);
-        expr.apply_witness(&Witness::Signature, &from0);
-        assert_eq!(expr, BudgetExpr::new_authorized_payment(&from1, 42, &to));
+        expr.apply_witness(&Endorsement::Signature, &from2);
+        expr.apply_witness(&Endorsement::Signature, &from0);
+        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
     }
 
     #[test]
@@ -326,16 +326,16 @@ mod tests {
         let dt = Utc.ymd(2014, 11, 11).and_hms(7, 7, 7);
         let to = Pubkey::default();
 
-        let expr = BudgetExpr::new_2_2_multisig_payment(&from0, &from1, 42, &to);
-        let mut expr = BudgetExpr::After(Condition::Timestamp(dt, from0), Box::new(expr));
+        let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
+        let mut expr = BvmScript::After(Switch::Timestamp(dt, from0), Box::new(expr));
 
-        expr.apply_witness(&Witness::Timestamp(dt), &from0);
+        expr.apply_witness(&Endorsement::Timestamp(dt), &from0);
         assert_eq!(
             expr,
-            BudgetExpr::new_2_2_multisig_payment(&from0, &from1, 42, &to)
+            BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to)
         );
 
-        expr.apply_witness(&Witness::Signature, &from0);
-        assert_eq!(expr, BudgetExpr::new_authorized_payment(&from1, 42, &to));
+        expr.apply_witness(&Endorsement::Signature, &from0);
+        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
     }
 }

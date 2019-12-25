@@ -1524,8 +1524,8 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memmap 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-budget-api 0.15.3",
  "morgan-budget-controller 0.15.3",
+ "morgan-bvm-script 0.15.3",
  "morgan-client 0.15.3",
  "morgan-config-controller 0.15.3",
  "morgan-exchange-controller 0.15.3",
@@ -1604,7 +1604,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "morgan-budget-api"
+name = "morgan-budget-controller"
+version = "0.15.3"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "morgan-bvm-script 0.15.3",
+ "morgan-interface 0.15.3",
+ "morgan-logger 0.15.3",
+]
+
+[[package]]
+name = "morgan-bvm-script"
 version = "0.15.3"
 dependencies = [
  "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1617,16 +1627,6 @@ dependencies = [
  "num-traits 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "morgan-budget-controller"
-version = "0.15.3"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-budget-api 0.15.3",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
 ]
 
 [[package]]
@@ -1730,8 +1730,8 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "morgan 0.15.3",
- "morgan-budget-api 0.15.3",
  "morgan-budget-controller 0.15.3",
+ "morgan-bvm-script 0.15.3",
  "morgan-config-api 0.15.3",
  "morgan-config-controller 0.15.3",
  "morgan-exchange-api 0.15.3",
@@ -2077,8 +2077,8 @@ dependencies = [
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "morgan 0.15.3",
- "morgan-budget-api 0.15.3",
  "morgan-budget-controller 0.15.3",
+ "morgan-bvm-script 0.15.3",
  "morgan-client 0.15.3",
  "morgan-helper 0.1.0",
  "morgan-interface 0.15.3",

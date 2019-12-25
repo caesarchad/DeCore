@@ -1,5 +1,5 @@
 //! budget state
-use crate::budget_expr::BudgetExpr;
+use crate::bvm_script::BvmScript;
 use bincode::{self, deserialize, serialize_into};
 use num_derive::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
@@ -27,14 +27,14 @@ impl std::error::Error for BudgetError {}
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct BudgetState {
     pub initialized: bool,
-    pub pending_budget: Option<BudgetExpr>,
+    pub pending_budget: Option<BvmScript>,
 }
 
 impl BudgetState {
-    pub fn new(budget_expr: BudgetExpr) -> Self {
+    pub fn new(bvm_script: BvmScript) -> Self {
         Self {
             initialized: true,
-            pending_budget: Some(budget_expr),
+            pending_budget: Some(bvm_script),
         }
     }
 

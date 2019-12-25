@@ -134,7 +134,7 @@ fn test_wallet_witness_tx() {
     check_balance(0, &rpc_client, &bob_pubkey); // recipient balance
 
     // Sign transaction by config_witness
-    config_witness.command = WalletCommand::Witness(bob_pubkey, process_id);
+    config_witness.command = WalletCommand::Endorsement(bob_pubkey, process_id);
     process_command(&config_witness).unwrap();
 
     check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
