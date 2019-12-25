@@ -724,17 +724,17 @@ impl NodeGroupInfo {
     pub fn broadcast(
         id: &Pubkey,
         contains_last_drop: bool,
-        broadcast_table: &[ContactInfo],
+        pyramid_node_grp_list: &[ContactInfo],
         s: &UdpSocket,
         blobs: &[SharedBlob],
     ) -> Result<()> {
-        if broadcast_table.is_empty() {
+        if pyramid_node_grp_list.is_empty() {
             debug!("{}:not enough peers in node_group_info table", id);
             inc_new_counter_error!("node_group_info-broadcast-not_enough_peers_error", 1);
             Err(NodeGroupInfoError::NoPeers)?;
         }
 
-        let orders = Self::create_broadcast_orders(contains_last_drop, blobs, broadcast_table);
+        let orders = Self::create_broadcast_orders(contains_last_drop, blobs, pyramid_node_grp_list);
 
         trace!("broadcast orders table {}", orders.len());
 
@@ -859,7 +859,7 @@ impl NodeGroupInfo {
     pub fn create_broadcast_orders<'a, T>(
         contains_last_drop: bool,
         blobs: &[T],
-        broadcast_table: &'a [ContactInfo],
+        pyramid_node_grp_list: &'a [ContactInfo],
     ) -> Vec<(T, Vec<&'a ContactInfo>)>
     where
         T: Clone,
@@ -871,17 +871,17 @@ impl NodeGroupInfo {
         }
         let mut orders = Vec::with_capacity(blobs.len());
 
-        let x = thread_rng().gen_range(0, broadcast_table.len());
+        let x = thread_rng().gen_range(0, pyramid_node_grp_list.len());
         for (i, blob) in blobs.iter().enumerate() {
-            let br_idx = (x + i) % broadcast_table.len();
+            let br_idx = (x + i) % pyramid_node_grp_list.len();
 
             trace!("broadcast order data br_idx {}", br_idx);
 
-            orders.push((blob.clone(), vec![&broadcast_table[br_idx]]));
+            orders.push((blob.clone(), vec![&pyramid_node_grp_list[br_idx]]));
         }
 
         if contains_last_drop {
-            // Broadcast the last _drop to everyone on the network so it doesn't get dropped
+            // PyramidNode the last _drop to everyone on the network so it doesn't get dropped
             // (Need to maximize probability the next leader in line sees this handoff _drop
             // despite packet drops)
             // If we had a _drop at max_drop_height, then we know it must be the last
@@ -889,7 +889,7 @@ impl NodeGroupInfo {
             // last _drop, guaranteed by the WaterClockService).
             orders.push((
                 blobs.last().unwrap().clone(),
-                broadcast_table.iter().collect(),
+                pyramid_node_grp_list.iter().collect(),
             ));
         }
 

@@ -72,7 +72,7 @@ impl PartialOrd for VerContInfTblValue {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct MempoolConfig {
-    pub broadcast_transactions: bool,
+    pub is_pyramid_node: bool,
     pub shared_mempool_drop_interval_ms: u64,
     pub shared_mempool_batch_size: usize,
     pub shared_mempool_max_concurrent_inbound_syncs: usize,
@@ -88,7 +88,7 @@ pub struct MempoolConfig {
 impl Default for MempoolConfig {
     fn default() -> MempoolConfig {
         MempoolConfig {
-            broadcast_transactions: true,
+            is_pyramid_node: true,
             shared_mempool_drop_interval_ms: 50,
             shared_mempool_batch_size: 100,
             shared_mempool_max_concurrent_inbound_syncs: 100,

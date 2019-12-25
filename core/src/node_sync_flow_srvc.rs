@@ -220,10 +220,10 @@ mod test {
             &mut nodesyncflow,
         )
         .unwrap();
-        assert_eq!(nodesyncflow.entries().len(), 7);
+        assert_eq!(nodesyncflow.statements().len(), 7);
 
         let (entry_events, block_events): (Vec<Value>, Vec<Value>) = nodesyncflow
-            .entries()
+            .statements()
             .iter()
             .map(|item| {
                 let json: Value = serde_json::from_str(&item).unwrap();

@@ -3,7 +3,7 @@
 
 use crate::treasury_phase::TreasuryPhase;
 use crate::block_buffer_pool::BlockBufferPool;
-use crate::propagate_phase::BroadcastPhase;
+use crate::propagate_phase::PyramidPhase;
 use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info_voter_listener::ClusterInfoVoteListener;
 use crate::fetch_phase::FetchPhase;
@@ -23,7 +23,7 @@ pub struct TransactionDigestingModule {
     sigverify_phase: SigVerifyPhase,
     treasury_phase: TreasuryPhase,
     cluster_info_vote_listener: ClusterInfoVoteListener,
-    broadcast_phase: BroadcastPhase,
+    broadcast_phase: PyramidPhase,
 }
 
 impl TransactionDigestingModule {
@@ -72,7 +72,7 @@ impl TransactionDigestingModule {
             verified_vote_receiver,
         );
 
-        let broadcast_phase = BroadcastPhase::new(
+        let broadcast_phase = PyramidPhase::new(
             broadcast_socket,
             node_group_info.clone(),
             entry_receiver,

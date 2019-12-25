@@ -41,7 +41,7 @@ impl FiscStmtVector {
         }
     }
 
-    pub fn entries(&self) -> Vec<String> {
+    pub fn statements(&self) -> Vec<String> {
         self.values.borrow().clone()
     }
 }
@@ -69,7 +69,7 @@ pub trait NodeSyncEvents {
         slot: u64,
         drop_height: u64,
         leader_pubkey: &Pubkey,
-        entries: &FsclStmt,
+        statements: &FsclStmt,
     ) -> Result<()>;
     fn emit_block_event(
         &self,
@@ -219,8 +219,8 @@ impl FakeNodeSync {
         }
     }
 
-    pub fn entries(&self) -> Vec<String> {
-        self.output.entries()
+    pub fn statements(&self) -> Vec<String> {
+        self.output.statements()
     }
 }
 
@@ -268,7 +268,7 @@ mod test {
         let drops_per_slot = 5;
 
         let mut transaction_seal = Hash::default();
-        let mut entries = Vec::new();
+        let mut statements = Vec::new();
         let mut expected_entries = Vec::new();
 
         let drop_height_initial = 0;
@@ -289,11 +289,11 @@ mod test {
                 .emit_fscl_stmt_event(curr_slot, drop_height, &leader_pubkey, &entry)
                 .unwrap();
             expected_entries.push(entry.clone());
-            entries.push(entry);
+            statements.push(entry);
         }
 
         assert_eq!(
-            nodesyncflow.entries().len() as u64,
+            nodesyncflow.statements().len() as u64,
             // one entry per drop (0..=N+2) is +3, plus one block
             drops_per_slot + 3 + 1
         );
@@ -303,7 +303,7 @@ mod test {
         let mut matched_slots = HashSet::new();
         let mut matched_blocks = HashSet::new();
 
-        for item in nodesyncflow.entries() {
+        for item in nodesyncflow.statements() {
             let json: Value = serde_json::from_str(&item).unwrap();
             let dt_str = json["dt"].as_str().unwrap();
 

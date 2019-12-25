@@ -26,24 +26,24 @@ use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BroadcastPhaseReturnType {
-    ChannelDisconnected,
+pub enum PyramidPhaseRC {
+    PipeBroken,
 }
 
 #[derive(Default)]
-struct BroadcastStats {
+struct PyramidInfo {
     fscl_stmt_cnt: Vec<usize>,
     run_elapsed: Vec<u64>,
     to_blobs_elapsed: Vec<u64>,
 }
 
-struct Broadcast {
+struct PyramidNode {
     id: Pubkey,
     coding_generator: CodingGenerator,
-    stats: BroadcastStats,
+    stats: PyramidInfo,
 }
 
-impl Broadcast {
+impl PyramidNode {
     fn run(
         &mut self,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -84,16 +84,16 @@ impl Broadcast {
         }
 
         let treasury_round = treasury.get_stakers_epoch(treasury.slot());
-        let mut broadcast_table = node_group_info
+        let mut pyramid_node_grp_list = node_group_info
             .read()
             .unwrap()
             .ordered_blaze_node_lists(staking_utils::staked_nodes_at_epoch(&treasury, treasury_round).as_ref());
 
-        inc_new_counter_warn!("broadcast_service-num_peers", broadcast_table.len() + 1);
+        inc_new_counter_warn!("propagate_thread-node_cnt", pyramid_node_grp_list.len() + 1);
         // Layer 1, leader nodes are limited to the fanout size.
-        broadcast_table.truncate(DATA_PLANE_FANOUT);
+        pyramid_node_grp_list.truncate(DATA_PLANE_FANOUT);
 
-        inc_new_counter_info!("broadcast_service-entries_received", fscl_stmt_cnt);
+        inc_new_counter_info!("propagate_thread-stmts_rcvd", fscl_stmt_cnt);
 
         let to_blobs_start = Instant::now();
 
@@ -136,12 +136,12 @@ impl Broadcast {
         let broadcast_start = Instant::now();
 
         // Send out data
-        NodeGroupInfo::broadcast(&self.id, contains_last_drop, &broadcast_table, sock, &blobs)?;
+        NodeGroupInfo::broadcast(&self.id, contains_last_drop, &pyramid_node_grp_list, sock, &blobs)?;
 
         inc_new_counter_debug!("streamer-broadcast-sent", blobs.len());
 
         // send out erasures
-        NodeGroupInfo::broadcast(&self.id, false, &broadcast_table, sock, &coding)?;
+        NodeGroupInfo::broadcast(&self.id, false, &pyramid_node_grp_list, sock, &coding)?;
 
         self.update_broadcast_stats(
             duration_as_ms(&broadcast_start.elapsed()),
@@ -162,7 +162,7 @@ impl Broadcast {
         to_blobs_elapsed: u64,
         blob_index: u64,
     ) {
-        inc_new_counter_info!("broadcast_service-time_ms", broadcast_elapsed as usize);
+        inc_new_counter_info!("propagate_thread-time_ms", broadcast_elapsed as usize);
 
         self.stats.fscl_stmt_cnt.push(fscl_stmt_cnt);
         self.stats.to_blobs_elapsed.push(to_blobs_elapsed);
@@ -190,7 +190,7 @@ impl Broadcast {
     }
 }
 
-// Implement a destructor for the BroadcastPhase thread to signal it exited
+// Implement a destructor for the PyramidPhase thread to signal it exited
 // even on panics
 struct EndSignal {
     exit_sender: Arc<AtomicBool>,
@@ -208,11 +208,11 @@ impl Drop for EndSignal {
     }
 }
 
-pub struct BroadcastPhase {
-    thread_hdl: JoinHandle<BroadcastPhaseReturnType>,
+pub struct PyramidPhase {
+    thread_hdl: JoinHandle<PyramidPhaseRC>,
 }
 
-impl BroadcastPhase {
+impl PyramidPhase {
     #[allow(clippy::too_many_arguments)]
     fn run(
         sock: &UdpSocket,
@@ -220,14 +220,14 @@ impl BroadcastPhase {
         receiver: &Receiver<WorkingTreasuryEntries>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         genesis_transaction_seal: &Hash,
-    ) -> BroadcastPhaseReturnType {
+    ) -> PyramidPhaseRC {
         let me = node_group_info.read().unwrap().my_data().clone();
         let coding_generator = CodingGenerator::default();
 
-        let mut broadcast = Broadcast {
+        let mut broadcast = PyramidNode {
             id: me.id,
             coding_generator,
-            stats: BroadcastStats::default(),
+            stats: PyramidInfo::default(),
         };
 
         loop {
@@ -236,17 +236,17 @@ impl BroadcastPhase {
             {
                 match e {
                     Error::RecvTimeoutError(RecvTimeoutError::Disconnected) | Error::SendError => {
-                        return BroadcastPhaseReturnType::ChannelDisconnected;
+                        return PyramidPhaseRC::PipeBroken;
                     }
                     Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                     Error::NodeGroupInfoError(NodeGroupInfoError::NoPeers) => (), // TODO: Why are the unit-tests throwing hundreds of these?
                     _ => {
-                        inc_new_counter_error!("streamer-broadcaster-error", 1, 1);
-                        // error!("{}", Error(format!("broadcaster error: {:?}", e).to_string()));
+                        inc_new_counter_error!("node_sync_agent-pyramid-error", 1, 1);
+                        // error!("{}", Error(format!("pyramid_agent err:{:?}", e).to_string()));
                         println!(
                             "{}",
                             Error(
-                                format!("broadcaster error: {:?}", e).to_string(),
+                                format!("pyramid_agent err:{:?}", e).to_string(),
                                 module_path!().to_string()
                             )
                         );
@@ -268,7 +268,7 @@ impl BroadcastPhase {
     /// Otherwise, when a TransactionDigestingModule closes, it only closes the phasea that come after it. The phasea
     /// that come before could be blocked on a receive, and never notice that they need to
     /// exit. Now, if any phase of the TransactionDigestingModule closes, it will lead to closing the WritePhase (b/c
-    /// WritePhase is the last phase in the pipeline), which will then close Broadcast service,
+    /// WritePhase is the last phase in the pipeline), which will then close PyramidNode service,
     /// which will then close FetchPhase in the TransactionDigestingModule, and then the rest of the TransactionDigestingModule,
     /// completing the cycle.
     #[allow(clippy::too_many_arguments)]
@@ -284,7 +284,7 @@ impl BroadcastPhase {
         let exit_sender = exit_sender.clone();
         let genesis_transaction_seal = *genesis_transaction_seal;
         let thread_hdl = Builder::new()
-            .name("morgan-broadcaster".to_string())
+            .name("morgan-pyramid_agent".to_string())
             .spawn(move || {
                 let _finalizer = EndSignal::new(exit_sender);
                 Self::run(
@@ -301,10 +301,10 @@ impl BroadcastPhase {
     }
 }
 
-impl Service for BroadcastPhase {
-    type JoinReturnType = BroadcastPhaseReturnType;
+impl Service for PyramidPhase {
+    type JoinReturnType = PyramidPhaseRC;
 
-    fn join(self) -> thread::Result<BroadcastPhaseReturnType> {
+    fn join(self) -> thread::Result<PyramidPhaseRC> {
         self.thread_hdl.join()
     }
 }
@@ -326,9 +326,9 @@ mod test {
     use std::thread::sleep;
     use std::time::Duration;
 
-    struct MockBroadcastPhase {
+    struct FakePyramidPhase {
         block_buffer_pool: Arc<BlockBufferPool>,
-        broadcast_service: BroadcastPhase,
+        propagate_thread: PyramidPhase,
         treasury: Arc<Treasury>,
     }
 
@@ -336,7 +336,7 @@ mod test {
         leader_pubkey: &Pubkey,
         ledger_path: &str,
         entry_receiver: Receiver<WorkingTreasuryEntries>,
-    ) -> MockBroadcastPhase {
+    ) -> FakePyramidPhase {
         // Make the database ledger
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(ledger_path).unwrap());
 
@@ -358,7 +358,7 @@ mod test {
         let treasury = Arc::new(Treasury::new(&genesis_block));
 
         // Start up the broadcast phase
-        let broadcast_service = BroadcastPhase::new(
+        let propagate_thread = PyramidPhase::new(
             leader_info.sockets.broadcast,
             node_group_info,
             entry_receiver,
@@ -367,9 +367,9 @@ mod test {
             &Hash::default(),
         );
 
-        MockBroadcastPhase {
+        FakePyramidPhase {
             block_buffer_pool,
-            broadcast_service,
+            propagate_thread,
             treasury,
         }
     }
@@ -384,12 +384,12 @@ mod test {
             let leader_keypair = Keypair::new();
 
             let (entry_sender, entry_receiver) = channel();
-            let broadcast_service = setup_dummy_broadcast_service(
+            let propagate_thread = setup_dummy_broadcast_service(
                 &leader_keypair.pubkey(),
                 &ledger_path,
                 entry_receiver,
             );
-            let treasury = broadcast_service.treasury.clone();
+            let treasury = propagate_thread.treasury.clone();
             let start_drop_height = treasury.drop_height();
             let max_drop_height = treasury.max_drop_height();
             let drops_per_slot = treasury.drops_per_slot();
@@ -410,7 +410,7 @@ mod test {
                 drops_per_slot,
             );
 
-            let block_buffer_pool = broadcast_service.block_buffer_pool;
+            let block_buffer_pool = propagate_thread.block_buffer_pool;
             let mut blob_index = 0;
             for i in 0..max_drop_height - start_drop_height {
                 let slot = (start_drop_height + i + 1) / drops_per_slot;
@@ -422,8 +422,8 @@ mod test {
             }
 
             drop(entry_sender);
-            broadcast_service
-                .broadcast_service
+            propagate_thread
+                .propagate_thread
                 .join()
                 .expect("Expect successful join of broadcast service");
         }
