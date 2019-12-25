@@ -288,8 +288,8 @@ mod tests {
     use jsonrpc_core::futures::sync::mpsc;
     use jsonrpc_core::Response;
     use jsonrpc_pubsub::{PubSubHandler, Session};
-    use morgan_budget_api;
-    use morgan_budget_api::sc_opcode;
+    use morgan_bvm_script;
+    use morgan_bvm_script::sc_opcode;
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -420,7 +420,7 @@ mod tests {
         let witness = Keypair::new();
         let contract_funds = Keypair::new();
         let contract_state = Keypair::new();
-        let budget_program_id = morgan_budget_api::id();
+        let budget_program_id = morgan_bvm_script::id();
         let executable = false; // TODO
         let treasury = Treasury::new(&genesis_block);
         let transaction_seal = treasury.last_transaction_seal();

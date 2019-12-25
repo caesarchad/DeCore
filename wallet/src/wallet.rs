@@ -4,9 +4,9 @@ use log::*;
 use num_traits::FromPrimitive;
 use serde_json;
 use serde_json::json;
-use morgan_budget_api;
-use morgan_budget_api::sc_opcode;
-use morgan_budget_api::script_state::BudgetError;
+use morgan_bvm_script;
+use morgan_bvm_script::sc_opcode;
+use morgan_bvm_script::script_state::BudgetError;
 use morgan_client::account_host_err::ClientError;
 use morgan_client::rpc_client::RpcClient;
 #[cfg(not(test))]

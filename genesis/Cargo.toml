@@ -25,8 +25,6 @@ morgan-token-api = { path = "../controllers/token_api", version = "0.15.3"     }
 morgan-token-controller = { path = "../controllers/token_controller", version = "0.15.3"     }
 morgan-config-api = { path = "../controllers/config_api", version = "0.15.3"     }
 morgan-config-controller = { path = "../controllers/config_controller", version = "0.15.3"     }
-morgan-exchange-api = { path = "../controllers/exchange_api", version = "0.15.3"     }
-morgan-exchange-controller = { path = "../controllers/exchange_controller", version = "0.15.3"     }
 
 [dev-dependencies]
 hashbrown = "0.3.0"

@@ -8,7 +8,7 @@ use crate::result::Result;
 use bincode::{deserialize, serialized_size};
 use chrono::prelude::Utc;
 use rayon::prelude::*;
-use morgan_budget_api::sc_opcode;
+use morgan_bvm_script::sc_opcode;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::transaction::Transaction;

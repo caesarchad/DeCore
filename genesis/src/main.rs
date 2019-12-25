@@ -9,8 +9,6 @@ extern crate morgan_budget_controller;
 extern crate morgan_token_controller;
 #[macro_use]
 extern crate morgan_config_controller;
-#[macro_use]
-extern crate morgan_exchange_controller;
 
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
 use morgan::block_buffer_pool::make_new_ledger_file;
@@ -219,7 +217,6 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             morgan_budget_controller!(),
             morgan_token_controller!(),
             morgan_config_controller!(),
-            morgan_exchange_controller!(),
         ],
     );
     genesis_block.add_storage_controller(&bootstrap_storage_keypair.pubkey());
@@ -282,7 +279,7 @@ mod tests {
             ),
             (
                 "Budget1111111111111111111111111111111111111",
-                morgan_budget_api::id(),
+                morgan_bvm_script::id(),
             ),
             (
                 "Stake11111111111111111111111111111111111111",
@@ -308,10 +305,6 @@ mod tests {
                 "Config1111111111111111111111111111111111111",
                 morgan_config_api::id(),
             ),
-            (
-                "Exchange11111111111111111111111111111111111",
-                morgan_exchange_api::id(),
-            ),
         ];
         assert!(ids.iter().all(|(name, id)| *name == id.to_string()));
     }
@@ -323,13 +316,12 @@ mod tests {
             morgan_interface::system_program::id(),
             morgan_interface::bultin_mounter::id(),
             morgan_interface::bvm_controller::id(),
-            morgan_budget_api::id(),
+            morgan_bvm_script::id(),
             morgan_storage_api::id(),
             morgan_token_api::id(),
             morgan_vote_api::id(),
             morgan_stake_api::id(),
             morgan_config_api::id(),
-            morgan_exchange_api::id(),
         ];
         assert!(ids.into_iter().all(move |id| unique.insert(id)));
     }

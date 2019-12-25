@@ -22,7 +22,7 @@ pub fn test_multisig_tx() -> Transaction {
 
     let transfer_instruction = SysOpCode::Transfer { difs };
 
-    let program_ids = vec![system_program::id(), morgan_budget_api::id()];
+    let program_ids = vec![system_program::id(), morgan_bvm_script::id()];
 
     let instructions = vec![EncodedOpCodes::new(
         0,

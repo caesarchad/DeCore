@@ -1528,7 +1528,6 @@ dependencies = [
  "morgan-bvm-script 0.15.3",
  "morgan-client 0.15.3",
  "morgan-config-controller 0.15.3",
- "morgan-exchange-controller 0.15.3",
  "morgan-helper 0.1.0",
  "morgan-interface 0.15.3",
  "morgan-logger 0.15.3",
@@ -1690,40 +1689,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "morgan-exchange-api"
-version = "0.15.3"
-dependencies = [
- "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-helper 0.1.0",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
- "morgan-metricbot 0.15.3",
- "morgan-runtime 0.15.3",
- "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "morgan-exchange-controller"
-version = "0.15.3"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-exchange-api 0.15.3",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
-]
-
-[[package]]
-name = "morgan-failure-controller"
-version = "0.15.3"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-interface 0.15.3",
- "morgan-runtime 0.15.3",
-]
-
-[[package]]
 name = "morgan-genesis"
 version = "0.15.3"
 dependencies = [
@@ -1734,8 +1699,6 @@ dependencies = [
  "morgan-bvm-script 0.15.3",
  "morgan-config-api 0.15.3",
  "morgan-config-controller 0.15.3",
- "morgan-exchange-api 0.15.3",
- "morgan-exchange-controller 0.15.3",
  "morgan-interface 0.15.3",
  "morgan-stake-api 0.15.3",
  "morgan-stake-controller 0.15.3",
@@ -1856,15 +1819,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "morgan-noop-controller"
-version = "0.15.3"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
-]
-
-[[package]]
 name = "morgan-runtime"
 version = "0.15.3"
 dependencies = [
@@ -1881,7 +1835,6 @@ dependencies = [
  "morgan-interface 0.15.3",
  "morgan-logger 0.15.3",
  "morgan-metricbot 0.15.3",
- "morgan-noop-controller 0.15.3",
  "morgan-stake-api 0.15.3",
  "morgan-stake-controller 0.15.3",
  "morgan-vote-api 0.15.3",
