@@ -251,7 +251,7 @@ impl StorageMiner {
 
         let fix_socket = Arc::new(node.sockets.repair);
         let mut blob_sockets: Vec<Arc<UdpSocket>> =
-            node.sockets.tvu.into_iter().map(Arc::new).collect();
+            node.sockets.blaze_unit.into_iter().map(Arc::new).collect();
         blob_sockets.push(fix_socket.clone());
         let (blob_fetch_sender, blob_fetch_receiver) = channel();
         let fetch_phase = BlobFetchPhase::new_multi_socket(blob_sockets, &blob_fetch_sender, &exit);
@@ -408,7 +408,7 @@ impl StorageMiner {
         );
         // Remove storage-miner from the data plane
         let mut contact_info = node_info.clone();
-        contact_info.tvu = "0.0.0.0:0".parse().unwrap();
+        contact_info.blaze_unit = "0.0.0.0:0".parse().unwrap();
         contact_info.wallclock = timestamp();
         {
             let mut node_group_info_w = node_group_info.write().unwrap();
@@ -524,7 +524,7 @@ impl StorageMiner {
 
     fn submit_mining_proof(&self) {
         // No point if we've got no storage account...
-        let nodes = self.node_group_info.read().unwrap().tvu_peers();
+        let nodes = self.node_group_info.read().unwrap().fetch_blaze_node_list();
         let client = crate::gossip_service::get_client(&nodes);
         assert!(
             client

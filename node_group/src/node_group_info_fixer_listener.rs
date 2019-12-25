@@ -209,13 +209,13 @@ impl NodeGroupInfoFixListener {
         for (repairee_pubkey, repairee_epoch_slots) in repairees {
             let repairee_root = repairee_epoch_slots.root;
 
-            let repairee_tvu = {
+            let fix_target_blaze_unit = {
                 let r_node_group_info = node_group_info.read().unwrap();
                 let contact_info = r_node_group_info.get_contact_info_for_node(repairee_pubkey);
-                contact_info.map(|c| c.tvu)
+                contact_info.map(|c| c.blaze_unit)
             };
 
-            if let Some(repairee_tvu) = repairee_tvu {
+            if let Some(fix_target_blaze_unit) = fix_target_blaze_unit {
                 // For every repairee, get the set of repairmen who are responsible for
                 let mut eligible_repairmen = Self::find_eligible_repairmen(
                     my_pubkey,
@@ -240,7 +240,7 @@ impl NodeGroupInfoFixListener {
                     &repairee_epoch_slots,
                     &eligible_repairmen,
                     socket,
-                    &repairee_tvu,
+                    &fix_target_blaze_unit,
                     UPDATE_SLOTS,
                     epoch_schedule,
                 );
@@ -257,7 +257,7 @@ impl NodeGroupInfoFixListener {
         repairee_epoch_slots: &EpochSlots,
         eligible_repairmen: &[&Pubkey],
         socket: &UdpSocket,
-        repairee_tvu: &SocketAddr,
+        fix_target_blaze_unit: &SocketAddr,
         num_slots_to_repair: usize,
         epoch_schedule: &RoundPlan,
     ) -> Result<()> {
@@ -317,7 +317,7 @@ impl NodeGroupInfoFixListener {
                             .fetch_data_blob_bytes(slot, blob_index as u64)
                             .expect("Failed to read data blob from block_buffer_pool")
                         {
-                            socket.send_to(&blob_data[..], repairee_tvu)?;
+                            socket.send_to(&blob_data[..], fix_target_blaze_unit)?;
                             total_data_blobs_sent += 1;
                         }
 
@@ -325,7 +325,7 @@ impl NodeGroupInfoFixListener {
                             .fetch_coding_col_by_bytes(slot, blob_index as u64)
                             .expect("Failed to read coding blob from block_buffer_pool")
                         {
-                            socket.send_to(&coding_bytes[..], repairee_tvu)?;
+                            socket.send_to(&coding_bytes[..], fix_target_blaze_unit)?;
                             total_coding_blobs_sent += 1;
                         }
                     }
@@ -493,7 +493,7 @@ mod tests {
     struct MockRepairee {
         id: Pubkey,
         receiver: Receiver<Vec<SharedBlob>>,
-        tvu_address: SocketAddr,
+        blaze_node_url: SocketAddr,
         repairee_exit: Arc<AtomicBool>,
         repairee_receiver_thread_hdl: JoinHandle<()>,
     }
@@ -502,14 +502,14 @@ mod tests {
         pub fn new(
             id: Pubkey,
             receiver: Receiver<Vec<SharedBlob>>,
-            tvu_address: SocketAddr,
+            blaze_node_url: SocketAddr,
             repairee_exit: Arc<AtomicBool>,
             repairee_receiver_thread_hdl: JoinHandle<()>,
         ) -> Self {
             Self {
                 id,
                 receiver,
-                tvu_address,
+                blaze_node_url,
                 repairee_exit,
                 repairee_receiver_thread_hdl,
             }
@@ -519,7 +519,7 @@ mod tests {
             let id = Pubkey::new_rand();
             let (repairee_sender, repairee_receiver) = channel();
             let repairee_socket = Arc::new(UdpSocket::bind("0.0.0.0:0").unwrap());
-            let repairee_tvu_addr = repairee_socket.local_addr().unwrap();
+            let fix_target_blaze_node_url = repairee_socket.local_addr().unwrap();
             let repairee_exit = Arc::new(AtomicBool::new(false));
             let repairee_receiver_thread_hdl =
                 streamer::blob_receiver(repairee_socket, &repairee_exit, repairee_sender);
@@ -527,7 +527,7 @@ mod tests {
             Self::new(
                 id,
                 repairee_receiver,
-                repairee_tvu_addr,
+                fix_target_blaze_node_url,
                 repairee_exit,
                 repairee_receiver_thread_hdl,
             )
@@ -663,7 +663,7 @@ mod tests {
                 &repairee_epoch_slots,
                 &eligible_repairmen_refs,
                 &my_socket,
-                &mock_repairee.tvu_address,
+                &mock_repairee.blaze_node_url,
                 num_missing_slots as usize,
                 &epoch_schedule,
             )
@@ -732,7 +732,7 @@ mod tests {
             &repairee_epoch_slots,
             &vec![&my_pubkey],
             &my_socket,
-            &mock_repairee.tvu_address,
+            &mock_repairee.blaze_node_url,
             1 as usize,
             &epoch_schedule,
         )
@@ -753,7 +753,7 @@ mod tests {
             &repairee_epoch_slots,
             &vec![&my_pubkey],
             &my_socket,
-            &mock_repairee.tvu_address,
+            &mock_repairee.blaze_node_url,
             1 as usize,
             &epoch_schedule,
         )

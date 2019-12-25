@@ -250,7 +250,7 @@ fn test_storage_miner_startup_ledger_hang() {
     let mut storage_miner_node = Node::new_localhost_with_pubkey(&bad_keys.pubkey());
 
     // Pass bad TVU sockets to prevent successful ledger download
-    storage_miner_node.sockets.tvu = vec![std::net::UdpSocket::bind("0.0.0.0:0").unwrap()];
+    storage_miner_node.sockets.blaze_unit = vec![std::net::UdpSocket::bind("0.0.0.0:0").unwrap()];
     let (miner_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&node_group.genesis_block);
 
     let storage_miner_res = StorageMiner::new(

@@ -72,7 +72,7 @@ fn run_simulation(stakes: &[u64], fanout: usize) {
     let blobs: Vec<(_, _)> = (0..100).into_par_iter().map(|i| (i as i32, true)).collect();
 
     // pretend to broadcast from leader - node_group_info::create_broadcast_orders
-    let mut broadcast_table = node_group_info.sorted_tvu_peers(Some(&staked_nodes));
+    let mut broadcast_table = node_group_info.ordered_blaze_node_lists(Some(&staked_nodes));
     broadcast_table.truncate(fanout);
     let orders = NodeGroupInfo::create_broadcast_orders(false, &blobs, &broadcast_table);
 

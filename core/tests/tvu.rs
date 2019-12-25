@@ -15,7 +15,7 @@ use morgan::service::Service;
 use morgan::storage_stage::StorageState;
 use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
 use morgan::streamer;
-use morgan::transaction_verify_centre::{Sockets, Tvu};
+use morgan::transaction_verify_centre::{Sockets, BlazeUnit};
 use morgan::verifier;
 use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
 use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -62,7 +62,7 @@ fn test_replay() {
     // to simulate the genesis peer and get blobs out of the socket to
     // simulate target peer
     let (s_reader, r_reader) = channel();
-    let blob_sockets: Vec<Arc<UdpSocket>> = target2.sockets.tvu.into_iter().map(Arc::new).collect();
+    let blob_sockets: Vec<Arc<UdpSocket>> = target2.sockets.blaze_unit.into_iter().map(Arc::new).collect();
 
     let t_receiver = streamer::blob_receiver(blob_sockets[0].clone(), &exit, s_reader);
 
@@ -85,7 +85,7 @@ fn test_replay() {
     genesis_block.candidate_each_round = MINIMUM_SLOT_LENGTH as u64;
     let (block_buffer_pool_path, transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
-    let tvu_addr = target1.info.tvu;
+    let blz_nd_url = target1.info.blaze_unit;
 
     let (
         treasury_forks,
@@ -116,7 +116,7 @@ fn test_replay() {
     {
         let (waterclock_service_exit, waterclock_recorder, waterclock_service, _entry_receiver) =
             create_test_recorder(&working_treasury, &block_buffer_pool);
-        let tvu = Tvu::new(
+        let blaze_unit = BlazeUnit::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
@@ -126,7 +126,7 @@ fn test_replay() {
                 Sockets {
                     repair: target1.sockets.repair,
                     retransmit: target1.sockets.retransmit,
-                    fetch: target1.sockets.tvu,
+                    fetch: target1.sockets.blaze_unit,
                 }
             },
             block_buffer_pool,
@@ -172,7 +172,7 @@ fn test_replay() {
             blob_idx += blobs.len() as u64;
             blobs
                 .iter()
-                .for_each(|b| b.write().unwrap().meta.set_addr(&tvu_addr));
+                .for_each(|b| b.write().unwrap().meta.set_addr(&blz_nd_url));
             msgs.extend(blobs.into_iter());
         }
 
@@ -202,7 +202,7 @@ fn test_replay() {
         exit.store(true, Ordering::Relaxed);
         waterclock_service_exit.store(true, Ordering::Relaxed);
         waterclock_service.join().unwrap();
-        tvu.join().unwrap();
+        blaze_unit.join().unwrap();
         dr_l.join().unwrap();
         dr_2.join().unwrap();
         dr_1.join().unwrap();

@@ -87,7 +87,7 @@ impl Broadcast {
         let mut broadcast_table = node_group_info
             .read()
             .unwrap()
-            .sorted_tvu_peers(staking_utils::staked_nodes_at_epoch(&treasury, treasury_round).as_ref());
+            .ordered_blaze_node_lists(staking_utils::staked_nodes_at_epoch(&treasury, treasury_round).as_ref());
 
         inc_new_counter_warn!("broadcast_service-num_peers", broadcast_table.len() + 1);
         // Layer 1, leader nodes are limited to the fanout size.

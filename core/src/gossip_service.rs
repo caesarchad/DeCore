@@ -95,7 +95,7 @@ pub fn discover(
             module_path!().to_string()
         )
     );
-    let (met_criteria, secs, tvu_peers, miners) =
+    let (met_criteria, secs, fetch_blaze_node_list, miners) =
         spy(spy_ref.clone(), num_nodes, timeout, find_node);
 
     exit.store(true, Ordering::Relaxed);
@@ -117,10 +117,10 @@ pub fn discover(
                 module_path!().to_string()
             )
         );
-        return Ok((tvu_peers, miners));
+        return Ok((fetch_blaze_node_list, miners));
     }
 
-    if !tvu_peers.is_empty() {
+    if !fetch_blaze_node_list.is_empty() {
         // info!(
         //     "{}",
         //     Info(format!("discover failed to match criteria by timeout...\n{}",
@@ -134,7 +134,7 @@ pub fn discover(
                 module_path!().to_string()
             )
         );
-        return Ok((tvu_peers, miners));
+        return Ok((fetch_blaze_node_list, miners));
     }
 
     // info!(
@@ -260,7 +260,7 @@ fn spy(
 ) -> (bool, u64, Vec<ContactInfo>, Vec<ContactInfo>) {
     let now = Instant::now();
     let mut met_criteria = false;
-    let mut tvu_peers: Vec<ContactInfo> = Vec::new();
+    let mut fetch_blaze_node_list: Vec<ContactInfo> = Vec::new();
     let mut miners: Vec<ContactInfo> = Vec::new();
     let mut i = 0;
     loop {
@@ -269,20 +269,20 @@ fn spy(
                 break;
             }
         }
-        // collect tvu peers but filter out miners since their tvu is transient and we do not want
+        // collect blaze_unit peers but filter out miners since their blaze_unit is transient and we do not want
         // it to show up as a "node"
-        tvu_peers = spy_ref
+        fetch_blaze_node_list = spy_ref
             .read()
             .unwrap()
-            .tvu_peers()
+            .fetch_blaze_node_list()
             .into_iter()
             .filter(|node| !NodeGroupInfo::is_storage_miner(&node))
             .collect::<Vec<_>>();
         miners = spy_ref.read().unwrap().storage_peers();
         if let Some(num) = num_nodes {
-            if tvu_peers.len() + miners.len() >= num {
+            if fetch_blaze_node_list.len() + miners.len() >= num {
                 if let Some(pubkey) = find_node {
-                    if tvu_peers
+                    if fetch_blaze_node_list
                         .iter()
                         .chain(miners.iter())
                         .any(|x| x.id == pubkey)
@@ -298,7 +298,7 @@ fn spy(
         }
         if let Some(pubkey) = find_node {
             if num_nodes.is_none()
-                && tvu_peers
+                && fetch_blaze_node_list
                     .iter()
                     .chain(miners.iter())
                     .any(|x| x.id == pubkey)
@@ -330,7 +330,7 @@ fn spy(
     (
         met_criteria,
         now.elapsed().as_secs(),
-        tvu_peers,
+        fetch_blaze_node_list,
         miners,
     )
 }
@@ -401,10 +401,10 @@ mod tests {
 
         let spy_ref = Arc::new(RwLock::new(node_group_info));
 
-        let (met_criteria, secs, tvu_peers, _) = spy(spy_ref.clone(), None, Some(1), None);
+        let (met_criteria, secs, fetch_blaze_node_list, _) = spy(spy_ref.clone(), None, Some(1), None);
         assert_eq!(met_criteria, false);
         assert_eq!(secs, 1);
-        assert_eq!(tvu_peers, spy_ref.read().unwrap().tvu_peers());
+        assert_eq!(fetch_blaze_node_list, spy_ref.read().unwrap().fetch_blaze_node_list());
 
         // Find num_nodes
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), Some(1), None, None);

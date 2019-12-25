@@ -455,15 +455,15 @@ impl NodeGroupInfo {
             .collect()
     }
 
-    /// all peers that have a valid tvu port.
-    pub fn tvu_peers(&self) -> Vec<ContactInfo> {
+    /// all peers that have a valid blaze_unit port.
+    pub fn fetch_blaze_node_list(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
             .contact_info_table
             .table
             .values()
             .filter_map(|x| x.value.contact_info())
-            .filter(|x| ContactInfo::is_valid_address(&x.tvu))
+            .filter(|x| ContactInfo::is_valid_address(&x.blaze_unit))
             .filter(|x| x.id != me)
             .cloned()
             .collect()
@@ -483,7 +483,7 @@ impl NodeGroupInfo {
             .collect()
     }
 
-    /// all peers that have a valid tvu
+    /// all peers that have a valid blaze_unit
     pub fn retransmit_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
         self.gossip
@@ -492,15 +492,15 @@ impl NodeGroupInfo {
             .values()
             .filter_map(|x| x.value.contact_info())
             .filter(|x| x.id != me)
-            .filter(|x| ContactInfo::is_valid_address(&x.tvu))
+            .filter(|x| ContactInfo::is_valid_address(&x.blaze_unit))
             .cloned()
             .collect()
     }
 
-    /// all tvu peers with valid gossip addrs
+    /// all blaze_unit peers with valid gossip addrs
     fn repair_peers(&self) -> Vec<ContactInfo> {
         let me = self.my_data().id;
-        NodeGroupInfo::tvu_peers(self)
+        NodeGroupInfo::fetch_blaze_node_list(self)
             .into_iter()
             .filter(|x| x.id != me)
             .filter(|x| ContactInfo::is_valid_address(&x.gossip))
@@ -510,7 +510,7 @@ impl NodeGroupInfo {
     fn is_spy_node(contact_info: &ContactInfo) -> bool {
         (!ContactInfo::is_valid_address(&contact_info.transaction_digesting_module)
             || !ContactInfo::is_valid_address(&contact_info.gossip)
-            || !ContactInfo::is_valid_address(&contact_info.tvu))
+            || !ContactInfo::is_valid_address(&contact_info.blaze_unit))
             && !ContactInfo::is_valid_address(&contact_info.storage_addr)
     }
 
@@ -567,8 +567,8 @@ impl NodeGroupInfo {
         (index, peers)
     }
 
-    pub fn sorted_tvu_peers(&self, stakes: Option<&HashMap<Pubkey, u64>>) -> Vec<ContactInfo> {
-        let peers = self.tvu_peers();
+    pub fn ordered_blaze_node_lists(&self, stakes: Option<&HashMap<Pubkey, u64>>) -> Vec<ContactInfo> {
+        let peers = self.fetch_blaze_node_list();
         let peers_with_stakes: Vec<_> = NodeGroupInfo::sort_by_stake(&peers, stakes);
         peers_with_stakes
             .iter()
@@ -782,11 +782,11 @@ impl NodeGroupInfo {
                     me.id,
                     wblob.index(),
                     v.id,
-                    v.tvu,
+                    v.blaze_unit,
                 );
                 //TODO profile this, may need multiple sockets for par_iter
                 assert!(wblob.meta.size <= BLOB_SIZE);
-                s.send_to(&wblob.data[..wblob.meta.size], &v.tvu)
+                s.send_to(&wblob.data[..wblob.meta.size], &v.blaze_unit)
             })
             .collect();
         // reset the blob to its old state. This avoids us having to copy the blob to modify it
@@ -820,7 +820,7 @@ impl NodeGroupInfo {
 
                 let ids_and_tvus = if log_enabled!(log::Level::Trace) {
                     let v_ids = vs.iter().map(|v| v.id);
-                    let tvus = vs.iter().map(|v| v.tvu);
+                    let tvus = vs.iter().map(|v| v.blaze_unit);
                     let ids_and_tvus = v_ids.zip(tvus).collect();
 
                     trace!(
@@ -841,7 +841,7 @@ impl NodeGroupInfo {
                 let send_errs_for_blob: Vec<_> = vs
                     .iter()
                     .map(move |v| {
-                        let e = s.send_to(&blob.data[..blob.meta.size], &v.tvu);
+                        let e = s.send_to(&blob.data[..blob.meta.size], &v.blaze_unit);
                         trace!(
                             "{}: done broadcast {} to {:?}",
                             id,
@@ -916,7 +916,7 @@ impl NodeGroupInfo {
 
     pub fn repair_request(&self, repair_request: &FixPlanType) -> Result<(SocketAddr, Vec<u8>)> {
         // find a peer that appears to be accepting replication, as indicated
-        //  by a valid tvu port location
+        //  by a valid blaze_unit port location
         let valid: Vec<_> = self.repair_peers();
         if valid.is_empty() {
             Err(NodeGroupInfoError::NoPeers)?;
@@ -1594,7 +1594,7 @@ pub fn compute_retransmit_peers<S: std::hash::BuildHasher>(
 #[derive(Debug)]
 pub struct Sockets {
     pub gossip: UdpSocket,
-    pub tvu: Vec<UdpSocket>,
+    pub blaze_unit: Vec<UdpSocket>,
     pub transaction_digesting_module: Vec<UdpSocket>,
     pub transaction_digesting_module_via_blobs: Vec<UdpSocket>,
     pub broadcast: UdpSocket,
@@ -1616,7 +1616,7 @@ impl Node {
     }
     pub fn new_localhost_storage_miner(pubkey: &Pubkey) -> Self {
         let gossip = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let tvu = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let blaze_unit = UdpSocket::bind("127.0.0.1:0").unwrap();
         let storage = UdpSocket::bind("127.0.0.1:0").unwrap();
         let empty = "0.0.0.0:0".parse().unwrap();
         let repair = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -1626,7 +1626,7 @@ impl Node {
         let info = ContactInfo::new(
             pubkey,
             gossip.local_addr().unwrap(),
-            tvu.local_addr().unwrap(),
+            blaze_unit.local_addr().unwrap(),
             empty,
             empty,
             storage.local_addr().unwrap(),
@@ -1639,7 +1639,7 @@ impl Node {
             info,
             sockets: Sockets {
                 gossip,
-                tvu: vec![tvu],
+                blaze_unit: vec![blaze_unit],
                 transaction_digesting_module: vec![],
                 transaction_digesting_module_via_blobs: vec![],
                 broadcast,
@@ -1652,7 +1652,7 @@ impl Node {
     pub fn new_localhost_with_pubkey(pubkey: &Pubkey) -> Self {
         let transaction_digesting_module = UdpSocket::bind("127.0.0.1:0").unwrap();
         let gossip = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let tvu = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let blaze_unit = UdpSocket::bind("127.0.0.1:0").unwrap();
         let transaction_digesting_module_via_blobs = UdpSocket::bind("127.0.0.1:0").unwrap();
         let repair = UdpSocket::bind("127.0.0.1:0").unwrap();
         let rpc_port = find_available_port_in_range((1024, 65535)).unwrap();
@@ -1667,7 +1667,7 @@ impl Node {
         let info = ContactInfo::new(
             pubkey,
             gossip.local_addr().unwrap(),
-            tvu.local_addr().unwrap(),
+            blaze_unit.local_addr().unwrap(),
             transaction_digesting_module.local_addr().unwrap(),
             transaction_digesting_module_via_blobs.local_addr().unwrap(),
             storage.local_addr().unwrap(),
@@ -1679,7 +1679,7 @@ impl Node {
             info,
             sockets: Sockets {
                 gossip,
-                tvu: vec![tvu],
+                blaze_unit: vec![blaze_unit],
                 transaction_digesting_module: vec![transaction_digesting_module],
                 transaction_digesting_module_via_blobs: vec![transaction_digesting_module_via_blobs],
                 broadcast,
@@ -1711,7 +1711,7 @@ impl Node {
     ) -> Node {
         let (gossip_port, gossip) = Self::get_gossip_port(gossip_addr, port_range);
 
-        let (tvu_port, tvu_sockets) = multi_bind_in_range(port_range, 8).expect("tvu multi_bind");
+        let (blaze_node_port, blaze_node_sockets) = multi_bind_in_range(port_range, 8).expect("blaze_unit multi_bind");
 
         let (transaction_digesting_module_port, transaction_digesting_module_sockets) = multi_bind_in_range(port_range, 32).expect("transaction_digesting_module multi_bind");
 
@@ -1725,7 +1725,7 @@ impl Node {
         let info = ContactInfo::new(
             pubkey,
             SocketAddr::new(gossip_addr.ip(), gossip_port),
-            SocketAddr::new(gossip_addr.ip(), tvu_port),
+            SocketAddr::new(gossip_addr.ip(), blaze_node_port),
             SocketAddr::new(gossip_addr.ip(), transaction_digesting_module_port),
             SocketAddr::new(gossip_addr.ip(), transaction_digesting_module_via_blobs_port),
             socketaddr_any!(),
@@ -1739,7 +1739,7 @@ impl Node {
             info,
             sockets: Sockets {
                 gossip,
-                tvu: tvu_sockets,
+                blaze_unit: blaze_node_sockets,
                 transaction_digesting_module: transaction_digesting_module_sockets,
                 transaction_digesting_module_via_blobs: transaction_digesting_module_via_blobs_sockets,
                 broadcast,
@@ -2099,7 +2099,7 @@ mod tests {
         check_socket(&node.sockets.gossip, ip, range);
         check_socket(&node.sockets.repair, ip, range);
 
-        check_sockets(&node.sockets.tvu, ip, range);
+        check_sockets(&node.sockets.blaze_unit, ip, range);
         check_sockets(&node.sockets.transaction_digesting_module, ip, range);
     }
 
@@ -2148,7 +2148,7 @@ mod tests {
         check_socket(&node.sockets.gossip, ip, FULLNODE_PORT_RANGE);
         check_socket(&node.sockets.repair, ip, FULLNODE_PORT_RANGE);
 
-        check_sockets(&node.sockets.tvu, ip, FULLNODE_PORT_RANGE);
+        check_sockets(&node.sockets.blaze_unit, ip, FULLNODE_PORT_RANGE);
     }
 
     //test that all node_group_info objects only generate signed messages

@@ -17,7 +17,7 @@ use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
 use crate::storage_stage::StorageState;
 use crate::transaction_process_centre::TransactionDigestingModule;
-use crate::transaction_verify_centre::{Sockets, Tvu};
+use crate::transaction_verify_centre::{Sockets, BlazeUnit};
 use morgan_metricbot::inc_new_counter_info;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::genesis_block::GenesisBlock;
@@ -68,7 +68,7 @@ pub struct Validator {
     waterclock_recorder: Arc<Mutex<WaterClockRecorder>>,
     waterclock_service: WaterClockService,
     transaction_digesting_module: TransactionDigestingModule,
-    tvu: Tvu,
+    blaze_unit: BlazeUnit,
     ip_echo_server: morgan_netutil::IpEchoServer,
 }
 
@@ -246,7 +246,7 @@ impl Validator {
                 .expect("Failed to clone retransmit socket"),
             fetch: node
                 .sockets
-                .tvu
+                .blaze_unit
                 .iter()
                 .map(|s| s.try_clone().expect("Failed to clone TVU Sockets"))
                 .collect(),
@@ -258,7 +258,7 @@ impl Validator {
             Some(voting_keypair)
         };
 
-        let tvu = Tvu::new(
+        let blaze_unit = BlazeUnit::new(
             vote_account,
             voting_keypair,
             storage_keypair,
@@ -310,7 +310,7 @@ impl Validator {
             rpc_service,
             rpc_pubsub_service,
             transaction_digesting_module,
-            tvu,
+            blaze_unit,
             exit,
             waterclock_service,
             waterclock_recorder,
@@ -378,7 +378,7 @@ impl Service for Validator {
 
         self.gossip_service.join()?;
         self.transaction_digesting_module.join()?;
-        self.tvu.join()?;
+        self.blaze_unit.join()?;
         self.ip_echo_server.shutdown_now();
 
         Ok(())

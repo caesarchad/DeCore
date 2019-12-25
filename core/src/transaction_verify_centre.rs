@@ -1,4 +1,4 @@
-//! The `tvu` module implements the Transaction Validation Unit, a
+//! The `blaze_unit` module implements the Transaction Validation Unit, a
 //! multi-phase transaction validation pipeline in software.
 //!
 //! 1. BlobFetchPhase
@@ -34,7 +34,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-pub struct Tvu {
+pub struct BlazeUnit {
     fetch_phase: BlobFetchPhase,
     retransmit_phase: RetransmitPhase,
     replay_phase: RepeatPhase,
@@ -48,7 +48,7 @@ pub struct Sockets {
     pub retransmit: UdpSocket,
 }
 
-impl Tvu {
+impl BlazeUnit {
     /// This service receives messages from a leader in the network and processes the transactions
     /// on the treasury state.
     /// # Arguments
@@ -80,7 +80,7 @@ impl Tvu {
     {
         let keypair: Arc<Keypair> = node_group_info
             .read()
-            .expect("Unable to read from node_group_info during Tvu creation")
+            .expect("Unable to read from node_group_info during BlazeUnit creation")
             .keypair
             .clone();
 
@@ -153,7 +153,7 @@ impl Tvu {
             &node_group_info,
         );
 
-        Tvu {
+        BlazeUnit {
             fetch_phase,
             retransmit_phase,
             replay_phase,
@@ -163,7 +163,7 @@ impl Tvu {
     }
 }
 
-impl Service for Tvu {
+impl Service for BlazeUnit {
     type JoinReturnType = ();
 
     fn join(self) -> thread::Result<()> {
@@ -242,7 +242,7 @@ pub mod tests {
     use std::sync::atomic::Ordering;
 
     #[test]
-    fn test_tvu_exit() {
+    fn test_blaze_close() {
         morgan_logger::setup();
         let leader = Node::new_localhost();
         let target1_keypair = Keypair::new();
@@ -269,7 +269,7 @@ pub mod tests {
         let voting_keypair = Keypair::new();
         let storage_keypair = Arc::new(Keypair::new());
         let leader_schedule_cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
-        let tvu = Tvu::new(
+        let blaze_unit = BlazeUnit::new(
             &voting_keypair.pubkey(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
@@ -279,7 +279,7 @@ pub mod tests {
                 Sockets {
                     repair: target1.sockets.repair,
                     retransmit: target1.sockets.retransmit,
-                    fetch: target1.sockets.tvu,
+                    fetch: target1.sockets.blaze_unit,
                 }
             },
             block_buffer_pool,
@@ -295,7 +295,7 @@ pub mod tests {
             completed_slots_receiver,
         );
         exit.store(true, Ordering::Relaxed);
-        tvu.join().unwrap();
+        blaze_unit.join().unwrap();
         waterclock_service.join().unwrap();
     }
 }
