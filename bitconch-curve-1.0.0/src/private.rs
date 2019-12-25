@@ -28,27 +28,27 @@ use crate::public::*;
 use crate::signature::*;
 
 #[derive(Default)]
-pub struct SecretKey(pub(crate) [u8; SECRET_KEY_LENGTH]);
+pub struct PrivateKey(pub(crate) [u8; SECRET_KEY_LENGTH]);
 
-impl Debug for SecretKey {
+impl Debug for PrivateKey {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "SecretKey: {:?}", &self.0[..])
+        write!(f, "PrivateKey: {:?}", &self.0[..])
     }
 }
 
-impl Drop for SecretKey {
+impl Drop for PrivateKey {
     fn drop(&mut self) {
         self.0.clear();
     }
 }
 
-impl AsRef<[u8]> for SecretKey {
+impl AsRef<[u8]> for PrivateKey {
     fn as_ref(&self) -> &[u8] {
         self.as_octets()
     }
 }
 
-impl SecretKey {
+impl PrivateKey {
     #[inline]
     pub fn to_octets(&self) -> [u8; SECRET_KEY_LENGTH] {
         self.0
@@ -60,24 +60,24 @@ impl SecretKey {
     }
 
     #[inline]
-    pub fn from_octets(bytes: &[u8]) -> Result<SecretKey, SignatureError> {
+    pub fn from_octets(bytes: &[u8]) -> Result<PrivateKey, SignatureError> {
         if bytes.len() != SECRET_KEY_LENGTH {
             return Err(SignatureError(InternalError::BytesLengthError {
-                name: "SecretKey",
+                name: "PrivateKey",
                 length: SECRET_KEY_LENGTH,
             }));
         }
         let mut bits: [u8; 32] = [0u8; 32];
         bits.copy_from_slice(&bytes[..32]);
 
-        Ok(SecretKey(bits))
+        Ok(PrivateKey(bits))
     }
 
-    pub fn create<T>(csprng: &mut T) -> SecretKey
+    pub fn create<T>(csprng: &mut T) -> PrivateKey
     where
         T: CryptoRng + Rng,
     {
-        let mut sk: SecretKey = SecretKey([0u8; 32]);
+        let mut sk: PrivateKey = PrivateKey([0u8; 32]);
 
         csprng.fill_bytes(&mut sk.0);
 
@@ -86,7 +86,7 @@ impl SecretKey {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for SecretKey {
+impl Serialize for PrivateKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -96,7 +96,7 @@ impl Serialize for SecretKey {
 }
 
 #[cfg(feature = "serde")]
-impl<'d> Deserialize<'d> for SecretKey {
+impl<'d> Deserialize<'d> for PrivateKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'d>,
@@ -104,17 +104,17 @@ impl<'d> Deserialize<'d> for SecretKey {
         struct SecretKeyVisitor;
 
         impl<'d> Visitor<'d> for SecretKeyVisitor {
-            type Value = SecretKey;
+            type Value = PrivateKey;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 formatter.write_str("An ed25519 secret key as 32 bytes, as specified in RFC8032.")
             }
 
-            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<SecretKey, E>
+            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<PrivateKey, E>
             where
                 E: SerdeError,
             {
-                SecretKey::from_octets(bytes).or(Err(SerdeError::invalid_length(bytes.len(), &self)))
+                PrivateKey::from_octets(bytes).or(Err(SerdeError::invalid_length(bytes.len(), &self)))
             }
         }
         deserializer.deserialize_bytes(SecretKeyVisitor)
@@ -134,9 +134,9 @@ impl Drop for ExpandedSecretKey {
     }
 }
 
-impl<'a> From<&'a SecretKey> for ExpandedSecretKey {
+impl<'a> From<&'a PrivateKey> for ExpandedSecretKey {
 
-    fn from(secret_key: &'a SecretKey) -> ExpandedSecretKey {
+    fn from(secret_key: &'a PrivateKey) -> ExpandedSecretKey {
         let mut h: Sha512 = Sha512::default();
         let mut hash:  [u8; 64] = [0u8; 64];
         let mut lower: [u8; 32] = [0u8; 32];

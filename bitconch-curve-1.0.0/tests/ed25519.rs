@@ -62,7 +62,7 @@ mod vectors {
             let msg_bytes: Vec<u8> = FromHex::from_hex(&parts[2]).unwrap();
             let sig_bytes: Vec<u8> = FromHex::from_hex(&parts[3]).unwrap();
 
-            let secret: SecretKey = SecretKey::from_octets(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
+            let secret: PrivateKey = PrivateKey::from_octets(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
             let public: PublicKey = PublicKey::from_octets(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
             let keypair: Keypair  = Keypair{ secret: secret, public: public };
 
@@ -90,7 +90,7 @@ mod vectors {
         let msg_bytes: Vec<u8> = FromHex::from_hex(message).unwrap();
         let sig_bytes: Vec<u8> = FromHex::from_hex(signature).unwrap();
 
-        let secret: SecretKey = SecretKey::from_octets(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
+        let secret: PrivateKey = PrivateKey::from_octets(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
         let public: PublicKey = PublicKey::from_octets(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
         let keypair: Keypair  = Keypair{ secret: secret, public: public };
         let sig1: Signature = Signature::from_octets(&sig_bytes[..]).unwrap();
@@ -205,7 +205,7 @@ mod integrations {
     #[test]
     fn public_key_via_confidentiality_and_extended_confidentiality() {
         let mut csprng = thread_rng();
-        let secret: SecretKey = SecretKey::create(&mut csprng);
+        let secret: PrivateKey = PrivateKey::create(&mut csprng);
         let expanded_secret: ExpandedSecretKey = (&secret).into();
         let public_from_secret: PublicKey = (&secret).into(); // XXX eww
         let public_from_expanded_secret: PublicKey = (&expanded_secret).into(); // XXX eww
@@ -264,9 +264,9 @@ mod serialisation {
 
     #[test]
     fn serialize_deserialize_private_key() {
-        let secret_key: SecretKey = SecretKey::from_octets(&SECRET_KEY_BYTES).unwrap();
+        let secret_key: PrivateKey = PrivateKey::from_octets(&SECRET_KEY_BYTES).unwrap();
         let encoded_secret_key: Vec<u8> = serialize(&secret_key, Infinite).unwrap();
-        let decoded_secret_key: SecretKey = deserialize(&encoded_secret_key).unwrap();
+        let decoded_secret_key: PrivateKey = deserialize(&encoded_secret_key).unwrap();
 
         for i in 0..32 {
             assert_eq!(SECRET_KEY_BYTES[i], decoded_secret_key.as_octets()[i]);
@@ -287,7 +287,7 @@ mod serialisation {
 
     #[test]
     fn serialize_private_key_size() {
-        let secret_key: SecretKey = SecretKey::from_octets(&SECRET_KEY_BYTES).unwrap();
+        let secret_key: PrivateKey = PrivateKey::from_octets(&SECRET_KEY_BYTES).unwrap();
         assert_eq!(serialized_size(&secret_key) as usize, 40); // These sizes are specific to bincode==1.0.1
     }
 }

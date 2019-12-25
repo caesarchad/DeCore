@@ -92,7 +92,7 @@ pub fn validate_volume(
 
 #[derive(Debug, Default)]
 pub struct Keypair {
-    pub secret: SecretKey,
+    pub secret: PrivateKey,
     pub public: PublicKey,
 }
 
@@ -113,7 +113,7 @@ impl Keypair {
                 length: KEYPAIR_LENGTH,
             }));
         }
-        let secret = SecretKey::from_octets(&bytes[..SECRET_KEY_LENGTH])?;
+        let secret = PrivateKey::from_octets(&bytes[..SECRET_KEY_LENGTH])?;
         let public = PublicKey::from_octets(&bytes[SECRET_KEY_LENGTH..])?;
 
         Ok(Keypair{ secret: secret, public: public })
@@ -123,7 +123,7 @@ impl Keypair {
     where
         R: CryptoRng + Rng,
     {
-        let sk: SecretKey = SecretKey::create(csprng);
+        let sk: PrivateKey = PrivateKey::create(csprng);
         let pk: PublicKey = (&sk).into();
 
         Keypair{ public: pk, secret: sk }
@@ -207,7 +207,7 @@ impl<'d> Deserialize<'d> for Keypair {
             where
                 E: SerdeError,
             {
-                let secret_key = SecretKey::from_octets(&bytes[..SECRET_KEY_LENGTH]);
+                let secret_key = PrivateKey::from_octets(&bytes[..SECRET_KEY_LENGTH]);
                 let public_key = PublicKey::from_octets(&bytes[SECRET_KEY_LENGTH..]);
 
                 if secret_key.is_ok() && public_key.is_ok() {

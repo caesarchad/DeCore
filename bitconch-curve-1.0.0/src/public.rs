@@ -38,8 +38,8 @@ impl AsRef<[u8]> for PublicKey {
     }
 }
 
-impl<'a> From<&'a SecretKey> for PublicKey {
-    fn from(secret_key: &SecretKey) -> PublicKey {
+impl<'a> From<&'a PrivateKey> for PublicKey {
+    fn from(secret_key: &PrivateKey) -> PublicKey {
         let mut h: Sha512 = Sha512::new();
         let mut hash: [u8; 64] = [0u8; 64];
         let mut digest: [u8; 32] = [0u8; 32];
