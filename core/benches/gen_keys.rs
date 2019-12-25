@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use morgan::create_keys::GenKeys;
+use morgan_interface::create_keys::GenKeys;
 use test::Bencher;
 
 #[bench]

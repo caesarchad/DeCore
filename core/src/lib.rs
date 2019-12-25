@@ -35,7 +35,6 @@ pub mod node_group_tests;
 pub mod fiscal_statement_info;
 pub mod expunge;
 pub mod fetch_phase;
-pub mod create_keys;
 pub mod genesis_utils;
 pub mod gossip_service;
 pub mod leader_arrange;

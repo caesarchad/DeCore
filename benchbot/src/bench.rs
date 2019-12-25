@@ -2,7 +2,7 @@ use morgan_metricbot;
 
 use log::*;
 use rayon::prelude::*;
-use morgan::create_keys::GenKeys;
+use morgan_interface::create_keys::GenKeys;
 use morgan_client::sample_stats::{sample_txs, SampleStats};
 use morgan_tokenbot::drone::request_airdrop_transaction;
 use morgan_metricbot::datapoint_info;

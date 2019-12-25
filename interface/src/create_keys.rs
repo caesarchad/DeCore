@@ -3,7 +3,7 @@
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
-use morgan_interface::signature::Keypair;
+use crate::signature::Keypair;
 use serde::{Deserialize, Serialize};
 
 
@@ -60,8 +60,8 @@ impl Default for LoggerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use morgan_interface::pubkey::Pubkey;
-    use morgan_interface::signature::KeypairUtil;
+    pub use crate::pubkey::Pubkey;
+    use crate::signature::KeypairUtil;
     use std::collections::HashSet;
 
     #[test]

@@ -178,7 +178,7 @@ mod tests {
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
     use crate::fiscal_statement_info::FsclStmt;
-    use crate::create_keys::GenKeys;
+    use morgan_interface::create_keys::GenKeys;
     use morgan_interface::hash::{hash, Hash, Hasher};
     use morgan_interface::signature::KeypairUtil;
     use morgan_interface::system_transaction;
