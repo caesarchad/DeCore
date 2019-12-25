@@ -1,7 +1,7 @@
 pub mod account;
 pub mod account_utils;
 pub mod bvm_controller;
-pub mod create_keys;
+pub mod keymaker;
 pub mod constants;
 pub mod account_host;
 pub mod gas_cost;

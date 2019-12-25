@@ -2,7 +2,7 @@ use morgan_metricbot;
 
 use log::*;
 use rayon::prelude::*;
-use morgan_interface::create_keys::GenKeys;
+use morgan_interface::keymaker::ChaKeys;
 use morgan_client::sample_stats::{sample_txs, SampleStats};
 use morgan_tokenbot::drone::request_airdrop_transaction;
 use morgan_metricbot::datapoint_info;
@@ -576,7 +576,7 @@ fn should_switch_directions(num_difs_per_account: u64, i: u64) -> bool {
 pub fn generate_keypairs(seed_keypair: &Keypair, count: usize) -> Vec<Keypair> {
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&seed_keypair.to_bytes()[..32]);
-    let mut rnd = GenKeys::new(seed);
+    let mut rnd = ChaKeys::new(seed);
 
     let mut total_keys = 0;
     let mut target = count;
@@ -585,7 +585,7 @@ pub fn generate_keypairs(seed_keypair: &Keypair, count: usize) -> Vec<Keypair> {
         // Use the upper bound for this division otherwise it may not generate enough keys
         target = (target + MAX_SPENDS_PER_TX - 1) / MAX_SPENDS_PER_TX;
     }
-    rnd.gen_n_keypairs(total_keys as u64)
+    rnd.ed25519_keypair_vec(total_keys as u64)
 }
 
 pub fn generate_and_fund_keypairs<T: AccountHost>(

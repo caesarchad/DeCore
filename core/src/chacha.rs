@@ -178,7 +178,7 @@ mod tests {
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::chacha::chacha_cbc_encrypt_ledger;
     use crate::fiscal_statement_info::FsclStmt;
-    use morgan_interface::create_keys::GenKeys;
+    use morgan_interface::keymaker::ChaKeys;
     use morgan_interface::hash::{hash, Hash, Hasher};
     use morgan_interface::signature::KeypairUtil;
     use morgan_interface::system_transaction;
@@ -193,7 +193,7 @@ mod tests {
         let one = hash(&zero.as_ref());
 
         let seed = [2u8; 32];
-        let mut rnd = GenKeys::new(seed);
+        let mut rnd = ChaKeys::new(seed);
         let keypair = rnd.gen_keypair();
 
         let mut id = one;
