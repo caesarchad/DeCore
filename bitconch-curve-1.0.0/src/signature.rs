@@ -1,14 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ed25519-dalek.
-// Copyright (c) 2017-2019 isis lovecruft
-// See LICENSE for licensing information.
-//
-// Authors:
-// - isis agora lovecruft <isis@patternsinthevoid.net>
-
-//! An ed25519 signature.
-
 use core::fmt::Debug;
 
 use curve25519_dalek::edwards::CompressedEdwardsY;
@@ -26,36 +15,12 @@ use serde::{Deserializer, Serializer};
 use crate::constants::*;
 use crate::errors::*;
 
-/// An ed25519 signature.
-///
-/// # Note
-///
-/// These signatures, unlike the ed25519 signature reference implementation, are
-/// "detached"—that is, they do **not** include a copy of the message which has
-/// been signed.
 #[allow(non_snake_case)]
 #[derive(Copy, Eq, PartialEq)]
 pub struct Signature {
-    /// `R` is an `EdwardsPoint`, formed by using an hash function with
-    /// 512-bits output to produce the digest of:
-    ///
-    /// - the nonce half of the `ExpandedSecretKey`, and
-    /// - the message to be signed.
-    ///
-    /// This digest is then interpreted as a `Scalar` and reduced into an
-    /// element in ℤ/lℤ.  The scalar is then multiplied by the distinguished
-    /// basepoint to produce `R`, and `EdwardsPoint`.
+
     pub(crate) R: CompressedEdwardsY,
 
-    /// `s` is a `Scalar`, formed by using an hash function with 512-bits output
-    /// to produce the digest of:
-    ///
-    /// - the `r` portion of this `Signature`,
-    /// - the `PublicKey` which should be used to validate this `Signature`, and
-    /// - the message to be signed.
-    ///
-    /// This digest is then interpreted as a `Scalar` and reduced into an
-    /// element in ℤ/lℤ.
     pub(crate) s: Scalar,
 }
 
@@ -72,7 +37,6 @@ impl Debug for Signature {
 }
 
 impl Signature {
-    /// Convert this `Signature` to a byte array.
     #[inline]
     pub fn to_octets(&self) -> [u8; SIGNATURE_LENGTH] {
         let mut signature_bytes: [u8; SIGNATURE_LENGTH] = [0u8; SIGNATURE_LENGTH];
@@ -82,7 +46,6 @@ impl Signature {
         signature_bytes
     }
 
-    /// Construct a `Signature` from a slice of bytes.
     #[inline]
     pub fn from_octets(bytes: &[u8]) -> Result<Signature, SignatureError> {
         if bytes.len() != SIGNATURE_LENGTH {

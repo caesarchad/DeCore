@@ -1,14 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ed25519-dalek.
-// Copyright (c) 2017-2019 isis lovecruft
-// See LICENSE for licensing information.
-//
-// Authors:
-// - isis agora lovecruft <isis@patternsinthevoid.net>
-
-//! ed25519 public keys.
-
 use core::fmt::Debug;
 
 use curve25519_dalek::constants;
@@ -34,7 +23,6 @@ use crate::errors::*;
 use crate::private::*;
 use crate::signature::*;
 
-/// An ed25519 public key.
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 pub struct PublicKey(pub(crate) CompressedEdwardsY, pub(crate) EdwardsPoint);
 
@@ -51,7 +39,6 @@ impl AsRef<[u8]> for PublicKey {
 }
 
 impl<'a> From<&'a SecretKey> for PublicKey {
-    /// Derive this public key from its corresponding `SecretKey`.
     fn from(secret_key: &SecretKey) -> PublicKey {
         let mut h: Sha512 = Sha512::new();
         let mut hash: [u8; 64] = [0u8; 64];
@@ -67,7 +54,6 @@ impl<'a> From<&'a SecretKey> for PublicKey {
 }
 
 impl<'a> From<&'a ExpandedSecretKey> for PublicKey {
-    /// Derive this public key from its corresponding `ExpandedSecretKey`.
     fn from(expanded_secret_key: &ExpandedSecretKey) -> PublicKey {
         let mut bits: [u8; 32] = expanded_secret_key.key.to_bytes();
 
@@ -76,54 +62,16 @@ impl<'a> From<&'a ExpandedSecretKey> for PublicKey {
 }
 
 impl PublicKey {
-    /// Convert this public key to a byte array.
     #[inline]
     pub fn to_octets(&self) -> [u8; PUBLIC_KEY_LENGTH] {
         self.0.to_bytes()
     }
 
-    /// View this public key as a byte array.
     #[inline]
     pub fn as_octets<'a>(&'a self) -> &'a [u8; PUBLIC_KEY_LENGTH] {
         &(self.0).0
     }
 
-    /// Construct a `PublicKey` from a slice of bytes.
-    ///
-    /// # Warning
-    ///
-    /// The caller is responsible for ensuring that the bytes passed into this
-    /// method actually represent a `curve25519_dalek::curve::CompressedEdwardsY`
-    /// and that said compressed point is actually a point on the curve.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # extern crate ed25519_dalek;
-    /// #
-    /// use ed25519_dalek::PublicKey;
-    /// use ed25519_dalek::PUBLIC_KEY_LENGTH;
-    /// use ed25519_dalek::SignatureError;
-    ///
-    /// # fn doctest() -> Result<PublicKey, SignatureError> {
-    /// let public_key_bytes: [u8; PUBLIC_KEY_LENGTH] = [
-    ///    215,  90, 152,   1, 130, 177,  10, 183, 213,  75, 254, 211, 201, 100,   7,  58,
-    ///     14, 225, 114, 243, 218, 166,  35,  37, 175,   2,  26, 104, 247,   7,   81, 26];
-    ///
-    /// let public_key = PublicKey::from_octets(&public_key_bytes)?;
-    /// #
-    /// # Ok(public_key)
-    /// # }
-    /// #
-    /// # fn main() {
-    /// #     doctest();
-    /// # }
-    /// ```
-    ///
-    /// # Returns
-    ///
-    /// A `Result` whose okay value is an EdDSA `PublicKey` or whose error value
-    /// is an `SignatureError` describing the error that occurred.
     #[inline]
     pub fn from_octets(bytes: &[u8]) -> Result<PublicKey, SignatureError> {
         if bytes.len() != PUBLIC_KEY_LENGTH {
@@ -143,9 +91,7 @@ impl PublicKey {
         Ok(PublicKey(compressed, point))
     }
 
-    /// Internal utility function for mangling the bits of a (formerly
-    /// mathematically well-defined) "scalar" and multiplying it to produce a
-    /// public key.
+
     fn bash_value_bits_and_mul_via_origin_to_generate_pubkey(
         bits: &mut [u8; 32],
     ) -> PublicKey {
@@ -159,11 +105,6 @@ impl PublicKey {
         PublicKey(compressed, point)
     }
 
-    /// Verify a signature on a message with this keypair's public key.
-    ///
-    /// # Return
-    ///
-    /// Returns `Ok(())` if the signature is valid, and `Err` otherwise.
     #[allow(non_snake_case)]
     pub fn validate(
         &self,
@@ -190,24 +131,6 @@ impl PublicKey {
         }
     }
 
-    /// Verify a `signature` on a `prehashed_message` using the Ed25519ph algorithm.
-    ///
-    /// # Inputs
-    ///
-    /// * `prehashed_message` is an instantiated hash digest with 512-bits of
-    ///   output which has had the message to be signed previously fed into its
-    ///   state.
-    /// * `context` is an optional context string, up to 255 bytes inclusive,
-    ///   which may be used to provide additional domain separation.  If not
-    ///   set, this will default to an empty string.
-    /// * `signature` is a purported Ed25519ph [`Signature`] on the `prehashed_message`.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the `signature` was a valid signature created by this
-    /// `Keypair` on the `prehashed_message`.
-    ///
-    /// [rfc8032]: https://tools.ietf.org/html/rfc8032#section-5.1
     #[allow(non_snake_case)]
     pub fn validate_already_hashed<D>(
         &self,
@@ -228,7 +151,7 @@ impl PublicKey {
         let minus_A: EdwardsPoint = -self.1;
 
         h.input(b"SigEd25519 no Ed25519 collisions");
-        h.input(&[1]); // Ed25519ph
+        h.input(&[1]);
         h.input(&[ctx.len() as u8]);
         h.input(ctx);
         h.input(signature.R.as_bytes());
