@@ -2,7 +2,13 @@
 //!
 
 use crate::packet::{
-    deserialize_packets_in_blob, Blob, Meta, Packets, SharedBlobs, 
+    deserialize_packets_in_blob, Blob, Meta, Packets, 
+};
+use crate::bvm_types::{
+    PcktAcptr,
+    PcktSndr,
+    BlobSndr,
+    BlobAcptr,
 };
 use morgan_interface::constants::PACKET_DATA_SIZE;
 use crate::result::{Error, Result};
@@ -10,19 +16,15 @@ use bincode;
 use morgan_interface::timing::duration_as_ms;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::Arc;
 use std::thread::{Builder, JoinHandle};
 use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 use walkdir::WalkDir;
 
-pub type PacketReceiver = Receiver<Packets>;
-pub type PacketSender = Sender<Packets>;
-pub type BlobSender = Sender<SharedBlobs>;
-pub type BlobReceiver = Receiver<SharedBlobs>;
 
-fn recv_loop(sock: &UdpSocket, exit: Arc<AtomicBool>, channel: &PacketSender) -> Result<()> {
+fn acpt_window(sock: &UdpSocket, exit: Arc<AtomicBool>, channel: &PcktSndr) -> Result<()> {
     loop {
         let mut msgs = Packets::default();
         loop {
@@ -39,10 +41,10 @@ fn recv_loop(sock: &UdpSocket, exit: Arc<AtomicBool>, channel: &PacketSender) ->
     }
 }
 
-pub fn receiver(
+pub fn acptor(
     sock: Arc<UdpSocket>,
     exit: &Arc<AtomicBool>,
-    packet_sender: PacketSender,
+    packet_sender: PcktSndr,
 ) -> JoinHandle<()> {
     let res = sock.set_read_timeout(Some(Duration::new(1, 0)));
     if res.is_err() {
@@ -52,19 +54,19 @@ pub fn receiver(
     Builder::new()
         .name("morgan-receiver".to_string())
         .spawn(move || {
-            let _ = recv_loop(&sock, exit, &packet_sender);
+            let _ = acpt_window(&sock, exit, &packet_sender);
         })
         .unwrap()
 }
 
-fn recv_send(sock: &UdpSocket, r: &BlobReceiver) -> Result<()> {
+fn forward_msg(sock: &UdpSocket, r: &BlobAcptr) -> Result<()> {
     let timer = Duration::new(1, 0);
     let msgs = r.recv_timeout(timer)?;
     Blob::send_to(sock, msgs)?;
     Ok(())
 }
 
-pub fn recv_batch(recvr: &PacketReceiver, max_batch: usize) -> Result<(Vec<Packets>, usize, u64)> {
+pub fn batch_forward(recvr: &PcktAcptr, max_batch: usize) -> Result<(Vec<Packets>, usize, u64)> {
     let timer = Duration::new(1, 0);
     let msgs = recvr.recv_timeout(timer)?;
     let recv_start = Instant::now();
@@ -84,11 +86,11 @@ pub fn recv_batch(recvr: &PacketReceiver, max_batch: usize) -> Result<(Vec<Packe
     Ok((batch, len, duration_as_ms(&recv_start.elapsed())))
 }
 
-pub fn responder(name: &'static str, sock: Arc<UdpSocket>, r: BlobReceiver) -> JoinHandle<()> {
+pub fn handle_forward_srvc(name: &'static str, sock: Arc<UdpSocket>, r: BlobAcptr) -> JoinHandle<()> {
     Builder::new()
-        .name(format!("morgan-responder-{}", name))
+        .name(format!("morgan-hfs-{}", name))
         .spawn(move || loop {
-            if let Err(e) = recv_send(&sock, &r) {
+            if let Err(e) = forward_msg(&sock, &r) {
                 match e {
                     Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => break,
                     Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
@@ -110,8 +112,8 @@ pub fn responder(name: &'static str, sock: Arc<UdpSocket>, r: BlobReceiver) -> J
 
 //TODO, we would need to stick block authentication before we create the
 //window.
-fn recv_blobs(sock: &UdpSocket, s: &BlobSender) -> Result<()> {
-    trace!("recv_blobs: receiving on {}", sock.local_addr().unwrap());
+fn blob_catcher(sock: &UdpSocket, s: &BlobSndr) -> Result<()> {
+    trace!("blob_catcher is listening to {}", sock.local_addr().unwrap());
     let dq = Blob::recv_from(sock)?;
     if !dq.is_empty() {
         s.send(dq)?;
@@ -119,10 +121,10 @@ fn recv_blobs(sock: &UdpSocket, s: &BlobSender) -> Result<()> {
     Ok(())
 }
 
-pub fn blob_receiver(
+pub fn acptr_srvc(
     sock: Arc<UdpSocket>,
     exit: &Arc<AtomicBool>,
-    s: BlobSender,
+    s: BlobSndr,
 ) -> JoinHandle<()> {
     //DOCUMENTED SIDE-EFFECT
     //1 second timeout on socket read
@@ -131,12 +133,12 @@ pub fn blob_receiver(
         .expect("set socket timeout");
     let exit = exit.clone();
     Builder::new()
-        .name("morgan-blob_receiver".to_string())
+        .name("morgan-blob_catcher".to_string())
         .spawn(move || loop {
             if exit.load(Ordering::Relaxed) {
                 break;
             }
-            let _ = recv_blobs(&sock, &s);
+            let _ = blob_catcher(&sock, &s);
         })
         .unwrap()
 }
@@ -145,7 +147,7 @@ use std::path::{Path, PathBuf};
 
 /// Helper function to iterate through all the files in the given directory, skipping hidden files,
 /// and return an iterator of their paths.
-pub fn iterate_directory(path: &Path) -> impl Iterator<Item = PathBuf> {
+pub fn traverse_folder(path: &Path) -> impl Iterator<Item = PathBuf> {
     walkdir::WalkDir::new(path)
         .into_iter()
         .map(::std::result::Result::unwrap)
@@ -173,15 +175,15 @@ pub fn derive_test_name(root: &Path, path: &Path, test_name: &str) -> String {
 }
 
 
-fn recv_blob_packets(sock: &UdpSocket, s: &PacketSender) -> Result<()> {
+fn blob_filter(sock: &UdpSocket, s: &PcktSndr) -> Result<()> {
     trace!(
-        "recv_blob_packets: receiving on {}",
+        "blob_filter: listening to {}",
         sock.local_addr().unwrap()
     );
 
     let meta = Meta::default();
-    let serialized_meta_size = bincode::serialized_size(&meta)? as usize;
-    let serialized_packet_size = serialized_meta_size + PACKET_DATA_SIZE;
+    let se_met_sz = bincode::serialized_size(&meta)? as usize;
+    let se_pkt_sz = se_met_sz + PACKET_DATA_SIZE;
     let blobs = Blob::recv_from(sock)?;
     for blob in blobs {
         let r_blob = blob.read().unwrap();
@@ -191,7 +193,7 @@ fn recv_blob_packets(sock: &UdpSocket, s: &PacketSender) -> Result<()> {
         };
 
         let packets =
-            deserialize_packets_in_blob(data, serialized_packet_size, serialized_meta_size);
+            deserialize_packets_in_blob(data, se_pkt_sz, se_met_sz);
 
         if packets.is_err() {
             continue;
@@ -204,10 +206,10 @@ fn recv_blob_packets(sock: &UdpSocket, s: &PacketSender) -> Result<()> {
     Ok(())
 }
 
-pub fn blob_packet_receiver(
+pub fn blob_filter_window(
     sock: Arc<UdpSocket>,
     exit: &Arc<AtomicBool>,
-    s: PacketSender,
+    s: PcktSndr,
 ) -> JoinHandle<()> {
     //DOCUMENTED SIDE-EFFECT
     //1 second timeout on socket read
@@ -216,12 +218,12 @@ pub fn blob_packet_receiver(
         .expect("set socket timeout");
     let exit = exit.clone();
     Builder::new()
-        .name("morgan-blob_packet_receiver".to_string())
+        .name("morgan-blob_filter_window".to_string())
         .spawn(move || loop {
             if exit.load(Ordering::Relaxed) {
                 break;
             }
-            let _ = recv_blob_packets(&sock, &s);
+            let _ = blob_filter(&sock, &s);
         })
         .unwrap()
 }
@@ -231,7 +233,7 @@ mod test {
     use super::*;
     use crate::packet::{Blob, Packet, Packets, SharedBlob};
     use morgan_interface::constants::PACKET_DATA_SIZE;
-    use crate::data_filter::{receiver, responder};
+    use crate::data_filter::{acptor, handle_forward_srvc};
     use std::io;
     use std::io::Write;
     use std::net::UdpSocket;
@@ -240,7 +242,7 @@ mod test {
     use std::sync::Arc;
     use std::time::Duration;
 
-    fn get_msgs(r: PacketReceiver, num: &mut usize) -> Result<()> {
+    fn get_msgs(r: PcktAcptr, num: &mut usize) -> Result<()> {
         for _ in 0..10 {
             let m = r.recv_timeout(Duration::new(1, 0))?;
 
@@ -268,10 +270,10 @@ mod test {
         let send = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let exit = Arc::new(AtomicBool::new(false));
         let (s_reader, r_reader) = channel();
-        let t_receiver = receiver(Arc::new(read), &exit, s_reader);
+        let t_receiver = acptor(Arc::new(read), &exit, s_reader);
         let t_responder = {
             let (s_responder, r_responder) = channel();
-            let t_responder = responder("streamer_send_test", Arc::new(send), r_responder);
+            let t_responder = handle_forward_srvc("streamer_send_test", Arc::new(send), r_responder);
             let mut msgs = Vec::new();
             for i in 0..5 {
                 let b = SharedBlob::default();

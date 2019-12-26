@@ -9,7 +9,7 @@ use crate::packet::to_shared_blob;
 use crate::fix_missing_spot_service::{FixSlotLength, FixPlan};
 use crate::result::Result;
 use crate::service::Service;
-use crate::data_filter::{receiver, responder};
+use crate::data_filter::{acptor, handle_forward_srvc};
 use crate::spot_transmit_service::SpotTransmitService;
 use bincode::deserialize;
 use rand::thread_rng;
@@ -129,10 +129,10 @@ fn create_request_processor(
     let (s_reader, r_reader) = channel();
     let (s_responder, r_responder) = channel();
     let storage_socket = Arc::new(socket);
-    let t_receiver = receiver(storage_socket.clone(), exit, s_reader);
+    let t_receiver = acptor(storage_socket.clone(), exit, s_reader);
     thread_handles.push(t_receiver);
 
-    let t_responder = responder("storage-miner-responder", storage_socket.clone(), r_responder);
+    let t_responder = handle_forward_srvc("storage-miner-responder", storage_socket.clone(), r_responder);
     thread_handles.push(t_responder);
 
     let exit = exit.clone();

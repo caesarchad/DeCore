@@ -46,9 +46,9 @@ impl GossipService {
             &node_group_info.read().unwrap().my_data().id,
             gossip_socket.local_addr().unwrap()
         );
-        let t_receiver = data_filter::blob_receiver(gossip_socket.clone(), &exit, request_sender);
+        let t_receiver = data_filter::acptr_srvc(gossip_socket.clone(), &exit, request_sender);
         let (response_sender, response_receiver) = channel();
-        let t_responder = data_filter::responder("gossip", gossip_socket, response_receiver);
+        let t_responder = data_filter::handle_forward_srvc("gossip", gossip_socket, response_receiver);
         let t_listen = NodeGroupInfo::listen(
             node_group_info.clone(),
             block_buffer_pool,

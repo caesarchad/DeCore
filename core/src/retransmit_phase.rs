@@ -9,7 +9,7 @@ use crate::fix_missing_spot_service::FixPlan;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::staking_utils;
-use crate::data_filter::BlobReceiver;
+use crate::bvm_types::BlobAcptr;
 use crate::spot_transmit_service::{check_replay_blob, SpotTransmitService};
 use morgan_metricbot::{datapoint_info, inc_new_counter_error};
 use morgan_runtime::epoch_schedule::RoundPlan;
@@ -26,7 +26,7 @@ fn retransmit(
     treasury_forks: &Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
-    r: &BlobReceiver,
+    r: &BlobAcptr,
     sock: &UdpSocket,
 ) -> Result<()> {
     let timer = Duration::new(1, 0);
@@ -70,7 +70,7 @@ fn retransmitter(
     treasury_forks: Arc<RwLock<TreasuryForks>>,
     leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     node_group_info: Arc<RwLock<NodeGroupInfo>>,
-    r: BlobReceiver,
+    r: BlobAcptr,
 ) -> JoinHandle<()> {
     let treasury_forks = treasury_forks.clone();
     let leader_schedule_cache = leader_schedule_cache.clone();
@@ -179,7 +179,7 @@ impl RetransmitPhase {
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         retransmit_socket: Arc<UdpSocket>,
         fix_socket: Arc<UdpSocket>,
-        fetch_phase_receiver: BlobReceiver,
+        fetch_phase_receiver: BlobAcptr,
         exit: &Arc<AtomicBool>,
         genesis_transaction_seal: &Hash,
         completed_slots_receiver: CompletedSlotsReceiver,

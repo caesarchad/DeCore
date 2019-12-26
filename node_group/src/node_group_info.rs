@@ -24,7 +24,7 @@ use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
 use crate::fix_missing_spot_service::FixPlanType;
 use crate::result::Result;
 use crate::staking_utils;
-use crate::data_filter::{BlobReceiver, BlobSender};
+use crate::data_filter::{BlobAcptr, BlobSndr};
 use bincode::{deserialize, serialize};
 use core::cmp;
 use hashbrown::HashMap;
@@ -1028,7 +1028,7 @@ impl NodeGroupInfo {
     fn run_gossip(
         obj: &Arc<RwLock<Self>>,
         stakes: &HashMap<Pubkey, u64>,
-        blob_sender: &BlobSender,
+        blob_sender: &BlobSndr,
     ) -> Result<()> {
         let reqs = obj.write().unwrap().gossip_request(&stakes);
         let blobs = reqs
@@ -1043,7 +1043,7 @@ impl NodeGroupInfo {
     pub fn gossip(
         obj: Arc<RwLock<Self>>,
         treasury_forks: Option<Arc<RwLock<TreasuryForks>>>,
-        blob_sender: BlobSender,
+        blob_sender: BlobSndr,
         exit: &Arc<AtomicBool>,
     ) -> JoinHandle<()> {
         let exit = exit.clone();
@@ -1466,8 +1466,8 @@ impl NodeGroupInfo {
     fn run_listen(
         obj: &Arc<RwLock<Self>>,
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
-        requests_receiver: &BlobReceiver,
-        response_sender: &BlobSender,
+        requests_receiver: &BlobAcptr,
+        response_sender: &BlobSndr,
     ) -> Result<()> {
         //TODO cache connections
         let timeout = Duration::new(1, 0);
@@ -1486,8 +1486,8 @@ impl NodeGroupInfo {
     pub fn listen(
         me: Arc<RwLock<Self>>,
         block_buffer_pool: Option<Arc<BlockBufferPool>>,
-        requests_receiver: BlobReceiver,
-        response_sender: BlobSender,
+        requests_receiver: BlobAcptr,
+        response_sender: BlobSndr,
         exit: &Arc<AtomicBool>,
     ) -> JoinHandle<()> {
         let exit = exit.clone();

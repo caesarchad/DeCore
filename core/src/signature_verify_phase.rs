@@ -9,7 +9,8 @@ use crate::packet::Packets;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::signature_verify;
-use crate::data_filter::{self, PacketReceiver};
+use crate::data_filter;
+use crate::bvm_types::PcktAcptr;
 use morgan_metricbot::{datapoint_info, inc_new_counter_info};
 use morgan_interface::timing;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
@@ -57,12 +58,12 @@ impl SigVerifyPhase {
     }
 
     fn verifier(
-        recvr: &Arc<Mutex<PacketReceiver>>,
+        recvr: &Arc<Mutex<PcktAcptr>>,
         sendr: &Sender<VerifiedPackets>,
         sigverify_disabled: bool,
         id: usize,
     ) -> Result<()> {
-        let (batch, len, recv_time) = data_filter::recv_batch(
+        let (batch, len, recv_time) = data_filter::batch_forward(
             &recvr.lock().expect("'recvr' lock in fn verifier"),
             RECV_BATCH_MAX,
         )?;
@@ -111,7 +112,7 @@ impl SigVerifyPhase {
     }
 
     fn verifier_service(
-        packet_receiver: Arc<Mutex<PacketReceiver>>,
+        packet_receiver: Arc<Mutex<PcktAcptr>>,
         verified_sender: Sender<VerifiedPackets>,
         sigverify_disabled: bool,
         id: usize,
@@ -145,7 +146,7 @@ impl SigVerifyPhase {
     }
 
     fn verifier_services(
-        packet_receiver: PacketReceiver,
+        packet_receiver: PcktAcptr,
         verified_sender: Sender<VerifiedPackets>,
         sigverify_disabled: bool,
     ) -> Vec<JoinHandle<()>> {

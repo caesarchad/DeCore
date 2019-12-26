@@ -522,7 +522,7 @@ mod tests {
             let fix_target_blaze_node_url = repairee_socket.local_addr().unwrap();
             let repairee_exit = Arc::new(AtomicBool::new(false));
             let repairee_receiver_thread_hdl =
-                data_filter::blob_receiver(repairee_socket, &repairee_exit, repairee_sender);
+                data_filter::acptr_srvc(repairee_socket, &repairee_exit, repairee_sender);
 
             Self::new(
                 id,

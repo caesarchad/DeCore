@@ -69,6 +69,7 @@ pub mod transaction_process_centre;
 pub mod transaction_verify_centre;
 pub mod verifier;
 pub mod spot_transmit_service;
+pub mod bvm_types;
 
 #[macro_use]
 extern crate morgan_budget_controller;

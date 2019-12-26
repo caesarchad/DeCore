@@ -8,7 +8,7 @@ use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
 use crate::fix_missing_spot_service::{FixService, FixPlan};
 use crate::result::{Error, Result};
 use crate::service::Service;
-use crate::data_filter::{BlobReceiver, BlobSender};
+use crate::bvm_types::{BlobAcptr, BlobSndr};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
@@ -22,7 +22,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
-fn replay_blobs(blobs: &[SharedBlob], retransmit: &BlobSender, id: &Pubkey) -> Result<()> {
+fn replay_blobs(blobs: &[SharedBlob], retransmit: &BlobSndr, id: &Pubkey) -> Result<()> {
     let mut retransmit_queue: Vec<SharedBlob> = Vec::new();
     for blob in blobs {
         if blob.read().unwrap().id() != *id {
@@ -97,8 +97,8 @@ pub fn check_replay_blob(
 fn accept_epoch<F>(
     block_buffer_pool: &Arc<BlockBufferPool>,
     my_pubkey: &Pubkey,
-    r: &BlobReceiver,
-    retransmit: &BlobSender,
+    r: &BlobAcptr,
+    retransmit: &BlobSndr,
     genesis_transaction_seal: &Hash,
     blob_filter: F,
 ) -> Result<()>
@@ -159,8 +159,8 @@ impl SpotTransmitService {
     pub fn new<F>(
         block_buffer_pool: Arc<BlockBufferPool>,
         node_group_info: Arc<RwLock<NodeGroupInfo>>,
-        r: BlobReceiver,
-        retransmit: BlobSender,
+        r: BlobAcptr,
+        retransmit: BlobSndr,
         fix_socket: Arc<UdpSocket>,
         exit: &Arc<AtomicBool>,
         fix_plan: FixPlan,
@@ -256,7 +256,7 @@ mod test {
     use crate::genesis_utils::create_genesis_block_with_leader;
     use crate::packet::{index_blobs, Blob};
     use crate::service::Service;
-    use crate::data_filter::{blob_receiver, responder};
+    use crate::data_filter::{acptr_srvc, handle_forward_srvc};
     use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
     use morgan_interface::hash::Hash;
     use std::fs::remove_dir_all;
@@ -348,7 +348,7 @@ mod test {
         let subs = Arc::new(RwLock::new(cluster_info_me));
 
         let (s_reader, r_reader) = channel();
-        let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
+        let t_receiver = acptr_srvc(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
@@ -383,7 +383,7 @@ mod test {
             let blob_sockets: Vec<Arc<UdpSocket>> =
                 leader_node.sockets.blaze_unit.into_iter().map(Arc::new).collect();
 
-            let t_responder = responder("window_send_test", blob_sockets[0].clone(), r_responder);
+            let t_responder = handle_forward_srvc("window_send_test", blob_sockets[0].clone(), r_responder);
             let num_blobs_to_make = 10;
             let gossip_address = &leader_node.info.gossip;
             let msgs = make_consecutive_blobs(
@@ -435,7 +435,7 @@ mod test {
         let subs = Arc::new(RwLock::new(cluster_info_me));
 
         let (s_reader, r_reader) = channel();
-        let t_receiver = blob_receiver(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
+        let t_receiver = acptr_srvc(Arc::new(leader_node.sockets.gossip), &exit, s_reader);
         let (s_retransmit, r_retransmit) = channel();
         let block_buffer_pool_path = fetch_interim_ledger_location!();
         let (block_buffer_pool, _, completed_slots_receiver) = BlockBufferPool::open_by_message(&block_buffer_pool_path)
@@ -465,7 +465,7 @@ mod test {
             let (s_responder, r_responder) = channel();
             let blob_sockets: Vec<Arc<UdpSocket>> =
                 leader_node.sockets.blaze_unit.into_iter().map(Arc::new).collect();
-            let t_responder = responder("window_send_test", blob_sockets[0].clone(), r_responder);
+            let t_responder = handle_forward_srvc("window_send_test", blob_sockets[0].clone(), r_responder);
             let mut msgs = Vec::new();
             let blobs =
                 make_consecutive_blobs(&me_id, 14u64, 0, Hash::default(), &leader_node.info.gossip);

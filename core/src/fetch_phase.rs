@@ -3,7 +3,8 @@
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
 use crate::service::Service;
-use crate::data_filter::{self, PacketReceiver, PacketSender};
+use crate::data_filter;
+use crate::bvm_types::{ PcktAcptr, PcktSndr,};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info};
 use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use std::net::UdpSocket;
@@ -49,7 +50,7 @@ impl FetchPhase {
         transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
-    ) -> (Self, PacketReceiver) {
+    ) -> (Self, PcktAcptr) {
         let (sender, receiver) = channel();
         (
             Self::new_with_sender(sockets, transaction_digesting_module_via_blobs_sockets, exit, &sender, &waterclock_recorder),
@@ -60,7 +61,7 @@ impl FetchPhase {
         sockets: Vec<UdpSocket>,
         transaction_digesting_module_via_blobs_sockets: Vec<UdpSocket>,
         exit: &Arc<AtomicBool>,
-        sender: &PacketSender,
+        sender: &PcktSndr,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
         let tx_sockets = sockets.into_iter().map(Arc::new).collect();
@@ -75,8 +76,8 @@ impl FetchPhase {
     }
 
     fn handle_forwarded_packets(
-        recvr: &PacketReceiver,
-        sendr: &PacketSender,
+        recvr: &PcktAcptr,
+        sendr: &PcktSndr,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Result<()> {
         let msgs = recvr.recv()?;
@@ -109,17 +110,17 @@ impl FetchPhase {
         sockets: Vec<Arc<UdpSocket>>,
         transaction_digesting_module_via_blobs_sockets: Vec<Arc<UdpSocket>>,
         exit: &Arc<AtomicBool>,
-        sender: &PacketSender,
+        sender: &PcktSndr,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
     ) -> Self {
         let transaction_digesting_module_threads = sockets
             .into_iter()
-            .map(|socket| data_filter::receiver(socket, &exit, sender.clone()));
+            .map(|socket| data_filter::acptor(socket, &exit, sender.clone()));
 
         let (forward_sender, forward_receiver) = channel();
         let transaction_digesting_module_via_blobs_threads = transaction_digesting_module_via_blobs_sockets
             .into_iter()
-            .map(|socket| data_filter::blob_packet_receiver(socket, &exit, forward_sender.clone()));
+            .map(|socket| data_filter::blob_filter_window(socket, &exit, forward_sender.clone()));
 
         let sender = sender.clone();
         let waterclock_recorder = waterclock_recorder.clone();
