@@ -8,7 +8,7 @@ use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
 use crate::fix_missing_spot_service::{FixService, FixPlan};
 use crate::result::{Error, Result};
 use crate::service::Service;
-use crate::streamer::{BlobReceiver, BlobSender};
+use crate::data_filter::{BlobReceiver, BlobSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
@@ -35,7 +35,7 @@ fn replay_blobs(blobs: &[SharedBlob], retransmit: &BlobSender, id: &Pubkey) -> R
 
     if !retransmit_queue.is_empty() {
         inc_new_counter_debug!(
-            "streamer-accept_epoch-retransmit",
+            "data_filter-accept_epoch-retransmit",
             retransmit_queue.len(),
             0,
             1000
@@ -81,13 +81,13 @@ pub fn check_replay_blob(
     };
 
     if blob.id() == *my_pubkey {
-        inc_new_counter_debug!("streamer-accept_epoch-circular_transmission", 1);
+        inc_new_counter_debug!("data_filter-accept_epoch-circular_transmission", 1);
         false
     } else if slot_leader_pubkey == None {
-        inc_new_counter_debug!("streamer-accept_epoch-unknown_leader", 1);
+        inc_new_counter_debug!("data_filter-accept_epoch-unknown_leader", 1);
         false
     } else if slot_leader_pubkey != Some(blob.id()) {
-        inc_new_counter_debug!("streamer-accept_epoch-wrong_leader", 1);
+        inc_new_counter_debug!("data_filter-accept_epoch-wrong_leader", 1);
         false
     } else {
         true
@@ -112,7 +112,7 @@ where
         blobs.append(&mut blob)
     }
     let now = Instant::now();
-    inc_new_counter_debug!("streamer-accept_epoch-recv", blobs.len(), 0, 1000);
+    inc_new_counter_debug!("data_filter-accept_epoch-recv", blobs.len(), 0, 1000);
 
     blobs.retain(|blob| {
         blob_filter(&blob.read().unwrap())
@@ -214,7 +214,7 @@ impl SpotTransmitService {
                             Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => break,
                             Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                             _ => {
-                                inc_new_counter_error!("streamer-window-error", 1, 1);
+                                inc_new_counter_error!("data_filter-window-error", 1, 1);
                                 
                                 println!(
                                     "{}",
@@ -256,7 +256,7 @@ mod test {
     use crate::genesis_utils::create_genesis_block_with_leader;
     use crate::packet::{index_blobs, Blob};
     use crate::service::Service;
-    use crate::streamer::{blob_receiver, responder};
+    use crate::data_filter::{blob_receiver, responder};
     use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
     use morgan_interface::hash::Hash;
     use std::fs::remove_dir_all;

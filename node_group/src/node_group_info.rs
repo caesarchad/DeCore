@@ -24,7 +24,7 @@ use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
 use crate::fix_missing_spot_service::FixPlanType;
 use crate::result::Result;
 use crate::staking_utils;
-use crate::streamer::{BlobReceiver, BlobSender};
+use crate::data_filter::{BlobReceiver, BlobSender};
 use bincode::{deserialize, serialize};
 use core::cmp;
 use hashbrown::HashMap;

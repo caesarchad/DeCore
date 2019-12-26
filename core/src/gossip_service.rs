@@ -7,7 +7,7 @@ use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info::FULLNODE_PORT_RANGE;
 use crate::connection_info::ContactInfo;
 use crate::service::Service;
-use crate::streamer;
+use crate::data_filter;
 use rand::{thread_rng, Rng};
 use morgan_client::slim_account_host::{create_client, SlimAccountHost};
 use morgan_interface::pubkey::Pubkey;
@@ -46,9 +46,9 @@ impl GossipService {
             &node_group_info.read().unwrap().my_data().id,
             gossip_socket.local_addr().unwrap()
         );
-        let t_receiver = streamer::blob_receiver(gossip_socket.clone(), &exit, request_sender);
+        let t_receiver = data_filter::blob_receiver(gossip_socket.clone(), &exit, request_sender);
         let (response_sender, response_receiver) = channel();
-        let t_responder = streamer::responder("gossip", gossip_socket, response_receiver);
+        let t_responder = data_filter::responder("gossip", gossip_socket, response_receiver);
         let t_listen = NodeGroupInfo::listen(
             node_group_info.clone(),
             block_buffer_pool,

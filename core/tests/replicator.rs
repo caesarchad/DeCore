@@ -13,7 +13,7 @@ use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
 use morgan::cloner::StorageMiner;
 use morgan::cloner::StorageMinerRequest;
 use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
-use morgan::streamer::blob_receiver;
+use morgan::data_filter::blob_receiver;
 use morgan::verifier::ValidatorConfig;
 use morgan_client::slim_account_host::create_client;
 use morgan_interface::genesis_block::create_genesis_block;

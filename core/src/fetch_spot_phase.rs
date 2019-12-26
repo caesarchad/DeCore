@@ -1,7 +1,7 @@
 //! The `blob_fetch_phase` pulls blobs from UDP sockets and sends it to a channel.
 
 use crate::service::Service;
-use crate::streamer::{self, BlobSender};
+use crate::data_filter::{self, BlobSender};
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -24,7 +24,7 @@ impl BlobFetchPhase {
     ) -> Self {
         let thread_hdls: Vec<_> = sockets
             .into_iter()
-            .map(|socket| streamer::blob_receiver(socket, &exit, sender.clone()))
+            .map(|socket| data_filter::blob_receiver(socket, &exit, sender.clone()))
             .collect();
 
         Self { thread_hdls }

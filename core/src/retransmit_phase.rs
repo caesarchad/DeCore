@@ -9,7 +9,7 @@ use crate::fix_missing_spot_service::FixPlan;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::staking_utils;
-use crate::streamer::BlobReceiver;
+use crate::data_filter::BlobReceiver;
 use crate::spot_transmit_service::{check_replay_blob, SpotTransmitService};
 use morgan_metricbot::{datapoint_info, inc_new_counter_error};
 use morgan_runtime::epoch_schedule::RoundPlan;
@@ -90,7 +90,7 @@ fn retransmitter(
                         Error::RecvTimeoutError(RecvTimeoutError::Disconnected) => break,
                         Error::RecvTimeoutError(RecvTimeoutError::Timeout) => (),
                         _ => {
-                            inc_new_counter_error!("streamer-retransmit-error", 1, 1);
+                            inc_new_counter_error!("data_filter-retransmit-error", 1, 1);
                         }
                     }
                 }

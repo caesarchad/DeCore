@@ -9,7 +9,7 @@ use crate::packet::to_shared_blob;
 use crate::fix_missing_spot_service::{FixSlotLength, FixPlan};
 use crate::result::Result;
 use crate::service::Service;
-use crate::streamer::{receiver, responder};
+use crate::data_filter::{receiver, responder};
 use crate::spot_transmit_service::SpotTransmitService;
 use bincode::deserialize;
 use rand::thread_rng;

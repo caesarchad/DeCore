@@ -63,7 +63,7 @@ pub mod signature_verify;
 pub mod signature_verify_phase;
 pub mod staking_utils;
 pub mod storage_stage;
-pub mod streamer;
+pub mod data_filter;
 pub mod test_tx;
 pub mod transaction_process_centre;
 pub mod transaction_verify_centre;

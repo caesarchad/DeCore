@@ -45,7 +45,7 @@ _ grcov target/cov/debug/deps/ > target/cov/lcov-full.info
 echo "--- filter-files-from-lcov"
 
 # List of directories to remove from the coverage report
-ignored_directories="^(bench-tps|upload-perf|bench-streamer)"
+ignored_directories="^(bench-tps|upload-perf|bench-data_filter)"
 
 filter-files-from-lcov() {
   declare skip=false

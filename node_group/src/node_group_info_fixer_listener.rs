@@ -481,7 +481,7 @@ mod tests {
     use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts_in_batch;
     use crate::node_group_info::Node;
     use crate::packet::{Blob, SharedBlob};
-    use crate::streamer;
+    use crate::data_filter;
     use std::collections::BTreeSet;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc::channel;
@@ -522,7 +522,7 @@ mod tests {
             let fix_target_blaze_node_url = repairee_socket.local_addr().unwrap();
             let repairee_exit = Arc::new(AtomicBool::new(false));
             let repairee_receiver_thread_hdl =
-                streamer::blob_receiver(repairee_socket, &repairee_exit, repairee_sender);
+                data_filter::blob_receiver(repairee_socket, &repairee_exit, repairee_sender);
 
             Self::new(
                 id,

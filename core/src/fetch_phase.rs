@@ -3,7 +3,7 @@
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
 use crate::service::Service;
-use crate::streamer::{self, PacketReceiver, PacketSender};
+use crate::data_filter::{self, PacketReceiver, PacketSender};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info};
 use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use std::net::UdpSocket;
@@ -114,12 +114,12 @@ impl FetchPhase {
     ) -> Self {
         let transaction_digesting_module_threads = sockets
             .into_iter()
-            .map(|socket| streamer::receiver(socket, &exit, sender.clone()));
+            .map(|socket| data_filter::receiver(socket, &exit, sender.clone()));
 
         let (forward_sender, forward_receiver) = channel();
         let transaction_digesting_module_via_blobs_threads = transaction_digesting_module_via_blobs_sockets
             .into_iter()
-            .map(|socket| streamer::blob_packet_receiver(socket, &exit, forward_sender.clone()));
+            .map(|socket| data_filter::blob_packet_receiver(socket, &exit, forward_sender.clone()));
 
         let sender = sender.clone();
         let waterclock_recorder = waterclock_recorder.clone();

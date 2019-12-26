@@ -138,7 +138,7 @@ impl PyramidNode {
         // Send out data
         NodeGroupInfo::broadcast(&self.id, contains_last_drop, &pyramid_node_grp_list, sock, &blobs)?;
 
-        inc_new_counter_debug!("streamer-broadcast-sent", blobs.len());
+        inc_new_counter_debug!("data_filter-broadcast-sent", blobs.len());
 
         // send out erasures
         NodeGroupInfo::broadcast(&self.id, false, &pyramid_node_grp_list, sock, &coding)?;

@@ -9,7 +9,7 @@ use crate::packet::Packets;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::signature_verify;
-use crate::streamer::{self, PacketReceiver};
+use crate::data_filter::{self, PacketReceiver};
 use morgan_metricbot::{datapoint_info, inc_new_counter_info};
 use morgan_interface::timing;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
@@ -62,7 +62,7 @@ impl SigVerifyPhase {
         sigverify_disabled: bool,
         id: usize,
     ) -> Result<()> {
-        let (batch, len, recv_time) = streamer::recv_batch(
+        let (batch, len, recv_time) = data_filter::recv_batch(
             &recvr.lock().expect("'recvr' lock in fn verifier"),
             RECV_BATCH_MAX,
         )?;
