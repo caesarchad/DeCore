@@ -40,7 +40,7 @@ pub enum Switch {
 
 impl Switch {
     /// Return true if the given Endorsement satisfies this Switch.
-    pub fn is_satisfied(&self, witness: &Endorsement, from: &BvmAddr) -> bool {
+    pub fn depends(&self, witness: &Endorsement, from: &BvmAddr) -> bool {
         match (self, witness) {
             (Switch::Signature(address), Endorsement::Signature) => address == from,
             (Switch::Timestamp(dt, address), Endorsement::Timestamp(last_time)) => {
@@ -59,7 +59,7 @@ pub enum BvmScript {
     Pay(AcctOp),
 
     /// Make a payment after some condition.
-    After(Switch, Box<BvmScript>),
+    On(Switch, Box<BvmScript>),
 
     /// Either make a payment after one condition or a different payment after another
     /// condition, which ever condition is satisfied first.
@@ -67,6 +67,9 @@ pub enum BvmScript {
 
     /// Make a payment after both of two conditions are satisfied
     And(Switch, Switch, Box<BvmScript>),
+
+    
+    
 }
 
 impl BvmScript {
@@ -76,8 +79,8 @@ impl BvmScript {
     }
 
     /// Create a budget that pays `difs` to `to` after being witnessed by `from`.
-    pub fn new_authorized_payment(from: &BvmAddr, difs: u64, to: &BvmAddr) -> Self {
-        BvmScript::After(
+    pub fn appr_pay(from: &BvmAddr, difs: u64, to: &BvmAddr) -> Self {
+        BvmScript::On(
             Switch::Signature(*from),
             Box::new(Self::new_payment(difs, to)),
         )
@@ -85,14 +88,14 @@ impl BvmScript {
 
     /// Create a budget that pays `difs` to `to` after being witnessed by `witness` unless
     /// canceled with a signature from `from`.
-    pub fn new_cancelable_authorized_payment(
+    pub fn pending_appr_pay(
         witness: &BvmAddr,
         difs: u64,
         to: &BvmAddr,
         from: Option<BvmAddr>,
     ) -> Self {
         if from.is_none() {
-            return Self::new_authorized_payment(witness, difs, to);
+            return Self::appr_pay(witness, difs, to);
         }
         let from = from.unwrap();
         BvmScript::Or(
@@ -108,7 +111,7 @@ impl BvmScript {
     }
 
     /// Create a budget that pays difs` to `to` after being witnessed by 2x `from`s
-    pub fn new_2_2_multisig_payment(
+    pub fn two_o_two_pay(
         from0: &BvmAddr,
         from1: &BvmAddr,
         difs: u64,
@@ -121,15 +124,17 @@ impl BvmScript {
         )
     }
 
+    
+
     /// Create a budget that pays `difs` to `to` after the given DateTime signed
     /// by `dt_address`.
-    pub fn new_future_payment(
+    pub fn planned_pay(
         dt: DateTime<Utc>,
         dt_address: &BvmAddr,
         difs: u64,
         to: &BvmAddr,
     ) -> Self {
-        BvmScript::After(
+        BvmScript::On(
             Switch::Timestamp(dt, *dt_address),
             Box::new(Self::new_payment(difs, to)),
         )
@@ -137,7 +142,7 @@ impl BvmScript {
 
     /// Create a budget that pays `difs` to `to` after the given DateTime
     /// signed by `dt_address` unless canceled by `from`.
-    pub fn new_cancelable_future_payment(
+    pub fn pending_planned_pay(
         dt: DateTime<Utc>,
         dt_address: &BvmAddr,
         difs: u64,
@@ -145,7 +150,7 @@ impl BvmScript {
         from: Option<BvmAddr>,
     ) -> Self {
         if from.is_none() {
-            return Self::new_future_payment(dt, dt_address, difs, to);
+            return Self::planned_pay(dt, dt_address, difs, to);
         }
         let from = from.unwrap();
         BvmScript::Or(
@@ -161,7 +166,7 @@ impl BvmScript {
     }
 
     /// Return AcctOp if the budget requires no additional Witnesses.
-    pub fn final_payment(&self) -> Option<AcctOp> {
+    pub fn commit_pay(&self) -> Option<AcctOp> {
         match self {
             BvmScript::Pay(payment) => Some(payment.clone()),
             _ => None,
@@ -172,7 +177,7 @@ impl BvmScript {
     pub fn verify(&self, spendable_difs: u64) -> bool {
         match self {
             BvmScript::Pay(payment) => payment.difs == spendable_difs,
-            BvmScript::After(_, sub_expr) | BvmScript::And(_, _, sub_expr) => {
+            BvmScript::On(_, sub_expr) | BvmScript::And(_, _, sub_expr) => {
                 sub_expr.verify(spendable_difs)
             }
             BvmScript::Or(a, b) => {
@@ -185,20 +190,20 @@ impl BvmScript {
     /// If so, modify the budget in-place.
     pub fn apply_witness(&mut self, witness: &Endorsement, from: &BvmAddr) {
         let new_expr = match self {
-            BvmScript::After(cond, sub_expr) if cond.is_satisfied(witness, from) => {
+            BvmScript::On(cond, sub_expr) if cond.depends(witness, from) => {
                 Some(sub_expr.clone())
             }
-            BvmScript::Or((cond, sub_expr), _) if cond.is_satisfied(witness, from) => {
+            BvmScript::Or((cond, sub_expr), _) if cond.depends(witness, from) => {
                 Some(sub_expr.clone())
             }
-            BvmScript::Or(_, (cond, sub_expr)) if cond.is_satisfied(witness, from) => {
+            BvmScript::Or(_, (cond, sub_expr)) if cond.depends(witness, from) => {
                 Some(sub_expr.clone())
             }
             BvmScript::And(cond0, cond1, sub_expr) => {
-                if cond0.is_satisfied(witness, from) {
-                    Some(Box::new(BvmScript::After(cond1.clone(), sub_expr.clone())))
-                } else if cond1.is_satisfied(witness, from) {
-                    Some(Box::new(BvmScript::After(cond0.clone(), sub_expr.clone())))
+                if cond0.depends(witness, from) {
+                    Some(Box::new(BvmScript::On(cond1.clone(), sub_expr.clone())))
+                } else if cond1.depends(witness, from) {
+                    Some(Box::new(BvmScript::On(cond0.clone(), sub_expr.clone())))
                 } else {
                     None
                 }
@@ -218,7 +223,7 @@ mod tests {
     #[test]
     fn test_signature_satisfied() {
         let from = BvmAddr::default();
-        assert!(Switch::Signature(from).is_satisfied(&Endorsement::Signature, &from));
+        assert!(Switch::Signature(from).depends(&Endorsement::Signature, &from));
     }
 
     #[test]
@@ -226,9 +231,9 @@ mod tests {
         let dt1 = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
         let dt2 = Utc.ymd(2014, 11, 14).and_hms(10, 9, 8);
         let from = BvmAddr::default();
-        assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
-        assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt2), &from));
-        assert!(!Switch::Timestamp(dt2, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
+        assert!(Switch::Timestamp(dt1, from).depends(&Endorsement::Timestamp(dt1), &from));
+        assert!(Switch::Timestamp(dt1, from).depends(&Endorsement::Timestamp(dt2), &from));
+        assert!(!Switch::Timestamp(dt2, from).depends(&Endorsement::Timestamp(dt1), &from));
     }
 
     #[test]
@@ -237,10 +242,10 @@ mod tests {
         let from = BvmAddr::default();
         let to = BvmAddr::default();
         assert!(BvmScript::new_payment(42, &to).verify(42));
-        assert!(BvmScript::new_authorized_payment(&from, 42, &to).verify(42));
-        assert!(BvmScript::new_future_payment(dt, &from, 42, &to).verify(42));
+        assert!(BvmScript::appr_pay(&from, 42, &to).verify(42));
+        assert!(BvmScript::planned_pay(dt, &from, 42, &to).verify(42));
         assert!(
-            BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from)).verify(42)
+            BvmScript::pending_planned_pay(dt, &from, 42, &to, Some(from)).verify(42)
         );
     }
 
@@ -249,7 +254,7 @@ mod tests {
         let from = BvmAddr::default();
         let to = BvmAddr::default();
 
-        let mut expr = BvmScript::new_authorized_payment(&from, 42, &to);
+        let mut expr = BvmScript::appr_pay(&from, 42, &to);
         expr.apply_witness(&Endorsement::Signature, &from);
         assert_eq!(expr, BvmScript::new_payment(42, &to));
     }
@@ -260,7 +265,7 @@ mod tests {
         let from = BvmAddr::new_rand();
         let to = BvmAddr::new_rand();
 
-        let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
+        let mut expr = BvmScript::planned_pay(dt, &from, 42, &to);
         expr.apply_witness(&Endorsement::Timestamp(dt), &from);
         assert_eq!(expr, BvmScript::new_payment(42, &to));
     }
@@ -273,7 +278,7 @@ mod tests {
         let from = BvmAddr::new_rand();
         let to = BvmAddr::new_rand();
 
-        let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
+        let mut expr = BvmScript::planned_pay(dt, &from, 42, &to);
         let orig_expr = expr.clone();
         expr.apply_witness(&Endorsement::Timestamp(dt), &to); // <-- Attack!
         assert_eq!(expr, orig_expr);
@@ -285,11 +290,11 @@ mod tests {
         let from = BvmAddr::default();
         let to = BvmAddr::default();
 
-        let mut expr = BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
+        let mut expr = BvmScript::pending_planned_pay(dt, &from, 42, &to, Some(from));
         expr.apply_witness(&Endorsement::Timestamp(dt), &from);
         assert_eq!(expr, BvmScript::new_payment(42, &to));
 
-        let mut expr = BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
+        let mut expr = BvmScript::pending_planned_pay(dt, &from, 42, &to, Some(from));
         expr.apply_witness(&Endorsement::Signature, &from);
         assert_eq!(expr, BvmScript::new_payment(42, &from));
     }
@@ -299,9 +304,9 @@ mod tests {
         let from1 = BvmAddr::new_rand();
         let to = BvmAddr::default();
 
-        let mut expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
+        let mut expr = BvmScript::two_o_two_pay(&from0, &from1, 42, &to);
         expr.apply_witness(&Endorsement::Signature, &from0);
-        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
+        assert_eq!(expr, BvmScript::appr_pay(&from1, 42, &to));
     }
 
     #[test]
@@ -311,12 +316,12 @@ mod tests {
         let from2 = BvmAddr::new_rand();
         let to = BvmAddr::default();
 
-        let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
-        let mut expr = BvmScript::After(Switch::Signature(from2), Box::new(expr));
+        let expr = BvmScript::two_o_two_pay(&from0, &from1, 42, &to);
+        let mut expr = BvmScript::On(Switch::Signature(from2), Box::new(expr));
 
         expr.apply_witness(&Endorsement::Signature, &from2);
         expr.apply_witness(&Endorsement::Signature, &from0);
-        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
+        assert_eq!(expr, BvmScript::appr_pay(&from1, 42, &to));
     }
 
     #[test]
@@ -326,16 +331,16 @@ mod tests {
         let dt = Utc.ymd(2014, 11, 11).and_hms(7, 7, 7);
         let to = BvmAddr::default();
 
-        let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
-        let mut expr = BvmScript::After(Switch::Timestamp(dt, from0), Box::new(expr));
+        let expr = BvmScript::two_o_two_pay(&from0, &from1, 42, &to);
+        let mut expr = BvmScript::On(Switch::Timestamp(dt, from0), Box::new(expr));
 
         expr.apply_witness(&Endorsement::Timestamp(dt), &from0);
         assert_eq!(
             expr,
-            BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to)
+            BvmScript::two_o_two_pay(&from0, &from1, 42, &to)
         );
 
         expr.apply_witness(&Endorsement::Signature, &from0);
-        assert_eq!(expr, BvmScript::new_authorized_payment(&from1, 42, &to));
+        assert_eq!(expr, BvmScript::appr_pay(&from1, 42, &to));
     }
 }

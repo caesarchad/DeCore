@@ -72,7 +72,7 @@ pub fn on_date(
     cancelable: Option<BvmAddr>,
     difs: u64,
 ) -> Vec<OpCode> {
-    let expr = BvmScript::new_cancelable_future_payment(dt, dt_address, difs, to, cancelable);
+    let expr = BvmScript::pending_planned_pay(dt, dt_address, difs, to, cancelable);
     create_account(from, contract, difs, expr)
 }
 
@@ -85,7 +85,7 @@ pub fn when_signed(
     cancelable: Option<BvmAddr>,
     difs: u64,
 ) -> Vec<OpCode> {
-    let expr = BvmScript::new_cancelable_authorized_payment(witness, difs, to, cancelable);
+    let expr = BvmScript::pending_appr_pay(witness, difs, to, cancelable);
     create_account(from, contract, difs, expr)
 }
 

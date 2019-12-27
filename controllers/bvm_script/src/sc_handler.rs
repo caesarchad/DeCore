@@ -16,14 +16,14 @@ fn apply_signature(
     script_state: &mut BudgetState,
     keyed_accounts: &mut [KeyedAccount],
 ) -> Result<(), BudgetError> {
-    let mut final_payment = None;
+    let mut commit_pay = None;
     if let Some(ref mut expr) = script_state.pending_budget {
         let key = keyed_accounts[0].signer_key().unwrap();
         expr.apply_witness(&Endorsement::Signature, key);
-        final_payment = expr.final_payment();
+        commit_pay = expr.commit_pay();
     }
 
-    if let Some(payment) = final_payment {
+    if let Some(payment) = commit_pay {
         if let Some(key) = keyed_accounts[0].signer_key() {
             if &payment.to == key {
                 script_state.pending_budget = None;
@@ -51,15 +51,15 @@ fn apply_timestamp(
     dt: DateTime<Utc>,
 ) -> Result<(), BudgetError> {
     // Check to see if any timelocked transactions can be completed.
-    let mut final_payment = None;
+    let mut commit_pay = None;
 
     if let Some(ref mut expr) = script_state.pending_budget {
         let key = keyed_accounts[0].signer_key().unwrap();
         expr.apply_witness(&Endorsement::Timestamp(dt), key);
-        final_payment = expr.final_payment();
+        commit_pay = expr.commit_pay();
     }
 
-    if let Some(payment) = final_payment {
+    if let Some(payment) = commit_pay {
         if &payment.to != keyed_accounts[2].unsigned_key() {
             trace!("destination missing");
             return Err(BudgetError::DestinationMissing);
@@ -94,7 +94,7 @@ pub fn handle_opcode(
     match instruction {
         SmarContractOpCode::InitializeAccount(expr) => {
             let expr = expr.clone();
-            if let Some(payment) = expr.final_payment() {
+            if let Some(payment) = expr.commit_pay() {
                 keyed_accounts[1].account.difs = 0;
                 keyed_accounts[0].account.difs += payment.difs;
                 return Ok(());
