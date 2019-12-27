@@ -49,28 +49,28 @@ pub struct Transaction {
     pub signatures: Vec<Signature>,
 
     /// The message to sign.
-    pub message: Context,
+    pub context: Context,
 }
 
 impl Transaction {
-    pub fn new_unsigned(message: Context) -> Self {
+    pub fn new_unsigned(context: Context) -> Self {
         Self {
-            signatures: vec![Signature::default(); message.header.num_required_signatures as usize],
-            message,
+            signatures: vec![Signature::default(); context.header.num_required_signatures as usize],
+            context,
         }
     }
 
     pub fn new_u_opcodes(instructions: Vec<OpCode>) -> Self {
-        let message = Context::new(instructions);
-        Self::new_unsigned(message)
+        let context = Context::new(instructions);
+        Self::new_unsigned(context)
     }
 
     pub fn new<T: KeypairUtil>(
         from_keypairs: &[&T],
-        message: Context,
+        context: Context,
         recent_transaction_seal: Hash,
     ) -> Transaction {
-        let mut tx = Self::new_unsigned(message);
+        let mut tx = Self::new_unsigned(context);
         tx.sign(from_keypairs, recent_transaction_seal);
         tx
     }
@@ -80,8 +80,8 @@ impl Transaction {
         instructions: Vec<OpCode>,
         recent_transaction_seal: Hash,
     ) -> Transaction {
-        let message = Context::new(instructions);
-        Self::new(from_keypairs, message, recent_transaction_seal)
+        let context = Context::new(instructions);
+        Self::new(from_keypairs, context, recent_transaction_seal)
     }
 
     
@@ -98,7 +98,7 @@ impl Transaction {
             .collect();
         account_keys.extend_from_slice(keys);
         account_keys.extend(&program_ids);
-        let message = Context::new_with_encoded_opcodes(
+        let context = Context::new_with_encoded_opcodes(
             from_keypairs.len() as u8,
             0,
             program_ids.len() as u8,
@@ -106,15 +106,15 @@ impl Transaction {
             Hash::default(),
             instructions,
         );
-        Transaction::new(from_keypairs, message, recent_transaction_seal)
+        Transaction::new(from_keypairs, context, recent_transaction_seal)
     }
 
     pub fn data(&self, instruction_index: usize) -> &[u8] {
-        &self.message.instructions[instruction_index].data
+        &self.context.instructions[instruction_index].data
     }
 
     fn key_index(&self, instruction_index: usize, accounts_index: usize) -> Option<usize> {
-        self.message
+        self.context
             .instructions
             .get(instruction_index)
             .and_then(|instruction| instruction.accounts.get(accounts_index))
@@ -122,7 +122,7 @@ impl Transaction {
     }
     pub fn key(&self, instruction_index: usize, accounts_index: usize) -> Option<&BvmAddr> {
         self.key_index(instruction_index, accounts_index)
-            .and_then(|account_keys_index| self.message.account_keys.get(account_keys_index))
+            .and_then(|account_keys_index| self.context.account_keys.get(account_keys_index))
     }
     pub fn signer_key(&self, instruction_index: usize, accounts_index: usize) -> Option<&BvmAddr> {
         match self.key_index(instruction_index, accounts_index) {
@@ -131,35 +131,35 @@ impl Transaction {
                 if signature_index >= self.signatures.len() {
                     return None;
                 }
-                self.message.account_keys.get(signature_index)
+                self.context.account_keys.get(signature_index)
             }
         }
     }
 
     /// Return a message containing all data that should be signed.
-    pub fn message(&self) -> &Context {
-        &self.message
+    pub fn self_context(&self) -> &Context {
+        &self.context
     }
 
     /// Return the serialized message data to sign.
-    pub fn message_data(&self) -> Vec<u8> {
-        serialize(&self.message()).unwrap()
+    pub fn context_data(&self) -> Vec<u8> {
+        serialize(&self.self_context()).unwrap()
     }
 
     /// Sign this transaction.
     pub fn sign_unchecked<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
-        self.message.recent_transaction_seal = recent_transaction_seal;
-        let message_data = self.message_data();
+        self.context.recent_transaction_seal = recent_transaction_seal;
+        let context_data = self.context_data();
         self.signatures = keypairs
             .iter()
-            .map(|keypair| keypair.sign_message(&message_data))
+            .map(|keypair| keypair.sign_message(&context_data))
             .collect();
     }
 
     /// Check keys and keypair lengths, then sign this transaction.
     pub fn sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
         let signed_keys =
-            &self.message.account_keys[0..self.message.header.num_required_signatures as usize];
+            &self.context.account_keys[0..self.context.header.num_required_signatures as usize];
         for (i, keypair) in keypairs.iter().enumerate() {
             assert_eq!(keypair.pubkey(), signed_keys[i], "keypair-pubkey mismatch");
         }
@@ -172,11 +172,11 @@ impl Transaction {
     ///  clear any prior signatures and update recent_transaction_seal
     pub fn partial_sign<T: KeypairUtil>(&mut self, keypairs: &[&T], recent_transaction_seal: Hash) {
         let signed_keys =
-            &self.message.account_keys[0..self.message.header.num_required_signatures as usize];
+            &self.context.account_keys[0..self.context.header.num_required_signatures as usize];
 
         // if you change the transaction_seal, you're re-signing...
-        if recent_transaction_seal != self.message.recent_transaction_seal {
-            self.message.recent_transaction_seal = recent_transaction_seal;
+        if recent_transaction_seal != self.context.recent_transaction_seal {
+            self.context.recent_transaction_seal = recent_transaction_seal;
             self.signatures
                 .iter_mut()
                 .for_each(|signature| *signature = Signature::default());
@@ -188,7 +188,7 @@ impl Transaction {
                 .position(|pubkey| pubkey == &keypair.pubkey())
                 .expect("keypair-pubkey mismatch");
 
-            self.signatures[i] = keypair.sign_message(&self.message_data())
+            self.signatures[i] = keypair.sign_message(&self.context_data())
         }
     }
 
@@ -200,13 +200,13 @@ impl Transaction {
 
     /// Verify that references in the instructions are valid
     pub fn verify_refs(&self) -> bool {
-        let message = self.message();
-        for instruction in &message.instructions {
-            if (instruction.program_ids_index as usize) >= message.account_keys.len() {
+        let context = self.self_context();
+        for instruction in &context.instructions {
+            if (instruction.program_ids_index as usize) >= context.account_keys.len() {
                 return false;
             }
             for account_index in &instruction.accounts {
-                if (*account_index as usize) >= message.account_keys.len() {
+                if (*account_index as usize) >= context.account_keys.len() {
                     return false;
                 }
             }
@@ -226,9 +226,9 @@ mod tests {
     use std::mem::size_of;
 
     fn get_program_id(tx: &Transaction, instruction_index: usize) -> &BvmAddr {
-        let message = tx.message();
-        let instruction = &message.instructions[instruction_index];
-        instruction.program_id(&message.account_keys)
+        let context = tx.self_context();
+        let instruction = &context.instructions[instruction_index];
+        instruction.program_id(&context.account_keys)
     }
 
     #[test]
@@ -322,8 +322,8 @@ mod tests {
             AccountMeta::new(to, false),
         ];
         let instruction = OpCode::new(program_id, &(1u8, 2u8, 3u8), account_metas);
-        let message = Context::new(vec![instruction]);
-        Transaction::new(&[&keypair], message, Hash::default())
+        let context = Context::new(vec![instruction]);
+        Transaction::new(&[&keypair], context, Hash::default())
     }
 
     #[test]
@@ -353,14 +353,14 @@ mod tests {
         let expected_instruction_size = 1 + 1 + ix.accounts.len() + 1 + expected_data_size;
         assert_eq!(expected_instruction_size, 17);
 
-        let message = Context::new(vec![ix]);
+        let context = Context::new(vec![ix]);
         assert_eq!(
-            serialized_size(&message.instructions[0]).unwrap() as usize,
+            serialized_size(&context.instructions[0]).unwrap() as usize,
             expected_instruction_size,
             "unexpected Instruction::serialized_size"
         );
 
-        let tx = Transaction::new(&[&alice_keypair], message, Hash::default());
+        let tx = Transaction::new(&[&alice_keypair], context, Hash::default());
 
         let len_size = 1;
         let num_required_sigs_size = 1;
@@ -371,7 +371,7 @@ mod tests {
             + num_required_sigs_size
             + num_credit_only_accounts_size
             + len_size
-            + (tx.message.account_keys.len() * size_of::<BvmAddr>())
+            + (tx.context.account_keys.len() * size_of::<BvmAddr>())
             + transaction_seal_size
             + len_size
             + expected_instruction_size;
@@ -481,7 +481,7 @@ mod tests {
         let mut tx = Transaction::new_u_opcodes(vec![ix]);
         tx.sign(&[&keypair0], Hash::default());
         assert_eq!(
-            tx.message.instructions[0],
+            tx.context.instructions[0],
             EncodedOpCodes::new(1, &0, vec![0])
         );
         assert!(tx.is_signed());

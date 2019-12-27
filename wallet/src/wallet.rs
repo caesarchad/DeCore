@@ -698,9 +698,9 @@ fn process_claim_storage_reward(
         slot,
     );
     let signers = [&config.keypair];
-    let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+    let context = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
 
-    let mut transaction = Transaction::new(&signers, message, recent_transaction_seal);
+    let mut transaction = Transaction::new(&signers, context, recent_transaction_seal);
     let signature_str = rpc_client.send_and_confirm_transaction(&mut transaction, &signers)?;
     Ok(signature_str.to_string())
 }
@@ -776,16 +776,16 @@ fn process_deploy(
                 (i * USERDATA_CHUNK_SIZE) as u32,
                 chunk.to_vec(),
             );
-            let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
-            Transaction::new(&signers, message, transaction_seal)
+            let context = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+            Transaction::new(&signers, context, transaction_seal)
         })
         .collect();
     rpc_client.send_and_confirm_transactions(write_transactions, &signers)?;
 
     trace!("Finalizing program account");
     let instruction = morgan_interface::mounter_opcode::finalize(&program_id.pubkey(), &bvm_controller::id());
-    let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
-    let mut tx = Transaction::new(&signers, message, transaction_seal);
+    let context = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+    let mut tx = Transaction::new(&signers, context, transaction_seal);
     rpc_client
         .send_and_confirm_transaction(&mut tx, &signers)
         .map_err(|_| {
@@ -1149,7 +1149,7 @@ impl KeypairUtil for DroneKeypair {
 
     /// Return the public key of the keypair used to sign votes
     fn pubkey(&self) -> BvmAddr {
-        self.transaction.message().account_keys[0]
+        self.transaction.self_context().account_keys[0]
     }
 
     fn sign_message(&self, _msg: &[u8]) -> Signature {

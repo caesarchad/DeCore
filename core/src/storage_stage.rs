@@ -308,8 +308,8 @@ impl StoragePhase {
         }
 
         let signer_keys = vec![keypair.as_ref(), storage_keypair.as_ref()];
-        let message = Context::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
-        let transaction = Transaction::new(&signer_keys, message, transaction_seal);
+        let context = Context::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
+        let transaction = Transaction::new(&signer_keys, context, transaction_seal);
 
         account_host_socket.send_to(
             &bincode::serialize(&transaction).unwrap(),
@@ -488,12 +488,12 @@ impl StoragePhase {
                         // Go through the transactions, find proofs, and use them to update
                         // the storage_keys with their signatures
                         for tx in &entry.transactions {
-                            for instruction in tx.message.instructions.iter() {
+                            for instruction in tx.context.instructions.iter() {
                                 let program_id =
-                                    tx.message.account_keys[instruction.program_ids_index as usize];
+                                    tx.context.account_keys[instruction.program_ids_index as usize];
                                 if morgan_storage_api::check_id(&program_id) {
                                     let storage_account_key =
-                                        tx.message.account_keys[instruction.accounts[0] as usize];
+                                        tx.context.account_keys[instruction.accounts[0] as usize];
                                     Self::process_storage_transaction(
                                         &instruction.data,
                                         slot,

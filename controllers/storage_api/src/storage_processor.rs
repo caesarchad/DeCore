@@ -284,7 +284,7 @@ mod tests {
             &[&miner_1_storage_id, &miner_2_storage_id],
             10,
         );
-        let message = Context::new(storage_opcode::create_mining_pool_account(
+        let context = Context::new(storage_opcode::create_mining_pool_account(
             &mint_pubkey,
             &mining_pool_pubkey,
             100,
@@ -298,7 +298,7 @@ mod tests {
         }
 
         // advertise for storage segment 1
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -333,7 +333,7 @@ mod tests {
                     &treasury_client,
                 ));
         }
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -352,7 +352,7 @@ mod tests {
             Ok(_)
         );
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::proof_validation(
                 &validator_storage_id,
                 get_segment_from_slot(slot) as u64,
@@ -366,7 +366,7 @@ mod tests {
             Ok(_)
         );
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -387,7 +387,7 @@ mod tests {
 
         assert_eq!(treasury_client.get_balance(&validator_storage_id).unwrap(), 10);
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &validator_storage_id,
                 &mining_pool_pubkey,
@@ -411,7 +411,7 @@ mod tests {
             10
         );
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_1_storage_id,
                 &mining_pool_pubkey,
@@ -421,7 +421,7 @@ mod tests {
         );
         assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_2_storage_id,
                 &mining_pool_pubkey,
@@ -464,7 +464,7 @@ mod tests {
                     difs,
                 ))
             });
-        let message = Context::new(ixs);
+        let context = Context::new(ixs);
         client.send_online_msg(&[mint], message).unwrap();
     }
 
@@ -511,7 +511,7 @@ mod tests {
         treasury_client: &TreasuryClient,
     ) -> CheckedProof {
         let sha_state = Hash::new(BvmAddr::new_rand().as_ref());
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
                 &storage_keypair.pubkey(),
                 sha_state,
@@ -575,21 +575,21 @@ mod tests {
             .online_transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
-        let message = Context::new(storage_opcode::create_miner_storage_account(
+        let context = Context::new(storage_opcode::create_miner_storage_account(
             &mint_pubkey,
             &miner_pubkey,
             1,
         ));
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
-        let message = Context::new(storage_opcode::create_validator_storage_account(
+        let context = Context::new(storage_opcode::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
         ));
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_pubkey,
                 storage_transaction_seal,
@@ -604,7 +604,7 @@ mod tests {
         );
 
         let slot = 0;
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
                 &miner_pubkey,
                 Hash::default(),

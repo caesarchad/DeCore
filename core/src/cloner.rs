@@ -542,10 +542,10 @@ impl StorageMiner {
             self.slot,
             Signature::new(&self.signature.to_bytes()),
         );
-        let message = Context::new_with_payer(vec![instruction], Some(&self.keypair.pubkey()));
+        let context = Context::new_with_payer(vec![instruction], Some(&self.keypair.pubkey()));
         let mut transaction = Transaction::new(
             &[self.keypair.as_ref(), self.storage_keypair.as_ref()],
-            message,
+            context,
             transaction_seal,
         );
         client

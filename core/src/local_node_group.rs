@@ -524,7 +524,7 @@ impl LocalNodeGroup {
         from_keypair: &Arc<Keypair>,
         storage_miner: bool,
     ) -> Result<()> {
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             if storage_miner {
                 storage_opcode::create_miner_storage_account(
                     &from_keypair.pubkey(),
@@ -542,7 +542,7 @@ impl LocalNodeGroup {
         );
         let signer_keys = vec![from_keypair.as_ref()];
         let transaction_seal = client.get_recent_transaction_seal().unwrap().0;
-        let mut transaction = Transaction::new(&signer_keys, message, transaction_seal);
+        let mut transaction = Transaction::new(&signer_keys, context, transaction_seal);
         client
             .retry_transfer(&from_keypair, &mut transaction, 5)
             .map(|_signature| ())

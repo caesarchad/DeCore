@@ -334,7 +334,7 @@ mod tests {
             Some(SIG_OFFSET)
         );
         assert_eq!(
-            memfind(&tx_bytes, &tx.message().account_keys[0].as_ref()),
+            memfind(&tx_bytes, &tx.self_context().account_keys[0].as_ref()),
             Some(pubkey_offset as usize)
         );
         assert_eq!(
@@ -362,7 +362,7 @@ mod tests {
         );
         let tx1 = deserialize(&tx_bytes).unwrap();
         assert_eq!(tx0, tx1);
-        assert_eq!(tx1.message().instructions[0].data, vec![1, 2, 3]);
+        assert_eq!(tx1.self_context().instructions[0].data, vec![1, 2, 3]);
 
         tx0.message.instructions[0].data = vec![1, 2, 4];
         let message0b = tx0.message_data();

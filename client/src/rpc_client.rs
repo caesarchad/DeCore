@@ -190,7 +190,7 @@ impl RpcClient {
 
             // Re-sign any failed transactions with a new transaction_seal and retry
             let (transaction_seal, _fee_calculator) =
-                self.get_new_transaction_seal(&transactions_signatures[0].0.message().recent_transaction_seal)?;
+                self.get_new_transaction_seal(&transactions_signatures[0].0.self_context().recent_transaction_seal)?;
             transactions = transactions_signatures
                 .into_iter()
                 .map(|(mut transaction, _)| {
@@ -207,7 +207,7 @@ impl RpcClient {
         signer_keys: &[&T],
     ) -> Result<(), ClientError> {
         let (transaction_seal, _fee_calculator) =
-            self.get_new_transaction_seal(&tx.message().recent_transaction_seal)?;
+            self.get_new_transaction_seal(&tx.self_context().recent_transaction_seal)?;
         tx.sign(signer_keys, transaction_seal);
         Ok(())
     }
@@ -736,8 +736,8 @@ mod tests {
         assert_ne!(prev_tx, tx);
         assert_ne!(prev_tx.signatures, tx.signatures);
         assert_ne!(
-            prev_tx.message().recent_transaction_seal,
-            tx.message().recent_transaction_seal
+            prev_tx.self_context().recent_transaction_seal,
+            tx.self_context().recent_transaction_seal
         );
     }
 

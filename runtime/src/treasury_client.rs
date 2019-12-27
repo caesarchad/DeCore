@@ -52,8 +52,8 @@ impl OfflineAccount for TreasuryClient {
         instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let message = Context::new(vec![instruction]);
-        self.send_offline_message(&[keypair], message, recent_transaction_seal)
+        let context = Context::new(vec![instruction]);
+        self.send_offline_message(&[keypair], context, recent_transaction_seal)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -80,8 +80,8 @@ impl OnlineAccount for TreasuryClient {
 
     /// Create and process a transaction from a single instruction.
     fn snd_online_instruction(&self, keypair: &Keypair, instruction: OpCode) -> Result<Signature> {
-        let message = Context::new(vec![instruction]);
-        self.send_online_msg(&[keypair], message)
+        let context = Context::new(vec![instruction]);
+        self.send_online_msg(&[keypair], context)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -236,8 +236,8 @@ mod tests {
             .accounts
             .push(AccountMeta::new(jane_pubkey, true));
 
-        let message = Context::new(vec![transfer_instruction]);
-        treasury_client.send_online_msg(&doe_keypairs, message).unwrap();
+        let context = Context::new(vec![transfer_instruction]);
+        treasury_client.send_online_msg(&doe_keypairs, context).unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }
 }

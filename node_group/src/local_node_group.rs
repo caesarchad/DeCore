@@ -523,7 +523,7 @@ impl LocalNodeGroup {
         from_keypair: &Arc<Keypair>,
         storage_miner: bool,
     ) -> Result<()> {
-        let message = Context::new_with_payer(
+        let context = Context::new_with_payer(
             if storage_miner {
                 storage_opcode::create_miner_storage_account(
                     &from_keypair.pubkey(),

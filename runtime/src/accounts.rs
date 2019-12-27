@@ -167,7 +167,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
     ) -> Result<Vec<Account>> {
         // Copy all the accounts
-        let message = tx.message();
+        let message = tx.self_context();
         if tx.signatures.is_empty() && fee != 0 {
             Err(TransactionError::MissingSignatureForFee)
         } else {
@@ -256,7 +256,7 @@ impl Accounts {
         tx: &Transaction,
         error_counters: &mut ErrorCounters,
     ) -> Result<Vec<Vec<(BvmAddr, Account)>>> {
-        let message = tx.message();
+        let message = tx.self_context();
         message
             .instructions
             .iter()
@@ -293,7 +293,7 @@ impl Accounts {
             .zip(lock_results.into_iter())
             .map(|etx| match etx {
                 (tx, Ok(())) => {
-                    let fee = fee_calculator.calculate_fee(tx.message());
+                    let fee = fee_calculator.calculate_fee(tx.self_context());
                     let accounts = Self::load_tx_accounts(
                         &storage,
                         ancestors,
@@ -415,7 +415,7 @@ impl Accounts {
         match result {
             Err(TransactionError::AccountInUse) => (),
             _ => {
-                for k in &tx.message().account_keys {
+                for k in &tx.self_context().account_keys {
                     locks.remove(k);
                 }
             }
@@ -426,7 +426,7 @@ impl Accounts {
     where
         I: Borrow<Transaction>,
     {
-        for k in &tx.borrow().message().account_keys {
+        for k in &tx.borrow().self_context().account_keys {
             locks.remove(k);
         }
     }
@@ -475,11 +475,11 @@ impl Accounts {
         let rv = txs
             .iter()
             .map(|tx| {
-                let message = tx.borrow().message();
+                let context = tx.borrow().self_context();
                 Self::lock_account(
                     (&mut self.account_locks.lock().unwrap(), parent_record_locks),
-                    &message.account_keys[..(message.account_keys.len()
-                        - message.header.num_credit_only_unsigned_accounts as usize)],
+                    &context.account_keys[..(context.account_keys.len()
+                        - context.header.num_credit_only_unsigned_accounts as usize)],
                     &mut error_counters,
                 )
             })
@@ -501,11 +501,11 @@ impl Accounts {
     {
         let record_locks = self.record_locks.lock().unwrap();
         for tx in txs {
-            let message = tx.borrow().message();
+            let context = tx.borrow().self_context();
             Self::lock_record_account(
                 &record_locks.0,
-                &message.account_keys[..(message.account_keys.len()
-                    - message.header.num_credit_only_unsigned_accounts as usize)],
+                &context.account_keys[..(context.account_keys.len()
+                    - context.header.num_credit_only_unsigned_accounts as usize)],
             );
         }
     }
@@ -561,9 +561,9 @@ impl Accounts {
                 continue;
             }
 
-            let message = &txs[i].message();
+            let context = &txs[i].self_context();
             let acc = raccs.as_ref().unwrap();
-            for (key, account) in message.account_keys.iter().zip(acc.0.iter()) {
+            for (key, account) in context.account_keys.iter().zip(acc.0.iter()) {
                 accounts.push((key, account));
             }
         }
@@ -724,7 +724,7 @@ mod tests {
         );
 
         let fee_calculator = GasCost::new(10);
-        assert_eq!(fee_calculator.calculate_fee(tx.message()), 10);
+        assert_eq!(fee_calculator.calculate_fee(tx.self_context()), 10);
 
         let loaded_accounts =
             load_accounts_with_fee(tx, &accounts, &fee_calculator, &mut error_counters);

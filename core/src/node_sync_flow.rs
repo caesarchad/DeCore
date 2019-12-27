@@ -135,7 +135,7 @@ where
         if transactions.len() > 0 {
             // ignore entry.transaction.message's account_keys contain Vote111111111111111111111111111111111111111
             for tx in &stmt.transactions {
-                for key in &tx.message.account_keys {
+                for key in &tx.context.account_keys {
                     if key.to_string() == "Vote111111111111111111111111111111111111111" {
                         be_vote_tx = true;
                         break;

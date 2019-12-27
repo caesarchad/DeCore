@@ -360,7 +360,7 @@ impl Treasury {
         for (i, tx) in txs.iter().enumerate() {
             if Self::can_commit(&res[i]) && !tx.signatures.is_empty() {
                 status_cache.insert(
-                    &tx.message().recent_transaction_seal,
+                    &tx.self_context().recent_transaction_seal,
                     &tx.signatures[0],
                     self.slot(),
                     res[i].clone(),
@@ -525,7 +525,7 @@ impl Treasury {
             .zip(lock_results.into_iter())
             .map(|(tx, lock_res)| {
                 if lock_res.is_ok()
-                    && !hash_queue.check_hash_age(tx.message().recent_transaction_seal, max_age)
+                    && !hash_queue.check_hash_age(tx.self_context().recent_transaction_seal, max_age)
                 {
                     error_counters.reserve_transaction_seal += 1;
                     Err(TransactionError::TransactionSealNotFound)
@@ -552,7 +552,7 @@ impl Treasury {
                     && rcache
                         .get_signature_status(
                             &tx.signatures[0],
-                            &tx.message().recent_transaction_seal,
+                            &tx.self_context().recent_transaction_seal,
                             &self.ancestors,
                         )
                         .is_some()
@@ -668,7 +668,7 @@ impl Treasury {
                     Err(e) => Err(e.clone()),
                     Ok((ref mut accounts, ref mut loaders)) => self
                         .message_processor
-                        .process_message(tx.message(), loaders, accounts, drop_height),
+                        .process_message(tx.self_context(), loaders, accounts, drop_height),
                 })
                 .collect();
 
@@ -720,8 +720,8 @@ impl Treasury {
             .iter()
             .zip(executed.iter())
             .map(|(tx, res)| {
-                let fee = self.fee_calculator.calculate_fee(tx.message());
-                let message = tx.message();
+                let fee = self.fee_calculator.calculate_fee(tx.self_context());
+                let message = tx.self_context();
                 match *res {
                     Err(TransactionError::OpCodeErr(_, _)) => {
                         // credit the transaction fee even in case of OpCodeErr
@@ -967,7 +967,7 @@ impl Treasury {
                 continue;
             }
 
-            let message = &txs[i].message();
+            let message = &txs[i].self_context();
             let acc = raccs.as_ref().unwrap();
 
             for (pubkey, account) in message

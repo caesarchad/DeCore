@@ -388,12 +388,12 @@ mod tests {
         let program_id = BvmAddr::default();
         let id0 = BvmAddr::default();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
-        let message = Context::new(vec![ix]);
-        assert_eq!(message.header.num_required_signatures, 0);
+        let context = Context::new(vec![ix]);
+        assert_eq!(context.header.num_required_signatures, 0);
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        let message = Context::new(vec![ix]);
-        assert_eq!(message.header.num_required_signatures, 1);
+        let context = Context::new(vec![ix]);
+        assert_eq!(context.header.num_required_signatures, 1);
     }
 
     #[test]
@@ -433,21 +433,21 @@ mod tests {
         let id0 = BvmAddr::default();
         let keypair1 = Keypair::new();
         let id1 = keypair1.pubkey();
-        let message = Context::new(vec![
+        let context = Context::new(vec![
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id0, false)]),
             OpCode::new(program_id1, &0, vec![AccountMeta::new(id1, true)]),
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id1, false)]),
         ]);
         assert_eq!(
-            message.instructions[0],
+            context.instructions[0],
             EncodedOpCodes::new(2, &0, vec![1])
         );
         assert_eq!(
-            message.instructions[1],
+            context.instructions[1],
             EncodedOpCodes::new(3, &0, vec![0])
         );
         assert_eq!(
-            message.instructions[2],
+            context.instructions[2],
             EncodedOpCodes::new(2, &0, vec![0])
         );
     }
@@ -459,20 +459,20 @@ mod tests {
         let id0 = BvmAddr::default();
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
-        let message = Context::new_with_payer(vec![ix], Some(&payer));
-        assert_eq!(message.header.num_required_signatures, 1);
+        let context = Context::new_with_payer(vec![ix], Some(&payer));
+        assert_eq!(context.header.num_required_signatures, 1);
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        let message = Context::new_with_payer(vec![ix], Some(&payer));
-        assert_eq!(message.header.num_required_signatures, 2);
+        let context = Context::new_with_payer(vec![ix], Some(&payer));
+        assert_eq!(context.header.num_required_signatures, 2);
 
         let ix = OpCode::new(
             program_id,
             &0,
             vec![AccountMeta::new(payer, true), AccountMeta::new(id0, true)],
         );
-        let message = Context::new_with_payer(vec![ix], Some(&payer));
-        assert_eq!(message.header.num_required_signatures, 2);
+        let context = Context::new_with_payer(vec![ix], Some(&payer));
+        assert_eq!(context.header.num_required_signatures, 2);
     }
 
     #[test]
@@ -506,13 +506,13 @@ mod tests {
         let program_id0 = BvmAddr::default();
         let program_id1 = BvmAddr::new_rand();
         let id = BvmAddr::new_rand();
-        let message = Context::new(vec![
+        let context = Context::new(vec![
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id, false)]),
             OpCode::new(program_id1, &0, vec![AccountMeta::new(id, true)]),
         ]);
-        assert_eq!(message.program_position(0), None);
-        assert_eq!(message.program_position(1), Some(0));
-        assert_eq!(message.program_position(2), Some(1));
+        assert_eq!(context.program_position(0), None);
+        assert_eq!(context.program_position(1), Some(0));
+        assert_eq!(context.program_position(2), Some(1));
     }
 
     #[test]
@@ -524,7 +524,7 @@ mod tests {
         let key4 = BvmAddr::new_rand();
         let key5 = BvmAddr::new_rand();
 
-        let message = Context {
+        let context = Context {
             header: MessageHeader {
                 num_required_signatures: 3,
                 num_credit_only_signed_accounts: 2,
@@ -534,12 +534,12 @@ mod tests {
             recent_transaction_seal: Hash::default(),
             instructions: vec![],
         };
-        assert_eq!(message.is_credit_debit(0), true);
-        assert_eq!(message.is_credit_debit(1), false);
-        assert_eq!(message.is_credit_debit(2), false);
-        assert_eq!(message.is_credit_debit(3), true);
-        assert_eq!(message.is_credit_debit(4), true);
-        assert_eq!(message.is_credit_debit(5), false);
+        assert_eq!(context.is_credit_debit(0), true);
+        assert_eq!(context.is_credit_debit(1), false);
+        assert_eq!(context.is_credit_debit(2), false);
+        assert_eq!(context.is_credit_debit(3), true);
+        assert_eq!(context.is_credit_debit(4), true);
+        assert_eq!(context.is_credit_debit(5), false);
     }
 
     #[test]
@@ -549,7 +549,7 @@ mod tests {
         let id1 = BvmAddr::new_rand();
         let id2 = BvmAddr::new_rand();
         let id3 = BvmAddr::new_rand();
-        let message = Context::new(vec![
+        let context = Context::new(vec![
             OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
             OpCode::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
             OpCode::new(
@@ -564,7 +564,7 @@ mod tests {
             ),
         ]);
         assert_eq!(
-            message.get_account_keys_by_lock_type(),
+            context.get_account_keys_by_lock_type(),
             (vec![&id1, &id0], vec![&id3, &id2, &program_id])
         );
     }

@@ -136,8 +136,8 @@ impl Drone {
                         &to,
                         difs,
                     );
-                    let message = Context::new(vec![create_instruction]);
-                    Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
+                    let context = Context::new(vec![create_instruction]);
+                    Ok(Transaction::new(&[&self.mint_keypair], context, transaction_seal))
                 } else {
                     Err(Error::new(
                         ErrorKind::Other,
@@ -172,8 +172,8 @@ impl Drone {
                         &to,
                         reputations,
                     );
-                    let message = Context::new(vec![create_instruction]);
-                    Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
+                    let context = Context::new(vec![create_instruction]);
+                    Ok(Transaction::new(&[&self.mint_keypair], context, transaction_seal))
                 } else {
                     Err(Error::new(
                         ErrorKind::Other,
@@ -565,7 +565,7 @@ mod tests {
         let mut drone = Drone::new(mint, None, None);
 
         let tx = drone.build_airdrop_transaction(request).unwrap();
-        let message = tx.message();
+        let message = tx.self_context();
 
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
@@ -607,7 +607,7 @@ mod tests {
         let mut drone = Drone::new(mint, None, None);
 
         let tx = drone.build_airdrop_transaction(request).unwrap();
-        let message = tx.message();
+        let message = tx.self_context();
 
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
@@ -650,7 +650,7 @@ mod tests {
         let keypair = Keypair::new();
         let expected_instruction =
             sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
-        let message = Context::new(vec![expected_instruction]);
+        let context = Context::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
@@ -684,7 +684,7 @@ mod tests {
         let keypair = Keypair::new();
         let expected_instruction =
             sys_opcode::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
-        let message = Context::new(vec![expected_instruction]);
+        let context = Context::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];

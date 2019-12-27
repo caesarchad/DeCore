@@ -433,7 +433,7 @@ pub fn set_panic_hook(program: &'static str) {
                     .add_field(
                         "message",
                         influxdb::Value::String(
-                            // TODO: use ono.message() when it becomes stable
+                            // TODO: use ono.self_context() when it becomes stable
                             ono.to_string(),
                         ),
                     )

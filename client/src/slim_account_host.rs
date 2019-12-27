@@ -180,8 +180,8 @@ impl OnlineAccount for SlimAccountHost {
         keypair: &Keypair,
         instruction: OpCode,
     ) -> TransportResult<Signature> {
-        let message = Context::new(vec![instruction]);
-        self.send_online_msg(&[keypair], message)
+        let context = Context::new(vec![instruction]);
+        self.send_online_msg(&[keypair], context)
     }
 
     fn online_transfer(
@@ -263,10 +263,10 @@ impl OfflineAccount for SlimAccountHost {
     fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
-        message: Context,
+        context: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
+        let transaction = Transaction::new(&keypairs, context, recent_transaction_seal);
         self.send_offline_transaction(transaction)
     }
     fn send_offline_instruction(
@@ -275,8 +275,8 @@ impl OfflineAccount for SlimAccountHost {
         instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let message = Context::new(vec![instruction]);
-        self.send_offline_message(&[keypair], message, recent_transaction_seal)
+        let context = Context::new(vec![instruction]);
+        self.send_offline_message(&[keypair], context, recent_transaction_seal)
     }
     fn offline_transfer(
         &self,

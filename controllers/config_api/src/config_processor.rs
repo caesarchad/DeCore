@@ -124,7 +124,7 @@ mod tests {
         let my_config = MyConfig::new(42);
 
         let instruction = config_instruction::store(&config_pubkey, &my_config);
-        let message = Context::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
+        let context = Context::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
         treasury_client
             .send_online_msg(&[&mint_keypair, &config_keypair], message)
             .unwrap();
@@ -150,7 +150,7 @@ mod tests {
 
         let mut instruction = config_instruction::store(&config_pubkey, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
-        let message = Context::new(vec![instruction]);
+        let context = Context::new(vec![instruction]);
         treasury_client
             .send_online_msg(&[&config_keypair], message)
             .unwrap_err();
@@ -173,7 +173,7 @@ mod tests {
         let mut store_instruction = config_instruction::store(&config_pubkey, &my_config);
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
-        let message = Context::new(vec![transfer_instruction, store_instruction]);
+        let context = Context::new(vec![transfer_instruction, store_instruction]);
         treasury_client
             .send_online_msg(&[&system_keypair], message)
             .unwrap_err();

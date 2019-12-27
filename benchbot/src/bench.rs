@@ -326,7 +326,7 @@ fn do_tx_transfers<T: AccountHost>(
 }
 
 fn verify_funding_transfer<T: AccountHost>(client: &T, tx: &Transaction, amount: u64) -> bool {
-    for a in &tx.message().account_keys[1..] {
+    for a in &tx.self_context().account_keys[1..] {
         if client.get_balance(a).unwrap_or(0) >= amount {
             return true;
         }
@@ -395,7 +395,7 @@ pub fn fund_keys<T: AccountHost>(client: &T, genesis: &Keypair, dests: &[Keypair
             while !to_fund_txs.is_empty() {
                 let receivers = to_fund_txs
                     .iter()
-                    .fold(0, |len, (_, tx)| len + tx.message().instructions.len());
+                    .fold(0, |len, (_, tx)| len + tx.self_context().instructions.len());
 
                 println!(
                     "{} {} to {} in {} txs",
