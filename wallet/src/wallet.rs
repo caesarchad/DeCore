@@ -20,7 +20,7 @@ use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::opcodes_utils::DecodeError;
 use morgan_interface::mounter_opcode;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{read_keypair, Keypair, KeypairUtil, Signature};
 use morgan_interface::sys_opcode::SystemError;

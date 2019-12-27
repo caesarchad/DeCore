@@ -12,7 +12,7 @@ use morgan_client::slim_account_host::create_client;
 use morgan_client::slim_account_host::SlimAccountHost;
 use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::GenesisBlock;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};

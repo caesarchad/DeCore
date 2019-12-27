@@ -22,7 +22,7 @@ use morgan_runtime::treasury::Treasury;
 use morgan_interface::account_host::{OfflineAccount, OnlineAccount};
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{Hash, Hasher};
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;

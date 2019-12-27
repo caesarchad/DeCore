@@ -1,6 +1,6 @@
 use morgan_tokenbot::drone::{request_airdrop_transaction, run_local_drone};
 use morgan_interface::hash::Hash;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;

@@ -1,4 +1,4 @@
-use crate::message::Context;
+use crate::context::Context;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]

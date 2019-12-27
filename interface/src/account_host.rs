@@ -10,7 +10,7 @@
 use crate::gas_cost::GasCost;
 use crate::hash::Hash;
 use crate::opcodes::OpCode;
-use crate::message::Context;
+use crate::context::Context;
 use crate::bvm_address::BvmAddr;
 use crate::signature::{Keypair, Signature};
 use crate::transaction;

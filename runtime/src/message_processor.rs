@@ -3,7 +3,7 @@ use crate::sys_opcode_handler;
 use morgan_interface::account::{create_keyed_accounts, Account, KeyedAccount};
 use morgan_interface::opcodes::{EncodedOpCodes, OpCodeErr};
 use morgan_interface::opcodes_utils;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_controller;
 use morgan_interface::transaction::TransactionError;

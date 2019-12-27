@@ -2,7 +2,7 @@
 
 use crate::hash::Hash;
 use crate::opcodes::{EncodedOpCodes, OpCode, OpCodeErr};
-use crate::message::Context;
+use crate::context::Context;
 use crate::bvm_address::BvmAddr;
 use crate::short_vec;
 use crate::signature::{KeypairUtil, Signature};

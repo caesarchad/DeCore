@@ -16,7 +16,7 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCode;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;

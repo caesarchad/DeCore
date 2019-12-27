@@ -11,7 +11,7 @@ use log::*;
 use serde_derive::{Deserialize, Serialize};
 use morgan_metricbot::datapoint_info;
 use morgan_interface::hash::Hash;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::constants::PACKET_DATA_SIZE;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};

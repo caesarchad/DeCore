@@ -111,7 +111,7 @@ mod tests {
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::hash::{hash, Hash};
     use morgan_interface::opcodes::OpCode;
-    use morgan_interface::message::Context;
+    use morgan_interface::context::Context;
     use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
     use std::collections::HashMap;

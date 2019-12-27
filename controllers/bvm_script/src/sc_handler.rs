@@ -158,7 +158,7 @@ mod tests {
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::opcodes::OpCodeErr;
-    use morgan_interface::message::Context;
+    use morgan_interface::context::Context;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::TransactionError;
 

@@ -10,7 +10,7 @@ pub mod hash;
 pub mod opcodes;
 pub mod opcodes_utils;
 pub mod mounter_opcode;
-pub mod message;
+pub mod context;
 pub mod bultin_mounter;
 pub mod waterclock_config;
 pub mod bvm_address;

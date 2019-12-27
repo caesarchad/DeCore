@@ -8,7 +8,7 @@ use crate::packet::{Pkt, BndlPkt};
 use crate::result::Result;
 use bincode::serialized_size;
 use morgan_metricbot::inc_new_counter_debug;
-use morgan_interface::message::MessageHeader;
+use morgan_interface::context::MessageHeader;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::short_vec::des_lenth;
 use morgan_interface::signature::Signature;

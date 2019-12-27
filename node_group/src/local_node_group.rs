@@ -11,7 +11,7 @@ use bitconch_client::slim_account_host::create_client;
 use bitconch_client::slim_account_host::SlimAccountHost;
 use bitconch_interface::account_host::OnlineAccount;
 use bitconch_interface::genesis_block::GenesisBlock;
-use bitconch_interface::message::Context;
+use bitconch_interface::context::Context;
 use bitconch_interface::waterclock_config::WaterClockConfig;
 use bitconch_interface::pubkey::BvmAddr;
 use bitconch_interface::signature::{Keypair, KeypairUtil};

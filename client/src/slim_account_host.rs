@@ -10,7 +10,7 @@ use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount}
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCode;
-use morgan_interface::message::Context;
+use morgan_interface::context::Context;
 use morgan_interface::constants::PACKET_DATA_SIZE;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
