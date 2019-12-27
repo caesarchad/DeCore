@@ -8,6 +8,7 @@ use crate::node_group_info::NodeGroupInfo;
 use crate::node_group_info_fixer_listener::NodeGroupInfoFixListener;
 use crate::result::Result;
 use crate::service::Service;
+use crate::bvm_types::*;
 use morgan_metricbot::datapoint_info;
 use morgan_runtime::epoch_schedule::RoundPlan;
 use morgan_interface::pubkey::Pubkey;
@@ -21,11 +22,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::Duration;
 use morgan_helper::logHelper::*;
 
-pub const MAX_REPAIR_LENGTH: usize = 16;
-pub const REPAIR_MS: u64 = 100;
-pub const MAX_REPAIR_TRIES: u64 = 128;
-pub const NUM_FORKS_TO_REPAIR: usize = 5;
-pub const MAX_ORPHANS: usize = 5;
+
 
 pub enum FixPlan {
     FixSlotList(FixSlotLength),

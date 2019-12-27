@@ -1,4 +1,4 @@
-use crate::expunge::{NUM_CODING, NUM_DATA};
+use crate::bvm_types::{NUM_CODING, NUM_DATA};
 use morgan_metricbot::datapoint;
 use std::borrow::Borrow;
 
@@ -220,7 +220,7 @@ impl ErasureMetaColumn {
 fn test_meta_indexes() {
     use rand::{thread_rng, Rng};
     // to avoid casts everywhere
-    const NUM_DATA: u64 = crate::expunge::NUM_DATA as u64;
+    const NUM_DATA: u64 = crate::bvm_types::NUM_DATA as u64;
 
     let mut rng = thread_rng();
 
@@ -286,8 +286,8 @@ fn test_meta_coding_present() {
 fn test_erasure_meta_status() {
     use rand::{seq::SliceRandom, thread_rng};
     // Local constansts just used to avoid repetitive casts
-    const N_DATA: u64 = crate::expunge::NUM_DATA as u64;
-    const N_CODING: u64 = crate::expunge::NUM_CODING as u64;
+    const N_DATA: u64 = crate::bvm_types::NUM_DATA as u64;
+    const N_CODING: u64 = crate::bvm_types::NUM_CODING as u64;
 
     let mut e_meta = ErasureMetaColumn::default();
     let mut rng = thread_rng();

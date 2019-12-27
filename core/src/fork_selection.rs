@@ -1,6 +1,7 @@
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
 use crate::staking_utils;
+use crate::bvm_types::*;
 use hashbrown::{HashMap, HashSet};
 use morgan_metricbot::datapoint_info;
 use morgan_runtime::treasury::Treasury;
@@ -12,9 +13,6 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use morgan_helper::logHelper::*;
 
-pub const VOTE_THRESHOLD_DEPTH: usize = 8;
-pub const VOTE_THRESHOLD_SIZE: f64 = 2f64 / 3f64;
-pub const MAX_RECENT_VOTES: usize = 16;
 
 #[derive(Default)]
 pub struct EpochStakes {

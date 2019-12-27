@@ -11,10 +11,10 @@
 
 use crate::connection_info::ContactInfo;
 use crate::connection_info_table::ContactInfoTable;
-use crate::gossip::{get_stake, get_weight, NDTB_GOSSIP_BLOOM_SIZE};
+use crate::gossip::{get_stake, get_weight,};
 use crate::gossip_error_type::NodeTbleErr;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag};
-use crate::packet::BLOB_DATA_SIZE;
+use crate::bvm_types::*;
 use bincode::serialized_size;
 use hashbrown::HashMap;
 use rand;
@@ -25,7 +25,7 @@ use morgan_interface::pubkey::Pubkey;
 use std::cmp;
 use std::collections::VecDeque;
 
-pub const NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS: u64 = 15000;
+
 
 #[derive(Clone)]
 pub struct NodeTbleGspPull {

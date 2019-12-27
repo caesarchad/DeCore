@@ -10,6 +10,7 @@ use crate::chacha_cuda::chacha_cbc_encrypt_file_many_keys;
 use crate::node_group_info::NodeGroupInfo;
 use crate::result::{Error, Result};
 use crate::service::Service;
+use crate::bvm_types::*;
 use bincode::deserialize;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -58,10 +59,10 @@ pub struct StoragePhase {
     t_storage_create_accounts: JoinHandle<()>,
 }
 
-pub const STORAGE_ROTATE_TEST_COUNT: u64 = 2;
+
 // TODO: some way to dynamically size NUM_IDENTITIES
 const NUM_IDENTITIES: usize = 1024;
-pub const NUM_STORAGE_SAMPLES: usize = 4;
+
 const KEY_SIZE: usize = 64;
 
 type OpCodeSender = Sender<OpCode>;

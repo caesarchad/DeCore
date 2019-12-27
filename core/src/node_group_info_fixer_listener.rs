@@ -3,6 +3,7 @@ use crate::node_group_info::NodeGroupInfo;
 use crate::propagation_value::EpochSlots;
 use crate::result::Result;
 use crate::service::Service;
+use crate::bvm_types::*;
 use byteorder::{ByteOrder, LittleEndian};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -21,11 +22,7 @@ use std::thread::{self, sleep, Builder, JoinHandle};
 use std::time::Duration;
 use morgan_helper::logHelper::*;
 
-pub const FIXER_SLEEP_TIME: usize = 150;
-pub const FIX_REDUNDANCY: usize = 1;
-pub const BUFFER_SLOTS: usize = 50;
-pub const DELAY_SLOTS: usize = 2;
-pub const UPDATE_SLOTS: usize = 2;
+
 
 // Represents the blobs that a repairman is responsible for repairing in specific slot. More
 // specifically, a repairman is responsible for every blob in this slot with index

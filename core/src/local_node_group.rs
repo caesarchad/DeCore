@@ -1,6 +1,7 @@
 use crate::block_buffer_pool::{create_new_tmp_ledger, tmp_copy_block_buffer};
 use crate::node_group::NodeGroup;
-use crate::node_group_info::{Node, FULLNODE_PORT_RANGE};
+use crate::node_group_info::Node;
+use crate::bvm_types::*;
 use crate::connection_info::ContactInfo;
 use crate::genesis_utils::{create_genesis_block_with_leader, GenesisBlockInfo};
 use crate::gossip_service::find_node_group_host;
@@ -589,7 +590,7 @@ impl Drop for LocalNodeGroup {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+    use crate::bvm_types::STORAGE_ROTATE_TEST_COUNT;
     use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
 
     #[test]

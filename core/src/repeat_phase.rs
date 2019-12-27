@@ -14,6 +14,7 @@ use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
 use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
+use crate::bvm_types::*;
 use hashbrown::HashMap;
 use morgan_metricbot::{datapoint_warn, inc_new_counter_error, inc_new_counter_info};
 use morgan_runtime::treasury::Treasury;
@@ -32,7 +33,7 @@ use std::time::Instant;
 use morgan_helper::logHelper::*;
 use chrono::prelude::*;
 
-pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
+
 
 // Implement a destructor for the RepeatPhase thread to signal it exited
 // even on panics

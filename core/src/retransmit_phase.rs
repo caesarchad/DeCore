@@ -3,7 +3,8 @@
 // use crate::treasury_forks::TreasuryForks;
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::{BlockBufferPool, CompletedSlotsReceiver};
-use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, DATA_PLANE_FANOUT};
+use crate::node_group_info::{compute_retransmit_peers, NodeGroupInfo, };
+use crate::bvm_types::DATA_PLANE_FANOUT;
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::fix_missing_spot_service::FixPlan;
 use crate::result::{Error, Result};

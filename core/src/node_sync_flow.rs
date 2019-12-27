@@ -4,6 +4,7 @@
 
 use crate::fiscal_statement_info::FsclStmt;
 use crate::result::Result;
+use crate::bvm_types::*;
 use bincode::serialize;
 use chrono::{SecondsFormat, Utc};
 use serde_json::json;
@@ -85,8 +86,7 @@ pub struct NodeSyncFlow<T: FiscSatementWriter> {
     pub output: T,
 }
 
-pub const INTERFACE_CONNECT_ATTEMPTS_MAX: usize = 30;
-pub const INTERFACE_CONNECT_INTERVAL: Duration = Duration::from_secs(1);
+
 
 pub fn try_with_port<T, F: FnOnce() -> T>(port: u16, f: F) -> T {
     let mut attempts = 0;

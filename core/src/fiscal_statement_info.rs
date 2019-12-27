@@ -2,7 +2,8 @@
 //! unique ID that is the hash of the FsclStmt before it, plus the hash of the
 //! transactions within it. Entries cannot be reordered, and its field `num_hashes`
 //! represents an approximate amount of time since the last FsclStmt was created.
-use crate::packet::{Blob, SharedBlob, BLOB_DATA_SIZE};
+use crate::packet::{Blob, SharedBlob,};
+use crate::bvm_types::BLOB_DATA_SIZE;
 use crate::water_clock::WaterClock;
 use crate::result::Result;
 use bincode::{deserialize, serialized_size};
@@ -417,7 +418,8 @@ pub fn next_entry(prev_hash: &Hash, num_hashes: u64, transactions: Vec<Transacti
 mod tests {
     use super::*;
     use crate::fiscal_statement_info::FsclStmt;
-    use crate::packet::{to_blobs, BLOB_DATA_SIZE};
+    use crate::packet::to_blobs;
+    use crate::bvm_types::BLOB_DATA_SIZE;
     use morgan_interface::constants::PACKET_DATA_SIZE;
     use morgan_interface::hash::hash;
     use morgan_interface::opcodes::OpCode;

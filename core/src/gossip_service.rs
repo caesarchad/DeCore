@@ -4,10 +4,10 @@
 use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
-use crate::node_group_info::FULLNODE_PORT_RANGE;
 use crate::connection_info::ContactInfo;
 use crate::service::Service;
 use crate::data_filter;
+use crate::bvm_types::*;
 use rand::{thread_rng, Rng};
 use morgan_client::slim_account_host::{create_client, SlimAccountHost};
 use morgan_interface::pubkey::Pubkey;
@@ -323,7 +323,7 @@ fn spy(
             );
         }
         sleep(Duration::from_millis(
-            crate::node_group_info::GOSSIP_SLEEP_MILLIS,
+            crate::bvm_types::GOSSIP_SLEEP_MILLIS,
         ));
         i += 1;
     }

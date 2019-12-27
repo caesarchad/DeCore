@@ -6,16 +6,16 @@
 use crate::connection_info_table::ContactInfoTable;
 use crate::gossip_error_type::NodeTbleErr;
 use crate::pull_from_gossip::NodeTbleGspPull;
-use crate::push_to_gossip::{NodeTbleGspPush, NDTB_GOSSIP_NUM_ACTIVE};
+use crate::push_to_gossip::NodeTbleGspPush;
 use crate::propagation_value::ContInfTblValue;
+use crate::bvm_types::*;
 use hashbrown::HashMap;
 use morgan_runtime::bloom::Bloom;
 use morgan_interface::hash::Hash;
 use morgan_interface::pubkey::Pubkey;
 use std::{thread, time::Duration};
 
-///The min size for bloom filters
-pub const NDTB_GOSSIP_BLOOM_SIZE: usize = 1000;
+
 
 #[derive(Clone)]
 pub struct NodeTbleGossip {

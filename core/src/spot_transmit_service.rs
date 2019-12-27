@@ -4,7 +4,8 @@
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
-use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
+use crate::packet::{Blob, SharedBlob, };
+use crate::bvm_types::BLOB_HEADER_SIZE;
 use crate::fix_missing_spot_service::{FixService, FixPlan};
 use crate::result::{Error, Result};
 use crate::service::Service;

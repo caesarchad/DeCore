@@ -1,12 +1,13 @@
 //! The `recvmmsg` module provides recvmmsg() API implementation
 
 use crate::packet::Packet;
+use crate::bvm_types::*;
 use std::cmp;
 use std::io;
 use std::net::UdpSocket;
 use std::collections::HashMap;
 
-pub const NUM_RCVMMSGS: usize = 16;
+
 
 #[cfg(not(target_os = "linux"))]
 pub fn recvmmsg(socket: &UdpSocket, packets: &mut [Packet]) -> io::Result<usize> {

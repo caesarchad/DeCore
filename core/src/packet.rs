@@ -1,6 +1,7 @@
 //! The `packet` module defines data structures and methods to pull data from the network.
-use crate::recvmmsg::{recvmmsg, NUM_RCVMMSGS};
+use crate::recvmmsg::recvmmsg;
 use crate::result::{Error, Result};
+use crate::bvm_types::*;
 use bincode;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::Serialize;
@@ -23,11 +24,6 @@ use morgan_helper::logHelper::*;
 pub type SharedBlob = Arc<RwLock<Blob>>;
 pub type SharedBlobs = Vec<SharedBlob>;
 
-pub const NUM_PACKETS: usize = 1024 * 8;
-pub const BLOB_SIZE: usize = (64 * 1024 - 128); // wikipedia says there should be 20b for ipv4 headers
-pub const BLOB_DATA_SIZE: usize = BLOB_SIZE - (BLOB_HEADER_SIZE * 2);
-pub const BLOB_DATA_ALIGN: usize = 16; // safe for erasure input pointers, gf.c needs 16byte-aligned buffers
-pub const NUM_BLOBS: usize = (NUM_PACKETS * PACKET_DATA_SIZE) / BLOB_SIZE;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
@@ -349,32 +345,10 @@ fn deserialize_single_packet_in_blob(data: &[u8], serialized_meta_size: usize) -
     Ok(Packet::new(packet_data, meta))
 }
 
-macro_rules! range {
-    ($prev:expr, $type:ident) => {
-        $prev..$prev + size_of::<$type>()
-    };
-}
 
-const PARENT_RANGE: std::ops::Range<usize> = range!(0, u64);
-const SLOT_RANGE: std::ops::Range<usize> = range!(PARENT_RANGE.end, u64);
-const INDEX_RANGE: std::ops::Range<usize> = range!(SLOT_RANGE.end, u64);
-const ID_RANGE: std::ops::Range<usize> = range!(INDEX_RANGE.end, Pubkey);
-const FORWARDED_RANGE: std::ops::Range<usize> = range!(ID_RANGE.end, bool);
-const GENESIS_RANGE: std::ops::Range<usize> = range!(FORWARDED_RANGE.end, Hash);
-const FLAGS_RANGE: std::ops::Range<usize> = range!(GENESIS_RANGE.end, u32);
-const SIZE_RANGE: std::ops::Range<usize> = range!(FLAGS_RANGE.end, u64);
 
-macro_rules! align {
-    ($x:expr, $align:expr) => {
-        $x + ($align - 1) & !($align - 1)
-    };
-}
 
-pub const BLOB_HEADER_SIZE: usize = align!(SIZE_RANGE.end, BLOB_DATA_ALIGN); // make sure data() is safe for erasure
 
-pub const BLOB_FLAG_IS_LAST_IN_SLOT: u32 = 0x2;
-
-pub const BLOB_FLAG_IS_CODING: u32 = 0x1;
 
 impl Blob {
     pub fn new(data: &[u8]) -> Self {

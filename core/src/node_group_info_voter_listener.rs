@@ -1,4 +1,5 @@
-use crate::node_group_info::{NodeGroupInfo, GOSSIP_SLEEP_MILLIS};
+use crate::node_group_info::NodeGroupInfo;
+use crate::bvm_types::GOSSIP_SLEEP_MILLIS;
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::Result;
 use crate::service::Service;
@@ -115,7 +116,8 @@ pub enum SafetyRulesBackend {
 
 #[cfg(test)]
 mod tests {
-    use crate::fork_selection::MAX_RECENT_VOTES;
+    use crate::fork_selection;
+    use crate::bvm_types::MAX_RECENT_VOTES;
     use crate::packet;
     use morgan_interface::hash::Hash;
     use morgan_interface::signature::{Keypair, KeypairUtil};

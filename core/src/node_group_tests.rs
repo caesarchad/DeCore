@@ -3,11 +3,13 @@ use crate::block_buffer_pool::BlockBufferPool;
 ///
 /// All tests must start from an connection url and a funding keypair and
 /// discover the rest of the network.
-use crate::node_group_info::FULLNODE_PORT_RANGE;
+use crate::bvm_types::{
+    FULLNODE_PORT_RANGE,
+    VOTE_THRESHOLD_DEPTH,
+};
 use crate::connection_info::ContactInfo;
 use crate::fiscal_statement_info::{FsclStmt, FsclStmtSlc};
 use crate::gossip_service::find_node_group_host;
-use crate::fork_selection::VOTE_THRESHOLD_DEPTH;
 use morgan_client::slim_account_host::create_client;
 use morgan_runtime::epoch_schedule::MINIMUM_SLOT_LENGTH;
 use morgan_interface::account_host::OnlineAccount;

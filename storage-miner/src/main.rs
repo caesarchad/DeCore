@@ -1,5 +1,6 @@
 use clap::{crate_description, crate_name, crate_version, App, Arg};
-use morgan::node_group_info::{Node, FULLNODE_PORT_RANGE};
+use morgan::node_group_info::Node;
+use morgan::bvm_types::FULLNODE_PORT_RANGE;
 use morgan::connection_info::ContactInfo;
 use morgan::cloner::StorageMiner;
 use morgan::socketaddr;

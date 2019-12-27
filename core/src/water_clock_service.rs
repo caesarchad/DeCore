@@ -1,6 +1,7 @@
 //! The water_clock_service implements a system-wide clock to measure the passage of time
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::service::Service;
+use crate::bvm_types::*;
 use core_affinity;
 use morgan_interface::waterclock_config::WaterClockConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,7 +15,7 @@ pub struct WaterClockService {
 }
 
 
-pub const NUM_HASHES_PER_BATCH: u64 = 1;
+
 
 impl WaterClockService {
     pub fn new(

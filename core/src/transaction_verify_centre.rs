@@ -237,7 +237,7 @@ pub mod tests {
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::node_group_info::{NodeGroupInfo, Node};
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use crate::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+    use crate::bvm_types::STORAGE_ROTATE_TEST_COUNT;
     use morgan_runtime::treasury::Treasury;
     use std::sync::atomic::Ordering;
 

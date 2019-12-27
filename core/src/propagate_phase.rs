@@ -1,7 +1,8 @@
 //! A phase to broadcast data from a leader node to validators
 //!
 use crate::block_buffer_pool::BlockBufferPool;
-use crate::node_group_info::{NodeGroupInfo, NodeGroupInfoError, DATA_PLANE_FANOUT};
+use crate::bvm_types::DATA_PLANE_FANOUT;
+use crate::node_group_info::{NodeGroupInfo, NodeGroupInfoError, };
 use crate::fiscal_statement_info::FsclStmtSlc;
 use crate::expunge::CodingGenerator;
 use crate::packet::index_blobs_with_genesis;

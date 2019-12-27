@@ -13,6 +13,7 @@ use crate::water_clock_service::WaterClockService;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::signature_verify_phase ::VerifiedPackets;
+use crate::bvm_types::*;
 use bincode::deserialize;
 use itertools::Itertools;
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_info, inc_new_counter_warn};
@@ -40,7 +41,7 @@ type PacketsAndOffsets = (Packets, Vec<usize>);
 pub type UnprocessedPackets = Vec<PacketsAndOffsets>;
 
 // number of threads is 1 until mt treasury is ready
-pub const NUM_THREADS: u32 = 10;
+
 
 /// Stores the phase's thread handle and output receiver.
 pub struct TreasuryPhase {
@@ -509,7 +510,7 @@ impl TreasuryPhase {
             let chunk_end = chunk_start
                 + fiscal_statement_info::is_bound(
                     &transactions[chunk_start..],
-                    packet::BLOB_DATA_SIZE as u64,
+                    BLOB_DATA_SIZE as u64,
                     &FsclStmt::serialized_to_blob_size,
                 );
 

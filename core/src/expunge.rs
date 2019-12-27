@@ -1,15 +1,10 @@
-use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
+use crate::packet::{Blob, SharedBlob};
+use crate::bvm_types::*;
 use std::cmp;
 use std::convert::AsMut;
 use std::sync::{Arc, RwLock};
-
 use reed_solomon_erasure::ReedSolomon;
 
-pub const NUM_DATA: usize = 8;
-
-pub const NUM_CODING: usize = 8;
-
-pub const ERASURE_SET_SIZE: usize = NUM_DATA + NUM_CODING;
 
 type Result<T> = std::result::Result<T, reed_solomon_erasure::Error>;
 
@@ -236,7 +231,11 @@ pub mod test {
     use super::*;
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
-    use crate::packet::{index_blobs, SharedBlob, BLOB_DATA_SIZE, BLOB_HEADER_SIZE};
+    use crate::packet::{index_blobs, SharedBlob,};
+    use crate::bvm_types::{
+        BLOB_DATA_SIZE, 
+        BLOB_HEADER_SIZE,
+    };
     use morgan_interface::pubkey::Pubkey;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use std::borrow::Borrow;

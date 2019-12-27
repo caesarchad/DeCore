@@ -18,13 +18,13 @@ use crate::block_buffer_pool::BlockBufferPool;
 use crate::connection_info::ContactInfo;
 use crate::gossip::NodeTbleGossip;
 use crate::gossip_error_type::NodeTbleErr;
-use crate::pull_from_gossip::NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag, EpochSlots, Vote};
-use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
+use crate::packet::{to_shared_blob, Blob, SharedBlob};
 use crate::fix_missing_spot_service::FixPlanType;
 use crate::result::Result;
 use crate::staking_utils;
 use crate::bvm_types::{BlobAcptr, BlobSndr};
+use crate::bvm_types::*;
 use bincode::{deserialize, serialize};
 use core::cmp;
 use hashbrown::HashMap;
@@ -51,15 +51,7 @@ use std::thread::{sleep, Builder, JoinHandle};
 use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
-pub const FULLNODE_PORT_RANGE: PortRange = (10_000, 12_000);
 
-/// The Data plane fanout size, also used as the neighborhood size
-pub const DATA_PLANE_FANOUT: usize = 200;
-/// milliseconds we sleep for between gossip requests
-pub const GOSSIP_SLEEP_MILLIS: u64 = 100;
-
-/// the number of slots to respond with when responding to `Orphan` requests
-pub const MAX_ORPHAN_REPAIR_RESPONSES: usize = 10;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum NodeGroupInfoError {
@@ -1791,7 +1783,7 @@ mod tests {
     use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts_in_batch;
     use crate::block_buffer_pool::BlockBufferPool;
     use crate::propagation_value::ContInfTblValueTag;
-    use crate::packet::BLOB_HEADER_SIZE;
+    use crate::bvm_types::BLOB_HEADER_SIZE;
     use crate::fix_missing_spot_service::FixPlanType;
     use crate::result::Error;
     use crate::test_tx::test_tx;

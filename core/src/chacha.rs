@@ -6,8 +6,7 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-pub const CHACHA_BLOCK_SIZE: usize = 64;
-pub const CHACHA_KEY_SIZE: usize = 32;
+
 
 #[link(name = "cpu-crypt")]
 extern "C" {

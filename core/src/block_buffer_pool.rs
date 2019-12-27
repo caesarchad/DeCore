@@ -2,9 +2,9 @@
 //! system wide clock.
 use crate::fiscal_statement_info::FsclStmt;
 use crate::expunge::{self, Session};
-use crate::packet::{Blob, SharedBlob, BLOB_HEADER_SIZE};
+use crate::packet::{Blob, SharedBlob};
 use crate::result::{Error, Result};
-
+use crate::bvm_types::*;
 use bincode::deserialize;
 
 use hashbrown::HashMap;
@@ -1318,8 +1318,6 @@ fn attempt_erasure_restore(
     prev_inserted_blob_datas: &HashMap<(u64, u64), &[u8]>,
     new_coding_blob: Option<(u64, &[u8])>,
 ) -> Result<Option<(Vec<Blob>, Vec<Blob>)>> {
-    use crate::expunge::ERASURE_SET_SIZE;
-
     let set_index = erasure_meta.set_index;
     let start_index = erasure_meta.start_index();
     let (data_end_index, _) = erasure_meta.end_indexes();
@@ -1420,7 +1418,7 @@ fn restore(
     prev_inserted_blob_datas: &HashMap<(u64, u64), &[u8]>,
     new_coding: Option<(u64, &[u8])>,
 ) -> Result<(Vec<Blob>, Vec<Blob>)> {
-    use crate::expunge::ERASURE_SET_SIZE;
+    use crate::bvm_types::ERASURE_SET_SIZE;
 
     let start_idx = erasure_meta.start_index();
     let size = erasure_meta.size();
@@ -1628,7 +1626,8 @@ pub mod tests {
     use crate::fiscal_statement_info::{
         create_drops, compose_s_fiscal_stmt_nohash, compose_s_fiscal_stmt, FsclStmt, FsclStmtSlc,
     };
-    use crate::expunge::{CodingGenerator, NUM_CODING, NUM_DATA};
+    use crate::expunge::CodingGenerator;
+    use crate::bvm_types;
     use crate::packet;
     use rand::seq::SliceRandom;
     use rand::thread_rng;
@@ -2031,7 +2030,7 @@ pub mod tests {
             let entry_serialized_size =
                 bincode::serialized_size(&compose_s_fiscal_stmt_nohash(1)).unwrap();
             let entries_per_slot =
-                (blobs_per_slot * packet::BLOB_DATA_SIZE as u64) / entry_serialized_size;
+                (blobs_per_slot * bvm_types::BLOB_DATA_SIZE as u64) / entry_serialized_size;
 
             // Write entries
             for slot in 0..num_slots {
@@ -3164,7 +3163,8 @@ pub mod tests {
         use super::*;
         use crate::block_buffer_pool::meta::ErasureMetaStatus;
         use crate::expunge::test::{generate_ledger_model, ErasureSpec, SlotSpec};
-        use crate::expunge::{CodingGenerator, NUM_CODING, NUM_DATA};
+        use crate::expunge::CodingGenerator;
+        use crate::bvm_types::*;
         use rand::{thread_rng, Rng};
         use std::sync::RwLock;
 
@@ -3176,7 +3176,7 @@ pub mod tests {
 
         #[test]
         fn test_erasure_meta_accuracy() {
-            use crate::expunge::ERASURE_SET_SIZE;
+            use crate::bvm_types::ERASURE_SET_SIZE;
             use ErasureMetaStatus::{DataFull, StillNeed};
 
             let path = fetch_interim_ledger_location!();
