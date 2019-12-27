@@ -10,8 +10,8 @@
 use crate::gas_cost::GasCost;
 use crate::hash::Hash;
 use crate::opcodes::OpCode;
-use crate::message::Message;
-use crate::pubkey::Pubkey;
+use crate::message::Context;
+use crate::bvm_address::BvmAddr;
 use crate::signature::{Keypair, Signature};
 use crate::transaction;
 use crate::transport::Result;
@@ -24,7 +24,7 @@ pub trait AccountHost: OnlineAccount + OfflineAccount {
 pub trait OnlineAccount {
     /// Create a transaction from the given message, and send it to the
     /// server, retrying as-needed.
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature>;
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> Result<Signature>;
 
     /// Create a transaction from a single instruction that only requires
     /// a single signer. Then send it to the server, retrying as-needed.
@@ -32,13 +32,13 @@ pub trait OnlineAccount {
 
     /// Transfer difs from `keypair` to `pubkey`, retrying until the
     /// transfer completes or produces and error.
-    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature>;
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &BvmAddr) -> Result<Signature>;
 
     /// Get an account or None if not found.
-    fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>>;
+    fn get_account_data(&self, pubkey: &BvmAddr) -> Result<Option<Vec<u8>>>;
 
     /// Get account balance or 0 if not found.
-    fn get_balance(&self, pubkey: &Pubkey) -> Result<u64>;
+    fn get_balance(&self, pubkey: &BvmAddr) -> Result<u64>;
 
     /// Get signature status.
     fn get_signature_status(
@@ -77,7 +77,7 @@ pub trait OfflineAccount {
     fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
-        message: Message,
+        message: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 
@@ -95,7 +95,7 @@ pub trait OfflineAccount {
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 }

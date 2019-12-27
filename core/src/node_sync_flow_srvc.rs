@@ -10,7 +10,7 @@ use crate::node_sync_flow::SocketNodeSync as NodeSyncFlow;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::result::{Error, Result};
 use crate::service::Service;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::constants::{
     QUALIFIER,
     ORGANIZATION,
@@ -66,7 +66,7 @@ pub fn n3h_binaries_directory() -> PathBuf {
 impl NodeSyncSrvc {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        slot_full_receiver: Receiver<(u64, Pubkey)>,
+        slot_full_receiver: Receiver<(u64, BvmAddr)>,
         block_buffer_pool: Arc<BlockBufferPool>,
         node_sync_socket: String,
         exit: &Arc<AtomicBool>,
@@ -102,7 +102,7 @@ impl NodeSyncSrvc {
         Self { nodesync_thread }
     }
     fn handle_fiscal_stmts(
-        slot_full_receiver: &Receiver<(u64, Pubkey)>,
+        slot_full_receiver: &Receiver<(u64, BvmAddr)>,
         block_buffer_pool: &Arc<BlockBufferPool>,
         nodesyncflow: &mut NodeSyncFlow,
     ) -> Result<()> {
@@ -172,7 +172,7 @@ mod test {
     #[test]
     fn test_blockstream_service_process_entries() {
         let drops_per_slot = 5;
-        let leader_pubkey = Pubkey::new_rand();
+        let leader_pubkey = BvmAddr::new_rand();
 
         // Set up genesis block and block_buffer_pool
         let GenesisBlockInfo {

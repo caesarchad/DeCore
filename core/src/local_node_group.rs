@@ -12,9 +12,9 @@ use morgan_client::slim_account_host::create_client;
 use morgan_client::slim_account_host::SlimAccountHost;
 use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::GenesisBlock;
-use morgan_interface::message::Message;
+use morgan_interface::message::Context;
 use morgan_interface::waterclock_config::WaterClockConfig;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_controller;
 use morgan_interface::constants::DEFAULT_SLOTS_PER_EPOCH;
@@ -39,12 +39,12 @@ pub struct ValidatorInfo {
 }
 
 pub struct StorageMinerInfo {
-    pub miner_storage_pubkey: Pubkey,
+    pub miner_storage_pubkey: BvmAddr,
     pub ledger_path: String,
 }
 
 impl StorageMinerInfo {
-    fn new(storage_pubkey: Pubkey, ledger_path: String) -> Self {
+    fn new(storage_pubkey: BvmAddr, ledger_path: String) -> Self {
         Self {
             miner_storage_pubkey: storage_pubkey,
             ledger_path,
@@ -68,7 +68,7 @@ pub struct NodeGroupConfig {
     pub drops_per_slot: u64,
     pub candidate_each_round: u64,
     pub stake_place_holder: u64,
-    pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
+    pub builtin_opcode_handlers: Vec<(String, BvmAddr)>,
     pub waterclock_config: WaterClockConfig,
 }
 
@@ -95,13 +95,13 @@ pub struct LocalNodeGroup {
     pub validator_config: ValidatorConfig,
     /// FsclStmt point from which the rest of the network can be discovered
     pub connection_url_inf: ContactInfo,
-    pub fullnode_infos: HashMap<Pubkey, ValidatorInfo>,
-    pub listener_infos: HashMap<Pubkey, ValidatorInfo>,
-    fullnodes: HashMap<Pubkey, Validator>,
+    pub fullnode_infos: HashMap<BvmAddr, ValidatorInfo>,
+    pub listener_infos: HashMap<BvmAddr, ValidatorInfo>,
+    fullnodes: HashMap<BvmAddr, Validator>,
     genesis_ledger_path: String,
     pub genesis_block: GenesisBlock,
     miners: Vec<StorageMiner>,
-    pub storage_miner_infos: HashMap<Pubkey, StorageMinerInfo>,
+    pub storage_miner_infos: HashMap<BvmAddr, StorageMinerInfo>,
 }
 
 impl LocalNodeGroup {
@@ -374,7 +374,7 @@ impl LocalNodeGroup {
         }
     }
 
-    pub fn transfer(&self, source_keypair: &Keypair, dest_pubkey: &Pubkey, difs: u64) -> u64 {
+    pub fn transfer(&self, source_keypair: &Keypair, dest_pubkey: &BvmAddr, difs: u64) -> u64 {
         let client = create_client(
             self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
@@ -385,7 +385,7 @@ impl LocalNodeGroup {
     fn transfer_with_client(
         client: &SlimAccountHost,
         source_keypair: &Keypair,
-        dest_pubkey: &Pubkey,
+        dest_pubkey: &BvmAddr,
         difs: u64,
     ) -> u64 {
         trace!("getting leader transaction_seal");
@@ -524,7 +524,7 @@ impl LocalNodeGroup {
         from_keypair: &Arc<Keypair>,
         storage_miner: bool,
     ) -> Result<()> {
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             if storage_miner {
                 storage_opcode::create_miner_storage_account(
                     &from_keypair.pubkey(),
@@ -550,11 +550,11 @@ impl LocalNodeGroup {
 }
 
 impl NodeGroup for LocalNodeGroup {
-    fn get_node_pubkeys(&self) -> Vec<Pubkey> {
+    fn get_node_pubkeys(&self) -> Vec<BvmAddr> {
         self.fullnodes.keys().cloned().collect()
     }
 
-    fn restart_node(&mut self, pubkey: Pubkey) {
+    fn restart_node(&mut self, pubkey: BvmAddr) {
         // Shut down the fullnode
         let node = self.fullnodes.remove(&pubkey).unwrap();
         node.exit();

@@ -8,14 +8,14 @@ use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::{Account, KeyedAccount};
 use morgan_interface::account_utils::State;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_vote_api::vote_state::VoteState;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum StakeState {
     Uninitialized,
     Delegate {
-        voter_pubkey: Pubkey,
+        voter_pubkey: BvmAddr,
         credits_observed: u64,
     },
     MiningPool,
@@ -46,11 +46,11 @@ impl StakeState {
     }
 
     // utility function, used by Stakes, tests
-    pub fn voter_pubkey_from(account: &Account) -> Option<Pubkey> {
+    pub fn voter_pubkey_from(account: &Account) -> Option<BvmAddr> {
         Self::from(account).and_then(|state: Self| state.voter_pubkey())
     }
 
-    pub fn voter_pubkey(&self) -> Option<Pubkey> {
+    pub fn voter_pubkey(&self) -> Option<BvmAddr> {
         match self {
             StakeState::Delegate { voter_pubkey, .. } => Some(*voter_pubkey),
             _ => None,
@@ -109,7 +109,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
     fn initialize_delegate(&mut self) -> Result<(), OpCodeErr> {
         if let StakeState::Uninitialized = self.state()? {
             self.set_state(&StakeState::Delegate {
-                voter_pubkey: Pubkey::default(),
+                voter_pubkey: BvmAddr::default(),
                 credits_observed: 0,
             })
         } else {
@@ -183,7 +183,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
 
 // utility function, used by Treasury, tests, genesis
 pub fn create_delegate_stake_account(
-    voter_pubkey: &Pubkey,
+    voter_pubkey: &BvmAddr,
     vote_state: &VoteState,
     difs: u64,
 ) -> Account {
@@ -204,7 +204,7 @@ mod tests {
     use super::*;
     use crate::id;
     use morgan_interface::account::Account;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_vote_api::vote_state;
 
@@ -218,11 +218,11 @@ mod tests {
 
         let vote_pubkey = vote_keypair.pubkey();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &Pubkey::new_rand(), 0, 100);
+            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
         let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let stake_pubkey = Pubkey::default();
+        let stake_pubkey = BvmAddr::default();
         let mut stake_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
 
         let mut stake_keyed_account = KeyedAccount::new(&stake_pubkey, false, &mut stake_account);
@@ -323,11 +323,11 @@ mod tests {
 
         let vote_pubkey = vote_keypair.pubkey();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &Pubkey::new_rand(), 0, 100);
+            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
         let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let pubkey = Pubkey::default();
+        let pubkey = BvmAddr::default();
         let mut stake_account = Account::new(
             STAKE_GETS_PAID_EVERY_VOTE,
             0,
@@ -398,11 +398,11 @@ mod tests {
 
         let vote_pubkey = vote_keypair.pubkey();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &Pubkey::new_rand(), 0, 100);
+            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
         let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let pubkey = Pubkey::default();
+        let pubkey = BvmAddr::default();
         let mut stake_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
         let mut stake_keyed_account = KeyedAccount::new(&pubkey, true, &mut stake_account);
         stake_keyed_account.initialize_delegate().unwrap();
@@ -435,7 +435,7 @@ mod tests {
         let vote1_keypair = Keypair::new();
         let vote1_pubkey = vote1_keypair.pubkey();
         let mut vote1_account =
-            vote_state::create_account(&vote1_pubkey, &Pubkey::new_rand(), 0, 100);
+            vote_state::create_account(&vote1_pubkey, &BvmAddr::new_rand(), 0, 100);
         let mut vote1_keyed_account = KeyedAccount::new(&vote1_pubkey, false, &mut vote1_account);
         vote1_keyed_account.set_state(&vote_state).unwrap();
 

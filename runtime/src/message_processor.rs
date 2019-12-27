@@ -3,8 +3,8 @@ use crate::sys_opcode_handler;
 use morgan_interface::account::{create_keyed_accounts, Account, KeyedAccount};
 use morgan_interface::opcodes::{EncodedOpCodes, OpCodeErr};
 use morgan_interface::opcodes_utils;
-use morgan_interface::message::Message;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::message::Context;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_controller;
 use morgan_interface::transaction::TransactionError;
 use std::collections::HashMap;
@@ -55,8 +55,8 @@ fn get_subset_unchecked_mut<'a, T>(
 }
 
 fn check_opcode(
-    program_id: &Pubkey,
-    pre_program_id: &Pubkey,
+    program_id: &BvmAddr,
+    pre_program_id: &BvmAddr,
     pre_difs: u64,
     pre_data: &[u8],
     account: &Account,
@@ -82,18 +82,18 @@ fn check_opcode(
 }
 
 pub type HandleOpCode =
-    fn(&Pubkey, &mut [KeyedAccount], &[u8], u64) -> Result<(), OpCodeErr>;
+    fn(&BvmAddr, &mut [KeyedAccount], &[u8], u64) -> Result<(), OpCodeErr>;
 
 pub type SymbolCache = RwLock<HashMap<Vec<u8>, Symbol<opcodes_utils::Entrypoint>>>;
 
 pub struct MessageHandler {
-    opcode_handler: Vec<(Pubkey, HandleOpCode)>,
+    opcode_handler: Vec<(BvmAddr, HandleOpCode)>,
     symbol_cache: SymbolCache,
 }
 
 impl Default for MessageHandler {
     fn default() -> Self {
-        let opcode_handler: Vec<(Pubkey, HandleOpCode)> = vec![(
+        let opcode_handler: Vec<(BvmAddr, HandleOpCode)> = vec![(
             sys_controller::id(),
             sys_opcode_handler::handle_opcode,
         )];
@@ -109,7 +109,7 @@ impl MessageHandler {
     /// Add a static entrypoint to intercept intructions before the dynamic loader.
     pub fn add_opcode_handler(
         &mut self,
-        program_id: Pubkey,
+        program_id: BvmAddr,
         handle_opcode: HandleOpCode,
     ) {
         self.opcode_handler
@@ -120,9 +120,9 @@ impl MessageHandler {
     /// This method calls the instruction's program entrypoint method
     fn handle_opcode(
         &self,
-        message: &Message,
+        message: &Context,
         instruction: &EncodedOpCodes,
-        executable_accounts: &mut [(Pubkey, Account)],
+        executable_accounts: &mut [(BvmAddr, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
     ) -> Result<(), OpCodeErr> {
@@ -167,9 +167,9 @@ impl MessageHandler {
     /// The accounts are committed back to the treasury only if this function returns Ok(_).
     fn execute_instruction(
         &self,
-        message: &Message,
+        message: &Context,
         instruction: &EncodedOpCodes,
-        executable_accounts: &mut [(Pubkey, Account)],
+        executable_accounts: &mut [(BvmAddr, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
     ) -> Result<(), OpCodeErr> {
@@ -215,8 +215,8 @@ impl MessageHandler {
     /// The accounts are committed back to the treasury only if every instruction succeeds
     pub fn process_message(
         &self,
-        message: &Message,
-        loaders: &mut [Vec<(Pubkey, Account)>],
+        message: &Context,
+        loaders: &mut [Vec<(BvmAddr, Account)>],
         accounts: &mut [Account],
         drop_height: u64,
     ) -> Result<(), TransactionError> {
@@ -284,16 +284,16 @@ mod tests {
     #[test]
     fn test_verify_instruction_change_program_id() {
         fn change_program_id(
-            ix: &Pubkey,
-            pre: &Pubkey,
-            post: &Pubkey,
+            ix: &BvmAddr,
+            pre: &BvmAddr,
+            post: &BvmAddr,
         ) -> Result<(), OpCodeErr> {
             check_opcode(&ix, &pre, 0, &[], &Account::new(0, 0, 0, post))
         }
 
         let system_program_id = sys_controller::id();
-        let alice_program_id = Pubkey::new_rand();
-        let mallory_program_id = Pubkey::new_rand();
+        let alice_program_id = BvmAddr::new_rand();
+        let mallory_program_id = BvmAddr::new_rand();
 
         assert_eq!(
             change_program_id(&system_program_id, &system_program_id, &alice_program_id),
@@ -309,14 +309,14 @@ mod tests {
 
     #[test]
     fn test_verify_instruction_change_data() {
-        fn change_data(program_id: &Pubkey) -> Result<(), OpCodeErr> {
-            let alice_program_id = Pubkey::new_rand();
+        fn change_data(program_id: &BvmAddr) -> Result<(), OpCodeErr> {
+            let alice_program_id = BvmAddr::new_rand();
             let account = Account::new(0, 0, 0, &alice_program_id);
             check_opcode(&program_id, &alice_program_id, 0, &[42], &account)
         }
 
         let system_program_id = sys_controller::id();
-        let mallory_program_id = Pubkey::new_rand();
+        let mallory_program_id = BvmAddr::new_rand();
 
         assert_eq!(
             change_data(&system_program_id),

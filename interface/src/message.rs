@@ -2,15 +2,15 @@
 
 use crate::hash::Hash;
 use crate::opcodes::{AccountMeta, EncodedOpCodes, OpCode};
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::short_vec;
 use itertools::Itertools;
 
-fn position(keys: &[Pubkey], key: &Pubkey) -> u8 {
+fn position(keys: &[BvmAddr], key: &BvmAddr) -> u8 {
     keys.iter().position(|k| k == key).unwrap() as u8
 }
 
-fn encode_opcode(ix:OpCode,keys: &[Pubkey]) -> EncodedOpCodes {
+fn encode_opcode(ix:OpCode,keys: &[BvmAddr]) -> EncodedOpCodes {
     let accounts: Vec<_> = ix
         .accounts
         .iter()
@@ -24,7 +24,7 @@ fn encode_opcode(ix:OpCode,keys: &[Pubkey]) -> EncodedOpCodes {
     }
 }
 
-fn encode_multiple_opcodes(ixs: Vec<OpCode>, keys: &[Pubkey]) -> Vec<EncodedOpCodes> {
+fn encode_multiple_opcodes(ixs: Vec<OpCode>, keys: &[BvmAddr]) -> Vec<EncodedOpCodes> {
     ixs.into_iter()
         .map(|ix| encode_opcode(ix, keys))
         .collect()
@@ -33,16 +33,16 @@ fn encode_multiple_opcodes(ixs: Vec<OpCode>, keys: &[Pubkey]) -> Vec<EncodedOpCo
 /// A helper struct to collect pubkeys referenced by a set of instructions and credit-only counts
 #[derive(Debug, PartialEq, Eq)]
 struct OpCodeKeys {
-    pub signed_keys: Vec<Pubkey>,
-    pub unsigned_keys: Vec<Pubkey>,
+    pub signed_keys: Vec<BvmAddr>,
+    pub unsigned_keys: Vec<BvmAddr>,
     pub num_credit_only_signed_accounts: u8,
     pub num_credit_only_unsigned_accounts: u8,
 }
 
 impl OpCodeKeys {
     fn new(
-        signed_keys: Vec<Pubkey>,
-        unsigned_keys: Vec<Pubkey>,
+        signed_keys: Vec<BvmAddr>,
+        unsigned_keys: Vec<BvmAddr>,
         num_credit_only_signed_accounts: u8,
         num_credit_only_unsigned_accounts: u8,
     ) -> Self {
@@ -59,7 +59,7 @@ impl OpCodeKeys {
 /// payer key is provided, it is always placed first in the list of signed keys. Credit-only signed
 /// accounts are placed last in the set of signed accounts. Credit-only unsigned accounts,
 /// including program ids, are placed last in the set. No duplicates and order is preserved.
-fn get_keys(instructions: &[OpCode], payer: Option<&Pubkey>) -> OpCodeKeys {
+fn get_keys(instructions: &[OpCode], payer: Option<&BvmAddr>) -> OpCodeKeys {
     let programs: Vec<_> = get_program_ids(instructions)
         .iter()
         .map(|program_id| AccountMeta {
@@ -115,7 +115,7 @@ fn get_keys(instructions: &[OpCode], payer: Option<&Pubkey>) -> OpCodeKeys {
 }
 
 /// Return program ids referenced by all instructions.  No duplicates and order is preserved.
-fn get_program_ids(instructions: &[OpCode]) -> Vec<Pubkey> {
+fn get_program_ids(instructions: &[OpCode]) -> Vec<BvmAddr> {
     instructions
         .iter()
         .map(|ix| ix.program_ids_index)
@@ -140,13 +140,13 @@ pub struct MessageHeader {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct Message {
+pub struct Context {
     /// The message header, identifying signed and credit-only `account_keys`
     pub header: MessageHeader,
 
     /// All the account keys used by this transaction
     #[serde(with = "short_vec")]
-    pub account_keys: Vec<Pubkey>,
+    pub account_keys: Vec<BvmAddr>,
 
     /// The id of a recent ledger entry.
     pub recent_transaction_seal: Hash,
@@ -157,12 +157,12 @@ pub struct Message {
     pub instructions: Vec<EncodedOpCodes>,
 }
 
-impl Message {
+impl Context {
     pub fn new_with_encoded_opcodes(
         num_required_signatures: u8,
         num_credit_only_signed_accounts: u8,
         num_credit_only_unsigned_accounts: u8,
-        account_keys: Vec<Pubkey>,
+        account_keys: Vec<BvmAddr>,
         recent_transaction_seal: Hash,
         instructions: Vec<EncodedOpCodes>,
     ) -> Self {
@@ -182,7 +182,7 @@ impl Message {
         Self::new_with_payer(instructions, None)
     }
 
-    pub fn new_with_payer(instructions: Vec<OpCode>, payer: Option<&Pubkey>) -> Self {
+    pub fn new_with_payer(instructions: Vec<OpCode>, payer: Option<&BvmAddr>) -> Self {
         let OpCodeKeys {
             mut signed_keys,
             unsigned_keys,
@@ -202,7 +202,7 @@ impl Message {
         )
     }
 
-    pub fn program_ids(&self) -> Vec<&Pubkey> {
+    pub fn program_ids(&self) -> Vec<&BvmAddr> {
         self.instructions
             .iter()
             .map(|ix| &self.account_keys[ix.program_ids_index as usize])
@@ -224,7 +224,7 @@ impl Message {
                     - self.header.num_credit_only_unsigned_accounts as usize)
     }
 
-    pub fn get_account_keys_by_lock_type(&self) -> (Vec<&Pubkey>, Vec<&Pubkey>) {
+    pub fn get_account_keys_by_lock_type(&self) -> (Vec<&BvmAddr>, Vec<&BvmAddr>) {
         let mut credit_debit_keys = vec![];
         let mut credit_only_keys = vec![];
         for (i, key) in self.account_keys.iter().enumerate() {
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_message_unique_program_ids() {
-        let program_id0 = Pubkey::default();
+        let program_id0 = BvmAddr::default();
         let program_ids = get_program_ids(&[
             OpCode::new(program_id0, &0, vec![]),
             OpCode::new(program_id0, &0, vec![]),
@@ -256,8 +256,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_program_ids_not_adjacent() {
-        let program_id0 = Pubkey::default();
-        let program_id1 = Pubkey::new_rand();
+        let program_id0 = BvmAddr::default();
+        let program_id1 = BvmAddr::new_rand();
         let program_ids = get_program_ids(&[
             OpCode::new(program_id0, &0, vec![]),
             OpCode::new(program_id1, &0, vec![]),
@@ -268,8 +268,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_program_ids_order_preserved() {
-        let program_id0 = Pubkey::new_rand();
-        let program_id1 = Pubkey::default(); // Key less than program_id0
+        let program_id0 = BvmAddr::new_rand();
+        let program_id1 = BvmAddr::default(); // Key less than program_id0
         let program_ids = get_program_ids(&[
             OpCode::new(program_id0, &0, vec![]),
             OpCode::new(program_id1, &0, vec![]),
@@ -280,8 +280,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_both_signed() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
         let keys = get_keys(
             &[
                 OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]),
@@ -294,8 +294,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_signed_and_payer() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
         let keys = get_keys(
             &[OpCode::new(
                 program_id,
@@ -309,8 +309,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_unsigned_and_payer() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
         let keys = get_keys(
             &[OpCode::new(
                 program_id,
@@ -324,8 +324,8 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_one_signed() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
         let keys = get_keys(
             &[
                 OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
@@ -338,9 +338,9 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_order_preserved() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::new_rand();
-        let id1 = Pubkey::default(); // Key less than id0
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::new_rand();
+        let id1 = BvmAddr::default(); // Key less than id0
         let keys = get_keys(
             &[
                 OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
@@ -353,9 +353,9 @@ mod tests {
 
     #[test]
     fn test_message_unique_keys_not_adjacent() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
-        let id1 = Pubkey::new_rand();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
+        let id1 = BvmAddr::new_rand();
         let keys = get_keys(
             &[
                 OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
@@ -369,9 +369,9 @@ mod tests {
 
     #[test]
     fn test_message_signed_keys_first() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
-        let id1 = Pubkey::new_rand();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
+        let id1 = BvmAddr::new_rand();
         let keys = get_keys(
             &[
                 OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
@@ -385,24 +385,24 @@ mod tests {
     #[test]
     // Ensure there's a way to calculate the number of required signatures.
     fn test_message_signed_keys_len() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
-        let message = Message::new(vec![ix]);
+        let message = Context::new(vec![ix]);
         assert_eq!(message.header.num_required_signatures, 0);
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        let message = Message::new(vec![ix]);
+        let message = Context::new(vec![ix]);
         assert_eq!(message.header.num_required_signatures, 1);
     }
 
     #[test]
     fn test_message_credit_only_keys_last() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::default(); // Identical key/program_id should be de-duped
-        let id1 = Pubkey::new_rand();
-        let id2 = Pubkey::new_rand();
-        let id3 = Pubkey::new_rand();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::default(); // Identical key/program_id should be de-duped
+        let id1 = BvmAddr::new_rand();
+        let id2 = BvmAddr::new_rand();
+        let id3 = BvmAddr::new_rand();
         let keys = get_keys(
             &[
                 OpCode::new(
@@ -428,12 +428,12 @@ mod tests {
 
     #[test]
     fn test_message_kitchen_sink() {
-        let program_id0 = Pubkey::new_rand();
-        let program_id1 = Pubkey::new_rand();
-        let id0 = Pubkey::default();
+        let program_id0 = BvmAddr::new_rand();
+        let program_id1 = BvmAddr::new_rand();
+        let id0 = BvmAddr::default();
         let keypair1 = Keypair::new();
         let id1 = keypair1.pubkey();
-        let message = Message::new(vec![
+        let message = Context::new(vec![
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id0, false)]),
             OpCode::new(program_id1, &0, vec![AccountMeta::new(id1, true)]),
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id1, false)]),
@@ -454,16 +454,16 @@ mod tests {
 
     #[test]
     fn test_message_payer_first() {
-        let program_id = Pubkey::default();
-        let payer = Pubkey::new_rand();
-        let id0 = Pubkey::default();
+        let program_id = BvmAddr::default();
+        let payer = BvmAddr::new_rand();
+        let id0 = BvmAddr::default();
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]);
-        let message = Message::new_with_payer(vec![ix], Some(&payer));
+        let message = Context::new_with_payer(vec![ix], Some(&payer));
         assert_eq!(message.header.num_required_signatures, 1);
 
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
-        let message = Message::new_with_payer(vec![ix], Some(&payer));
+        let message = Context::new_with_payer(vec![ix], Some(&payer));
         assert_eq!(message.header.num_required_signatures, 2);
 
         let ix = OpCode::new(
@@ -471,15 +471,15 @@ mod tests {
             &0,
             vec![AccountMeta::new(payer, true), AccountMeta::new(id0, true)],
         );
-        let message = Message::new_with_payer(vec![ix], Some(&payer));
+        let message = Context::new_with_payer(vec![ix], Some(&payer));
         assert_eq!(message.header.num_required_signatures, 2);
     }
 
     #[test]
     fn test_message_program_last() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::new_rand();
-        let id1 = Pubkey::new_rand();
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::new_rand();
+        let id1 = BvmAddr::new_rand();
         let keys = get_keys(
             &[
                 OpCode::new(
@@ -503,10 +503,10 @@ mod tests {
 
     #[test]
     fn test_program_position() {
-        let program_id0 = Pubkey::default();
-        let program_id1 = Pubkey::new_rand();
-        let id = Pubkey::new_rand();
-        let message = Message::new(vec![
+        let program_id0 = BvmAddr::default();
+        let program_id1 = BvmAddr::new_rand();
+        let id = BvmAddr::new_rand();
+        let message = Context::new(vec![
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id, false)]),
             OpCode::new(program_id1, &0, vec![AccountMeta::new(id, true)]),
         ]);
@@ -517,14 +517,14 @@ mod tests {
 
     #[test]
     fn test_is_credit_debit() {
-        let key0 = Pubkey::new_rand();
-        let key1 = Pubkey::new_rand();
-        let key2 = Pubkey::new_rand();
-        let key3 = Pubkey::new_rand();
-        let key4 = Pubkey::new_rand();
-        let key5 = Pubkey::new_rand();
+        let key0 = BvmAddr::new_rand();
+        let key1 = BvmAddr::new_rand();
+        let key2 = BvmAddr::new_rand();
+        let key3 = BvmAddr::new_rand();
+        let key4 = BvmAddr::new_rand();
+        let key5 = BvmAddr::new_rand();
 
-        let message = Message {
+        let message = Context {
             header: MessageHeader {
                 num_required_signatures: 3,
                 num_credit_only_signed_accounts: 2,
@@ -544,12 +544,12 @@ mod tests {
 
     #[test]
     fn test_get_account_keys_by_lock_type() {
-        let program_id = Pubkey::default();
-        let id0 = Pubkey::new_rand();
-        let id1 = Pubkey::new_rand();
-        let id2 = Pubkey::new_rand();
-        let id3 = Pubkey::new_rand();
-        let message = Message::new(vec![
+        let program_id = BvmAddr::default();
+        let id0 = BvmAddr::new_rand();
+        let id1 = BvmAddr::new_rand();
+        let id2 = BvmAddr::new_rand();
+        let id3 = BvmAddr::new_rand();
+        let message = Context::new(vec![
             OpCode::new(program_id, &0, vec![AccountMeta::new(id0, false)]),
             OpCode::new(program_id, &0, vec![AccountMeta::new(id1, true)]),
             OpCode::new(

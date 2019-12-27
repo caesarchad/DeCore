@@ -3,7 +3,7 @@
 use jsonrpc_core::{Error, MetaIoHandler, Metadata, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::{hyper, AccessControlAllowOrigin, DomainsValidation, ServerBuilder};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -71,13 +71,13 @@ pub trait VoteSignerRpc {
     type Metadata;
 
     #[rpc(meta, name = "registerNode")]
-    fn register(&self, _: Self::Metadata, _: Pubkey, _: Signature, _: Vec<u8>) -> Result<Pubkey>;
+    fn register(&self, _: Self::Metadata, _: BvmAddr, _: Signature, _: Vec<u8>) -> Result<BvmAddr>;
 
     #[rpc(meta, name = "signVote")]
-    fn sign(&self, _: Self::Metadata, _: Pubkey, _: Signature, _: Vec<u8>) -> Result<Signature>;
+    fn sign(&self, _: Self::Metadata, _: BvmAddr, _: Signature, _: Vec<u8>) -> Result<Signature>;
 
     #[rpc(meta, name = "deregisterNode")]
-    fn deregister(&self, _: Self::Metadata, _: Pubkey, _: Signature, _: Vec<u8>) -> Result<()>;
+    fn deregister(&self, _: Self::Metadata, _: BvmAddr, _: Signature, _: Vec<u8>) -> Result<()>;
 }
 
 pub struct VoteSignerRpcImpl;
@@ -87,10 +87,10 @@ impl VoteSignerRpc for VoteSignerRpcImpl {
     fn register(
         &self,
         meta: Self::Metadata,
-        id: Pubkey,
+        id: BvmAddr,
         sig: Signature,
         signed_msg: Vec<u8>,
-    ) -> Result<Pubkey> {
+    ) -> Result<BvmAddr> {
         // info!("{}", Info(format!("register rpc request received: {:?}", id).to_string()));
         println!("{}",
             printLn(
@@ -104,7 +104,7 @@ impl VoteSignerRpc for VoteSignerRpcImpl {
     fn sign(
         &self,
         meta: Self::Metadata,
-        id: Pubkey,
+        id: BvmAddr,
         sig: Signature,
         signed_msg: Vec<u8>,
     ) -> Result<Signature> {
@@ -121,7 +121,7 @@ impl VoteSignerRpc for VoteSignerRpcImpl {
     fn deregister(
         &self,
         meta: Self::Metadata,
-        id: Pubkey,
+        id: BvmAddr,
         sig: Signature,
         signed_msg: Vec<u8>,
     ) -> Result<()> {
@@ -136,7 +136,7 @@ impl VoteSignerRpc for VoteSignerRpcImpl {
     }
 }
 
-fn verify_signature(sig: &Signature, pubkey: &Pubkey, msg: &[u8]) -> Result<()> {
+fn verify_signature(sig: &Signature, pubkey: &BvmAddr, msg: &[u8]) -> Result<()> {
     if sig.verify(pubkey.as_ref(), msg) {
         Ok(())
     } else {
@@ -145,18 +145,18 @@ fn verify_signature(sig: &Signature, pubkey: &Pubkey, msg: &[u8]) -> Result<()> 
 }
 
 pub trait VoteSigner {
-    fn register(&self, pubkey: &Pubkey, sig: &Signature, signed_msg: &[u8]) -> Result<Pubkey>;
-    fn sign(&self, pubkey: &Pubkey, sig: &Signature, msg: &[u8]) -> Result<Signature>;
-    fn deregister(&self, pubkey: &Pubkey, sig: &Signature, msg: &[u8]) -> Result<()>;
+    fn register(&self, pubkey: &BvmAddr, sig: &Signature, signed_msg: &[u8]) -> Result<BvmAddr>;
+    fn sign(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature>;
+    fn deregister(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()>;
 }
 
 #[derive(Clone)]
 pub struct LocalVoteSigner {
-    nodes: Arc<RwLock<HashMap<Pubkey, Keypair>>>,
+    nodes: Arc<RwLock<HashMap<BvmAddr, Keypair>>>,
 }
 impl VoteSigner for LocalVoteSigner {
     /// Process JSON-RPC request items sent via JSON-RPC.
-    fn register(&self, pubkey: &Pubkey, sig: &Signature, msg: &[u8]) -> Result<Pubkey> {
+    fn register(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<BvmAddr> {
         verify_signature(&sig, &pubkey, &msg)?;
         {
             if let Some(voting_keypair) = self.nodes.read().unwrap().get(&pubkey) {
@@ -168,14 +168,14 @@ impl VoteSigner for LocalVoteSigner {
         self.nodes.write().unwrap().insert(*pubkey, voting_keypair);
         Ok(voting_pubkey)
     }
-    fn sign(&self, pubkey: &Pubkey, sig: &Signature, msg: &[u8]) -> Result<Signature> {
+    fn sign(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature> {
         verify_signature(&sig, &pubkey, &msg)?;
         match self.nodes.read().unwrap().get(&pubkey) {
             Some(voting_keypair) => Ok(voting_keypair.sign_message(&msg)),
             None => Err(Error::invalid_request()),
         }
     }
-    fn deregister(&self, pubkey: &Pubkey, sig: &Signature, msg: &[u8]) -> Result<()> {
+    fn deregister(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()> {
         verify_signature(&sig, &pubkey, &msg)?;
         self.nodes.write().unwrap().remove(&pubkey);
         Ok(())
@@ -231,9 +231,9 @@ mod tests {
                 assert_eq!(succ.id, Id::Num(1));
                 assert_eq!(
                     succ.result.as_array().unwrap().len(),
-                    mem::size_of::<Pubkey>()
+                    mem::size_of::<BvmAddr>()
                 );
-                let _pk: Pubkey = serde_json::from_value(succ.result).unwrap();
+                let _pk: BvmAddr = serde_json::from_value(succ.result).unwrap();
             } else {
                 assert!(false);
             }
@@ -355,14 +355,14 @@ mod tests {
         let res = io.handle_request_sync(&req.to_string(), meta.clone());
         let result: Response = serde_json::from_str(&res.expect("actual response"))
             .expect("actual response deserialization");
-        let mut vote_pubkey = Pubkey::new_rand();
+        let mut vote_pubkey = BvmAddr::new_rand();
         if let Response::Single(out) = result {
             if let Output::Success(succ) = out {
                 assert_eq!(succ.jsonrpc.unwrap(), Version::V2);
                 assert_eq!(succ.id, Id::Num(1));
                 assert_eq!(
                     succ.result.as_array().unwrap().len(),
-                    mem::size_of::<Pubkey>()
+                    mem::size_of::<BvmAddr>()
                 );
                 vote_pubkey = serde_json::from_value(succ.result).unwrap();
             } else {

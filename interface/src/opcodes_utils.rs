@@ -1,6 +1,6 @@
 use crate::account::KeyedAccount;
 use crate::opcodes::OpCodeErr;
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use num_traits::FromPrimitive;
 
 // All native programs export a symbol named process()
@@ -8,7 +8,7 @@ pub const ENTRYPOINT: &str = "process";
 
 // Native program ENTRYPOINT prototype
 pub type Entrypoint = unsafe extern "C" fn(
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
@@ -21,7 +21,7 @@ macro_rules! morgan_entrypoint(
     ($entrypoint:ident) => (
         #[no_mangle]
         pub extern "C" fn process(
-            program_id: &morgan_interface::pubkey::Pubkey,
+            program_id: &morgan_interface::bvm_address::BvmAddr,
             keyed_accounts: &mut [morgan_interface::account::KeyedAccount],
             data: &[u8],
             drop_height: u64
@@ -35,12 +35,12 @@ macro_rules! morgan_entrypoint(
 macro_rules! morgan_program_id(
     ($program_id:ident) => (
 
-        pub fn check_id(program_id: &morgan_interface::pubkey::Pubkey) -> bool {
+        pub fn check_id(program_id: &morgan_interface::bvm_address::BvmAddr) -> bool {
             program_id.as_ref() == $program_id
         }
 
-        pub fn id() -> morgan_interface::pubkey::Pubkey {
-            morgan_interface::pubkey::Pubkey::new(&$program_id)
+        pub fn id() -> morgan_interface::bvm_address::BvmAddr {
+            morgan_interface::bvm_address::BvmAddr::new(&$program_id)
         }
 
         #[cfg(test)]

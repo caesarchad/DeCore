@@ -10,9 +10,9 @@ use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount}
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCode;
-use morgan_interface::message::Message;
+use morgan_interface::message::Context;
 use morgan_interface::constants::PACKET_DATA_SIZE;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::sys_opcode;
 use morgan_interface::transaction::{self, Transaction};
@@ -127,7 +127,7 @@ impl SlimAccountHost {
 
     pub fn poll_balance_with_timeout(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         polling_frequency: &Duration,
         timeout: &Duration,
     ) -> io::Result<u64> {
@@ -135,11 +135,11 @@ impl SlimAccountHost {
             .poll_balance_with_timeout(pubkey, polling_frequency, timeout)
     }
 
-    pub fn poll_get_balance(&self, pubkey: &Pubkey) -> io::Result<u64> {
+    pub fn poll_get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
         self.rpc_client.poll_get_balance(pubkey)
     }
 
-    pub fn wait_for_balance(&self, pubkey: &Pubkey, expected_balance: Option<u64>) -> Option<u64> {
+    pub fn wait_for_balance(&self, pubkey: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
         self.rpc_client.wait_for_balance(pubkey, expected_balance)
     }
 
@@ -168,7 +168,7 @@ impl AccountHost for SlimAccountHost {
 }
 
 impl OnlineAccount for SlimAccountHost {
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> TransportResult<Signature> {
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> TransportResult<Signature> {
         let (transaction_seal, _fee_calculator) = self.get_recent_transaction_seal()?;
         let mut transaction = Transaction::new(&keypairs, message, transaction_seal);
         let signature = self.send_and_confirm_transaction(keypairs, &mut transaction, 5, 0)?;
@@ -180,7 +180,7 @@ impl OnlineAccount for SlimAccountHost {
         keypair: &Keypair,
         instruction: OpCode,
     ) -> TransportResult<Signature> {
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         self.send_online_msg(&[keypair], message)
     }
 
@@ -188,18 +188,18 @@ impl OnlineAccount for SlimAccountHost {
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
     ) -> TransportResult<Signature> {
         let transfer_instruction =
             sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
         self.snd_online_instruction(keypair, transfer_instruction)
     }
 
-    fn get_account_data(&self, pubkey: &Pubkey) -> TransportResult<Option<Vec<u8>>> {
+    fn get_account_data(&self, pubkey: &BvmAddr) -> TransportResult<Option<Vec<u8>>> {
         Ok(self.rpc_client.get_account_data(pubkey).ok())
     }
 
-    fn get_balance(&self, pubkey: &Pubkey) -> TransportResult<u64> {
+    fn get_balance(&self, pubkey: &BvmAddr) -> TransportResult<u64> {
         let balance = self.rpc_client.get_balance(pubkey)?;
         Ok(balance)
     }
@@ -263,7 +263,7 @@ impl OfflineAccount for SlimAccountHost {
     fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
-        message: Message,
+        message: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
@@ -275,14 +275,14 @@ impl OfflineAccount for SlimAccountHost {
         instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         self.send_offline_message(&[keypair], message, recent_transaction_seal)
     }
     fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =

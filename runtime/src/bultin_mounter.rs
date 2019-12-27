@@ -10,7 +10,7 @@ use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::opcodes_utils;
 use morgan_interface::mounter_opcode::MounterOpCode;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::env;
 use std::path::PathBuf;
 use std::str;
@@ -57,7 +57,7 @@ fn create_path(name: &str) -> PathBuf {
 }
 
 pub fn entrypoint(
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     ix_data: &[u8],
     drop_height: u64,

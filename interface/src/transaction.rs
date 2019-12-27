@@ -2,8 +2,8 @@
 
 use crate::hash::Hash;
 use crate::opcodes::{EncodedOpCodes, OpCode, OpCodeErr};
-use crate::message::Message;
-use crate::pubkey::Pubkey;
+use crate::message::Context;
+use crate::bvm_address::BvmAddr;
 use crate::short_vec;
 use crate::signature::{KeypairUtil, Signature};
 use bincode::serialize;
@@ -49,11 +49,11 @@ pub struct Transaction {
     pub signatures: Vec<Signature>,
 
     /// The message to sign.
-    pub message: Message,
+    pub message: Context,
 }
 
 impl Transaction {
-    pub fn new_unsigned(message: Message) -> Self {
+    pub fn new_unsigned(message: Context) -> Self {
         Self {
             signatures: vec![Signature::default(); message.header.num_required_signatures as usize],
             message,
@@ -61,13 +61,13 @@ impl Transaction {
     }
 
     pub fn new_u_opcodes(instructions: Vec<OpCode>) -> Self {
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         Self::new_unsigned(message)
     }
 
     pub fn new<T: KeypairUtil>(
         from_keypairs: &[&T],
-        message: Message,
+        message: Context,
         recent_transaction_seal: Hash,
     ) -> Transaction {
         let mut tx = Self::new_unsigned(message);
@@ -80,16 +80,16 @@ impl Transaction {
         instructions: Vec<OpCode>,
         recent_transaction_seal: Hash,
     ) -> Transaction {
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         Self::new(from_keypairs, message, recent_transaction_seal)
     }
 
     
     pub fn new_with_encoded_opcodes<T: KeypairUtil>(
         from_keypairs: &[&T],
-        keys: &[Pubkey],
+        keys: &[BvmAddr],
         recent_transaction_seal: Hash,
-        program_ids: Vec<Pubkey>,
+        program_ids: Vec<BvmAddr>,
         instructions: Vec<EncodedOpCodes>,
     ) -> Self {
         let mut account_keys: Vec<_> = from_keypairs
@@ -98,7 +98,7 @@ impl Transaction {
             .collect();
         account_keys.extend_from_slice(keys);
         account_keys.extend(&program_ids);
-        let message = Message::new_with_encoded_opcodes(
+        let message = Context::new_with_encoded_opcodes(
             from_keypairs.len() as u8,
             0,
             program_ids.len() as u8,
@@ -120,11 +120,11 @@ impl Transaction {
             .and_then(|instruction| instruction.accounts.get(accounts_index))
             .map(|&account_keys_index| account_keys_index as usize)
     }
-    pub fn key(&self, instruction_index: usize, accounts_index: usize) -> Option<&Pubkey> {
+    pub fn key(&self, instruction_index: usize, accounts_index: usize) -> Option<&BvmAddr> {
         self.key_index(instruction_index, accounts_index)
             .and_then(|account_keys_index| self.message.account_keys.get(account_keys_index))
     }
-    pub fn signer_key(&self, instruction_index: usize, accounts_index: usize) -> Option<&Pubkey> {
+    pub fn signer_key(&self, instruction_index: usize, accounts_index: usize) -> Option<&BvmAddr> {
         match self.key_index(instruction_index, accounts_index) {
             None => None,
             Some(signature_index) => {
@@ -137,7 +137,7 @@ impl Transaction {
     }
 
     /// Return a message containing all data that should be signed.
-    pub fn message(&self) -> &Message {
+    pub fn message(&self) -> &Context {
         &self.message
     }
 
@@ -225,7 +225,7 @@ mod tests {
     use bincode::{deserialize, serialize, serialized_size};
     use std::mem::size_of;
 
-    fn get_program_id(tx: &Transaction, instruction_index: usize) -> &Pubkey {
+    fn get_program_id(tx: &Transaction, instruction_index: usize) -> &BvmAddr {
         let message = tx.message();
         let instruction = &message.instructions[instruction_index];
         instruction.program_id(&message.account_keys)
@@ -234,10 +234,10 @@ mod tests {
     #[test]
     fn test_refs() {
         let key = Keypair::new();
-        let key1 = Pubkey::new_rand();
-        let key2 = Pubkey::new_rand();
-        let prog1 = Pubkey::new_rand();
-        let prog2 = Pubkey::new_rand();
+        let key1 = BvmAddr::new_rand();
+        let key2 = BvmAddr::new_rand();
+        let prog1 = BvmAddr::new_rand();
+        let prog2 = BvmAddr::new_rand();
         let instructions = vec![
             EncodedOpCodes::new(3, &(), vec![0, 1]),
             EncodedOpCodes::new(4, &(), vec![0, 2]),
@@ -293,10 +293,10 @@ mod tests {
             &[&key],
             &[],
             Hash::default(),
-            vec![Pubkey::default()],
+            vec![BvmAddr::default()],
             instructions,
         );
-        assert_eq!(*get_program_id(&tx, 0), Pubkey::default());
+        assert_eq!(*get_program_id(&tx, 0), BvmAddr::default());
         assert!(!tx.verify_refs());
     }
 
@@ -308,12 +308,12 @@ mod tests {
             62, 89, 99,
         ])
         .unwrap();
-        let to = Pubkey::new(&[
+        let to = BvmAddr::new(&[
             1, 1, 1, 4, 5, 6, 7, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 7, 6, 5, 4,
             1, 1, 1,
         ]);
 
-        let program_id = Pubkey::new(&[
+        let program_id = BvmAddr::new(&[
             2, 2, 2, 4, 5, 6, 7, 8, 9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 8, 7, 6, 5, 4,
             2, 2, 2,
         ]);
@@ -322,7 +322,7 @@ mod tests {
             AccountMeta::new(to, false),
         ];
         let instruction = OpCode::new(program_id, &(1u8, 2u8, 3u8), account_metas);
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         Transaction::new(&[&keypair], message, Hash::default())
     }
 
@@ -339,7 +339,7 @@ mod tests {
     fn test_transaction_minimum_serialized_size() {
         let alice_keypair = Keypair::new();
         let alice_pubkey = alice_keypair.pubkey();
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let ix = sys_opcode::transfer(&alice_pubkey, &bob_pubkey, 42);
 
         let expected_data_size = size_of::<u32>() + size_of::<u64>();
@@ -353,7 +353,7 @@ mod tests {
         let expected_instruction_size = 1 + 1 + ix.accounts.len() + 1 + expected_data_size;
         assert_eq!(expected_instruction_size, 17);
 
-        let message = Message::new(vec![ix]);
+        let message = Context::new(vec![ix]);
         assert_eq!(
             serialized_size(&message.instructions[0]).unwrap() as usize,
             expected_instruction_size,
@@ -371,7 +371,7 @@ mod tests {
             + num_required_sigs_size
             + num_credit_only_accounts_size
             + len_size
-            + (tx.message.account_keys.len() * size_of::<Pubkey>())
+            + (tx.message.account_keys.len() * size_of::<BvmAddr>())
             + transaction_seal_size
             + len_size
             + expected_instruction_size;
@@ -417,9 +417,9 @@ mod tests {
     fn test_partial_sign_mismatched_key() {
         let keypair = Keypair::new();
         Transaction::new_u_opcodes(vec![OpCode::new(
-            Pubkey::default(),
+            BvmAddr::default(),
             &0,
-            vec![AccountMeta::new(Pubkey::new_rand(), true)],
+            vec![AccountMeta::new(BvmAddr::new_rand(), true)],
         )])
         .partial_sign(&[&keypair], Hash::default());
     }
@@ -430,7 +430,7 @@ mod tests {
         let keypair1 = Keypair::new();
         let keypair2 = Keypair::new();
         let mut tx = Transaction::new_u_opcodes(vec![OpCode::new(
-            Pubkey::default(),
+            BvmAddr::default(),
             &0,
             vec![
                 AccountMeta::new(keypair0.pubkey(), true),
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_transaction_missing_keypair() {
-        let program_id = Pubkey::default();
+        let program_id = BvmAddr::default();
         let keypair0 = Keypair::new();
         let id0 = keypair0.pubkey();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
@@ -465,16 +465,16 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_transaction_wrong_key() {
-        let program_id = Pubkey::default();
+        let program_id = BvmAddr::default();
         let keypair0 = Keypair::new();
-        let wrong_id = Pubkey::default();
+        let wrong_id = BvmAddr::default();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(wrong_id, true)]);
         Transaction::new_u_opcodes(vec![ix]).sign(&[&keypair0], Hash::default());
     }
 
     #[test]
     fn test_transaction_correct_key() {
-        let program_id = Pubkey::default();
+        let program_id = BvmAddr::default();
         let keypair0 = Keypair::new();
         let id0 = keypair0.pubkey();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);

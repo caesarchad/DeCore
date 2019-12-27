@@ -21,7 +21,7 @@ use rand;
 use rand::distributions::{Distribution, WeightedIndex};
 use morgan_runtime::bloom::Bloom;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::cmp;
 use std::collections::VecDeque;
 
@@ -30,7 +30,7 @@ use std::collections::VecDeque;
 #[derive(Clone)]
 pub struct NodeTbleGspPull {
     /// timestamp of last request
-    pub pull_request_time: HashMap<Pubkey, u64>,
+    pub pull_request_time: HashMap<BvmAddr, u64>,
     /// hash and insert time
     purged_values: VecDeque<(Hash, u64)>,
     /// max bytes per message
@@ -53,10 +53,10 @@ impl NodeTbleGspPull {
     pub fn new_pull_request(
         &self,
         contact_info_table: &ContactInfoTable,
-        self_id: &Pubkey,
+        self_id: &BvmAddr,
         now: u64,
-        stakes: &HashMap<Pubkey, u64>,
-    ) -> Result<(Pubkey, Bloom<Hash>, ContInfTblValue), NodeTbleErr> {
+        stakes: &HashMap<BvmAddr, u64>,
+    ) -> Result<(BvmAddr, Bloom<Hash>, ContInfTblValue), NodeTbleErr> {
         let options = self.pull_options(contact_info_table, &self_id, now, stakes);
         if options.is_empty() {
             return Err(NodeTbleErr::NoPeers);
@@ -73,9 +73,9 @@ impl NodeTbleGspPull {
     fn pull_options<'a>(
         &self,
         contact_info_table: &'a ContactInfoTable,
-        self_id: &Pubkey,
+        self_id: &BvmAddr,
         now: u64,
-        stakes: &HashMap<Pubkey, u64>,
+        stakes: &HashMap<BvmAddr, u64>,
     ) -> Vec<(f32, &'a ContactInfo)> {
         contact_info_table.table
             .values()
@@ -96,7 +96,7 @@ impl NodeTbleGspPull {
     /// This is used for weighted random selection during `new_pull_request`
     /// It's important to use the local nodes request creation time as the weight
     /// instead of the response received time otherwise failed nodes will increase their weight.
-    pub fn mark_pull_request_creation_time(&mut self, from: &Pubkey, now: u64) {
+    pub fn mark_pull_request_creation_time(&mut self, from: &BvmAddr, now: u64) {
         self.pull_request_time.insert(*from, now);
     }
 
@@ -127,7 +127,7 @@ impl NodeTbleGspPull {
     pub fn process_pull_response(
         &mut self,
         contact_info_table: &mut ContactInfoTable,
-        from: &Pubkey,
+        from: &BvmAddr,
         response: Vec<ContInfTblValue>,
         now: u64,
     ) -> usize {
@@ -180,7 +180,7 @@ impl NodeTbleGspPull {
     }
     /// Purge values from the contact_info_table that are older then `active_timeout`
     /// The value_hash of an active item is put into self.purged_values queue
-    pub fn purge_active(&mut self, contact_info_table: &mut ContactInfoTable, self_id: &Pubkey, min_ts: u64) {
+    pub fn purge_active(&mut self, contact_info_table: &mut ContactInfoTable, self_id: &BvmAddr, min_ts: u64) {
         let old = contact_info_table.find_old_labels(min_ts);
         let mut purged: VecDeque<_> = old
             .iter()
@@ -215,10 +215,10 @@ mod test {
         let mut contact_info_table = ContactInfoTable::default();
         let mut stakes = HashMap::new();
         let node = NodeTbleGspPull::default();
-        let me = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let me = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         contact_info_table.insert(me.clone(), 0).unwrap();
         for i in 1..=30 {
-            let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
             let id = entry.label().pubkey();
             contact_info_table.insert(entry.clone(), 0).unwrap();
             stakes.insert(id, i * 100);
@@ -237,7 +237,7 @@ mod test {
     #[test]
     fn test_new_pull_request() {
         let mut contact_info_table = ContactInfoTable::default();
-        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let id = entry.label().pubkey();
         let node = NodeTbleGspPull::default();
         assert_eq!(
@@ -251,7 +251,7 @@ mod test {
             Err(NodeTbleErr::NoPeers)
         );
 
-        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         contact_info_table.insert(new.clone(), 0).unwrap();
         let req = node.new_pull_request(&contact_info_table, &id, 0, &HashMap::new());
         let (to, _, self_info) = req.unwrap();
@@ -262,13 +262,13 @@ mod test {
     #[test]
     fn test_new_mark_creation_time() {
         let mut contact_info_table = ContactInfoTable::default();
-        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let node_pubkey = entry.label().pubkey();
         let mut node = NodeTbleGspPull::default();
         contact_info_table.insert(entry.clone(), 0).unwrap();
-        let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         contact_info_table.insert(old.clone(), 0).unwrap();
-        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         contact_info_table.insert(new.clone(), 0).unwrap();
 
         // set request creation time to max_value
@@ -286,11 +286,11 @@ mod test {
     #[test]
     fn test_process_pull_request() {
         let mut node_contact_table = ContactInfoTable::default();
-        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let node_pubkey = entry.label().pubkey();
         let node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
-        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         node_contact_table.insert(new.clone(), 0).unwrap();
         let req = node.new_pull_request(&node_contact_table, &node_pubkey, 0, &HashMap::new());
 
@@ -318,17 +318,17 @@ mod test {
     #[test]
     fn test_process_pull_request_response() {
         let mut node_contact_table = ContactInfoTable::default();
-        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let node_pubkey = entry.label().pubkey();
         let mut node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
 
-        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         node_contact_table.insert(new.clone(), 0).unwrap();
 
         let mut dest = NodeTbleGspPull::default();
         let mut dest_crds = ContactInfoTable::default();
-        let new_id = Pubkey::new_rand();
+        let new_id = BvmAddr::new_rand();
         let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&new_id, 1));
         dest_crds.insert(new.clone(), 0).unwrap();
 
@@ -382,12 +382,12 @@ mod test {
     #[test]
     fn test_gossip_purge() {
         let mut node_contact_table = ContactInfoTable::default();
-        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let node_label = entry.label();
         let node_pubkey = node_label.pubkey();
         let mut node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
-        let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         node_contact_table.insert(old.clone(), 0).unwrap();
         let value_hash = node_contact_table.lookup_versioned(&old.label()).unwrap().value_hash;
 

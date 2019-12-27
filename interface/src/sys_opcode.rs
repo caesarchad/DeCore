@@ -1,7 +1,7 @@
 use log::*;
 use crate::opcodes::{AccountMeta, OpCode};
 use crate::opcodes_utils::DecodeError;
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::sys_controller;
 use num_derive::FromPrimitive;
 use morgan_helper::logHelper::*;
@@ -39,11 +39,11 @@ pub enum SysOpCode {
         difs: u64,
         reputations: u64,
         space: u64,
-        program_id: Pubkey,
+        program_id: BvmAddr,
     },
     /// Assign account to a program
     /// * Transaction::keys[0] - account to assign
-    Assign { program_id: Pubkey },
+    Assign { program_id: BvmAddr },
     /// Transfer difs
     /// * Transaction::keys[0] - genesis
     /// * Transaction::keys[1] - destination
@@ -57,7 +57,7 @@ pub enum SysOpCode {
     CreateAccountWithReputation {
         reputations: u64,
         space: u64,
-        program_id: Pubkey,
+        program_id: BvmAddr,
     },
     /// Transfer reputations
     /// * Transaction::keys[0] - genesis
@@ -66,11 +66,11 @@ pub enum SysOpCode {
 }
 
 pub fn create_account(
-    from_pubkey: &Pubkey,
-    to_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    to_pubkey: &BvmAddr,
     difs: u64,
     space: u64,
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
@@ -90,11 +90,11 @@ pub fn create_account(
 }
 
 pub fn create_account_with_reputation(
-    from_pubkey: &Pubkey,
-    to_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    to_pubkey: &BvmAddr,
     reputations: u64,
     space: u64,
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
@@ -119,13 +119,13 @@ pub fn create_account_with_reputation(
 }
 
 /// Create and sign a transaction to create a system account
-pub fn create_user_account(from_pubkey: &Pubkey, to_pubkey: &Pubkey, difs: u64) -> OpCode {
+pub fn create_user_account(from_pubkey: &BvmAddr, to_pubkey: &BvmAddr, difs: u64) -> OpCode {
     let program_id = sys_controller::id();
     create_account(from_pubkey, to_pubkey, difs, 0, &program_id)
 }
 
 /// Create and sign a transaction to create a system account with reputation
-pub fn create_user_account_with_reputation(from_pubkey: &Pubkey, to_pubkey: &Pubkey, reputations: u64) -> OpCode {
+pub fn create_user_account_with_reputation(from_pubkey: &BvmAddr, to_pubkey: &BvmAddr, reputations: u64) -> OpCode {
     let program_id = sys_controller::id();
     // info!("{}", Info(format!("create_user_account_with_reputation to : {:?}", to_pubkey).to_string()));
     println!("{}",
@@ -137,7 +137,7 @@ pub fn create_user_account_with_reputation(from_pubkey: &Pubkey, to_pubkey: &Pub
     create_account_with_reputation(from_pubkey, to_pubkey, reputations, 0, &program_id)
 }
 
-pub fn assign(from_pubkey: &Pubkey, program_id: &Pubkey) -> OpCode {
+pub fn assign(from_pubkey: &BvmAddr, program_id: &BvmAddr) -> OpCode {
     let account_metas = vec![AccountMeta::new(*from_pubkey, true)];
     OpCode::new(
         sys_controller::id(),
@@ -148,7 +148,7 @@ pub fn assign(from_pubkey: &Pubkey, program_id: &Pubkey) -> OpCode {
     )
 }
 
-pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, difs: u64) -> OpCode {
+pub fn transfer(from_pubkey: &BvmAddr, to_pubkey: &BvmAddr, difs: u64) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
         AccountMeta::new(*to_pubkey, false),
@@ -160,7 +160,7 @@ pub fn transfer(from_pubkey: &Pubkey, to_pubkey: &Pubkey, difs: u64) -> OpCode {
     )
 }
 
-pub fn transfer_reputations(from_pubkey: &Pubkey, to_pubkey: &Pubkey, reputations: u64) -> OpCode {
+pub fn transfer_reputations(from_pubkey: &BvmAddr, to_pubkey: &BvmAddr, reputations: u64) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
         AccountMeta::new(*to_pubkey, false),
@@ -173,7 +173,7 @@ pub fn transfer_reputations(from_pubkey: &Pubkey, to_pubkey: &Pubkey, reputation
 }
 
 /// Create and sign new SysOpCode::Transfer transaction to many destinations
-pub fn transfer_many(from_pubkey: &Pubkey, to_difs: &[(Pubkey, u64)]) -> Vec<OpCode> {
+pub fn transfer_many(from_pubkey: &BvmAddr, to_difs: &[(BvmAddr, u64)]) -> Vec<OpCode> {
     to_difs
         .iter()
         .map(|(to_pubkey, difs)| transfer(from_pubkey, to_pubkey, *difs))
@@ -184,15 +184,15 @@ pub fn transfer_many(from_pubkey: &Pubkey, to_difs: &[(Pubkey, u64)]) -> Vec<OpC
 mod tests {
     use super::*;
 
-    fn get_keys(instruction: &OpCode) -> Vec<Pubkey> {
+    fn get_keys(instruction: &OpCode) -> Vec<BvmAddr> {
         instruction.accounts.iter().map(|x| x.pubkey).collect()
     }
 
     #[test]
     fn test_move_many() {
-        let alice_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
-        let carol_pubkey = Pubkey::new_rand();
+        let alice_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let carol_pubkey = BvmAddr::new_rand();
         let to_difs = vec![(bob_pubkey, 1), (carol_pubkey, 2)];
 
         let instructions = transfer_many(&alice_pubkey, &to_difs);

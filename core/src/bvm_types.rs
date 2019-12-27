@@ -7,7 +7,7 @@ use morgan_netutil::PortRange;
 pub use morgan_interface::constants::PACKET_DATA_SIZE;
 use std::time::Duration;
 use std::mem::size_of;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::hash::Hash;
 pub type PcktAcptr = Receiver<BndlPkt>;
 pub type PcktSndr = Sender<BndlPkt>;
@@ -27,7 +27,7 @@ macro_rules! range {
 pub const PARENT_RANGE: std::ops::Range<usize> = range!(0, u64);
 pub const SLOT_RANGE: std::ops::Range<usize> = range!(PARENT_RANGE.end, u64);
 pub const INDEX_RANGE: std::ops::Range<usize> = range!(SLOT_RANGE.end, u64);
-pub const ID_RANGE: std::ops::Range<usize> = range!(INDEX_RANGE.end, Pubkey);
+pub const ID_RANGE: std::ops::Range<usize> = range!(INDEX_RANGE.end, BvmAddr);
 pub const FORWARDED_RANGE: std::ops::Range<usize> = range!(ID_RANGE.end, bool);
 pub const GENESIS_RANGE: std::ops::Range<usize> = range!(FORWARDED_RANGE.end, Hash);
 pub const FLAGS_RANGE: std::ops::Range<usize> = range!(GENESIS_RANGE.end, u32);

@@ -3,14 +3,14 @@
 //!
 //! Data is stored in the ContInfTblValue type, each type has a specific
 //! ContInfTblValueTag.  Labels are semantically grouped into a single record
-//! that is identified by a Pubkey.
-//! * 1 Pubkey maps many CrdsValueLabels
+//! that is identified by a BvmAddr.
+//! * 1 BvmAddr maps many CrdsValueLabels
 //! * 1 ContInfTblValueTag maps to 1 ContInfTblValue
-//! The Label, the record Pubkey, and all the record labels can be derived
+//! The Label, the record BvmAddr, and all the record labels can be derived
 //! from a single ContInfTblValue.
 //!
 //! The actual data is stored in a single map of
-//! `ContInfTblValueTag(Pubkey) -> ContInfTblValue` This allows for partial record
+//! `ContInfTblValueTag(BvmAddr) -> ContInfTblValue` This allows for partial record
 //! updates to be propagated through the network.
 //!
 //! This means that full `Record` updates are not atomic.
@@ -28,7 +28,7 @@ use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag};
 use bincode::serialize;
 use indexmap::map::IndexMap;
 use morgan_interface::hash::{hash, Hash};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::cmp;
 use serde::{Deserialize, Serialize};
 
@@ -169,8 +169,8 @@ impl ContactInfoTable {
         }
     }
 
-    /// Update the timestamp's of all the labels that are assosciated with Pubkey
-    pub fn update_record_timestamp(&mut self, pubkey: &Pubkey, now: u64) {
+    /// Update the timestamp's of all the labels that are assosciated with BvmAddr
+    pub fn update_record_timestamp(&mut self, pubkey: &BvmAddr, now: u64) {
         for label in &ContInfTblValue::record_labels(pubkey) {
             self.update_label_timestamp(label, now);
         }
@@ -221,9 +221,9 @@ mod test {
     #[test]
     fn test_update_new() {
         let mut contact_info_table = ContactInfoTable::default();
-        let original = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 0));
+        let original = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 0));
         assert_matches!(contact_info_table.insert(original.clone(), 0), Ok(_));
-        let val = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 1));
+        let val = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 1));
         assert_eq!(
             contact_info_table.insert(val.clone(), 1).unwrap().unwrap().value,
             original
@@ -233,7 +233,7 @@ mod test {
     #[test]
     fn test_update_timestamp() {
         let mut contact_info_table = ContactInfoTable::default();
-        let val = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 0));
+        let val = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 0));
         assert_eq!(contact_info_table.insert(val.clone(), 0), Ok(None));
 
         contact_info_table.update_label_timestamp(&val.label(), 1);
@@ -293,10 +293,10 @@ mod test {
     fn test_hash_order() {
         let v1 = VerContInfTblValue::new(
             1,
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 0)),
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 0)),
         );
         let v2 = VerContInfTblValue::new(1, {
-            let mut contact_info = ContactInfo::new_localhost(&Pubkey::default(), 0);
+            let mut contact_info = ContactInfo::new_localhost(&BvmAddr::default(), 0);
             contact_info.rpc = socketaddr!("0.0.0.0:0");
             ContInfTblValue::ContactInfo(contact_info)
         });
@@ -320,11 +320,11 @@ mod test {
     fn test_wallclock_order() {
         let v1 = VerContInfTblValue::new(
             1,
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 1)),
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 1)),
         );
         let v2 = VerContInfTblValue::new(
             1,
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::default(), 0)),
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::default(), 0)),
         );
         assert_eq!(v1.value.label(), v2.value.label());
         assert!(v1 > v2);
@@ -336,11 +336,11 @@ mod test {
     fn test_label_order() {
         let v1 = VerContInfTblValue::new(
             1,
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0)),
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0)),
         );
         let v2 = VerContInfTblValue::new(
             1,
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0)),
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0)),
         );
         assert_ne!(v1, v2);
         assert!(!(v1 == v2));

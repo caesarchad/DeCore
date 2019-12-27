@@ -3,7 +3,7 @@ use num_derive::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes_utils::DecodeError;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_helper::logHelper::*;
 
 #[derive(Serialize, Debug, PartialEq, FromPrimitive)]
@@ -41,16 +41,16 @@ pub struct TokenInfo {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenAccountDelegateInfo {
-    genesis: Pubkey,
+    genesis: BvmAddr,
 
     original_amount: u64,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TokenAccountInfo {
-    token: Pubkey,
+    token: BvmAddr,
 
-    owner: Pubkey,
+    owner: BvmAddr,
 
     amount: u64,
 
@@ -147,8 +147,8 @@ impl TokenState {
     }
 
     #[allow(dead_code)]
-    pub fn only_owner(&self, key: &Pubkey) -> Result<()> {
-        if *key != Pubkey::default() {
+    pub fn only_owner(&self, key: &BvmAddr) -> Result<()> {
+        if *key != BvmAddr::default() {
             if let TokenState::Account(account_info) = self {
                 if account_info.owner == *key {
                     return Ok(());
@@ -579,7 +579,7 @@ impl TokenState {
         Ok(())
     }
 
-    pub fn process(program_id: &Pubkey, info: &mut [KeyedAccount], input: &[u8]) -> Result<()> {
+    pub fn process(program_id: &BvmAddr, info: &mut [KeyedAccount], input: &[u8]) -> Result<()> {
         let command =
             bincode::deserialize::<TokenOpCode>(input).map_err(Self::map_to_invalid_args)?;
         
@@ -676,8 +676,8 @@ mod test {
         let mut data = vec![0; 256];
 
         let account = TokenState::Account(TokenAccountInfo {
-            token: Pubkey::new(&[1; 32]),
-            owner: Pubkey::new(&[2; 32]),
+            token: BvmAddr::new(&[1; 32]),
+            owner: BvmAddr::new(&[2; 32]),
             amount: 123,
             delegate: None,
         });

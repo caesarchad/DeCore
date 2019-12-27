@@ -8,7 +8,7 @@ use morgan_interface::account::{Account, KeyedAccount};
 use morgan_interface::account_utils::State;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::syscall::slot_hashes;
 use std::collections::VecDeque;
 use morgan_helper::logHelper::*;
@@ -63,8 +63,8 @@ impl Lockout {
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct VoteState {
     pub votes: VecDeque<Lockout>,
-    pub node_pubkey: Pubkey,
-    pub authorized_voter_pubkey: Pubkey,
+    pub node_pubkey: BvmAddr,
+    pub authorized_voter_pubkey: BvmAddr,
     /// fraction of std::u32::MAX that represents what part of a rewards
     ///  payout should be given to this VoteAccount
     pub commission: u32,
@@ -73,7 +73,7 @@ pub struct VoteState {
 }
 
 impl VoteState {
-    pub fn new(vote_pubkey: &Pubkey, node_pubkey: &Pubkey, commission: u32) -> Self {
+    pub fn new(vote_pubkey: &BvmAddr, node_pubkey: &BvmAddr, commission: u32) -> Self {
         let votes = VecDeque::new();
         let credits = 0;
         let root_slot = None;
@@ -247,7 +247,7 @@ impl VoteState {
 pub fn authorize_voter(
     vote_account: &mut KeyedAccount,
     other_signers: &[KeyedAccount],
-    authorized_voter_pubkey: &Pubkey,
+    authorized_voter_pubkey: &BvmAddr,
 ) -> Result<(), OpCodeErr> {
     let mut vote_state: VoteState = vote_account.state()?;
 
@@ -270,12 +270,12 @@ pub fn authorize_voter(
 /// that the transaction must be signed by the staker's keys
 pub fn initialize_account(
     vote_account: &mut KeyedAccount,
-    node_pubkey: &Pubkey,
+    node_pubkey: &BvmAddr,
     commission: u32,
 ) -> Result<(), OpCodeErr> {
     let vote_state: VoteState = vote_account.state()?;
 
-    if vote_state.authorized_voter_pubkey != Pubkey::default() {
+    if vote_state.authorized_voter_pubkey != BvmAddr::default() {
         return Err(OpCodeErr::AccountAlreadyInitialized);
     }
     vote_account.set_state(&VoteState::new(
@@ -293,7 +293,7 @@ pub fn process_votes(
 ) -> Result<(), OpCodeErr> {
     let mut vote_state: VoteState = vote_account.state()?;
 
-    if vote_state.authorized_voter_pubkey == Pubkey::default() {
+    if vote_state.authorized_voter_pubkey == BvmAddr::default() {
         return Err(OpCodeErr::UninitializedAccount);
     }
 
@@ -319,8 +319,8 @@ pub fn process_votes(
 
 // utility function, used by Treasury, tests
 pub fn create_account(
-    vote_pubkey: &Pubkey,
-    node_pubkey: &Pubkey,
+    vote_pubkey: &BvmAddr,
+    node_pubkey: &BvmAddr,
     commission: u32,
     difs: u64,
 ) -> Account {
@@ -337,8 +337,8 @@ pub fn create_account(
 
 // utility function, used by morgan-genesis, tests
 pub fn create_bootstrap_leader_account(
-    vote_pubkey: &Pubkey,
-    node_pubkey: &Pubkey,
+    vote_pubkey: &BvmAddr,
+    node_pubkey: &BvmAddr,
     commission: u32,
     difs: u64,
 ) -> (Account, VoteState) {
@@ -369,10 +369,10 @@ mod tests {
 
     #[test]
     fn test_initialize_vote_account() {
-        let vote_account_pubkey = Pubkey::new_rand();
+        let vote_account_pubkey = BvmAddr::new_rand();
         let mut vote_account = Account::new(100, 0, VoteState::size_of(), &id());
 
-        let node_pubkey = Pubkey::new_rand();
+        let node_pubkey = BvmAddr::new_rand();
 
         //init should pass
         let mut vote_account = KeyedAccount::new(&vote_account_pubkey, false, &mut vote_account);
@@ -384,15 +384,15 @@ mod tests {
         assert_eq!(res, Err(OpCodeErr::AccountAlreadyInitialized));
     }
 
-    fn create_test_account() -> (Pubkey, Account) {
-        let vote_pubkey = Pubkey::new_rand();
+    fn create_test_account() -> (BvmAddr, Account) {
+        let vote_pubkey = BvmAddr::new_rand();
         (
             vote_pubkey,
-            vote_state::create_account(&vote_pubkey, &Pubkey::new_rand(), 0, 100),
+            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100),
         )
     }
 
-    fn create_test_slot_hashes_account(slot_hashes: &[(u64, Hash)]) -> (Pubkey, Account) {
+    fn create_test_slot_hashes_account(slot_hashes: &[(u64, Hash)]) -> (BvmAddr, Account) {
         let mut slot_hashes_account = Account::new(
             0,
             0,
@@ -406,7 +406,7 @@ mod tests {
     }
 
     fn simulate_process_vote(
-        vote_pubkey: &Pubkey,
+        vote_pubkey: &BvmAddr,
         vote_account: &mut Account,
         vote: &Vote,
         slot_hashes: &[(u64, Hash)],
@@ -425,7 +425,7 @@ mod tests {
 
     /// exercises all the keyed accounts stuff
     fn simulate_process_vote_unchecked(
-        vote_pubkey: &Pubkey,
+        vote_pubkey: &BvmAddr,
         vote_account: &mut Account,
         vote: &Vote,
     ) -> Result<VoteState, OpCodeErr> {
@@ -434,9 +434,9 @@ mod tests {
 
     #[test]
     fn test_vote_create_bootstrap_leader_account() {
-        let vote_pubkey = Pubkey::new_rand();
+        let vote_pubkey = BvmAddr::new_rand();
         let (_vote_account, vote_state) =
-            vote_state::create_bootstrap_leader_account(&vote_pubkey, &Pubkey::new_rand(), 0, 100);
+            vote_state::create_bootstrap_leader_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
 
         assert_eq!(vote_state.votes.len(), 1);
         assert_eq!(vote_state.votes[0], Lockout::new(&Vote::default()));
@@ -507,7 +507,7 @@ mod tests {
         assert_eq!(
             process_votes(
                 &mut KeyedAccount::new(&vote_pubkey, true, &mut vote_account),
-                &mut KeyedAccount::new(&Pubkey::default(), false, &mut slot_hashes_account),
+                &mut KeyedAccount::new(&BvmAddr::default(), false, &mut slot_hashes_account),
                 &[],
                 &[vote.clone()],
             ),
@@ -543,7 +543,7 @@ mod tests {
         assert_eq!(res, Ok(()));
 
         // another voter
-        let authorized_voter_pubkey = Pubkey::new_rand();
+        let authorized_voter_pubkey = BvmAddr::new_rand();
         let res = authorize_voter(
             &mut KeyedAccount::new(&vote_pubkey, false, &mut vote_account),
             &[],
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_vote_without_initialization() {
-        let vote_pubkey = Pubkey::new_rand();
+        let vote_pubkey = BvmAddr::new_rand();
         let mut vote_account = Account::new(100, 0, VoteState::size_of(), &id());
 
         let res = simulate_process_vote_unchecked(
@@ -639,8 +639,8 @@ mod tests {
 
     #[test]
     fn test_vote_double_lockout_after_expiration() {
-        let voter_pubkey = Pubkey::new_rand();
-        let mut vote_state = VoteState::new(&voter_pubkey, &Pubkey::new_rand(), 0);
+        let voter_pubkey = BvmAddr::new_rand();
+        let mut vote_state = VoteState::new(&voter_pubkey, &BvmAddr::new_rand(), 0);
 
         for i in 0..3 {
             vote_state.process_slot_vote_unchecked(i as u64);
@@ -667,8 +667,8 @@ mod tests {
 
     #[test]
     fn test_expire_multiple_votes() {
-        let voter_pubkey = Pubkey::new_rand();
-        let mut vote_state = VoteState::new(&voter_pubkey, &Pubkey::new_rand(), 0);
+        let voter_pubkey = BvmAddr::new_rand();
+        let mut vote_state = VoteState::new(&voter_pubkey, &BvmAddr::new_rand(), 0);
 
         for i in 0..3 {
             vote_state.process_slot_vote_unchecked(i as u64);
@@ -698,8 +698,8 @@ mod tests {
 
     #[test]
     fn test_vote_credits() {
-        let voter_pubkey = Pubkey::new_rand();
-        let mut vote_state = VoteState::new(&voter_pubkey, &Pubkey::new_rand(), 0);
+        let voter_pubkey = BvmAddr::new_rand();
+        let mut vote_state = VoteState::new(&voter_pubkey, &BvmAddr::new_rand(), 0);
 
         for i in 0..MAX_LOCKOUT_HISTORY {
             vote_state.process_slot_vote_unchecked(i as u64);
@@ -717,8 +717,8 @@ mod tests {
 
     #[test]
     fn test_duplicate_vote() {
-        let voter_pubkey = Pubkey::new_rand();
-        let mut vote_state = VoteState::new(&voter_pubkey, &Pubkey::new_rand(), 0);
+        let voter_pubkey = BvmAddr::new_rand();
+        let mut vote_state = VoteState::new(&voter_pubkey, &BvmAddr::new_rand(), 0);
         vote_state.process_slot_vote_unchecked(0);
         vote_state.process_slot_vote_unchecked(1);
         vote_state.process_slot_vote_unchecked(0);
@@ -729,8 +729,8 @@ mod tests {
 
     #[test]
     fn test_nth_recent_vote() {
-        let voter_pubkey = Pubkey::new_rand();
-        let mut vote_state = VoteState::new(&voter_pubkey, &Pubkey::new_rand(), 0);
+        let voter_pubkey = BvmAddr::new_rand();
+        let mut vote_state = VoteState::new(&voter_pubkey, &BvmAddr::new_rand(), 0);
         for i in 0..MAX_LOCKOUT_HISTORY {
             vote_state.process_slot_vote_unchecked(i as u64);
         }
@@ -763,10 +763,10 @@ mod tests {
     /// check that two accounts with different data can be brought to the same state with one vote submission
     #[test]
     fn test_process_missed_votes() {
-        let account_a = Pubkey::new_rand();
-        let mut vote_state_a = VoteState::new(&account_a, &Pubkey::new_rand(), 0);
-        let account_b = Pubkey::new_rand();
-        let mut vote_state_b = VoteState::new(&account_b, &Pubkey::new_rand(), 0);
+        let account_a = BvmAddr::new_rand();
+        let mut vote_state_a = VoteState::new(&account_a, &BvmAddr::new_rand(), 0);
+        let account_b = BvmAddr::new_rand();
+        let mut vote_state_b = VoteState::new(&account_b, &BvmAddr::new_rand(), 0);
 
         // process some votes on account a
         (0..5)
@@ -788,14 +788,14 @@ mod tests {
 
     #[test]
     fn test_vote_state_commission_split() {
-        let vote_state = VoteState::new(&Pubkey::default(), &Pubkey::default(), 0);
+        let vote_state = VoteState::new(&BvmAddr::default(), &BvmAddr::default(), 0);
 
         assert_eq!(vote_state.commission_split(1.0), (0.0, 1.0, false));
 
-        let vote_state = VoteState::new(&Pubkey::default(), &Pubkey::default(), std::u32::MAX);
+        let vote_state = VoteState::new(&BvmAddr::default(), &BvmAddr::default(), std::u32::MAX);
         assert_eq!(vote_state.commission_split(1.0), (1.0, 0.0, false));
 
-        let vote_state = VoteState::new(&Pubkey::default(), &Pubkey::default(), std::u32::MAX / 2);
+        let vote_state = VoteState::new(&BvmAddr::default(), &BvmAddr::default(), std::u32::MAX / 2);
         let (voter_portion, staker_portion, was_split) = vote_state.commission_split(10.0);
 
         assert_eq!(

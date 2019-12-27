@@ -13,7 +13,7 @@ use crate::bvm_types::{BlobAcptr, BlobSndr};
 use morgan_metricbot::{inc_new_counter_debug, inc_new_counter_error};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::timing::duration_as_ms;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -23,7 +23,7 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
-fn replay_blobs(blobs: &[ArcBlb], retransmit: &BlobSndr, id: &Pubkey) -> Result<()> {
+fn replay_blobs(blobs: &[ArcBlb], retransmit: &BlobSndr, id: &BvmAddr) -> Result<()> {
     let mut retransmit_queue: Vec<ArcBlb> = Vec::new();
     for blob in blobs {
         if blob.read().unwrap().id() != *id {
@@ -74,7 +74,7 @@ pub fn check_replay_blob(
     blob: &Blob,
     treasury: Option<Arc<Treasury>>,
     leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
-    my_pubkey: &Pubkey,
+    my_pubkey: &BvmAddr,
 ) -> bool {
     let slot_leader_pubkey = match treasury {
         None => leader_schedule_cache.slot_leader_at(blob.slot(), None),
@@ -97,7 +97,7 @@ pub fn check_replay_blob(
 
 fn accept_epoch<F>(
     block_buffer_pool: &Arc<BlockBufferPool>,
-    my_pubkey: &Pubkey,
+    my_pubkey: &BvmAddr,
     r: &BlobAcptr,
     retransmit: &BlobSndr,
     genesis_transaction_seal: &Hash,
@@ -170,7 +170,7 @@ impl SpotTransmitService {
     ) -> SpotTransmitService
     where
         F: 'static
-            + Fn(&Pubkey, &Blob, Option<Arc<Treasury>>) -> bool
+            + Fn(&BvmAddr, &Blob, Option<Arc<Treasury>>) -> bool
             + std::marker::Send
             + std::marker::Sync,
     {
@@ -275,7 +275,7 @@ mod test {
         let original_entries = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt);
         let shared_blobs = original_entries.clone().to_shared_blobs();
 
-        index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, 0, 0);
+        index_blobs(&shared_blobs, &BvmAddr::new_rand(), 0, 0, 0);
 
         for blob in shared_blobs.into_iter().rev() {
             handle_data_blob(&[blob], &block_buffer_pool).expect("Expect successful processing of blob");
@@ -292,8 +292,8 @@ mod test {
 
     #[test]
     fn test_should_retransmit_and_persist() {
-        let me_id = Pubkey::new_rand();
-        let leader_pubkey = Pubkey::new_rand();
+        let me_id = BvmAddr::new_rand();
+        let leader_pubkey = BvmAddr::new_rand();
         let treasury = Arc::new(Treasury::new(
             &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
         ));
@@ -315,7 +315,7 @@ mod test {
         );
 
         // set the blob to have come from the wrong leader
-        blob.set_id(&Pubkey::new_rand());
+        blob.set_id(&BvmAddr::new_rand());
         assert_eq!(
             check_replay_blob(&blob, Some(treasury.clone()), &cache, &me_id),
             false

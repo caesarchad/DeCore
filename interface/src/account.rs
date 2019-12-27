@@ -1,4 +1,4 @@
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use std::{cmp, fmt};
 
 /// An Account with data that is stored on chain
@@ -12,7 +12,7 @@ pub struct Account {
     /// data held in this account
     pub data: Vec<u8>,
     /// the program that owns this account. If executable, the program that loads this account.
-    pub owner: Pubkey,
+    pub owner: BvmAddr,
     /// this account's data contains a loaded program (and is now read-only)
     pub executable: bool,
 }
@@ -39,7 +39,7 @@ impl fmt::Debug for Account {
 
 impl Account {
     // TODO do we want to add executable and leader_owner even though they should always be false/default?
-    pub fn new(difs: u64, reputations: u64, space: usize, owner: &Pubkey) -> Account {
+    pub fn new(difs: u64, reputations: u64, space: usize, owner: &BvmAddr) -> Account {
         Account {
             difs,
             reputations,
@@ -62,12 +62,12 @@ impl Account {
 #[derive(Debug)]
 pub struct KeyedAccount<'a> {
     is_signer: bool, // Transaction was signed by this account's key
-    key: &'a Pubkey,
+    key: &'a BvmAddr,
     pub account: &'a mut Account,
 }
 
 impl<'a> KeyedAccount<'a> {
-    pub fn signer_key(&self) -> Option<&Pubkey> {
+    pub fn signer_key(&self) -> Option<&BvmAddr> {
         if self.is_signer {
             Some(self.key)
         } else {
@@ -75,11 +75,11 @@ impl<'a> KeyedAccount<'a> {
         }
     }
 
-    pub fn unsigned_key(&self) -> &Pubkey {
+    pub fn unsigned_key(&self) -> &BvmAddr {
         self.key
     }
 
-    pub fn new(key: &'a Pubkey, is_signer: bool, account: &'a mut Account) -> KeyedAccount<'a> {
+    pub fn new(key: &'a BvmAddr, is_signer: bool, account: &'a mut Account) -> KeyedAccount<'a> {
         KeyedAccount {
             key,
             is_signer,
@@ -88,8 +88,8 @@ impl<'a> KeyedAccount<'a> {
     }
 }
 
-impl<'a> From<(&'a Pubkey, &'a mut Account)> for KeyedAccount<'a> {
-    fn from((key, account): (&'a Pubkey, &'a mut Account)) -> Self {
+impl<'a> From<(&'a BvmAddr, &'a mut Account)> for KeyedAccount<'a> {
+    fn from((key, account): (&'a BvmAddr, &'a mut Account)) -> Self {
         KeyedAccount {
             is_signer: false,
             key,
@@ -98,8 +98,8 @@ impl<'a> From<(&'a Pubkey, &'a mut Account)> for KeyedAccount<'a> {
     }
 }
 
-impl<'a> From<&'a mut (Pubkey, Account)> for KeyedAccount<'a> {
-    fn from((key, account): &'a mut (Pubkey, Account)) -> Self {
+impl<'a> From<&'a mut (BvmAddr, Account)> for KeyedAccount<'a> {
+    fn from((key, account): &'a mut (BvmAddr, Account)) -> Self {
         KeyedAccount {
             is_signer: false,
             key,
@@ -108,6 +108,6 @@ impl<'a> From<&'a mut (Pubkey, Account)> for KeyedAccount<'a> {
     }
 }
 
-pub fn create_keyed_accounts(accounts: &mut [(Pubkey, Account)]) -> Vec<KeyedAccount> {
+pub fn create_keyed_accounts(accounts: &mut [(BvmAddr, Account)]) -> Vec<KeyedAccount> {
     accounts.iter_mut().map(Into::into).collect()
 }

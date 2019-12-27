@@ -18,7 +18,7 @@ use morgan::service::Service;
 use morgan::test_tx::test_tx;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::sys_controller;
 use morgan_interface::timing::{duration_as_ms, timestamp,};
@@ -53,7 +53,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
     let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(100_000);
     let treasury = Arc::new(Treasury::new(&genesis_block));
     let ledger_path = fetch_interim_ledger_location!();
-    let my_pubkey = Pubkey::new_rand();
+    let my_pubkey = BvmAddr::new_rand();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -103,7 +103,7 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
-    let to_pubkey = Pubkey::new_rand();
+    let to_pubkey = BvmAddr::new_rand();
     let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     trace!("txs: {}", txes);
     let transactions: Vec<_> = (0..txes)
@@ -113,8 +113,8 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
             let from: Vec<u8> = (0..64).map(|_| thread_rng().gen()).collect();
             let to: Vec<u8> = (0..64).map(|_| thread_rng().gen()).collect();
             let sig: Vec<u8> = (0..64).map(|_| thread_rng().gen()).collect();
-            new.message.account_keys[0] = Pubkey::new(&from[0..32]);
-            new.message.account_keys[1] = Pubkey::new(&to[0..32]);
+            new.message.account_keys[0] = BvmAddr::new(&from[0..32]);
+            new.message.account_keys[1] = BvmAddr::new(&to[0..32]);
             new.signatures = vec![Signature::new(&sig[0..64])];
             new
         })
@@ -214,7 +214,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
-    let to_pubkey = Pubkey::new_rand();
+    let to_pubkey = BvmAddr::new_rand();
     let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
     let transactions: Vec<_> = (0..txes)
         .into_par_iter()
@@ -223,13 +223,13 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
             let from: Vec<u8> = (0..32).map(|_| thread_rng().gen()).collect();
             let sig: Vec<u8> = (0..64).map(|_| thread_rng().gen()).collect();
             let to: Vec<u8> = (0..32).map(|_| thread_rng().gen()).collect();
-            new.message.account_keys[0] = Pubkey::new(&from[0..32]);
-            new.message.account_keys[1] = Pubkey::new(&to[0..32]);
+            new.message.account_keys[0] = BvmAddr::new(&from[0..32]);
+            new.message.account_keys[1] = BvmAddr::new(&to[0..32]);
             let prog = new.message.instructions[0].clone();
             for i in 1..progs {
                 //generate programs that spend to random keys
                 let to: Vec<u8> = (0..32).map(|_| thread_rng().gen()).collect();
-                let to_key = Pubkey::new(&to[0..32]);
+                let to_key = BvmAddr::new(&to[0..32]);
                 new.message.account_keys.push(to_key);
                 assert_eq!(new.message.account_keys.len(), i + 2);
                 new.message.instructions.push(prog.clone());

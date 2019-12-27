@@ -54,7 +54,7 @@ impl<'a, 'b, I: Borrow<Transaction>> Drop for LockedAccountsResults<'a, 'b, I> {
 mod tests {
     use super::*;
     use crate::genesis_utils::{create_genesis_block_with_leader, GenesisBlockInfo};
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_controller;
 
@@ -107,7 +107,7 @@ mod tests {
     }
 
     fn setup() -> (Treasury, Vec<Transaction>) {
-        let dummy_leader_pubkey = Pubkey::new_rand();
+        let dummy_leader_pubkey = BvmAddr::new_rand();
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -115,9 +115,9 @@ mod tests {
         } = create_genesis_block_with_leader(500, &dummy_leader_pubkey, 100);
         let treasury = Treasury::new(&genesis_block);
 
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let keypair2 = Keypair::new();
-        let pubkey2 = Pubkey::new_rand();
+        let pubkey2 = BvmAddr::new_rand();
 
         let txs = vec![
             sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),

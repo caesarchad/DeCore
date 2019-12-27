@@ -88,7 +88,7 @@ impl Default for LoggerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use crate::pubkey::Pubkey;
+    pub use crate::bvm_address::BvmAddr;
     use crate::signature::KeypairUtil;
     use std::collections::HashSet;
 
@@ -114,7 +114,7 @@ mod tests {
         );
     }
 
-    fn gen_n_pubkeys(seed: [u8; 32], n: u64) -> HashSet<Pubkey> {
+    fn gen_n_pubkeys(seed: [u8; 32], n: u64) -> HashSet<BvmAddr> {
         ChaKeys::new(seed)
             .ed25519_keypair_vec(n)
             .into_iter()

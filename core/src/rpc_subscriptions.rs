@@ -9,7 +9,7 @@ use jsonrpc_pubsub::SubscriptionId;
 use serde::Serialize;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::transaction;
 use morgan_vote_api::vote_state::MAX_LOCKOUT_HISTORY;
@@ -19,9 +19,9 @@ use std::sync::{Arc, RwLock};
 pub type Confirmations = usize;
 
 type RpcAccountSubscriptions =
-    RwLock<HashMap<Pubkey, HashMap<SubscriptionId, (Sink<Account>, Confirmations)>>>;
+    RwLock<HashMap<BvmAddr, HashMap<SubscriptionId, (Sink<Account>, Confirmations)>>>;
 type RpcProgramSubscriptions =
-    RwLock<HashMap<Pubkey, HashMap<SubscriptionId, (Sink<(String, Account)>, Confirmations)>>>;
+    RwLock<HashMap<BvmAddr, HashMap<SubscriptionId, (Sink<(String, Account)>, Confirmations)>>>;
 type RpcSignatureSubscriptions = RwLock<
     HashMap<Signature, HashMap<SubscriptionId, (Sink<transaction::Result<()>>, Confirmations)>>,
 >;
@@ -142,7 +142,7 @@ where
     }
 }
 
-fn notify_program(accounts: Vec<(Pubkey, Account)>, sink: &Sink<(String, Account)>, _root: u64) {
+fn notify_program(accounts: Vec<(BvmAddr, Account)>, sink: &Sink<(String, Account)>, _root: u64) {
     for (pubkey, account) in accounts.iter() {
         sink.notify(Ok((pubkey.to_string(), account.clone())))
             .wait()
@@ -169,7 +169,7 @@ impl Default for RpcSubscriptions {
 impl RpcSubscriptions {
     pub fn check_account(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         current_slot: u64,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
@@ -186,7 +186,7 @@ impl RpcSubscriptions {
 
     pub fn check_program(
         &self,
-        program_id: &Pubkey,
+        program_id: &BvmAddr,
         current_slot: u64,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
@@ -221,7 +221,7 @@ impl RpcSubscriptions {
 
     pub fn add_account_subscription(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         confirmations: Option<Confirmations>,
         sub_id: &SubscriptionId,
         sink: &Sink<Account>,
@@ -237,7 +237,7 @@ impl RpcSubscriptions {
 
     pub fn add_program_subscription(
         &self,
-        program_id: &Pubkey,
+        program_id: &BvmAddr,
         confirmations: Option<Confirmations>,
         sub_id: &SubscriptionId,
         sink: &Sink<(String, Account)>,

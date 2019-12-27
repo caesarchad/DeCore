@@ -1,7 +1,7 @@
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::ops::Index;
 use bytes::{Bytes, BytesMut};
 use prost::{EncodeError, Message};
@@ -9,16 +9,16 @@ use prost::{EncodeError, Message};
 /// Stake-weighted leader schedule for one epoch.
 #[derive(Debug, Default, PartialEq)]
 pub struct LeaderSchedule {
-    slot_leaders: Vec<Pubkey>,
+    slot_leaders: Vec<BvmAddr>,
 }
 
 impl LeaderSchedule {
     // Note: passing in zero stakers will cause a panic.
-    pub fn new(ids_and_stakes: &[(Pubkey, u64)], seed: [u8; 32], len: u64, repeat: u64) -> Self {
+    pub fn new(ids_and_stakes: &[(BvmAddr, u64)], seed: [u8; 32], len: u64, repeat: u64) -> Self {
         let (ids, stakes): (Vec<_>, Vec<_>) = ids_and_stakes.iter().cloned().unzip();
         let rng = &mut ChaChaRng::from_seed(seed);
         let weighted_index = WeightedIndex::new(stakes).unwrap();
-        let mut current_node = Pubkey::default();
+        let mut current_node = BvmAddr::default();
         let slot_leaders = (0..len)
             .map(|i| {
                 if i % repeat == 0 {
@@ -34,8 +34,8 @@ impl LeaderSchedule {
 }
 
 impl Index<u64> for LeaderSchedule {
-    type Output = Pubkey;
-    fn index(&self, index: u64) -> &Pubkey {
+    type Output = BvmAddr;
+    fn index(&self, index: u64) -> &BvmAddr {
         let index = index as usize;
         &self.slot_leaders[index % self.slot_leaders.len()]
     }
@@ -70,7 +70,7 @@ pub mod test_helpers {
 
     /// Assert that protobuf encoding and decoding roundtrips correctly.
     ///
-    /// This is meant to be used for `prost::Message` instances.
+    /// This is meant to be used for `prost::Context` instances.
     pub fn assert_protobuf_encode_decode<P, T>(object: &T)
     where
         T: TryFrom<P> + Into<P> + Clone + Debug + Eq,
@@ -92,8 +92,8 @@ mod tests {
 
     #[test]
     fn test_leader_schedule_index() {
-        let pubkey0 = Pubkey::new_rand();
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey0 = BvmAddr::new_rand();
+        let pubkey1 = BvmAddr::new_rand();
         let leader_schedule = LeaderSchedule {
             slot_leaders: vec![pubkey0, pubkey1],
         };
@@ -105,9 +105,9 @@ mod tests {
     #[test]
     fn test_leader_schedule_basic() {
         let num_keys = 10;
-        let stakes: Vec<_> = (0..num_keys).map(|i| (Pubkey::new_rand(), i)).collect();
+        let stakes: Vec<_> = (0..num_keys).map(|i| (BvmAddr::new_rand(), i)).collect();
 
-        let seed = Pubkey::new_rand();
+        let seed = BvmAddr::new_rand();
         let mut seed_bytes = [0u8; 32];
         seed_bytes.copy_from_slice(seed.as_ref());
         let len = num_keys * 10;
@@ -121,16 +121,16 @@ mod tests {
     #[test]
     fn test_repeated_leader_schedule() {
         let num_keys = 10;
-        let stakes: Vec<_> = (0..num_keys).map(|i| (Pubkey::new_rand(), i)).collect();
+        let stakes: Vec<_> = (0..num_keys).map(|i| (BvmAddr::new_rand(), i)).collect();
 
-        let seed = Pubkey::new_rand();
+        let seed = BvmAddr::new_rand();
         let mut seed_bytes = [0u8; 32];
         seed_bytes.copy_from_slice(seed.as_ref());
         let len = num_keys * 10;
         let repeat = 8;
         let leader_schedule = LeaderSchedule::new(&stakes, seed_bytes, len, repeat);
         assert_eq!(leader_schedule.slot_leaders.len() as u64, len);
-        let mut leader_node = Pubkey::default();
+        let mut leader_node = BvmAddr::default();
         for (i, node) in leader_schedule.slot_leaders.iter().enumerate() {
             if i % repeat as usize == 0 {
                 leader_node = *node;
@@ -142,11 +142,11 @@ mod tests {
 
     #[test]
     fn test_repeated_leader_schedule_specific() {
-        let alice_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
+        let alice_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let stakes = vec![(alice_pubkey, 2), (bob_pubkey, 1)];
 
-        let seed = Pubkey::default();
+        let seed = BvmAddr::default();
         let mut seed_bytes = [0u8; 32];
         seed_bytes.copy_from_slice(seed.as_ref());
         let len = 8;

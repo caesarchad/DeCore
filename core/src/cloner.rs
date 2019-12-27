@@ -22,7 +22,7 @@ use morgan_runtime::treasury::Treasury;
 use morgan_interface::account_host::{OfflineAccount, OnlineAccount};
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{Hash, Hasher};
-use morgan_interface::message::Message;
+use morgan_interface::message::Context;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;
@@ -542,7 +542,7 @@ impl StorageMiner {
             self.slot,
             Signature::new(&self.signature.to_bytes()),
         );
-        let message = Message::new_with_payer(vec![instruction], Some(&self.keypair.pubkey()));
+        let message = Context::new_with_payer(vec![instruction], Some(&self.keypair.pubkey()));
         let mut transaction = Transaction::new(
             &[self.keypair.as_ref(), self.storage_keypair.as_ref()],
             message,

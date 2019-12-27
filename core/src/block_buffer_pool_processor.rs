@@ -417,7 +417,7 @@ pub mod tests {
     use morgan_runtime::epoch_schedule::RoundPlan;
     use morgan_interface::hash::Hash;
     use morgan_interface::opcodes::OpCodeErr;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_controller;
     use morgan_interface::transaction::TransactionError;
@@ -809,7 +809,7 @@ pub mod tests {
     #[test]
     fn test_process_ledger_simple() {
         morgan_logger::setup();
-        let leader_pubkey = Pubkey::new_rand();
+        let leader_pubkey = BvmAddr::new_rand();
         let mint = 100;
         let GenesisBlockInfo {
             genesis_block,
@@ -1312,7 +1312,7 @@ pub mod tests {
             ..
         } = create_genesis_block(11_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
         assert_eq!(treasury.get_balance(&pubkey), 1_000);
@@ -1471,7 +1471,7 @@ pub mod tests {
             .expect("process drops failed");
 
             i += 1;
-            treasury = Treasury::new_from_parent(&Arc::new(treasury), &Pubkey::default(), i as u64);
+            treasury = Treasury::new_from_parent(&Arc::new(treasury), &BvmAddr::default(), i as u64);
             treasury.squash();
         }
     }

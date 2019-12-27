@@ -11,7 +11,7 @@ use crate::water_clock_recorder::{WaterClockRecorder, WorkingTreasuryEntries};
 use crate::service::Service;
 use crate::signature_verify_phase ::SigVerifyPhase;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, Receiver};
@@ -29,7 +29,7 @@ pub struct TransactionDigestingModule {
 impl TransactionDigestingModule {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        id: &Pubkey,
+        id: &BvmAddr,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         entry_receiver: Receiver<WorkingTreasuryEntries>,

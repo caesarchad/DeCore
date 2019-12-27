@@ -1,6 +1,6 @@
 //! named accounts for synthesized data accounts for treasury state, etc.
 //!
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 
 pub mod slot_hashes;
 
@@ -11,11 +11,11 @@ const ID: [u8; 32] = [
     253, 202, 87, 144, 232, 16, 195, 192, 0, 0, 0, 0,
 ];
 
-pub fn id() -> Pubkey {
-    Pubkey::new(&ID)
+pub fn id() -> BvmAddr {
+    BvmAddr::new(&ID)
 }
 
-pub fn check_id(id: &Pubkey) -> bool {
+pub fn check_id(id: &BvmAddr) -> bool {
     id.as_ref() == ID
 }
 

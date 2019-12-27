@@ -3,7 +3,7 @@ use crate::leader_arrange::LeaderSchedule;
 use crate::leader_arrange_utils;
 use morgan_runtime::treasury::Treasury;
 use morgan_runtime::epoch_schedule::RoundPlan;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
@@ -39,7 +39,7 @@ impl LdrSchBufferPoolList {
         *self.max_epoch.write().unwrap() = self.epoch_schedule.get_stakers_epoch(root);
     }
 
-    pub fn slot_leader_at(&self, slot: u64, treasury: Option<&Treasury>) -> Option<Pubkey> {
+    pub fn slot_leader_at(&self, slot: u64, treasury: Option<&Treasury>) -> Option<BvmAddr> {
         if let Some(treasury) = treasury {
             self.slot_leader_at_else_compute(slot, treasury)
         } else {
@@ -50,7 +50,7 @@ impl LdrSchBufferPoolList {
     /// Return the next slot after the given current_slot that the given node will be leader
     pub fn next_leader_slot(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         mut current_slot: u64,
         treasury: &Treasury,
         block_buffer_pool: Option<&BlockBufferPool>,
@@ -88,7 +88,7 @@ impl LdrSchBufferPoolList {
         None
     }
 
-    fn slot_leader_at_no_compute(&self, slot: u64) -> Option<Pubkey> {
+    fn slot_leader_at_no_compute(&self, slot: u64) -> Option<BvmAddr> {
         let (epoch, slot_index) = self.epoch_schedule.get_epoch_and_slot_index(slot);
         self.cached_schedules
             .read()
@@ -98,7 +98,7 @@ impl LdrSchBufferPoolList {
             .map(|schedule| schedule[slot_index])
     }
 
-    fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Treasury) -> Option<Pubkey> {
+    fn slot_leader_at_else_compute(&self, slot: u64, treasury: &Treasury) -> Option<BvmAddr> {
         let cache_result = self.slot_leader_at_no_compute(slot);
         // Forbid asking for slots in an unconfirmed epoch
         let treasury_round = self.epoch_schedule.get_epoch_and_slot_index(slot).0;
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_next_leader_slot() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
             &pubkey,
@@ -291,7 +291,7 @@ mod tests {
 
         assert_eq!(
             cache.next_leader_slot(
-                &Pubkey::new_rand(), // not in leader_schedule
+                &BvmAddr::new_rand(), // not in leader_schedule
                 0,
                 &treasury,
                 None
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_next_leader_slot_block_buffer() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
             &pubkey,
@@ -361,7 +361,7 @@ mod tests {
 
             assert_eq!(
                 cache.next_leader_slot(
-                    &Pubkey::new_rand(), // not in leader_schedule
+                    &BvmAddr::new_rand(), // not in leader_schedule
                     0,
                     &treasury,
                     Some(&block_buffer_pool)
@@ -385,8 +385,8 @@ mod tests {
         let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         // Create new vote account
-        let node_pubkey = Pubkey::new_rand();
-        let vote_pubkey = Pubkey::new_rand();
+        let node_pubkey = BvmAddr::new_rand();
+        let vote_pubkey = BvmAddr::new_rand();
         setup_vote_and_stake_accounts(
             &treasury,
             &mint_keypair,
@@ -403,7 +403,7 @@ mod tests {
             target_slot += 1;
         }
 
-        let treasury = Treasury::new_from_parent(&Arc::new(treasury), &Pubkey::default(), target_slot);
+        let treasury = Treasury::new_from_parent(&Arc::new(treasury), &BvmAddr::default(), target_slot);
         let mut expected_slot = 0;
         let epoch = treasury.get_stakers_epoch(target_slot);
         for i in 0..epoch {
@@ -442,7 +442,7 @@ mod tests {
         assert_eq!(treasury.get_epoch_and_slot_index(96).0, 2);
         assert!(cache.slot_leader_at(96, Some(&treasury)).is_none());
 
-        let treasury2 = Treasury::new_from_parent(&treasury, &Pubkey::new_rand(), 95);
+        let treasury2 = Treasury::new_from_parent(&treasury, &BvmAddr::new_rand(), 95);
         assert!(treasury2.epoch_vote_accounts(2).is_some());
 
         // Set root for a slot in epoch 1, so that epoch 2 is now confirmed

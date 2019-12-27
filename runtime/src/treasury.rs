@@ -22,7 +22,7 @@ use morgan_interface::gas_cost::GasCost;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::hash::{extend_and_hash, Hash};
 use morgan_interface::bultin_mounter;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, Signature};
 use morgan_interface::syscall::slot_hashes::{self, SlotHashes};
 use morgan_interface::sys_controller;
@@ -81,7 +81,7 @@ pub struct Treasury {
     treasury_height: u64,
 
     /// The pubkey to send transactions fees to.
-    collector_id: Pubkey,
+    collector_id: BvmAddr,
 
     /// An object to calculate transaction fees.
     pub fee_calculator: GasCost,
@@ -100,7 +100,7 @@ pub struct Treasury {
     /// stream for the slot == self.slot
     is_delta: AtomicBool,
 
-    /// The Message processor
+    /// The Context processor
     message_processor: MessageHandler,
 }
 
@@ -132,7 +132,7 @@ impl Treasury {
     }
 
     /// Create a new treasury that points to an immutable checkpoint of another treasury.
-    pub fn new_from_parent(parent: &Arc<Treasury>, collector_id: &Pubkey, slot: u64) -> Self {
+    pub fn new_from_parent(parent: &Arc<Treasury>, collector_id: &BvmAddr, slot: u64) -> Self {
         parent.freeze();
         assert_ne!(slot, parent.slot());
 
@@ -185,7 +185,7 @@ impl Treasury {
         treasury
     }
 
-    pub fn collector_id(&self) -> Pubkey {
+    pub fn collector_id(&self) -> BvmAddr {
         self.collector_id
     }
 
@@ -318,7 +318,7 @@ impl Treasury {
         }
     }
 
-    pub fn register_native_instruction_processor(&self, name: &str, program_id: &Pubkey) {
+    pub fn register_native_instruction_processor(&self, name: &str, program_id: &BvmAddr) {
         debug!("Adding native program {} under {:?}", name, program_id);
         let account = bultin_mounter::create_loadable_account(name);
         self.store(program_id, &account);
@@ -800,7 +800,7 @@ impl Treasury {
 
     /// Create, sign, and process a Transaction from `keypair` to `to` of
     /// `n` difs where `transaction_seal` is the last Entry ID observed by the client.
-    pub fn transfer(&self, n: u64, keypair: &Keypair, to: &Pubkey) -> Result<Signature> {
+    pub fn transfer(&self, n: u64, keypair: &Keypair, to: &BvmAddr) -> Result<Signature> {
         let transaction_seal = self.last_transaction_seal();
         let tx = sys_controller::create_user_account(keypair, to, n, transaction_seal);
         let signature = tx.signatures[0];
@@ -812,7 +812,7 @@ impl Treasury {
     }
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
-    pub fn get_balance(&self, pubkey: &Pubkey) -> u64 {
+    pub fn get_balance(&self, pubkey: &BvmAddr) -> u64 {
         self.get_account(pubkey)
             .map(|x| Self::read_balance(&x))
             .unwrap_or(0)
@@ -823,7 +823,7 @@ impl Treasury {
     }
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
-    pub fn get_reputation(&self, pubkey: &Pubkey) -> u64 {
+    pub fn get_reputation(&self, pubkey: &BvmAddr) -> u64 {
         self.get_account(pubkey)
             .map(|x| Self::read_reputation(&x))
             .unwrap_or(0)
@@ -840,7 +840,7 @@ impl Treasury {
         parents
     }
 
-    fn store(&self, pubkey: &Pubkey, account: &Account) {
+    fn store(&self, pubkey: &BvmAddr, account: &Account) {
         self.accounts.store_slow(self.slot(), pubkey, account);
 
         if Stakes::is_stake(account) {
@@ -848,7 +848,7 @@ impl Treasury {
         }
     }
 
-    pub fn withdraw(&self, pubkey: &Pubkey, difs: u64) -> Result<()> {
+    pub fn withdraw(&self, pubkey: &BvmAddr, difs: u64) -> Result<()> {
         match self.get_account(pubkey) {
             Some(mut account) => {
                 if difs > account.difs {
@@ -864,13 +864,13 @@ impl Treasury {
         }
     }
 
-    pub fn deposit(&self, pubkey: &Pubkey, difs: u64) {
+    pub fn deposit(&self, pubkey: &BvmAddr, difs: u64) {
         let mut account = self.get_account(pubkey).unwrap_or_default();
         account.difs += difs;
         self.store(pubkey, &account);
     }
 
-    pub fn get_account(&self, pubkey: &Pubkey) -> Option<Account> {
+    pub fn get_account(&self, pubkey: &BvmAddr) -> Option<Account> {
         self.accounts
             .load_slow(&self.ancestors, pubkey)
             .map(|(account, _)| account)
@@ -878,12 +878,12 @@ impl Treasury {
 
     pub fn get_program_accounts_modified_since_parent(
         &self,
-        program_id: &Pubkey,
-    ) -> Vec<(Pubkey, Account)> {
+        program_id: &BvmAddr,
+    ) -> Vec<(BvmAddr, Account)> {
         self.accounts.load_by_program(self.slot(), program_id)
     }
 
-    pub fn get_account_modified_since_parent(&self, pubkey: &Pubkey) -> Option<(Account, Fork)> {
+    pub fn get_account_modified_since_parent(&self, pubkey: &BvmAddr) -> Option<(Account, Fork)> {
         let just_self: HashMap<u64, usize> = vec![(self.slot(), 0)].into_iter().collect();
         self.accounts.load_slow(&just_self, pubkey)
     }
@@ -983,13 +983,13 @@ impl Treasury {
 
     /// current vote accounts for this treasury along with the stake
     ///   attributed to each account
-    pub fn vote_accounts(&self) -> HashMap<Pubkey, (u64, Account)> {
+    pub fn vote_accounts(&self) -> HashMap<BvmAddr, (u64, Account)> {
         self.stakes.read().unwrap().vote_accounts().clone()
     }
 
     /// vote accounts for the specific epoch along with the stake
     ///   attributed to each account
-    pub fn epoch_vote_accounts(&self, epoch: u64) -> Option<&HashMap<Pubkey, (u64, Account)>> {
+    pub fn epoch_vote_accounts(&self, epoch: u64) -> Option<&HashMap<BvmAddr, (u64, Account)>> {
         self.epoch_stakes.get(&epoch).map(Stakes::vote_accounts)
     }
 
@@ -1010,7 +1010,7 @@ impl Treasury {
     /// Add an instruction processor to intercept instructions before the dynamic loader.
     pub fn add_opcode_handler(
         &mut self,
-        program_id: Pubkey,
+        program_id: BvmAddr,
         handle_opcode: HandleOpCode,
     ) {
         self.message_processor
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn test_treasury_new() {
-        let dummy_leader_pubkey = Pubkey::new_rand();
+        let dummy_leader_pubkey = BvmAddr::new_rand();
         let dummy_leader_difs = BOOTSTRAP_LEADER_DIFS;
         let mint_difs = 10_000;
         let GenesisBlockInfo {
@@ -1070,7 +1070,7 @@ mod tests {
     #[test]
     fn test_two_payments_to_one_party() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
@@ -1085,8 +1085,8 @@ mod tests {
     #[test]
     fn test_one_source_two_tx_one_batch() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
-        let key1 = Pubkey::new_rand();
-        let key2 = Pubkey::new_rand();
+        let key1 = BvmAddr::new_rand();
+        let key2 = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
@@ -1108,8 +1108,8 @@ mod tests {
     #[test]
     fn test_one_tx_two_out_atomic_fail() {
         let (genesis_block, mint_keypair) = create_genesis_block(1);
-        let key1 = Pubkey::new_rand();
-        let key2 = Pubkey::new_rand();
+        let key1 = BvmAddr::new_rand();
+        let key2 = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
             sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
@@ -1133,8 +1133,8 @@ mod tests {
     #[test]
     fn test_one_tx_two_out_atomic_pass() {
         let (genesis_block, mint_keypair) = create_genesis_block(2);
-        let key1 = Pubkey::new_rand();
-        let key2 = Pubkey::new_rand();
+        let key1 = BvmAddr::new_rand();
+        let key2 = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
             sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
@@ -1199,7 +1199,7 @@ mod tests {
     fn test_insufficient_funds() {
         let (genesis_block, mint_keypair) = create_genesis_block(11_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
         assert_eq!(treasury.get_balance(&pubkey), 1_000);
@@ -1221,7 +1221,7 @@ mod tests {
     fn test_transfer_to_newb() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         treasury.transfer(500, &mint_keypair, &pubkey).unwrap();
         assert_eq!(treasury.get_balance(&pubkey), 500);
     }
@@ -1269,7 +1269,7 @@ mod tests {
 
     #[test]
     fn test_treasury_tx_fee() {
-        let leader = Pubkey::new_rand();
+        let leader = BvmAddr::new_rand();
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -1313,7 +1313,7 @@ mod tests {
 
     #[test]
     fn test_filter_program_errors_and_collect_fee() {
-        let leader = Pubkey::new_rand();
+        let leader = BvmAddr::new_rand();
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
@@ -1374,7 +1374,7 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let payer0 = Keypair::new();
         let payer1 = Keypair::new();
-        let recipient = Pubkey::new_rand();
+        let recipient = BvmAddr::new_rand();
         // Fund additional payers
         treasury.transfer(3, &mint_keypair, &payer0.pubkey()).unwrap();
         treasury.transfer(3, &mint_keypair, &payer1.pubkey()).unwrap();
@@ -1484,7 +1484,7 @@ mod tests {
     }
 
     fn new_from_parent(parent: &Arc<Treasury>) -> Treasury {
-        Treasury::new_from_parent(parent, &Pubkey::default(), parent.slot() + 1)
+        Treasury::new_from_parent(parent, &BvmAddr::default(), parent.slot() + 1)
     }
 
     /// Verify that the parent's vector is computed correctly
@@ -1539,7 +1539,7 @@ mod tests {
         let initial_state = treasury0.hash_internal_state();
         assert_eq!(treasury1.hash_internal_state(), initial_state);
 
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         treasury0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
         assert_ne!(treasury0.hash_internal_state(), initial_state);
         treasury1.transfer(1_000, &mint_keypair, &pubkey).unwrap();
@@ -1559,7 +1559,7 @@ mod tests {
 
     #[test]
     fn test_treasury_hash_internal_state_squash() {
-        let collector_id = Pubkey::default();
+        let collector_id = BvmAddr::default();
         let treasury0 = Arc::new(Treasury::new(&create_genesis_block(10).0));
         let hash0 = treasury0.hash_internal_state();
         // save hash0 because new_from_parent
@@ -1658,7 +1658,7 @@ mod tests {
 
     #[test]
     fn test_treasury_epoch_vote_accounts() {
-        let leader_pubkey = Pubkey::new_rand();
+        let leader_pubkey = BvmAddr::new_rand();
         let leader_difs = 3;
         let mut genesis_block =
             create_genesis_block_with_leader(5, &leader_pubkey, leader_difs).genesis_block;
@@ -1901,7 +1901,7 @@ mod tests {
             genesis_block,
             mint_keypair,
             ..
-        } = create_genesis_block_with_leader(500, &Pubkey::new_rand(), 1);
+        } = create_genesis_block_with_leader(500, &BvmAddr::new_rand(), 1);
         let treasury = Arc::new(Treasury::new(&genesis_block));
 
         let vote_accounts = treasury.vote_accounts();
@@ -1977,7 +1977,7 @@ mod tests {
         // Should fail with OpCodeErr, but InstructionErrors are committable,
         // so is_delta should be true
         assert_eq!(
-            treasury.transfer(10_001, &mint_keypair, &Pubkey::new_rand()),
+            treasury.transfer(10_001, &mint_keypair, &BvmAddr::new_rand()),
             Err(TransactionError::OpCodeErr(
                 0,
                 OpCodeErr::new_result_with_negative_difs(),

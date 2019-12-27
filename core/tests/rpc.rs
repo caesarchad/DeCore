@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use morgan::verifier::new_validator_for_tests;
 use morgan_client::rpc_client::get_rpc_request_str;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_controller;
 use std::fs::remove_dir_all;
 use std::thread::sleep;
@@ -18,7 +18,7 @@ fn test_rpc_send_tx() {
     morgan_logger::setup();
 
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = Pubkey::new_rand();
+    let bob_pubkey = BvmAddr::new_rand();
 
     let client = reqwest::Client::new();
     let request = json!({

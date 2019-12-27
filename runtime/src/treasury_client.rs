@@ -3,8 +3,8 @@ use morgan_interface::account_host::{OfflineAccount, AccountHost, OnlineAccount}
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCode;
-use morgan_interface::message::Message;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::message::Context;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;
@@ -39,7 +39,7 @@ impl OfflineAccount for TreasuryClient {
     fn send_offline_message(
         &self,
         keypairs: &[&Keypair],
-        message: Message,
+        message: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
@@ -52,7 +52,7 @@ impl OfflineAccount for TreasuryClient {
         instruction: OpCode,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         self.send_offline_message(&[keypair], message, recent_transaction_seal)
     }
 
@@ -61,7 +61,7 @@ impl OfflineAccount for TreasuryClient {
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
@@ -71,7 +71,7 @@ impl OfflineAccount for TreasuryClient {
 }
 
 impl OnlineAccount for TreasuryClient {
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Message) -> Result<Signature> {
+    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> Result<Signature> {
         let transaction_seal = self.treasury.last_transaction_seal();
         let transaction = Transaction::new(&keypairs, message, transaction_seal);
         self.treasury.process_transaction(&transaction)?;
@@ -80,22 +80,22 @@ impl OnlineAccount for TreasuryClient {
 
     /// Create and process a transaction from a single instruction.
     fn snd_online_instruction(&self, keypair: &Keypair, instruction: OpCode) -> Result<Signature> {
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         self.send_online_msg(&[keypair], message)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
-    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &Pubkey) -> Result<Signature> {
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &BvmAddr) -> Result<Signature> {
         let transfer_instruction =
             sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
         self.snd_online_instruction(keypair, transfer_instruction)
     }
 
-    fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>> {
+    fn get_account_data(&self, pubkey: &BvmAddr) -> Result<Option<Vec<u8>>> {
         Ok(self.treasury.get_account(pubkey).map(|account| account.data))
     }
 
-    fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
+    fn get_balance(&self, pubkey: &BvmAddr) -> Result<u64> {
         Ok(self.treasury.get_balance(pubkey))
     }
 
@@ -230,13 +230,13 @@ mod tests {
         let treasury_client = TreasuryClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let mut transfer_instruction = sys_opcode::transfer(&john_pubkey, &bob_pubkey, 42);
         transfer_instruction
             .accounts
             .push(AccountMeta::new(jane_pubkey, true));
 
-        let message = Message::new(vec![transfer_instruction]);
+        let message = Context::new(vec![transfer_instruction]);
         treasury_client.send_online_msg(&doe_keypairs, message).unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }

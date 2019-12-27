@@ -110,7 +110,7 @@ mod tests {
     use crate::test_tx::test_tx;
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::hash::hash;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use std::time::Duration;
 
     #[test]
@@ -132,7 +132,7 @@ mod tests {
                 treasury.slot(),
                 Some(4),
                 treasury.drops_per_slot(),
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &waterclock_config,

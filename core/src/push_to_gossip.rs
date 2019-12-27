@@ -22,7 +22,7 @@ use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use morgan_runtime::bloom::Bloom;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::timing::timestamp;
 use std::cmp;
 
@@ -33,7 +33,7 @@ pub struct NodeTbleGspPush {
     /// max bytes per message
     pub max_bytes: usize,
     /// active set of validators for push
-    active_set: IndexMap<Pubkey, Bloom<Pubkey>>,
+    active_set: IndexMap<BvmAddr, Bloom<BvmAddr>>,
     /// push message queue
     push_messages: HashMap<ContInfTblValueTag, Hash>,
     pushed_once: HashMap<Hash, u64>,
@@ -95,11 +95,11 @@ impl NodeTbleGspPush {
     /// peers.
     /// The list of push messages is created such that all the randomly selected peers have not
     /// pruned the genesis addresses.
-    pub fn new_push_messages(&mut self, contact_info_table: &ContactInfoTable, now: u64) -> (Vec<Pubkey>, Vec<ContInfTblValue>) {
+    pub fn new_push_messages(&mut self, contact_info_table: &ContactInfoTable, now: u64) -> (Vec<BvmAddr>, Vec<ContInfTblValue>) {
         let max = self.active_set.len();
         let mut nodes: Vec<_> = (0..max).collect();
         nodes.shuffle(&mut rand::thread_rng());
-        let peers: Vec<Pubkey> = nodes
+        let peers: Vec<BvmAddr> = nodes
             .into_iter()
             .filter_map(|n| self.active_set.get_index(n))
             .take(self.push_fanout)
@@ -141,7 +141,7 @@ impl NodeTbleGspPush {
     }
 
     /// add the `from` to the peer's filter of nodes
-    pub fn process_prune_msg(&mut self, peer: &Pubkey, origins: &[Pubkey]) {
+    pub fn process_prune_msg(&mut self, peer: &BvmAddr, origins: &[BvmAddr]) {
         for origin in origins {
             if let Some(p) = self.active_set.get_mut(peer) {
                 p.add(origin)
@@ -159,8 +159,8 @@ impl NodeTbleGspPush {
     pub fn refresh_push_active_set(
         &mut self,
         contact_info_table: &ContactInfoTable,
-        stakes: &HashMap<Pubkey, u64>,
-        self_id: &Pubkey,
+        stakes: &HashMap<BvmAddr, u64>,
+        self_id: &BvmAddr,
         network_size: usize,
         ratio: usize,
     ) {
@@ -190,7 +190,7 @@ impl NodeTbleGspPush {
             let bloom = Bloom::random(size, 0.1, 1024 * 8 * 4);
             new_items.insert(item.id, bloom);
         }
-        let mut keys: Vec<Pubkey> = self.active_set.keys().cloned().collect();
+        let mut keys: Vec<BvmAddr> = self.active_set.keys().cloned().collect();
         keys.shuffle(&mut rand::thread_rng());
         let num = keys.len() / ratio;
         for k in &keys[..num] {
@@ -204,8 +204,8 @@ impl NodeTbleGspPush {
     fn push_options<'a>(
         &self,
         contact_info_table: &'a ContactInfoTable,
-        self_id: &Pubkey,
-        stakes: &HashMap<Pubkey, u64>,
+        self_id: &BvmAddr,
+        stakes: &HashMap<BvmAddr, u64>,
     ) -> Vec<(f32, &'a ContactInfo)> {
         contact_info_table.table
             .values()
@@ -268,7 +268,7 @@ mod test {
     fn test_process_push() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let value = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let value = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let label = value.label();
         // push a new message
         assert_eq!(
@@ -287,7 +287,7 @@ mod test {
     fn test_process_push_old_version() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let mut ci = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
         ci.wallclock = 1;
         let value = ContInfTblValue::ContactInfo(ci.clone());
 
@@ -307,7 +307,7 @@ mod test {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
         let timeout = push.msg_timeout;
-        let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let mut ci = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
 
         // push a version to far in the future
         ci.wallclock = timeout + 1;
@@ -329,7 +329,7 @@ mod test {
     fn test_process_push_update() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let mut ci = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
         ci.wallclock = 0;
         let value_old = ContInfTblValue::ContactInfo(ci.clone());
 
@@ -362,17 +362,17 @@ mod test {
         morgan_logger::setup();
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let value1 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let value1 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
 
         assert_eq!(contact_info_table.insert(value1.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
 
         assert!(push.active_set.get(&value1.label().pubkey()).is_some());
-        let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert!(push.active_set.get(&value2.label().pubkey()).is_none());
         assert_eq!(contact_info_table.insert(value2.clone(), 0), Ok(None));
         for _ in 0..30 {
-            push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+            push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
             if push.active_set.get(&value2.label().pubkey()).is_some() {
                 break;
             }
@@ -380,10 +380,10 @@ mod test {
         assert!(push.active_set.get(&value2.label().pubkey()).is_some());
 
         for _ in 0..push.num_active {
-            let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
             assert_eq!(contact_info_table.insert(value2.clone(), 0), Ok(None));
         }
-        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
         assert_eq!(push.active_set.len(), push.num_active);
     }
     #[test]
@@ -394,12 +394,12 @@ mod test {
         let mut stakes = HashMap::new();
         for i in 1..=100 {
             let peer =
-                ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), time));
+                ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), time));
             let id = peer.label().pubkey();
             contact_info_table.insert(peer.clone(), time).unwrap();
             stakes.insert(id, i * 100);
         }
-        let mut options = push.push_options(&contact_info_table, &Pubkey::default(), &stakes);
+        let mut options = push.push_options(&contact_info_table, &BvmAddr::default(), &stakes);
         assert!(!options.is_empty());
         options.sort_by(|(weight_l, _), (weight_r, _)| weight_r.partial_cmp(weight_l).unwrap());
         // check that the highest stake holder is also the heaviest weighted.
@@ -412,11 +412,11 @@ mod test {
     fn test_new_push_messages() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
 
-        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert_eq!(
             push.process_push_message(&mut contact_info_table, new_msg.clone(), 0),
             Ok(None)
@@ -431,11 +431,11 @@ mod test {
     fn test_process_prune() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
 
-        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let new_msg = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert_eq!(
             push.process_push_message(&mut contact_info_table, new_msg.clone(), 0),
             Ok(None)
@@ -450,11 +450,11 @@ mod test {
     fn test_purge_old_pending_push_messages() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+        let peer = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         assert_eq!(contact_info_table.insert(peer.clone(), 0), Ok(None));
-        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &Pubkey::default(), 1, 1);
+        push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
 
-        let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let mut ci = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
         ci.wallclock = 1;
         let new_msg = ContInfTblValue::ContactInfo(ci.clone());
         assert_eq!(
@@ -472,7 +472,7 @@ mod test {
     fn test_purge_old_pushed_once_messages() {
         let mut contact_info_table = ContactInfoTable::default();
         let mut push = NodeTbleGspPush::default();
-        let mut ci = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let mut ci = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
         ci.wallclock = 0;
         let value = ContInfTblValue::ContactInfo(ci.clone());
         let label = value.label();

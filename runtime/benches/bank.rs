@@ -12,7 +12,7 @@ use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::genesis_block::create_genesis_block;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::bultin_mounter;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::transaction::Transaction;
 use std::sync::Arc;
@@ -27,7 +27,7 @@ const BUILTIN_PROGRAM_ID: [u8; 32] = [
 ];
 
 fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     _keyed_accounts: &mut [KeyedAccount],
     _data: &[u8],
     _drop_height: u64,
@@ -39,7 +39,7 @@ pub fn create_builtin_transactions(
     treasury_client: &TreasuryClient,
     mint_keypair: &Keypair,
 ) -> Vec<Transaction> {
-    let program_id = Pubkey::new(&BUILTIN_PROGRAM_ID);
+    let program_id = BvmAddr::new(&BUILTIN_PROGRAM_ID);
 
     (0..4096)
         .into_iter()
@@ -131,7 +131,7 @@ fn do_bench_transactions(
     let ns_per_s = 1_000_000_000;
     let (genesis_block, mint_keypair) = create_genesis_block(100_000_000);
     let mut treasury = Treasury::new(&genesis_block);
-    treasury.add_opcode_handler(Pubkey::new(&BUILTIN_PROGRAM_ID), handle_opcode);
+    treasury.add_opcode_handler(BvmAddr::new(&BUILTIN_PROGRAM_ID), handle_opcode);
     let treasury = Arc::new(treasury);
     let treasury_client = TreasuryClient::new_shared(&treasury);
     let transactions = create_transactions(&treasury_client, &mint_keypair);

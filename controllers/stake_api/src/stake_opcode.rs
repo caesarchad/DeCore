@@ -5,7 +5,7 @@ use log::*;
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::{AccountMeta, OpCode, OpCodeErr};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_opcode;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -21,8 +21,8 @@ pub enum StakeOpCode {
 }
 
 pub fn create_delegate_account(
-    from_pubkey: &Pubkey,
-    staker_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    staker_pubkey: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
@@ -45,8 +45,8 @@ pub fn create_delegate_account(
 }
 
 pub fn create_mining_pool_account(
-    from_pubkey: &Pubkey,
-    staker_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    staker_pubkey: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
@@ -69,10 +69,10 @@ pub fn create_mining_pool_account(
 }
 
 pub fn redeem_vote_credits(
-    from_pubkey: &Pubkey,
-    mining_pool_pubkey: &Pubkey,
-    stake_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    mining_pool_pubkey: &BvmAddr,
+    stake_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
@@ -84,9 +84,9 @@ pub fn redeem_vote_credits(
 }
 
 pub fn delegate_stake(
-    from_pubkey: &Pubkey,
-    stake_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    stake_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
         AccountMeta::new(*from_pubkey, true),
@@ -97,7 +97,7 @@ pub fn delegate_stake(
 }
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
@@ -169,7 +169,7 @@ mod tests {
                 .map(|(meta, account)| KeyedAccount::new(&meta.pubkey, meta.is_signer, account))
                 .collect();
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut keyed_accounts,
                 &instruction.data,
                 0,
@@ -181,18 +181,18 @@ mod tests {
     fn test_stake_process_instruction() {
         assert_eq!(
             handle_opcode(&redeem_vote_credits(
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default()
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default()
             )),
             Err(OpCodeErr::InvalidAccountData),
         );
         assert_eq!(
             handle_opcode(&delegate_stake(
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default()
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default()
             )),
             Err(OpCodeErr::InvalidAccountData),
         );
@@ -205,9 +205,9 @@ mod tests {
         // gets the first check
         assert_eq!(
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut [KeyedAccount::new(
-                    &Pubkey::default(),
+                    &BvmAddr::default(),
                     false,
                     &mut Account::default(),
                 )],
@@ -220,10 +220,10 @@ mod tests {
         // gets the sub-check for number of args
         assert_eq!(
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut [
-                    KeyedAccount::new(&Pubkey::default(), true, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), true, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
                 ],
                 &serialize(&StakeOpCode::DelegateStake).unwrap(),
                 0,
@@ -233,11 +233,11 @@ mod tests {
 
         assert_eq!(
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut [
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
                 ],
                 &serialize(&StakeOpCode::RedeemVoteCredits).unwrap(),
                 0,
@@ -248,11 +248,11 @@ mod tests {
         // gets the check in delegate_stake
         assert_eq!(
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut [
-                    KeyedAccount::new(&Pubkey::default(), true, &mut Account::default()), // from
-                    KeyedAccount::new(&Pubkey::default(), true, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), true, &mut Account::default()), // from
+                    KeyedAccount::new(&BvmAddr::default(), true, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
                 ],
                 &serialize(&StakeOpCode::DelegateStake).unwrap(),
                 0,
@@ -263,12 +263,12 @@ mod tests {
         // gets the check in redeem_vote_credits
         assert_eq!(
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut [
-                    KeyedAccount::new(&Pubkey::default(), true, &mut Account::default()), // from
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
-                    KeyedAccount::new(&Pubkey::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), true, &mut Account::default()), // from
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
+                    KeyedAccount::new(&BvmAddr::default(), false, &mut Account::default()),
                 ],
                 &serialize(&StakeOpCode::RedeemVoteCredits).unwrap(),
                 0,

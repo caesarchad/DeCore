@@ -8,7 +8,7 @@ use serde::Serialize;
 use morgan_metricbot::inc_new_counter_debug;
 use morgan_interface::hash::Hash;
 pub use morgan_interface::constants::PACKET_DATA_SIZE;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::borrow::Borrow;
 use std::cmp;
 use std::fmt;
@@ -385,11 +385,11 @@ impl Blob {
         LittleEndian::write_u64(&mut self.data[INDEX_RANGE], ix);
     }
 
-    pub fn id(&self) -> Pubkey {
-        Pubkey::new(&self.data[ID_RANGE])
+    pub fn id(&self) -> BvmAddr {
+        BvmAddr::new(&self.data[ID_RANGE])
     }
 
-    pub fn set_id(&mut self, id: &Pubkey) {
+    pub fn set_id(&mut self, id: &BvmAddr) {
         self.data[ID_RANGE].copy_from_slice(id.as_ref())
     }
 
@@ -551,13 +551,13 @@ impl Blob {
     }
 }
 
-pub fn index_blobs(blobs: &[ArcBlb], id: &Pubkey, blob_index: u64, slot: u64, parent: u64) {
+pub fn index_blobs(blobs: &[ArcBlb], id: &BvmAddr, blob_index: u64, slot: u64, parent: u64) {
     index_blobs_with_genesis(blobs, id, &Hash::default(), blob_index, slot, parent)
 }
 
 pub fn index_blobs_with_genesis(
     blobs: &[ArcBlb],
-    id: &Pubkey,
+    id: &BvmAddr,
     genesis: &Hash,
     mut blob_index: u64,
     slot: u64,
@@ -819,7 +819,7 @@ mod tests {
         let mut blob = Blob::default();
         assert_eq!(blob.genesis_transaction_seal(), Hash::default());
 
-        let hash = Hash::new(&Pubkey::new_rand().as_ref());
+        let hash = Hash::new(&BvmAddr::new_rand().as_ref());
         blob.set_genesis_transaction_seal(&hash);
         assert_eq!(blob.genesis_transaction_seal(), hash);
     }

@@ -2,7 +2,7 @@ use chrono::prelude::*;
 use serde_json::Value;
 use morgan_client::rpc_client::RpcClient;
 use morgan_tokenbot::drone::run_local_drone;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::KeypairUtil;
 use morgan_wallet::wallet::{
     process_command, request_and_confirm_airdrop, WalletCommand, WalletConfig,
@@ -13,7 +13,7 @@ use std::sync::mpsc::channel;
 #[cfg(test)]
 use morgan::verifier::new_validator_for_tests;
 
-fn check_balance(expected_balance: u64, client: &RpcClient, pubkey: &Pubkey) {
+fn check_balance(expected_balance: u64, client: &RpcClient, pubkey: &BvmAddr) {
     let balance = client.retry_get_balance(pubkey, 1).unwrap().unwrap();
     assert_eq!(balance, expected_balance);
 }
@@ -21,7 +21,7 @@ fn check_balance(expected_balance: u64, client: &RpcClient, pubkey: &Pubkey) {
 #[test]
 fn test_wallet_timestamp_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = Pubkey::new_rand();
+    let bob_pubkey = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -65,7 +65,7 @@ fn test_wallet_timestamp_tx() {
     let process_id_vec = bs58::decode(process_id_str)
         .into_vec()
         .expect("base58-encoded public key");
-    let process_id = Pubkey::new(&process_id_vec);
+    let process_id = BvmAddr::new(&process_id_vec);
 
     check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance
@@ -86,7 +86,7 @@ fn test_wallet_timestamp_tx() {
 #[test]
 fn test_wallet_witness_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = Pubkey::new_rand();
+    let bob_pubkey = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -127,7 +127,7 @@ fn test_wallet_witness_tx() {
     let process_id_vec = bs58::decode(process_id_str)
         .into_vec()
         .expect("base58-encoded public key");
-    let process_id = Pubkey::new(&process_id_vec);
+    let process_id = BvmAddr::new(&process_id_vec);
 
     check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance
@@ -148,7 +148,7 @@ fn test_wallet_witness_tx() {
 #[test]
 fn test_wallet_cancel_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = Pubkey::new_rand();
+    let bob_pubkey = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -189,7 +189,7 @@ fn test_wallet_cancel_tx() {
     let process_id_vec = bs58::decode(process_id_str)
         .into_vec()
         .expect("base58-encoded public key");
-    let process_id = Pubkey::new(&process_id_vec);
+    let process_id = BvmAddr::new(&process_id_vec);
 
     check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance

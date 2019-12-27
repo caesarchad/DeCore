@@ -7,7 +7,7 @@ use morgan_metricbot::datapoint_info;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_vote_api::vote_state::{Lockout, Vote, VoteState, MAX_LOCKOUT_HISTORY};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -17,10 +17,10 @@ use morgan_helper::logHelper::*;
 #[derive(Default)]
 pub struct EpochStakes {
     epoch: u64,
-    stakes: HashMap<Pubkey, u64>,
+    stakes: HashMap<BvmAddr, u64>,
     self_staked: u64,
     total_staked: u64,
-    delegate_pubkey: Pubkey,
+    delegate_pubkey: BvmAddr,
 }
 
 #[derive(Default, Debug)]
@@ -39,7 +39,7 @@ pub struct LockStack {
 }
 
 impl EpochStakes {
-    pub fn new(epoch: u64, stakes: HashMap<Pubkey, u64>, delegate_pubkey: &Pubkey) -> Self {
+    pub fn new(epoch: u64, stakes: HashMap<BvmAddr, u64>, delegate_pubkey: &BvmAddr) -> Self {
         let total_staked = stakes.values().sum();
         let self_staked = *stakes.get(&delegate_pubkey).unwrap_or(&0);
         Self {
@@ -53,15 +53,15 @@ impl EpochStakes {
     pub fn new_for_tests(difs: u64) -> Self {
         Self::new(
             0,
-            vec![(Pubkey::default(), difs)].into_iter().collect(),
-            &Pubkey::default(),
+            vec![(BvmAddr::default(), difs)].into_iter().collect(),
+            &BvmAddr::default(),
         )
     }
-    pub fn new_from_stakes(epoch: u64, accounts: &[(Pubkey, (u64, Account))]) -> Self {
+    pub fn new_from_stakes(epoch: u64, accounts: &[(BvmAddr, (u64, Account))]) -> Self {
         let stakes = accounts.iter().map(|(k, (v, _))| (*k, *v)).collect();
         Self::new(epoch, stakes, &accounts[0].0)
     }
-    pub fn new_from_treasury(treasury: &Treasury, my_pubkey: &Pubkey) -> Self {
+    pub fn new_from_treasury(treasury: &Treasury, my_pubkey: &BvmAddr) -> Self {
         let treasury_round = treasury.get_epoch_and_slot_index(treasury.slot()).0;
         let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_round)
             .expect("voting require a treasury with stakes");
@@ -70,7 +70,7 @@ impl EpochStakes {
 }
 
 impl LockStack {
-    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_pubkey: &Pubkey) -> Self {
+    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_pubkey: &BvmAddr) -> Self {
         let mut frozen_treasuries: Vec<_> = treasury_forks.frozen_treasuries().values().cloned().collect();
         frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
@@ -110,7 +110,7 @@ impl LockStack {
         ancestors: &HashMap<u64, HashSet<u64>>,
     ) -> HashMap<u64, StakeLockout>
     where
-        F: Iterator<Item = (Pubkey, (u64, Account))>,
+        F: Iterator<Item = (BvmAddr, (u64, Account))>,
     {
         let mut stake_lockouts = HashMap::new();
         for (key, (_, account)) in vote_accounts {
@@ -418,7 +418,7 @@ impl LockStack {
 mod test {
     use super::*;
 
-    fn gen_stakes(stake_votes: &[(u64, &[u64])]) -> Vec<(Pubkey, (u64, Account))> {
+    fn gen_stakes(stake_votes: &[(u64, &[u64])]) -> Vec<(BvmAddr, (u64, Account))> {
         let mut stakes = vec![];
         for (difs, votes) in stake_votes {
             let mut account = Account::default();
@@ -431,7 +431,7 @@ mod test {
             vote_state
                 .serialize(&mut account.data)
                 .expect("serialize state");
-            stakes.push((Pubkey::new_rand(), (*difs, account)));
+            stakes.push((BvmAddr::new_rand(), (*difs, account)));
         }
         stakes
     }
@@ -801,7 +801,7 @@ mod test {
 
         // Initialize lock_stack
         let stakes: HashMap<_, _> = accounts.iter().map(|(pk, (s, _))| (*pk, *s)).collect();
-        let epoch_stakes = EpochStakes::new(0, stakes, &Pubkey::default());
+        let epoch_stakes = EpochStakes::new(0, stakes, &BvmAddr::default());
         let mut lock_stack = LockStack::new(epoch_stakes, VOTE_THRESHOLD_DEPTH, threshold_size);
 
         // CASE 1: Record the first VOTE_THRESHOLD lock_stack votes for fork 2. We want to

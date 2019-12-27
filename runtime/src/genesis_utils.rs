@@ -1,6 +1,6 @@
 use morgan_interface::account::Account;
 use morgan_interface::genesis_block::GenesisBlock;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_controller;
 use morgan_stake_api::stake_state;
@@ -16,7 +16,7 @@ pub struct GenesisBlockInfo {
 
 pub fn create_genesis_block_with_leader(
     mint_difs: u64,
-    bootstrap_leader_pubkey: &Pubkey,
+    bootstrap_leader_pubkey: &BvmAddr,
     bootstrap_leader_stake_difs: u64,
 ) -> GenesisBlockInfo {
     let mint_keypair = Keypair::new();

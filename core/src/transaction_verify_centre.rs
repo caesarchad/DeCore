@@ -26,7 +26,7 @@ use crate::rpc_subscriptions::RpcSubscriptions;
 use crate::service::Service;
 use crate::storage_stage::{StoragePhase, StorageState};
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use std::net::UdpSocket;
 use std::sync::atomic::AtomicBool;
@@ -57,7 +57,7 @@ impl BlazeUnit {
     /// * `block_buffer_pool` - the ledger itself
     #[allow(clippy::new_ret_no_self, clippy::too_many_arguments)]
     pub fn new<T>(
-        vote_account: &Pubkey,
+        vote_account: &BvmAddr,
         voting_keypair: Option<&Arc<T>>,
         storage_keypair: &Arc<Keypair>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,

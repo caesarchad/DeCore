@@ -11,7 +11,7 @@ use solana_rbpf::{EbpfVmRaw, MemoryRegion};
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::mounter_opcode::MounterOpCode;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::morgan_entrypoint;
 use std::alloc::Layout;
 use std::any::Any;
@@ -258,12 +258,12 @@ pub fn create_vm(prog: &[u8]) -> Result<(EbpfVmRaw, MemoryRegion), Error> {
 }
 
 fn serialize_parameters(
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
 ) -> Vec<u8> {
-    assert_eq!(32, mem::size_of::<Pubkey>());
+    assert_eq!(32, mem::size_of::<BvmAddr>());
 
     let mut v: Vec<u8> = Vec::new();
     v.write_u64::<LittleEndian>(keyed_accounts.len() as u64)
@@ -286,12 +286,12 @@ fn serialize_parameters(
 }
 
 fn deserialize_parameters(keyed_accounts: &mut [KeyedAccount], buffer: &[u8]) {
-    assert_eq!(32, mem::size_of::<Pubkey>());
+    assert_eq!(32, mem::size_of::<BvmAddr>());
 
     let mut start = mem::size_of::<u64>();
     for info in keyed_accounts.iter_mut() {
         start += mem::size_of::<u64>(); // skip signer_key boolean
-        start += mem::size_of::<Pubkey>(); // skip pubkey
+        start += mem::size_of::<BvmAddr>(); // skip pubkey
         info.account.difs = LittleEndian::read_u64(&buffer[start..]);
 
         start += mem::size_of::<u64>() // skip difs
@@ -300,13 +300,13 @@ fn deserialize_parameters(keyed_accounts: &mut [KeyedAccount], buffer: &[u8]) {
         info.account.data.clone_from_slice(&buffer[start..end]);
 
         start += info.account.data.len() // skip data
-                  + mem::size_of::<Pubkey>(); // skip owner
+                  + mem::size_of::<BvmAddr>(); // skip owner
     }
 }
 
 morgan_entrypoint!(entrypoint);
 fn entrypoint(
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     tx_data: &[u8],
     drop_height: u64,

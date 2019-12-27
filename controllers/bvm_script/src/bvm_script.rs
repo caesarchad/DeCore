@@ -5,7 +5,7 @@
 
 use chrono::prelude::*;
 use serde_derive::{Deserialize, Serialize};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::mem;
 
 /// The types of events a payment plan can process.
@@ -14,33 +14,33 @@ pub enum Endorsement {
     /// The current time.
     Timestamp(DateTime<Utc>),
 
-    /// A signature from Pubkey.
+    /// A signature from BvmAddr.
     Signature,
 }
 
-/// Some amount of difs that should be sent to the `to` `Pubkey`.
+/// Some amount of difs that should be sent to the `to` `BvmAddr`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AcctOp {
     /// Amount to be paid.
     pub difs: u64,
 
-    /// The `Pubkey` that `difs` should be paid to.
-    pub to: Pubkey,
+    /// The `BvmAddr` that `difs` should be paid to.
+    pub to: BvmAddr,
 }
 
 /// A data type representing a `Endorsement` that the payment plan is waiting on.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Switch {
     /// Wait for a `Timestamp` `Endorsement` at or after the given `DateTime`.
-    Timestamp(DateTime<Utc>, Pubkey),
+    Timestamp(DateTime<Utc>, BvmAddr),
 
-    /// Wait for a `Signature` `Endorsement` from `Pubkey`.
-    Signature(Pubkey),
+    /// Wait for a `Signature` `Endorsement` from `BvmAddr`.
+    Signature(BvmAddr),
 }
 
 impl Switch {
     /// Return true if the given Endorsement satisfies this Switch.
-    pub fn is_satisfied(&self, witness: &Endorsement, from: &Pubkey) -> bool {
+    pub fn is_satisfied(&self, witness: &Endorsement, from: &BvmAddr) -> bool {
         match (self, witness) {
             (Switch::Signature(pubkey), Endorsement::Signature) => pubkey == from,
             (Switch::Timestamp(dt, pubkey), Endorsement::Timestamp(last_time)) => {
@@ -70,13 +70,13 @@ pub enum BvmScript {
 }
 
 impl BvmScript {
-    /// Create the simplest budget - one that pays `difs` to Pubkey.
-    pub fn new_payment(difs: u64, to: &Pubkey) -> Self {
+    /// Create the simplest budget - one that pays `difs` to BvmAddr.
+    pub fn new_payment(difs: u64, to: &BvmAddr) -> Self {
         BvmScript::Pay(AcctOp { difs, to: *to })
     }
 
     /// Create a budget that pays `difs` to `to` after being witnessed by `from`.
-    pub fn new_authorized_payment(from: &Pubkey, difs: u64, to: &Pubkey) -> Self {
+    pub fn new_authorized_payment(from: &BvmAddr, difs: u64, to: &BvmAddr) -> Self {
         BvmScript::After(
             Switch::Signature(*from),
             Box::new(Self::new_payment(difs, to)),
@@ -86,10 +86,10 @@ impl BvmScript {
     /// Create a budget that pays `difs` to `to` after being witnessed by `witness` unless
     /// canceled with a signature from `from`.
     pub fn new_cancelable_authorized_payment(
-        witness: &Pubkey,
+        witness: &BvmAddr,
         difs: u64,
-        to: &Pubkey,
-        from: Option<Pubkey>,
+        to: &BvmAddr,
+        from: Option<BvmAddr>,
     ) -> Self {
         if from.is_none() {
             return Self::new_authorized_payment(witness, difs, to);
@@ -109,10 +109,10 @@ impl BvmScript {
 
     /// Create a budget that pays difs` to `to` after being witnessed by 2x `from`s
     pub fn new_2_2_multisig_payment(
-        from0: &Pubkey,
-        from1: &Pubkey,
+        from0: &BvmAddr,
+        from1: &BvmAddr,
         difs: u64,
-        to: &Pubkey,
+        to: &BvmAddr,
     ) -> Self {
         BvmScript::And(
             Switch::Signature(*from0),
@@ -125,9 +125,9 @@ impl BvmScript {
     /// by `dt_pubkey`.
     pub fn new_future_payment(
         dt: DateTime<Utc>,
-        dt_pubkey: &Pubkey,
+        dt_pubkey: &BvmAddr,
         difs: u64,
-        to: &Pubkey,
+        to: &BvmAddr,
     ) -> Self {
         BvmScript::After(
             Switch::Timestamp(dt, *dt_pubkey),
@@ -139,10 +139,10 @@ impl BvmScript {
     /// signed by `dt_pubkey` unless canceled by `from`.
     pub fn new_cancelable_future_payment(
         dt: DateTime<Utc>,
-        dt_pubkey: &Pubkey,
+        dt_pubkey: &BvmAddr,
         difs: u64,
-        to: &Pubkey,
-        from: Option<Pubkey>,
+        to: &BvmAddr,
+        from: Option<BvmAddr>,
     ) -> Self {
         if from.is_none() {
             return Self::new_future_payment(dt, dt_pubkey, difs, to);
@@ -183,7 +183,7 @@ impl BvmScript {
 
     /// Apply a witness to the budget to see if the budget can be reduced.
     /// If so, modify the budget in-place.
-    pub fn apply_witness(&mut self, witness: &Endorsement, from: &Pubkey) {
+    pub fn apply_witness(&mut self, witness: &Endorsement, from: &BvmAddr) {
         let new_expr = match self {
             BvmScript::After(cond, sub_expr) if cond.is_satisfied(witness, from) => {
                 Some(sub_expr.clone())
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_signature_satisfied() {
-        let from = Pubkey::default();
+        let from = BvmAddr::default();
         assert!(Switch::Signature(from).is_satisfied(&Endorsement::Signature, &from));
     }
 
@@ -225,7 +225,7 @@ mod tests {
     fn test_timestamp_satisfied() {
         let dt1 = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
         let dt2 = Utc.ymd(2014, 11, 14).and_hms(10, 9, 8);
-        let from = Pubkey::default();
+        let from = BvmAddr::default();
         assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
         assert!(Switch::Timestamp(dt1, from).is_satisfied(&Endorsement::Timestamp(dt2), &from));
         assert!(!Switch::Timestamp(dt2, from).is_satisfied(&Endorsement::Timestamp(dt1), &from));
@@ -234,8 +234,8 @@ mod tests {
     #[test]
     fn test_verify() {
         let dt = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
-        let from = Pubkey::default();
-        let to = Pubkey::default();
+        let from = BvmAddr::default();
+        let to = BvmAddr::default();
         assert!(BvmScript::new_payment(42, &to).verify(42));
         assert!(BvmScript::new_authorized_payment(&from, 42, &to).verify(42));
         assert!(BvmScript::new_future_payment(dt, &from, 42, &to).verify(42));
@@ -246,8 +246,8 @@ mod tests {
 
     #[test]
     fn test_authorized_payment() {
-        let from = Pubkey::default();
-        let to = Pubkey::default();
+        let from = BvmAddr::default();
+        let to = BvmAddr::default();
 
         let mut expr = BvmScript::new_authorized_payment(&from, 42, &to);
         expr.apply_witness(&Endorsement::Signature, &from);
@@ -257,8 +257,8 @@ mod tests {
     #[test]
     fn test_future_payment() {
         let dt = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
-        let from = Pubkey::new_rand();
-        let to = Pubkey::new_rand();
+        let from = BvmAddr::new_rand();
+        let to = BvmAddr::new_rand();
 
         let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
         expr.apply_witness(&Endorsement::Timestamp(dt), &from);
@@ -270,8 +270,8 @@ mod tests {
         // Ensure timestamp will only be acknowledged if it came from the
         // whitelisted public key.
         let dt = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
-        let from = Pubkey::new_rand();
-        let to = Pubkey::new_rand();
+        let from = BvmAddr::new_rand();
+        let to = BvmAddr::new_rand();
 
         let mut expr = BvmScript::new_future_payment(dt, &from, 42, &to);
         let orig_expr = expr.clone();
@@ -282,8 +282,8 @@ mod tests {
     #[test]
     fn test_cancelable_future_payment() {
         let dt = Utc.ymd(2014, 11, 14).and_hms(8, 9, 10);
-        let from = Pubkey::default();
-        let to = Pubkey::default();
+        let from = BvmAddr::default();
+        let to = BvmAddr::default();
 
         let mut expr = BvmScript::new_cancelable_future_payment(dt, &from, 42, &to, Some(from));
         expr.apply_witness(&Endorsement::Timestamp(dt), &from);
@@ -295,9 +295,9 @@ mod tests {
     }
     #[test]
     fn test_2_2_multisig_payment() {
-        let from0 = Pubkey::new_rand();
-        let from1 = Pubkey::new_rand();
-        let to = Pubkey::default();
+        let from0 = BvmAddr::new_rand();
+        let from1 = BvmAddr::new_rand();
+        let to = BvmAddr::default();
 
         let mut expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
         expr.apply_witness(&Endorsement::Signature, &from0);
@@ -306,10 +306,10 @@ mod tests {
 
     #[test]
     fn test_multisig_after_sig() {
-        let from0 = Pubkey::new_rand();
-        let from1 = Pubkey::new_rand();
-        let from2 = Pubkey::new_rand();
-        let to = Pubkey::default();
+        let from0 = BvmAddr::new_rand();
+        let from1 = BvmAddr::new_rand();
+        let from2 = BvmAddr::new_rand();
+        let to = BvmAddr::default();
 
         let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
         let mut expr = BvmScript::After(Switch::Signature(from2), Box::new(expr));
@@ -321,10 +321,10 @@ mod tests {
 
     #[test]
     fn test_multisig_after_ts() {
-        let from0 = Pubkey::new_rand();
-        let from1 = Pubkey::new_rand();
+        let from0 = BvmAddr::new_rand();
+        let from1 = BvmAddr::new_rand();
         let dt = Utc.ymd(2014, 11, 11).and_hms(7, 7, 7);
-        let to = Pubkey::default();
+        let to = BvmAddr::default();
 
         let expr = BvmScript::new_2_2_multisig_payment(&from0, &from1, 42, &to);
         let mut expr = BvmScript::After(Switch::Timestamp(dt, from0), Box::new(expr));

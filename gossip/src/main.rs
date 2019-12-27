@@ -7,13 +7,13 @@ use clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, 
 use morgan::connection_info::ContactInfo;
 use morgan::gossip_service::discover;
 use morgan_client::rpc_client::RpcClient;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::error;
 use std::net::SocketAddr;
 use std::process::exit;
 
 fn pubkey_validator(pubkey: String) -> Result<(), String> {
-    match pubkey.parse::<Pubkey>() {
+    match pubkey.parse::<BvmAddr>() {
         Ok(_) => Ok(()),
         Err(err) => Err(format!("{:?}", err)),
     }
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .map(|secs| secs.to_string().parse().unwrap());
             let pubkey = matches
                 .value_of("node_pubkey")
-                .map(|pubkey_str| pubkey_str.parse::<Pubkey>().unwrap());
+                .map(|pubkey_str| pubkey_str.parse::<BvmAddr>().unwrap());
 
             let gossip_addr = if matches.is_present("pull_only") {
                 None
@@ -172,7 +172,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             let pubkey = matches
                 .value_of("node_pubkey")
                 .unwrap()
-                .parse::<Pubkey>()
+                .parse::<BvmAddr>()
                 .unwrap();
             let (nodes, _storage_miners) = discover(&connection_url_addr, None, None, Some(pubkey), None)?;
             let node = nodes.iter().find(|x| x.id == pubkey).unwrap();

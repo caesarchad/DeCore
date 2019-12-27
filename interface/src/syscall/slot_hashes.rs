@@ -5,7 +5,7 @@
 use crate::account::Account;
 use crate::account_utils::State;
 use crate::hash::Hash;
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::syscall;
 use bincode::serialized_size;
 use std::ops::Deref;
@@ -17,11 +17,11 @@ const ID: [u8; 32] = [
     60, 130, 78, 86, 27, 113, 191, 208, 0, 0, 0,
 ];
 
-pub fn id() -> Pubkey {
-    Pubkey::new(&ID)
+pub fn id() -> BvmAddr {
+    BvmAddr::new(&ID)
 }
 
-pub fn check_id(pubkey: &Pubkey) -> bool {
+pub fn check_id(pubkey: &BvmAddr) -> bool {
     pubkey.as_ref() == ID
 }
 

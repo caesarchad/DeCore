@@ -1,5 +1,5 @@
 use clap::{crate_description, crate_name, crate_version, App, Arg, SubCommand};
-use morgan_interface::pubkey::write_pubkey;
+use morgan_interface::bvm_address::write_pubkey;
 use morgan_interface::signature::{gen_keypair_file, read_keypair, KeypairUtil};
 use std::error;
 

@@ -382,7 +382,7 @@ pub fn compose_b_fiscal_stmt(fscl_stmt_cnt: usize) -> Vec<FsclStmt> {
 
 #[cfg(test)]
 pub fn make_consecutive_blobs(
-    id: &morgan_interface::pubkey::Pubkey,
+    id: &morgan_interface::bvm_address::BvmAddr,
     num_blobs_to_make: u64,
     start_height: u64,
     start_hash: Hash,
@@ -423,7 +423,7 @@ mod tests {
     use morgan_interface::constants::PACKET_DATA_SIZE;
     use morgan_interface::hash::hash;
     use morgan_interface::opcodes::OpCode;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_controller;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -561,7 +561,7 @@ mod tests {
                 //mark_seal: 19,
                 hash: Hash::default(),
                 transactions: vec![Transaction::new_u_opcodes(vec![
-                    OpCode::new(Pubkey::default(), &vec![0u8; magic_len as usize], vec![]),
+                    OpCode::new(BvmAddr::default(), &vec![0u8; magic_len as usize], vec![]),
                 ])],
             }];
             let size = serialized_size(&entries).unwrap() as usize;
@@ -579,7 +579,7 @@ mod tests {
                 //mark_seal: 19,
                 hash: Hash::default(),
                 transactions: vec![Transaction::new_u_opcodes(vec![
-                    OpCode::new(Pubkey::default(), &vec![0u8; magic_len], vec![]),
+                    OpCode::new(BvmAddr::default(), &vec![0u8; magic_len], vec![]),
                 ])],
             };
             fscl_stmt_cnt

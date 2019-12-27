@@ -1,5 +1,5 @@
 use bincode::serialize;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 //use morgan_interface::rpc_port;
 #[cfg(test)]
 use morgan_interface::constants::{DEFAULT_RPC_PORT,DEFAULT_RPC_PUBSUB_PORT};
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 /// Structure representing a node on the network
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContactInfo {
-    pub id: Pubkey,
+    pub id: BvmAddr,
     /// signature of this ContactInfo
     pub signature: Signature,
     /// gossip address
@@ -92,7 +92,7 @@ impl Default for MetricsConfig {
 impl Default for ContactInfo {
     fn default() -> Self {
         ContactInfo {
-            id: Pubkey::default(),
+            id: BvmAddr::default(),
             gossip: socketaddr_any!(),
             blaze_unit: socketaddr_any!(),
             transaction_digesting_module: socketaddr_any!(),
@@ -108,7 +108,7 @@ impl Default for ContactInfo {
 
 impl ContactInfo {
     pub fn new(
-        id: &Pubkey,
+        id: &BvmAddr,
         gossip: SocketAddr,
         blaze_unit: SocketAddr,
         transaction_digesting_module: SocketAddr,
@@ -132,7 +132,7 @@ impl ContactInfo {
         }
     }
 
-    pub fn new_localhost(id: &Pubkey, now: u64) -> Self {
+    pub fn new_localhost(id: &BvmAddr, now: u64) -> Self {
         Self::new(
             id,
             socketaddr!("127.0.0.1:1234"),
@@ -152,7 +152,7 @@ impl ContactInfo {
         let addr = socketaddr!("224.0.1.255:1000");
         assert!(addr.ip().is_multicast());
         Self::new(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             addr,
             addr,
             addr,
@@ -165,7 +165,7 @@ impl ContactInfo {
     }
 
     #[cfg(test)]
-    fn new_with_pubkey_socketaddr(pubkey: &Pubkey, bind_addr: &SocketAddr) -> Self {
+    fn new_with_pubkey_socketaddr(pubkey: &BvmAddr, bind_addr: &SocketAddr) -> Self {
         fn next_port(addr: &SocketAddr, nxt: u16) -> SocketAddr {
             let mut nxt_addr = *addr;
             nxt_addr.set_port(addr.port() + nxt);
@@ -201,7 +201,7 @@ impl ContactInfo {
     pub fn new_gossip_connection_url(gossip_addr: &SocketAddr) -> Self {
         let daddr: SocketAddr = socketaddr!("0.0.0.0:0");
         Self::new(
-            &Pubkey::default(),
+            &BvmAddr::default(),
             *gossip_addr,
             daddr,
             daddr,
@@ -240,14 +240,14 @@ impl ContactInfo {
 }
 
 impl Signable for ContactInfo {
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         self.id
     }
 
     fn signable_data(&self) -> Vec<u8> {
         #[derive(Serialize)]
         struct SignData {
-            id: Pubkey,
+            id: BvmAddr,
             gossip: SocketAddr,
             blaze_unit: SocketAddr,
             transaction_digesting_module: SocketAddr,

@@ -4,7 +4,7 @@ use crate::account::Account;
 use crate::gas_cost::GasCost;
 use crate::hash::{hash, Hash};
 use crate::waterclock_config::WaterClockConfig;
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::signature::{Keypair, KeypairUtil};
 use crate::sys_controller;
 use crate::constants::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_DROPS_PER_SLOT};
@@ -14,11 +14,11 @@ use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GenesisBlock {
-    pub accounts: Vec<(Pubkey, Account)>,
-    pub bootstrap_leader_pubkey: Pubkey,
+    pub accounts: Vec<(BvmAddr, Account)>,
+    pub bootstrap_leader_pubkey: BvmAddr,
     pub epoch_warmup: bool,
     pub fee_calculator: GasCost,
-    pub builtin_opcode_handlers: Vec<(String, Pubkey)>,
+    pub builtin_opcode_handlers: Vec<(String, BvmAddr)>,
     pub candidate_each_round: u64,
     pub stake_place_holder: u64,
     pub drops_per_slot: u64,
@@ -30,7 +30,7 @@ pub fn create_genesis_block(difs: u64) -> (GenesisBlock, Keypair) {
     let mint_keypair = Keypair::new();
     (
         GenesisBlock::new(
-            &Pubkey::default(),
+            &BvmAddr::default(),
             &[(
                 mint_keypair.pubkey(),
                 Account::new(difs, 0, 0, &sys_controller::id()),
@@ -43,9 +43,9 @@ pub fn create_genesis_block(difs: u64) -> (GenesisBlock, Keypair) {
 
 impl GenesisBlock {
     pub fn new(
-        bootstrap_leader_pubkey: &Pubkey,
-        accounts: &[(Pubkey, Account)],
-        builtin_opcode_handlers: &[(String, Pubkey)],
+        bootstrap_leader_pubkey: &BvmAddr,
+        accounts: &[(BvmAddr, Account)],
+        builtin_opcode_handlers: &[(String, BvmAddr)],
     ) -> Self {
         Self {
             accounts: accounts.to_vec(),
@@ -105,15 +105,15 @@ mod tests {
     fn test_genesis_block() {
         let mint_keypair = Keypair::new();
         let block = GenesisBlock::new(
-            &Pubkey::default(),
+            &BvmAddr::default(),
             &[
                 (
                     mint_keypair.pubkey(),
-                    Account::new(10_000, 0, 0, &Pubkey::default()),
+                    Account::new(10_000, 0, 0, &BvmAddr::default()),
                 ),
-                (Pubkey::new_rand(), Account::new(1, 0, 0, &Pubkey::default())),
+                (BvmAddr::new_rand(), Account::new(1, 0, 0, &BvmAddr::default())),
             ],
-            &[("hi".to_string(), Pubkey::new_rand())],
+            &[("hi".to_string(), BvmAddr::new_rand())],
         );
         assert_eq!(block.accounts.len(), 2);
         assert!(block.accounts.iter().any(

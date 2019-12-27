@@ -9,7 +9,7 @@ use bincode::serialize;
 use chrono::{SecondsFormat, Utc};
 use serde_json::json;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::cell::RefCell;
 use std::io::prelude::*;
 use std::net::Shutdown;
@@ -69,14 +69,14 @@ pub trait NodeSyncEvents {
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &Pubkey,
+        leader_pubkey: &BvmAddr,
         statements: &FsclStmt,
     ) -> Result<()>;
     fn emit_block_event(
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &Pubkey,
+        leader_pubkey: &BvmAddr,
         transaction_seal: Hash,
     ) -> Result<()>;
 }
@@ -126,7 +126,7 @@ where
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &Pubkey,
+        leader_pubkey: &BvmAddr,
         stmt: &FsclStmt,
     ) -> Result<()> {
         let transactions: Vec<Vec<u8>> = serialize_transactions(stmt);
@@ -176,7 +176,7 @@ where
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &Pubkey,
+        leader_pubkey: &BvmAddr,
         transaction_seal: Hash,
     ) -> Result<()> {
         let payload = format!(
@@ -274,7 +274,7 @@ mod test {
         let drop_height_initial = 0;
         let drop_height_final = drop_height_initial + drops_per_slot + 2;
         let mut curr_slot = 0;
-        let leader_pubkey = Pubkey::new_rand();
+        let leader_pubkey = BvmAddr::new_rand();
 
         for drop_height in drop_height_initial..=drop_height_final {
             if drop_height == 5 {

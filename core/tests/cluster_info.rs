@@ -3,7 +3,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use morgan::node_group_info::{compute_retransmit_peers, NodeGroupInfo};
 use morgan::connection_info::ContactInfo;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::TryRecvError;
 use std::sync::mpsc::{Receiver, Sender};
@@ -11,14 +11,14 @@ use std::sync::Mutex;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-type Nodes = HashMap<Pubkey, (HashSet<i32>, Receiver<(i32, bool)>)>;
+type Nodes = HashMap<BvmAddr, (HashSet<i32>, Receiver<(i32, bool)>)>;
 
 fn num_threads() -> usize {
     sys_info::cpu_num().unwrap_or(10) as usize
 }
 
 /// Search for the a node with the given balance
-fn find_insert_blob(id: &Pubkey, blob: i32, batches: &mut [Nodes]) {
+fn find_insert_blob(id: &BvmAddr, blob: i32, batches: &mut [Nodes]) {
     batches.par_iter_mut().for_each(|batch| {
         if batch.contains_key(id) {
             let _ = batch.get_mut(id).unwrap().0.insert(blob);
@@ -32,7 +32,7 @@ fn run_simulation(stakes: &[u64], fanout: usize) {
     let timeout = 60 * 5;
 
     // describe the leader
-    let leader_info = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+    let leader_info = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
     let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(leader_info.clone());
 
     // setup staked nodes
@@ -40,7 +40,7 @@ fn run_simulation(stakes: &[u64], fanout: usize) {
 
     // setup accounts for all nodes (leader has 0 bal)
     let (s, r) = channel();
-    let senders: Arc<Mutex<HashMap<Pubkey, Sender<(i32, bool)>>>> =
+    let senders: Arc<Mutex<HashMap<BvmAddr, Sender<(i32, bool)>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     senders.lock().unwrap().insert(leader_info.id, s);
     let mut batches: Vec<Nodes> = Vec::with_capacity(num_threads);
@@ -55,7 +55,7 @@ fn run_simulation(stakes: &[u64], fanout: usize) {
         chunk.into_iter().for_each(|i| {
             //distribute neighbors across threads to maximize parallel compute
             let batch_ix = *i as usize % batches.len();
-            let node = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+            let node = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
             staked_nodes.insert(node.id, stakes[*i - 1]);
             node_group_info.insert_info(node.clone());
             let (s, r) = channel();
@@ -93,7 +93,7 @@ fn run_simulation(stakes: &[u64], fanout: usize) {
         let senders: HashMap<_, _> = senders.lock().unwrap().clone();
         // A map that holds neighbors and children senders for a given node
         let mut mapped_peers: HashMap<
-            Pubkey,
+            BvmAddr,
             (Vec<Sender<(i32, bool)>>, Vec<Sender<(i32, bool)>>),
         > = HashMap::new();
         while remaining > 0 {

@@ -6,7 +6,7 @@ use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::typed::Subscriber;
 use jsonrpc_pubsub::{Session, SubscriptionId};
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::transaction;
 use std::sync::{atomic, Arc};
@@ -119,7 +119,7 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
         pubkey_str: String,
         confirmations: Option<Confirmations>,
     ) {
-        match param::<Pubkey>(&pubkey_str, "pubkey") {
+        match param::<BvmAddr>(&pubkey_str, "pubkey") {
             Ok(pubkey) => {
                 let id = self.uid.fetch_add(1, atomic::Ordering::SeqCst);
                 let sub_id = SubscriptionId::Number(id as u64);
@@ -169,7 +169,7 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
         pubkey_str: String,
         confirmations: Option<Confirmations>,
     ) {
-        match param::<Pubkey>(&pubkey_str, "pubkey") {
+        match param::<BvmAddr>(&pubkey_str, "pubkey") {
             Ok(pubkey) => {
                 let id = self.uid.fetch_add(1, atomic::Ordering::SeqCst);
                 let sub_id = SubscriptionId::Number(id as u64);
@@ -291,7 +291,7 @@ mod tests {
     use morgan_bvm_script;
     use morgan_bvm_script::sc_opcode;
     use morgan_runtime::treasury::Treasury;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_controller;
     use morgan_interface::transaction::{self, Transaction};
@@ -363,7 +363,7 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let arc_treasury = Arc::new(treasury);
         let transaction_seal = arc_treasury.last_transaction_seal();
@@ -415,7 +415,7 @@ mod tests {
             .builtin_opcode_handlers
             .push(morgan_budget_controller!());
 
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let witness = Keypair::new();
         let contract_funds = Keypair::new();
         let contract_state = Keypair::new();
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_account_unsubscribe() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let session = create_session();
 
         let mut io = PubSubHandler::default();
@@ -602,11 +602,11 @@ mod tests {
         rpc.subscriptions.notify_subscribers(0, &treasury_forks);
 
         let treasury0 = treasury_forks.read().unwrap()[0].clone();
-        let treasury1 = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        let treasury1 = Treasury::new_from_parent(&treasury0, &BvmAddr::default(), 1);
         treasury_forks.write().unwrap().insert(treasury1);
         rpc.subscriptions.notify_subscribers(1, &treasury_forks);
         let treasury1 = treasury_forks.read().unwrap()[1].clone();
-        let treasury2 = Treasury::new_from_parent(&treasury1, &Pubkey::default(), 2);
+        let treasury2 = Treasury::new_from_parent(&treasury1, &BvmAddr::default(), 2);
         treasury_forks.write().unwrap().insert(treasury2);
         rpc.subscriptions.notify_subscribers(2, &treasury_forks);
         let string = receiver.poll();

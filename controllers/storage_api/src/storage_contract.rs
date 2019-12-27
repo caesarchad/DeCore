@@ -6,7 +6,7 @@ use morgan_interface::account::KeyedAccount;
 use morgan_interface::account_utils::State;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use std::collections::HashMap;
 use morgan_helper::logHelper::*;
@@ -207,7 +207,7 @@ impl<'a> StorageAccount<'a> {
     pub fn proof_validation(
         &mut self,
         segment: u64,
-        proofs: Vec<(Pubkey, Vec<CheckedProof>)>,
+        proofs: Vec<(BvmAddr, Vec<CheckedProof>)>,
         storage_miner_accounts: &mut [StorageAccount],
     ) -> Result<(), OpCodeErr> {
         let mut storage_contract = &mut self.account.state()?;

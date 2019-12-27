@@ -22,7 +22,7 @@ use morgan_metricbot::inc_new_counter_info;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::waterclock_config::WaterClockConfig;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::timing::timestamp;
 use morgan_storage_api::SLOTS_PER_SEGMENT;
@@ -60,7 +60,7 @@ impl Default for ValidatorConfig {
 }
 
 pub struct Validator {
-    pub id: Pubkey,
+    pub id: BvmAddr,
     exit: Arc<AtomicBool>,
     rpc_service: Option<JsonRpcService>,
     rpc_pubsub_service: Option<PubSubService>,
@@ -77,7 +77,7 @@ impl Validator {
         mut node: Node,
         keypair: &Arc<Keypair>,
         ledger_path: &str,
-        vote_account: &Pubkey,
+        vote_account: &BvmAddr,
         voting_keypair: &Arc<Keypair>,
         storage_keypair: &Arc<Keypair>,
         entrypoint_info_option: Option<&ContactInfo>,

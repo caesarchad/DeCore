@@ -3,17 +3,17 @@ use serde::Serialize;
 use morgan_interface::account_host::OnlineAccount;
 use morgan_interface::opcodes::{AccountMeta, OpCode};
 use morgan_interface::mounter_opcode;
-use morgan_interface::message::Message;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::message::Context;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;
 
 pub fn load_program(
     treasury_client: &TreasuryClient,
     from_keypair: &Keypair,
-    loader_pubkey: &Pubkey,
+    loader_pubkey: &BvmAddr,
     program: Vec<u8>,
-) -> Pubkey {
+) -> BvmAddr {
     let program_keypair = Keypair::new();
     let program_pubkey = program_keypair.pubkey();
 
@@ -33,7 +33,7 @@ pub fn load_program(
     for chunk in program.chunks(chunk_size) {
         let instruction =
             morgan_interface::mounter_opcode::write(&program_pubkey, loader_pubkey, offset, chunk.to_vec());
-        let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
+        let message = Context::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
         treasury_client
             .send_online_msg(&[from_keypair, &program_keypair], message)
             .unwrap();
@@ -41,7 +41,7 @@ pub fn load_program(
     }
 
     let instruction = morgan_interface::mounter_opcode::finalize(&program_pubkey, loader_pubkey);
-    let message = Message::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
+    let message = Context::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
     treasury_client
         .send_online_msg(&[from_keypair, &program_keypair], message)
         .unwrap();
@@ -52,8 +52,8 @@ pub fn load_program(
 // Return an Instruction that invokes `program_id` with `data` and required
 // a signature from `from_pubkey`.
 pub fn compose_call_opcode<T: Serialize>(
-    from_pubkey: Pubkey,
-    program_id: Pubkey,
+    from_pubkey: BvmAddr,
+    program_id: BvmAddr,
     data: &T,
 ) -> OpCode {
     let account_metas = vec![AccountMeta::new(from_pubkey, true)];

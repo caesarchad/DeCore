@@ -5,7 +5,7 @@ use bincode::serialized_size;
 use chrono::prelude::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::opcodes::{AccountMeta, OpCode};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_opcode;
 
 /// A smart contract.
@@ -26,11 +26,11 @@ pub enum SmarContractOpCode {
     ApplyTimestamp(DateTime<Utc>),
 
     /// Tell the budget that the `InitializeAccount` with `Signature` has been
-    /// signed by the containing transaction's `Pubkey`.
+    /// signed by the containing transaction's `BvmAddr`.
     ApplySignature,
 }
 
-fn initialize_account(contract: &Pubkey, expr: BvmScript) -> OpCode {
+fn initialize_account(contract: &BvmAddr, expr: BvmScript) -> OpCode {
     let mut keys = vec![];
     if let BvmScript::Pay(payment) = &expr {
         keys.push(AccountMeta::new(payment.to, false));
@@ -40,8 +40,8 @@ fn initialize_account(contract: &Pubkey, expr: BvmScript) -> OpCode {
 }
 
 pub fn create_account(
-    from: &Pubkey,
-    contract: &Pubkey,
+    from: &BvmAddr,
+    contract: &BvmAddr,
     difs: u64,
     expr: BvmScript,
 ) -> Vec<OpCode> {
@@ -56,20 +56,20 @@ pub fn create_account(
 }
 
 /// Create a new payment script.
-pub fn payment(from: &Pubkey, to: &Pubkey, difs: u64) -> Vec<OpCode> {
-    let contract = Pubkey::new_rand();
+pub fn payment(from: &BvmAddr, to: &BvmAddr, difs: u64) -> Vec<OpCode> {
+    let contract = BvmAddr::new_rand();
     let expr = BvmScript::new_payment(difs, to);
     create_account(from, &contract, difs, expr)
 }
 
 /// Create a future payment script.
 pub fn on_date(
-    from: &Pubkey,
-    to: &Pubkey,
-    contract: &Pubkey,
+    from: &BvmAddr,
+    to: &BvmAddr,
+    contract: &BvmAddr,
     dt: DateTime<Utc>,
-    dt_pubkey: &Pubkey,
-    cancelable: Option<Pubkey>,
+    dt_pubkey: &BvmAddr,
+    cancelable: Option<BvmAddr>,
     difs: u64,
 ) -> Vec<OpCode> {
     let expr = BvmScript::new_cancelable_future_payment(dt, dt_pubkey, difs, to, cancelable);
@@ -78,11 +78,11 @@ pub fn on_date(
 
 /// Create a multisig payment script.
 pub fn when_signed(
-    from: &Pubkey,
-    to: &Pubkey,
-    contract: &Pubkey,
-    witness: &Pubkey,
-    cancelable: Option<Pubkey>,
+    from: &BvmAddr,
+    to: &BvmAddr,
+    contract: &BvmAddr,
+    witness: &BvmAddr,
+    cancelable: Option<BvmAddr>,
     difs: u64,
 ) -> Vec<OpCode> {
     let expr = BvmScript::new_cancelable_authorized_payment(witness, difs, to, cancelable);
@@ -90,9 +90,9 @@ pub fn when_signed(
 }
 
 pub fn apply_timestamp(
-    from: &Pubkey,
-    contract: &Pubkey,
-    to: &Pubkey,
+    from: &BvmAddr,
+    contract: &BvmAddr,
+    to: &BvmAddr,
     dt: DateTime<Utc>,
 ) -> OpCode {
     let mut account_metas = vec![
@@ -105,7 +105,7 @@ pub fn apply_timestamp(
     OpCode::new(id(), &SmarContractOpCode::ApplyTimestamp(dt), account_metas)
 }
 
-pub fn apply_signature(from: &Pubkey, contract: &Pubkey, to: &Pubkey) -> OpCode {
+pub fn apply_signature(from: &BvmAddr, contract: &BvmAddr, to: &BvmAddr) -> OpCode {
     let mut account_metas = vec![
         AccountMeta::new(*from, true),
         AccountMeta::new(*contract, false),
@@ -123,17 +123,17 @@ mod tests {
 
     #[test]
     fn test_budget_instruction_verify() {
-        let alice_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
+        let alice_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         payment(&alice_pubkey, &bob_pubkey, 1); // No panic! indicates success.
     }
 
     #[test]
     #[should_panic]
     fn test_budget_instruction_overspend() {
-        let alice_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
-        let budget_pubkey = Pubkey::new_rand();
+        let alice_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
         let expr = BvmScript::new_payment(2, &bob_pubkey);
         create_account(&alice_pubkey, &budget_pubkey, 1, expr);
     }
@@ -141,9 +141,9 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_budget_instruction_underspend() {
-        let alice_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
-        let budget_pubkey = Pubkey::new_rand();
+        let alice_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
         let expr = BvmScript::new_payment(1, &bob_pubkey);
         create_account(&alice_pubkey, &budget_pubkey, 2, expr);
     }

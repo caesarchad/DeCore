@@ -7,7 +7,7 @@ use chrono::prelude::{DateTime, Utc};
 use log::*;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_helper::logHelper::*;
 
 /// Process a Endorsement Signature. Any payment plans waiting on this signature
@@ -72,7 +72,7 @@ fn apply_timestamp(
 }
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
@@ -158,7 +158,7 @@ mod tests {
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::opcodes::OpCodeErr;
-    use morgan_interface::message::Message;
+    use morgan_interface::message::Context;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::TransactionError;
 
@@ -174,9 +174,9 @@ mod tests {
         let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = TreasuryClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let instructions = sc_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
             .unwrap();
@@ -190,9 +190,9 @@ mod tests {
         let alice_pubkey = alice_keypair.pubkey();
 
         // Initialize BudgetState
-        let budget_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
-        let witness = Pubkey::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let witness = BvmAddr::new_rand();
         let instructions = sc_opcode::when_signed(
             &alice_pubkey,
             &bob_pubkey,
@@ -201,7 +201,7 @@ mod tests {
             None,
             1,
         );
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
             .unwrap();
@@ -214,7 +214,7 @@ mod tests {
             .unwrap();
         let instruction =
             sc_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
-        let mut message = Message::new(vec![instruction]);
+        let mut message = Context::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
         message.account_keys.insert(3, alice_pubkey);
@@ -238,8 +238,8 @@ mod tests {
         let alice_pubkey = alice_keypair.pubkey();
 
         // Initialize BudgetState
-        let budget_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let dt = Utc::now();
         let instructions = sc_opcode::on_date(
             &alice_pubkey,
@@ -250,7 +250,7 @@ mod tests {
             None,
             1,
         );
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
             .unwrap();
@@ -263,7 +263,7 @@ mod tests {
             .unwrap();
         let instruction =
             sc_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
-        let mut message = Message::new(vec![instruction]);
+        let mut message = Context::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
         message.account_keys.insert(3, alice_pubkey);
@@ -285,9 +285,9 @@ mod tests {
         let (treasury, alice_keypair) = create_treasury(2);
         let treasury_client = TreasuryClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
-        let budget_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
-        let mallory_pubkey = Pubkey::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let mallory_pubkey = BvmAddr::new_rand();
         let dt = Utc::now();
         let instructions = sc_opcode::on_date(
             &alice_pubkey,
@@ -298,7 +298,7 @@ mod tests {
             None,
             1,
         );
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
             .unwrap();
@@ -354,8 +354,8 @@ mod tests {
         let (treasury, alice_keypair) = create_treasury(3);
         let treasury_client = TreasuryClient::new(treasury);
         let alice_pubkey = alice_keypair.pubkey();
-        let budget_pubkey = Pubkey::new_rand();
-        let bob_pubkey = Pubkey::new_rand();
+        let budget_pubkey = BvmAddr::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let dt = Utc::now();
 
         let instructions = sc_opcode::on_date(
@@ -367,7 +367,7 @@ mod tests {
             Some(alice_pubkey),
             1,
         );
-        let message = Message::new(instructions);
+        let message = Context::new(instructions);
         treasury_client
             .send_online_msg(&[&alice_keypair], message)
             .unwrap();

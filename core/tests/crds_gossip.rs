@@ -9,17 +9,17 @@ use morgan::bvm_types::NDTB_GOSSIP_PUSH_MSG_TIMEOUT_MS;
 use morgan::propagation_value::ContInfTblValue;
 use morgan::propagation_value::ContInfTblValueTag;
 use morgan_interface::hash::hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::timing::timestamp;
 use std::sync::{Arc, Mutex};
 
 type Node = Arc<Mutex<NodeTbleGossip>>;
-type Network = HashMap<Pubkey, Node>;
+type Network = HashMap<BvmAddr, Node>;
 fn star_network_create(num: usize) -> Network {
-    let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+    let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
     let mut network: HashMap<_, _> = (1..num)
         .map(|_| {
-            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
             let id = new.label().pubkey();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
@@ -37,14 +37,14 @@ fn star_network_create(num: usize) -> Network {
 }
 
 fn rstar_network_create(num: usize) -> Network {
-    let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+    let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
     let mut origin = NodeTbleGossip::default();
     let id = entry.label().pubkey();
     origin.contact_info_table.insert(entry.clone(), 0).unwrap();
     origin.set_self(&id);
     let mut network: HashMap<_, _> = (1..num)
         .map(|_| {
-            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
             let id = new.label().pubkey();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
@@ -60,7 +60,7 @@ fn rstar_network_create(num: usize) -> Network {
 fn ring_network_create(num: usize) -> Network {
     let mut network: HashMap<_, _> = (0..num)
         .map(|_| {
-            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&Pubkey::new_rand(), 0));
+            let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
             let id = new.label().pubkey();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
@@ -68,7 +68,7 @@ fn ring_network_create(num: usize) -> Network {
             (new.label().pubkey(), Arc::new(Mutex::new(node)))
         })
         .collect();
-    let keys: Vec<Pubkey> = network.keys().cloned().collect();
+    let keys: Vec<BvmAddr> = network.keys().cloned().collect();
     for k in 0..keys.len() {
         let start_info = {
             let start = &network[&keys[k]];
@@ -368,10 +368,10 @@ fn test_star_network_large_push() {
 #[test]
 fn test_prune_errors() {
     let mut node_table_gossip = NodeTbleGossip::default();
-    node_table_gossip.id = Pubkey::new(&[0; 32]);
+    node_table_gossip.id = BvmAddr::new(&[0; 32]);
     let id = node_table_gossip.id;
-    let ci = ContactInfo::new_localhost(&Pubkey::new(&[1; 32]), 0);
-    let prune_pubkey = Pubkey::new(&[2; 32]);
+    let ci = ContactInfo::new_localhost(&BvmAddr::new(&[1; 32]), 0);
+    let prune_pubkey = BvmAddr::new(&[2; 32]);
     node_table_gossip
         .contact_info_table
         .insert(ContInfTblValue::ContactInfo(ci.clone()), 0)
@@ -381,7 +381,7 @@ fn test_prune_errors() {
     //incorrect dest
     let mut res = node_table_gossip.process_prune_msg(
         &ci.id,
-        &Pubkey::new(hash(&[1; 32]).as_ref()),
+        &BvmAddr::new(hash(&[1; 32]).as_ref()),
         &[prune_pubkey],
         now,
         now,

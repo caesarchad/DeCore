@@ -9,7 +9,7 @@ use crate::result::Result;
 use bincode::serialized_size;
 use morgan_metricbot::inc_new_counter_debug;
 use morgan_interface::message::MessageHeader;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::short_vec::des_lenth;
 use morgan_interface::signature::Signature;
 #[cfg(test)]
@@ -78,7 +78,7 @@ fn verify_packet(packet: &Pkt) -> u8 {
 
     let msg_end = packet.meta.size;
     for _ in 0..sig_len {
-        let pubkey_end = pubkey_start as usize + size_of::<Pubkey>();
+        let pubkey_end = pubkey_start as usize + size_of::<BvmAddr>();
         let sig_end = sig_start as usize + size_of::<Signature>();
 
         if pubkey_end >= packet.meta.size || sig_end >= packet.meta.size {
@@ -92,7 +92,7 @@ fn verify_packet(packet: &Pkt) -> u8 {
         ) {
             return 0;
         }
-        pubkey_start += size_of::<Pubkey>();
+        pubkey_start += size_of::<BvmAddr>();
         sig_start += size_of::<Signature>();
     }
     1
@@ -151,7 +151,7 @@ pub fn generate_offsets(batches: &[BndlPkt]) -> Result<TxOffsets> {
                 sig_offset += size_of::<Signature>() as u32;
 
                 pubkey_offsets.push(pubkey_offset);
-                pubkey_offset += size_of::<Pubkey>() as u32;
+                pubkey_offset += size_of::<BvmAddr>() as u32;
 
                 msg_start_offsets.push(msg_start_offset);
 

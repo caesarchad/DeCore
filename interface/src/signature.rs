@@ -1,6 +1,6 @@
 //! The `signature` module provides functionality for public, and private keys.
 
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use bs58;
 use generic_array::typenum::U64;
 use generic_array::GenericArray;
@@ -48,7 +48,7 @@ pub trait Signable {
             .verify(&self.pubkey().as_ref(), &self.signable_data())
     }
 
-    fn pubkey(&self) -> Pubkey;
+    fn pubkey(&self) -> BvmAddr;
     fn signable_data(&self) -> Vec<u8>;
     fn get_signature(&self) -> Signature;
     fn set_signature(&mut self, signature: Signature);
@@ -95,7 +95,7 @@ impl FromStr for Signature {
 
 pub trait KeypairUtil {
     fn new() -> Self;
-    fn pubkey(&self) -> Pubkey;
+    fn pubkey(&self) -> BvmAddr;
     fn sign_message(&self, message: &[u8]) -> Signature;
 }
 
@@ -107,8 +107,8 @@ impl KeypairUtil for Keypair {
     }
 
     /// Return the public key for the given keypair
-    fn pubkey(&self) -> Pubkey {
-        Pubkey::new(&self.public.as_ref())
+    fn pubkey(&self) -> BvmAddr {
+        BvmAddr::new(&self.public.as_ref())
     }
 
     fn sign_message(&self, message: &[u8]) -> Signature {
@@ -163,7 +163,7 @@ mod tests {
         );
         assert_eq!(
             read_keypair(&outfile).unwrap().pubkey().as_ref().len(),
-            mem::size_of::<Pubkey>()
+            mem::size_of::<BvmAddr>()
         );
         fs::remove_file(&outfile).unwrap();
         assert!(!Path::new(&outfile).exists());

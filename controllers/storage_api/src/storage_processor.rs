@@ -5,12 +5,12 @@ use crate::storage_contract::StorageAccount;
 use crate::storage_opcode::StorageOpCode;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use morgan_helper::logHelper::*;
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     drop_height: u64,
@@ -111,8 +111,8 @@ mod tests {
     use morgan_interface::genesis_block::create_genesis_block;
     use morgan_interface::hash::{hash, Hash};
     use morgan_interface::opcodes::OpCode;
-    use morgan_interface::message::Message;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::message::Context;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_proof_bounds() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut account = Account {
             data: vec![0; STORAGE_ACCOUNT_SPACE as usize],
             ..Account::default()
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_storage_tx() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut accounts = [(pubkey, Account::default())];
         let mut keyed_accounts = create_keyed_accounts(&mut accounts);
         assert!(handle_opcode(&id(), &mut keyed_accounts, &[], 42).is_err());
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_serialize_overflow() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut keyed_accounts = Vec::new();
         let mut user_account = Account::default();
         keyed_accounts.push(KeyedAccount::new(&pubkey, true, &mut user_account));
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_invalid_accounts_len() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut accounts = [Account::default()];
 
         let ix =
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn test_submit_mining_invalid_slot() {
         morgan_logger::setup();
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
         accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
         accounts[1].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn test_submit_mining_ok() {
         morgan_logger::setup();
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
         accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
         {
@@ -284,7 +284,7 @@ mod tests {
             &[&miner_1_storage_id, &miner_2_storage_id],
             10,
         );
-        let message = Message::new(storage_opcode::create_mining_pool_account(
+        let message = Context::new(storage_opcode::create_mining_pool_account(
             &mint_pubkey,
             &mining_pool_pubkey,
             100,
@@ -298,7 +298,7 @@ mod tests {
         }
 
         // advertise for storage segment 1
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -333,7 +333,7 @@ mod tests {
                     &treasury_client,
                 ));
         }
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -352,7 +352,7 @@ mod tests {
             Ok(_)
         );
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::proof_validation(
                 &validator_storage_id,
                 get_segment_from_slot(slot) as u64,
@@ -366,7 +366,7 @@ mod tests {
             Ok(_)
         );
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_storage_id,
                 Hash::default(),
@@ -387,7 +387,7 @@ mod tests {
 
         assert_eq!(treasury_client.get_balance(&validator_storage_id).unwrap(), 10);
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &validator_storage_id,
                 &mining_pool_pubkey,
@@ -411,7 +411,7 @@ mod tests {
             10
         );
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_1_storage_id,
                 &mining_pool_pubkey,
@@ -421,7 +421,7 @@ mod tests {
         );
         assert_matches!(treasury_client.send_online_msg(&[&mint_keypair], message), Ok(_));
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_2_storage_id,
                 &mining_pool_pubkey,
@@ -441,8 +441,8 @@ mod tests {
     fn init_storage_accounts(
         client: &TreasuryClient,
         mint: &Keypair,
-        validator_accounts_to_create: &[&Pubkey],
-        storage_miner_accounts_to_create: &[&Pubkey],
+        validator_accounts_to_create: &[&BvmAddr],
+        storage_miner_accounts_to_create: &[&BvmAddr],
         difs: u64,
     ) {
         let mut ixs: Vec<_> = validator_accounts_to_create
@@ -464,11 +464,11 @@ mod tests {
                     difs,
                 ))
             });
-        let message = Message::new(ixs);
+        let message = Context::new(ixs);
         client.send_online_msg(&[mint], message).unwrap();
     }
 
-    fn get_storage_slot<C: OnlineAccount>(client: &C, account: &Pubkey) -> u64 {
+    fn get_storage_slot<C: OnlineAccount>(client: &C, account: &BvmAddr) -> u64 {
         match client.get_account_data(&account).unwrap() {
             Some(storage_system_account_data) => {
                 let contract = deserialize(&storage_system_account_data);
@@ -510,8 +510,8 @@ mod tests {
         slot: u64,
         treasury_client: &TreasuryClient,
     ) -> CheckedProof {
-        let sha_state = Hash::new(Pubkey::new_rand().as_ref());
-        let message = Message::new_with_payer(
+        let sha_state = Hash::new(BvmAddr::new_rand().as_ref());
+        let message = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
                 &storage_keypair.pubkey(),
                 sha_state,
@@ -534,7 +534,7 @@ mod tests {
         }
     }
 
-    fn get_storage_transaction_seal<C: OnlineAccount>(client: &C, account: &Pubkey) -> Hash {
+    fn get_storage_transaction_seal<C: OnlineAccount>(client: &C, account: &BvmAddr) -> Hash {
         if let Some(storage_system_account_data) = client.get_account_data(&account).unwrap() {
             let contract = deserialize(&storage_system_account_data);
             if let Ok(contract) = contract {
@@ -575,21 +575,21 @@ mod tests {
             .online_transfer(10, &mint_keypair, &miner_pubkey)
             .unwrap();
 
-        let message = Message::new(storage_opcode::create_miner_storage_account(
+        let message = Context::new(storage_opcode::create_miner_storage_account(
             &mint_pubkey,
             &miner_pubkey,
             1,
         ));
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
-        let message = Message::new(storage_opcode::create_validator_storage_account(
+        let message = Context::new(storage_opcode::create_validator_storage_account(
             &mint_pubkey,
             &validator_pubkey,
             1,
         ));
         treasury_client.send_online_msg(&[&mint_keypair], message).unwrap();
 
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
                 &validator_pubkey,
                 storage_transaction_seal,
@@ -604,7 +604,7 @@ mod tests {
         );
 
         let slot = 0;
-        let message = Message::new_with_payer(
+        let message = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
                 &miner_pubkey,
                 Hash::default(),

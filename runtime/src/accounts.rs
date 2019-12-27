@@ -13,7 +13,7 @@ use morgan_interface::account::Account;
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::{Hash, Hasher};
 use morgan_interface::bultin_mounter;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_controller;
 use morgan_interface::transaction::Result;
@@ -39,7 +39,7 @@ pub enum AccountLockType {
     RecordLock,
 }
 
-type AccountLocks = Mutex<HashSet<Pubkey>>;
+type AccountLocks = Mutex<HashSet<BvmAddr>>;
 
 // Locks for accounts that are currently being recorded + committed
 type RecordLocks = (
@@ -209,9 +209,9 @@ impl Accounts {
         storage: &AccountStorage,
         ancestors: &HashMap<Fork, usize>,
         accounts_index: &AccountsIndex<AccountInfo>,
-        program_id: &Pubkey,
+        program_id: &BvmAddr,
         error_counters: &mut ErrorCounters,
-    ) -> Result<Vec<(Pubkey, Account)>> {
+    ) -> Result<Vec<(BvmAddr, Account)>> {
         let mut accounts = Vec::new();
         let mut depth = 0;
         let mut program_id = *program_id;
@@ -236,7 +236,7 @@ impl Accounts {
                     return Err(TransactionError::ProgramAccountNotFound);
                 }
             };
-            if !program.executable || program.owner == Pubkey::default() {
+            if !program.executable || program.owner == BvmAddr::default() {
                 error_counters.account_not_found += 1;
                 return Err(TransactionError::AccountNotFound);
             }
@@ -255,7 +255,7 @@ impl Accounts {
         accounts_index: &AccountsIndex<AccountInfo>,
         tx: &Transaction,
         error_counters: &mut ErrorCounters,
-    ) -> Result<Vec<Vec<(Pubkey, Account)>>> {
+    ) -> Result<Vec<Vec<(BvmAddr, Account)>>> {
         let message = tx.message();
         message
             .instructions
@@ -320,17 +320,17 @@ impl Accounts {
     pub fn load_slow(
         &self,
         ancestors: &HashMap<Fork, usize>,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
     ) -> Option<(Account, Fork)> {
         self.accounts_db
             .load_slow(ancestors, pubkey)
             .filter(|(acc, _)| acc.difs != 0)
     }
 
-    pub fn load_by_program(&self, fork: Fork, program_id: &Pubkey) -> Vec<(Pubkey, Account)> {
-        let accumulator: Vec<Vec<(Pubkey, u64, Account)>> = self.accounts_db.scan_account_storage(
+    pub fn load_by_program(&self, fork: Fork, program_id: &BvmAddr) -> Vec<(BvmAddr, Account)> {
+        let accumulator: Vec<Vec<(BvmAddr, u64, Account)>> = self.accounts_db.scan_account_storage(
             fork,
-            |stored_account: &StoredAccount, accum: &mut Vec<(Pubkey, u64, Account)>| {
+            |stored_account: &StoredAccount, accum: &mut Vec<(BvmAddr, u64, Account)>| {
                 if stored_account.balance.owner == *program_id {
                     let val = (
                         stored_account.meta.pubkey,
@@ -341,7 +341,7 @@ impl Accounts {
                 }
             },
         );
-        let mut versions: Vec<(Pubkey, u64, Account)> =
+        let mut versions: Vec<(BvmAddr, u64, Account)> =
             accumulator.into_iter().flat_map(|x| x).collect();
         versions.sort_by_key(|s| (s.0, (s.1 as i64).neg()));
         versions.dedup_by_key(|s| s.0);
@@ -349,13 +349,13 @@ impl Accounts {
     }
 
     /// Slow because lock is held for 1 operation instead of many
-    pub fn store_slow(&self, fork: Fork, pubkey: &Pubkey, account: &Account) {
+    pub fn store_slow(&self, fork: Fork, pubkey: &BvmAddr, account: &Account) {
         self.accounts_db.store(fork, &[(pubkey, account)]);
     }
 
     fn lock_account(
-        (fork_locks, parent_locks): (&mut HashSet<Pubkey>, &mut Vec<Arc<AccountLocks>>),
-        keys: &[Pubkey],
+        (fork_locks, parent_locks): (&mut HashSet<BvmAddr>, &mut Vec<Arc<AccountLocks>>),
+        keys: &[BvmAddr],
         error_counters: &mut ErrorCounters,
     ) -> Result<()> {
         // Copy all the accounts
@@ -400,7 +400,7 @@ impl Accounts {
         Ok(())
     }
 
-    fn lock_record_account(record_locks: &AccountLocks, keys: &[Pubkey]) {
+    fn lock_record_account(record_locks: &AccountLocks, keys: &[BvmAddr]) {
         let mut fork_locks = record_locks.lock().unwrap();
         for k in keys {
             // The fork locks should always be a subset of the account locks, so
@@ -411,7 +411,7 @@ impl Accounts {
         }
     }
 
-    fn unlock_account(tx: &Transaction, result: &Result<()>, locks: &mut HashSet<Pubkey>) {
+    fn unlock_account(tx: &Transaction, result: &Result<()>, locks: &mut HashSet<BvmAddr>) {
         match result {
             Err(TransactionError::AccountInUse) => (),
             _ => {
@@ -422,7 +422,7 @@ impl Accounts {
         }
     }
 
-    fn unlock_record_account<I>(tx: &I, locks: &mut HashSet<Pubkey>)
+    fn unlock_record_account<I>(tx: &I, locks: &mut HashSet<BvmAddr>)
     where
         I: Borrow<Transaction>,
     {
@@ -439,9 +439,9 @@ impl Accounts {
     }
 
     pub fn hash_internal_state(&self, fork_id: Fork) -> Option<Hash> {
-        let accumulator: Vec<Vec<(Pubkey, u64, Hash)>> = self.accounts_db.scan_account_storage(
+        let accumulator: Vec<Vec<(BvmAddr, u64, Hash)>> = self.accounts_db.scan_account_storage(
             fork_id,
-            |stored_account: &StoredAccount, accum: &mut Vec<(Pubkey, u64, Hash)>| {
+            |stored_account: &StoredAccount, accum: &mut Vec<(BvmAddr, u64, Hash)>| {
                 accum.push((
                     stored_account.meta.pubkey,
                     stored_account.meta.write_version,
@@ -555,7 +555,7 @@ impl Accounts {
         res: &[Result<()>],
         loaded: &[Result<(OpCodeAcct, OpCodeMounter)>],
     ) {
-        let mut accounts: Vec<(&Pubkey, &Account)> = vec![];
+        let mut accounts: Vec<(&BvmAddr, &Account)> = vec![];
         for (i, raccs) in loaded.iter().enumerate() {
             if res[i].is_err() || raccs.is_err() {
                 continue;
@@ -596,7 +596,7 @@ mod tests {
 
     fn load_accounts_with_fee(
         tx: Transaction,
-        ka: &Vec<(Pubkey, Account)>,
+        ka: &Vec<(BvmAddr, Account)>,
         fee_calculator: &GasCost,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(OpCodeAcct, OpCodeMounter)>> {
@@ -618,7 +618,7 @@ mod tests {
 
     fn load_accounts(
         tx: Transaction,
-        ka: &Vec<(Pubkey, Account)>,
+        ka: &Vec<(BvmAddr, Account)>,
         error_counters: &mut ErrorCounters,
     ) -> Vec<Result<(OpCodeAcct, OpCodeMounter)>> {
         let fee_calculator = GasCost::default();
@@ -627,7 +627,7 @@ mod tests {
 
     #[test]
     fn test_load_accounts_no_key() {
-        let accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let instructions = vec![EncodedOpCodes::new(0, &(), vec![0])];
@@ -648,7 +648,7 @@ mod tests {
 
     #[test]
     fn test_load_accounts_no_account_0_exists() {
-        let accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
@@ -671,17 +671,17 @@ mod tests {
 
     #[test]
     fn test_load_accounts_unknown_program_id() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let account = Account::new(2, 0, 1, &Pubkey::default());
+        let account = Account::new(2, 0, 1, &BvmAddr::default());
         accounts.push((key1, account));
 
         let instructions = vec![EncodedOpCodes::new(1, &(), vec![0])];
@@ -689,7 +689,7 @@ mod tests {
             &[&keypair],
             &[],
             Hash::default(),
-            vec![Pubkey::default()],
+            vec![BvmAddr::default()],
             instructions,
         );
 
@@ -705,13 +705,13 @@ mod tests {
 
     #[test]
     fn test_load_accounts_insufficient_funds() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
         let instructions = vec![EncodedOpCodes::new(1, &(), vec![0])];
@@ -739,13 +739,13 @@ mod tests {
 
     #[test]
     fn test_load_accounts_invalid_account_for_fee() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
 
-        let account = Account::new(1, 0, 1, &Pubkey::new_rand()); // <-- owner is not the system program
+        let account = Account::new(1, 0, 1, &BvmAddr::new_rand()); // <-- owner is not the system program
         accounts.push((key0, account));
 
         let instructions = vec![EncodedOpCodes::new(1, &(), vec![0])];
@@ -769,17 +769,17 @@ mod tests {
 
     #[test]
     fn test_load_accounts_no_loaders() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let account = Account::new(2, 0, 1, &Pubkey::default());
+        let account = Account::new(2, 0, 1, &BvmAddr::default());
         accounts.push((key1, account));
 
         let instructions = vec![EncodedOpCodes::new(2, &(), vec![0, 1])];
@@ -808,47 +808,47 @@ mod tests {
 
     #[test]
     fn test_load_accounts_max_call_depth() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
-        let key2 = Pubkey::new(&[6u8; 32]);
-        let key3 = Pubkey::new(&[7u8; 32]);
-        let key4 = Pubkey::new(&[8u8; 32]);
-        let key5 = Pubkey::new(&[9u8; 32]);
-        let key6 = Pubkey::new(&[10u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
+        let key2 = BvmAddr::new(&[6u8; 32]);
+        let key3 = BvmAddr::new(&[7u8; 32]);
+        let key4 = BvmAddr::new(&[8u8; 32]);
+        let key5 = BvmAddr::new(&[9u8; 32]);
+        let key6 = BvmAddr::new(&[10u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let mut account = Account::new(40, 0, 1, &Pubkey::default());
+        let mut account = Account::new(40, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = bultin_mounter::id();
         accounts.push((key1, account));
 
-        let mut account = Account::new(41, 0, 1, &Pubkey::default());
+        let mut account = Account::new(41, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key1;
         accounts.push((key2, account));
 
-        let mut account = Account::new(42, 0, 1, &Pubkey::default());
+        let mut account = Account::new(42, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key2;
         accounts.push((key3, account));
 
-        let mut account = Account::new(43, 0, 1, &Pubkey::default());
+        let mut account = Account::new(43, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key3;
         accounts.push((key4, account));
 
-        let mut account = Account::new(44, 0, 1, &Pubkey::default());
+        let mut account = Account::new(44, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key4;
         accounts.push((key5, account));
 
-        let mut account = Account::new(45, 0, 1, &Pubkey::default());
+        let mut account = Account::new(45, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key5;
         accounts.push((key6, account));
@@ -871,19 +871,19 @@ mod tests {
 
     #[test]
     fn test_load_accounts_bad_program_id() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let mut account = Account::new(40, 0, 1, &Pubkey::default());
+        let mut account = Account::new(40, 0, 1, &BvmAddr::default());
         account.executable = true;
-        account.owner = Pubkey::default();
+        account.owner = BvmAddr::default();
         accounts.push((key1, account));
 
         let instructions = vec![EncodedOpCodes::new(0, &(), vec![0])];
@@ -904,17 +904,17 @@ mod tests {
 
     #[test]
     fn test_load_accounts_not_executable() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let mut account = Account::new(40, 0, 1, &Pubkey::default());
+        let mut account = Account::new(40, 0, 1, &BvmAddr::default());
         account.owner = bultin_mounter::id();
         accounts.push((key1, account));
 
@@ -936,29 +936,29 @@ mod tests {
 
     #[test]
     fn test_load_accounts_multiple_loaders() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let key0 = keypair.pubkey();
-        let key1 = Pubkey::new(&[5u8; 32]);
-        let key2 = Pubkey::new(&[6u8; 32]);
-        let key3 = Pubkey::new(&[7u8; 32]);
+        let key1 = BvmAddr::new(&[5u8; 32]);
+        let key2 = BvmAddr::new(&[6u8; 32]);
+        let key3 = BvmAddr::new(&[7u8; 32]);
 
-        let account = Account::new(1, 0, 1, &Pubkey::default());
+        let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
 
-        let mut account = Account::new(40, 0, 1, &Pubkey::default());
+        let mut account = Account::new(40, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = bultin_mounter::id();
         accounts.push((key1, account));
 
-        let mut account = Account::new(41, 0, 1, &Pubkey::default());
+        let mut account = Account::new(41, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key1;
         accounts.push((key2, account));
 
-        let mut account = Account::new(42, 0, 1, &Pubkey::default());
+        let mut account = Account::new(42, 0, 1, &BvmAddr::default());
         account.executable = true;
         account.owner = key2;
         accounts.push((key3, account));
@@ -999,13 +999,13 @@ mod tests {
 
     #[test]
     fn test_load_account_pay_to_self() {
-        let mut accounts: Vec<(Pubkey, Account)> = Vec::new();
+        let mut accounts: Vec<(BvmAddr, Account)> = Vec::new();
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
         let pubkey = keypair.pubkey();
 
-        let account = Account::new(10, 0, 1, &Pubkey::default());
+        let account = Account::new(10, 0, 1, &BvmAddr::default());
         accounts.push((pubkey, account));
 
         let instructions = vec![EncodedOpCodes::new(0, &(), vec![0, 1])];
@@ -1033,21 +1033,21 @@ mod tests {
         let accounts = Accounts::new(None);
 
         // Load accounts owned by various programs into AccountsDB
-        let pubkey0 = Pubkey::new_rand();
-        let account0 = Account::new(1, 0, 0, &Pubkey::new(&[2; 32]));
+        let pubkey0 = BvmAddr::new_rand();
+        let account0 = Account::new(1, 0, 0, &BvmAddr::new(&[2; 32]));
         accounts.store_slow(0, &pubkey0, &account0);
-        let pubkey1 = Pubkey::new_rand();
-        let account1 = Account::new(1, 0, 0, &Pubkey::new(&[2; 32]));
+        let pubkey1 = BvmAddr::new_rand();
+        let account1 = Account::new(1, 0, 0, &BvmAddr::new(&[2; 32]));
         accounts.store_slow(0, &pubkey1, &account1);
-        let pubkey2 = Pubkey::new_rand();
-        let account2 = Account::new(1, 0, 0, &Pubkey::new(&[3; 32]));
+        let pubkey2 = BvmAddr::new_rand();
+        let account2 = Account::new(1, 0, 0, &BvmAddr::new(&[3; 32]));
         accounts.store_slow(0, &pubkey2, &account2);
 
-        let loaded = accounts.load_by_program(0, &Pubkey::new(&[2; 32]));
+        let loaded = accounts.load_by_program(0, &BvmAddr::new(&[2; 32]));
         assert_eq!(loaded.len(), 2);
-        let loaded = accounts.load_by_program(0, &Pubkey::new(&[3; 32]));
+        let loaded = accounts.load_by_program(0, &BvmAddr::new(&[3; 32]));
         assert_eq!(loaded, vec![(pubkey2, account2)]);
-        let loaded = accounts.load_by_program(0, &Pubkey::new(&[4; 32]));
+        let loaded = accounts.load_by_program(0, &BvmAddr::new(&[4; 32]));
         assert_eq!(loaded, vec![]);
     }
 
@@ -1064,7 +1064,7 @@ mod tests {
                 &storage,
                 &ancestors,
                 &accounts_index,
-                &Pubkey::new_rand(),
+                &BvmAddr::new_rand(),
                 &mut error_counters
             ),
             Err(TransactionError::ProgramAccountNotFound)

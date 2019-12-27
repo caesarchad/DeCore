@@ -16,7 +16,7 @@ use morgan_metricbot::{
     inc_new_counter_warn,
 };
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::timing::duration_as_ms;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,7 +39,7 @@ struct PyramidInfo {
 }
 
 struct PyramidNode {
-    id: Pubkey,
+    id: BvmAddr,
     coding_generator: CodingGenerator,
     stats: PyramidInfo,
 }
@@ -334,7 +334,7 @@ mod test {
     }
 
     fn setup_dummy_broadcast_service(
-        leader_pubkey: &Pubkey,
+        leader_pubkey: &BvmAddr,
         ledger_path: &str,
         entry_receiver: Receiver<WorkingTreasuryEntries>,
     ) -> FakePyramidPhase {

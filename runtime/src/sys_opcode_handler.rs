@@ -1,7 +1,7 @@
 use log::*;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::sys_opcode::{SystemError, SysOpCode};
 use morgan_interface::sys_controller;
 
@@ -13,7 +13,7 @@ fn create_system_account(
     difs: u64,
     reputations: u64,
     space: u64,
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> Result<(), SystemError> {
     if !sys_controller::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
         debug!("CreateAccount: invalid account[from] owner");
@@ -49,7 +49,7 @@ fn create_system_account_with_reputation(
     keyed_accounts: &mut [KeyedAccount],
     reputations: u64,
     space: u64,
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> Result<(), SystemError> {
     if !sys_controller::check_id(&keyed_accounts[FROM_ACCOUNT_INDEX].account.owner) {
         debug!("CreateAccount: invalid account[from] owner");
@@ -83,7 +83,7 @@ fn create_system_account_with_reputation(
 
 fn assign_account_to_program(
     keyed_accounts: &mut [KeyedAccount],
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> Result<(), SystemError> {
     keyed_accounts[FROM_ACCOUNT_INDEX].account.owner = *program_id;
     Ok(())
@@ -121,7 +121,7 @@ fn transfer_reputations(
 }
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
@@ -179,12 +179,12 @@ mod tests {
 
     #[test]
     fn test_create_system_account() {
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(0, 0, 0, &BvmAddr::default());
 
         let mut keyed_accounts = [
             KeyedAccount::new(&from, true, &mut from_account),
@@ -205,12 +205,12 @@ mod tests {
 
     #[test]
     fn test_create_system_account_with_reputation() {
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(2, 100, 0, &sys_controller::id());
 
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(0, 0, 0, &BvmAddr::default());
 
         let mut keyed_accounts = [
             KeyedAccount::new(&from, true, &mut from_account),
@@ -230,12 +230,12 @@ mod tests {
     #[test]
     fn test_create_negative_difs() {
         // Attempt to create account with more difs than remaining in from_account
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(0, 0, 0, &BvmAddr::default());
         let unchanged_account = to_account.clone();
 
         let mut keyed_accounts = [
@@ -252,12 +252,12 @@ mod tests {
     #[test]
     fn test_create_negative_reputations() {
         // Attempt to create account with more reputations than remaining in from_account
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(0, 100, 0, &sys_controller::id());
 
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(0, 0, 0, &BvmAddr::default());
         let unchanged_account = to_account.clone();
 
         let mut keyed_accounts = [
@@ -275,12 +275,12 @@ mod tests {
     #[test]
     fn test_create_already_owned() {
         // Attempt to create system account in account already owned by another program
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
-        let original_program_owner = Pubkey::new(&[5; 32]);
-        let owned_key = Pubkey::new_rand();
+        let original_program_owner = BvmAddr::new(&[5; 32]);
+        let owned_key = BvmAddr::new_rand();
         let mut owned_account = Account::new(0, 0, 0, &original_program_owner);
         let unchanged_account = owned_account.clone();
 
@@ -298,16 +298,16 @@ mod tests {
     #[test]
     fn test_create_data_populated() {
         // Attempt to create system account in account with populated data
-        let new_program_owner = Pubkey::new(&[9; 32]);
-        let from = Pubkey::new_rand();
+        let new_program_owner = BvmAddr::new(&[9; 32]);
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
 
-        let populated_key = Pubkey::new_rand();
+        let populated_key = BvmAddr::new_rand();
         let mut populated_account = Account {
             difs: 0,
             reputations: 0,
             data: vec![0, 1, 2, 3],
-            owner: Pubkey::default(),
+            owner: BvmAddr::default(),
             executable: false,
         };
         let unchanged_account = populated_account.clone();
@@ -324,12 +324,12 @@ mod tests {
 
     #[test]
     fn test_create_not_system_account() {
-        let other_program = Pubkey::new(&[9; 32]);
+        let other_program = BvmAddr::new(&[9; 32]);
 
-        let from = Pubkey::new_rand();
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &other_program);
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(0, 0, 0, &Pubkey::default());
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(0, 0, 0, &BvmAddr::default());
         let mut keyed_accounts = [
             KeyedAccount::new(&from, true, &mut from_account),
             KeyedAccount::new(&to, false, &mut to_account),
@@ -340,9 +340,9 @@ mod tests {
 
     #[test]
     fn test_assign_account_to_program() {
-        let new_program_owner = Pubkey::new(&[9; 32]);
+        let new_program_owner = BvmAddr::new(&[9; 32]);
 
-        let from = Pubkey::new_rand();
+        let from = BvmAddr::new_rand();
         let mut from_account = Account::new(100, 0, 0, &sys_controller::id());
         let mut keyed_accounts = [KeyedAccount::new(&from, true, &mut from_account)];
         assign_account_to_program(&mut keyed_accounts, &new_program_owner).unwrap();
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(from_owner, new_program_owner);
 
         // Attempt to assign account not owned by system program
-        let another_program_owner = Pubkey::new(&[8; 32]);
+        let another_program_owner = BvmAddr::new(&[8; 32]);
         keyed_accounts = [KeyedAccount::new(&from, true, &mut from_account)];
         let instruction = SysOpCode::Assign {
             program_id: another_program_owner,
@@ -363,10 +363,10 @@ mod tests {
 
     #[test]
     fn test_transfer_difs() {
-        let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 0, 0, &Pubkey::new(&[2; 32])); // account owner should not matter
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(1, 0, 0, &Pubkey::new(&[3; 32])); // account owner should not matter
+        let from = BvmAddr::new_rand();
+        let mut from_account = Account::new(100, 0, 0, &BvmAddr::new(&[2; 32])); // account owner should not matter
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(1, 0, 0, &BvmAddr::new(&[3; 32])); // account owner should not matter
         let mut keyed_accounts = [
             KeyedAccount::new(&from, true, &mut from_account),
             KeyedAccount::new(&to, false, &mut to_account),
@@ -390,10 +390,10 @@ mod tests {
 
     #[test]
     fn test_transfer_reputations() {
-        let from = Pubkey::new_rand();
-        let mut from_account = Account::new(100, 100, 0, &Pubkey::new(&[2; 32])); // account owner should not matter
-        let to = Pubkey::new_rand();
-        let mut to_account = Account::new(1, 0, 0, &Pubkey::new(&[3; 32])); // account owner should not matter
+        let from = BvmAddr::new_rand();
+        let mut from_account = Account::new(100, 100, 0, &BvmAddr::new(&[2; 32])); // account owner should not matter
+        let to = BvmAddr::new_rand();
+        let mut to_account = Account::new(1, 0, 0, &BvmAddr::new(&[3; 32])); // account owner should not matter
         let mut keyed_accounts = [
             KeyedAccount::new(&from, true, &mut from_account),
             KeyedAccount::new(&to, false, &mut to_account),

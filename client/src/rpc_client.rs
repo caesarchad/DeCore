@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use morgan_interface::account::Account;
 use morgan_interface::gas_cost::GasCost;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{KeypairUtil, Signature};
 use morgan_interface::constants::{DEFAULT_NUM_DROPS_PER_SECOND, DEFAULT_DROPS_PER_SLOT};
 use morgan_interface::transaction::{self, Transaction, TransactionError};
@@ -214,7 +214,7 @@ impl RpcClient {
 
     pub fn retry_get_balance(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         retries: usize,
     ) -> Result<Option<u64>, Box<dyn error::Error>> {
         let params = json!([format!("{}", pubkey)]);
@@ -225,7 +225,7 @@ impl RpcClient {
         Ok(res)
     }
 
-    pub fn get_account(&self, pubkey: &Pubkey) -> io::Result<Account> {
+    pub fn get_account(&self, pubkey: &BvmAddr) -> io::Result<Account> {
         let params = json!([format!("{}", pubkey)]);
         let response = self
             .client
@@ -246,14 +246,14 @@ impl RpcClient {
             })
     }
 
-    pub fn get_account_data(&self, pubkey: &Pubkey) -> io::Result<Vec<u8>> {
+    pub fn get_account_data(&self, pubkey: &BvmAddr) -> io::Result<Vec<u8>> {
         self.get_account(pubkey).map(|account| account.data)
     }
 
     /// Request the balance of the user holding `pubkey`. This method blocks
     /// until the server sends a response. If the response packet is dropped
     /// by the network, this method will hang indefinitely.
-    pub fn get_balance(&self, pubkey: &Pubkey) -> io::Result<u64> {
+    pub fn get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
         self.get_account(pubkey).map(|account| account.difs)
     }
 
@@ -330,7 +330,7 @@ impl RpcClient {
 
     pub fn poll_balance_with_timeout(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         polling_frequency: &Duration,
         timeout: &Duration,
     ) -> io::Result<u64> {
@@ -350,11 +350,11 @@ impl RpcClient {
         }
     }
 
-    pub fn poll_get_balance(&self, pubkey: &Pubkey) -> io::Result<u64> {
+    pub fn poll_get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
         self.poll_balance_with_timeout(pubkey, &Duration::from_millis(100), &Duration::from_secs(1))
     }
 
-    pub fn wait_for_balance(&self, pubkey: &Pubkey, expected_balance: Option<u64>) -> Option<u64> {
+    pub fn wait_for_balance(&self, pubkey: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
         const LAST: usize = 30;
         for run in 0..LAST {
             let balance_result = self.poll_get_balance(pubkey);
@@ -654,7 +654,7 @@ mod tests {
         let rpc_client = RpcClient::new_mock("succeeds".to_string());
 
         let key = Keypair::new();
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::default();
         let tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
 
@@ -703,7 +703,7 @@ mod tests {
         let rpc_client = RpcClient::new_mock("succeeds".to_string());
 
         let key = Keypair::new();
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::default();
         let mut tx = sys_controller::create_user_account(&key, &to, 50, transaction_seal);
 
@@ -724,7 +724,7 @@ mod tests {
         let rpc_client = RpcClient::new_mock("succeeds".to_string());
 
         let key = Keypair::new();
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal: Hash = "HUu3LwEzGRsUkuJS121jzkPJW39Kq62pXCTmTa1F9jDL"
             .parse()
             .unwrap();

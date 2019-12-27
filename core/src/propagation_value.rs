@@ -1,6 +1,6 @@
 use crate::connection_info::ContactInfo;
 use bincode::serialize;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, Signable, Signature};
 use morgan_interface::transaction::Transaction;
 use std::{collections::BTreeSet, time::Duration};
@@ -25,7 +25,7 @@ pub enum ContInfTblValue {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct EpochSlots {
-    pub from: Pubkey,
+    pub from: BvmAddr,
     pub root: u64,
     pub slots: BTreeSet<u64>,
     pub signature: Signature,
@@ -33,7 +33,7 @@ pub struct EpochSlots {
 }
 
 impl EpochSlots {
-    pub fn new(from: Pubkey, root: u64, slots: BTreeSet<u64>, wallclock: u64) -> Self {
+    pub fn new(from: BvmAddr, root: u64, slots: BTreeSet<u64>, wallclock: u64) -> Self {
         Self {
             from,
             root,
@@ -45,7 +45,7 @@ impl EpochSlots {
 }
 
 impl Signable for EpochSlots {
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         self.from
     }
 
@@ -75,14 +75,14 @@ impl Signable for EpochSlots {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Vote {
-    pub from: Pubkey,
+    pub from: BvmAddr,
     pub transaction: Transaction,
     pub signature: Signature,
     pub wallclock: u64,
 }
 
 impl Vote {
-    pub fn new(from: &Pubkey, transaction: Transaction, wallclock: u64) -> Self {
+    pub fn new(from: &BvmAddr, transaction: Transaction, wallclock: u64) -> Self {
         Self {
             from: *from,
             transaction,
@@ -93,7 +93,7 @@ impl Vote {
 }
 
 impl Signable for Vote {
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         self.from
     }
 
@@ -280,12 +280,12 @@ impl Collector for OpMetrics {
 }
 
 /// Type of the replicated value
-/// These are labels for values in a record that is associated with `Pubkey`
+/// These are labels for values in a record that is associated with `BvmAddr`
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
 pub enum ContInfTblValueTag {
-    ContactInfo(Pubkey),
-    Vote(Pubkey),
-    EpochSlots(Pubkey),
+    ContactInfo(BvmAddr),
+    Vote(BvmAddr),
+    EpochSlots(BvmAddr),
 }
 
 impl fmt::Display for ContInfTblValueTag {
@@ -299,7 +299,7 @@ impl fmt::Display for ContInfTblValueTag {
 }
 
 impl ContInfTblValueTag {
-    pub fn pubkey(&self) -> Pubkey {
+    pub fn pubkey(&self) -> BvmAddr {
         match self {
             ContInfTblValueTag::ContactInfo(p) => *p,
             ContInfTblValueTag::Vote(p) => *p,
@@ -346,8 +346,8 @@ impl ContInfTblValue {
             _ => None,
         }
     }
-    /// Return all the possible labels for a record identified by Pubkey.
-    pub fn record_labels(key: &Pubkey) -> [ContInfTblValueTag; 3] {
+    /// Return all the possible labels for a record identified by BvmAddr.
+    pub fn record_labels(key: &BvmAddr) -> [ContInfTblValueTag; 3] {
         [
             ContInfTblValueTag::ContactInfo(*key),
             ContInfTblValueTag::Vote(*key),
@@ -373,7 +373,7 @@ impl Signable for ContInfTblValue {
         }
     }
 
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         match self {
             ContInfTblValue::ContactInfo(contact_info) => contact_info.pubkey(),
             ContInfTblValue::Vote(vote) => vote.pubkey(),
@@ -411,7 +411,7 @@ mod test {
     fn test_labels() {
         let mut hits = [false; 3];
         // this method should cover all the possible labels
-        for v in &ContInfTblValue::record_labels(&Pubkey::default()) {
+        for v in &ContInfTblValue::record_labels(&BvmAddr::default()) {
             match v {
                 ContInfTblValueTag::ContactInfo(_) => hits[0] = true,
                 ContInfTblValueTag::Vote(_) => hits[1] = true,
@@ -427,12 +427,12 @@ mod test {
         let key = v.clone().contact_info().unwrap().id;
         assert_eq!(v.label(), ContInfTblValueTag::ContactInfo(key));
 
-        let v = ContInfTblValue::Vote(Vote::new(&Pubkey::default(), test_tx(), 0));
+        let v = ContInfTblValue::Vote(Vote::new(&BvmAddr::default(), test_tx(), 0));
         assert_eq!(v.wallclock(), 0);
         let key = v.clone().vote().unwrap().from;
         assert_eq!(v.label(), ContInfTblValueTag::Vote(key));
 
-        let v = ContInfTblValue::EpochSlots(EpochSlots::new(Pubkey::default(), 0, BTreeSet::new(), 0));
+        let v = ContInfTblValue::EpochSlots(EpochSlots::new(BvmAddr::default(), 0, BTreeSet::new(), 0));
         assert_eq!(v.wallclock(), 0);
         let key = v.clone().epoch_slots().unwrap().from;
         assert_eq!(v.label(), ContInfTblValueTag::EpochSlots(key));

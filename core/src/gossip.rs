@@ -12,7 +12,7 @@ use crate::bvm_types::*;
 use hashbrown::HashMap;
 use morgan_runtime::bloom::Bloom;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::{thread, time::Duration};
 
 
@@ -20,7 +20,7 @@ use std::{thread, time::Duration};
 #[derive(Clone)]
 pub struct NodeTbleGossip {
     pub contact_info_table: ContactInfoTable,
-    pub id: Pubkey,
+    pub id: BvmAddr,
     pub push: NodeTbleGspPush,
     pub pull: NodeTbleGspPull,
 }
@@ -29,7 +29,7 @@ impl Default for NodeTbleGossip {
     fn default() -> Self {
         NodeTbleGossip {
             contact_info_table: ContactInfoTable::default(),
-            id: Pubkey::default(),
+            id: BvmAddr::default(),
             push: NodeTbleGspPush::default(),
             pull: NodeTbleGspPull::default(),
         }
@@ -37,11 +37,11 @@ impl Default for NodeTbleGossip {
 }
 
 impl NodeTbleGossip {
-    pub fn set_self(&mut self, id: &Pubkey) {
+    pub fn set_self(&mut self, id: &BvmAddr) {
         self.id = *id;
     }
     /// process a push message to the network
-    pub fn process_push_message(&mut self, values: Vec<ContInfTblValue>, now: u64) -> Vec<Pubkey> {
+    pub fn process_push_message(&mut self, values: Vec<ContInfTblValue>, now: u64) -> Vec<BvmAddr> {
         let labels: Vec<_> = values.iter().map(ContInfTblValue::label).collect();
 
         let results: Vec<_> = values
@@ -66,7 +66,7 @@ impl NodeTbleGossip {
             .collect()
     }
 
-    pub fn new_push_messages(&mut self, now: u64) -> (Pubkey, Vec<Pubkey>, Vec<ContInfTblValue>) {
+    pub fn new_push_messages(&mut self, now: u64) -> (BvmAddr, Vec<BvmAddr>, Vec<ContInfTblValue>) {
         let (peers, values) = self.push.new_push_messages(&self.contact_info_table, now);
         (self.id, peers, values)
     }
@@ -74,9 +74,9 @@ impl NodeTbleGossip {
     /// add the `from` to the peer's filter of nodes
     pub fn process_prune_msg(
         &mut self,
-        peer: &Pubkey,
-        destination: &Pubkey,
-        origin: &[Pubkey],
+        peer: &BvmAddr,
+        destination: &BvmAddr,
+        origin: &[BvmAddr],
         wallclock: u64,
         now: u64,
     ) -> Result<(), NodeTbleErr> {
@@ -94,7 +94,7 @@ impl NodeTbleGossip {
 
     /// refresh the push active set
     /// * ratio - number of actives to rotate
-    pub fn refresh_push_active_set(&mut self, stakes: &HashMap<Pubkey, u64>) {
+    pub fn refresh_push_active_set(&mut self, stakes: &HashMap<BvmAddr, u64>) {
         self.push.refresh_push_active_set(
             &self.contact_info_table,
             stakes,
@@ -108,8 +108,8 @@ impl NodeTbleGossip {
     pub fn new_pull_request(
         &self,
         now: u64,
-        stakes: &HashMap<Pubkey, u64>,
-    ) -> Result<(Pubkey, Bloom<Hash>, ContInfTblValue), NodeTbleErr> {
+        stakes: &HashMap<BvmAddr, u64>,
+    ) -> Result<(BvmAddr, Bloom<Hash>, ContInfTblValue), NodeTbleErr> {
         self.pull
             .new_pull_request(&self.contact_info_table, &self.id, now, stakes)
     }
@@ -118,7 +118,7 @@ impl NodeTbleGossip {
     /// This is used for weighted random selection during `new_pull_request`
     /// It's important to use the local nodes request creation time as the weight
     /// instead of the response received time otherwise failed nodes will increase their weight.
-    pub fn mark_pull_request_creation_time(&mut self, from: &Pubkey, now: u64) {
+    pub fn mark_pull_request_creation_time(&mut self, from: &BvmAddr, now: u64) {
         self.pull.mark_pull_request_creation_time(from, now)
     }
     /// process a pull request and create a response
@@ -134,7 +134,7 @@ impl NodeTbleGossip {
     /// process a pull response
     pub fn process_pull_response(
         &mut self,
-        from: &Pubkey,
+        from: &BvmAddr,
         response: Vec<ContInfTblValue>,
         now: u64,
     ) -> usize {
@@ -210,7 +210,7 @@ impl Iterator for FixedDelay {
 }
 
 /// Computes a normalized(log of actual stake) stake
-pub fn get_stake<S: std::hash::BuildHasher>(id: &Pubkey, stakes: &HashMap<Pubkey, u64, S>) -> f32 {
+pub fn get_stake<S: std::hash::BuildHasher>(id: &BvmAddr, stakes: &HashMap<BvmAddr, u64, S>) -> f32 {
     // cap the max balance to u32 max (it should be plenty)
     let bal = f64::from(u32::max_value()).min(*stakes.get(id).unwrap_or(&0) as f64);
     1_f32.max((bal as f32).ln())
@@ -236,10 +236,10 @@ mod test {
     #[test]
     fn test_prune_errors() {
         let mut node_table_gossip = NodeTbleGossip::default();
-        node_table_gossip.id = Pubkey::new(&[0; 32]);
+        node_table_gossip.id = BvmAddr::new(&[0; 32]);
         let id = node_table_gossip.id;
-        let ci = ContactInfo::new_localhost(&Pubkey::new(&[1; 32]), 0);
-        let prune_pubkey = Pubkey::new(&[2; 32]);
+        let ci = ContactInfo::new_localhost(&BvmAddr::new(&[1; 32]), 0);
+        let prune_pubkey = BvmAddr::new(&[2; 32]);
         node_table_gossip
             .contact_info_table
             .insert(ContInfTblValue::ContactInfo(ci.clone()), 0)
@@ -249,7 +249,7 @@ mod test {
         //incorrect dest
         let mut res = node_table_gossip.process_prune_msg(
             &ci.id,
-            &Pubkey::new(hash(&[1; 32]).as_ref()),
+            &BvmAddr::new(hash(&[1; 32]).as_ref()),
             &[prune_pubkey],
             now,
             now,

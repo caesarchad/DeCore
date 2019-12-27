@@ -2,21 +2,21 @@
 //! node stakes
 use hashbrown::HashMap;
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_stake_api::stake_state::StakeState;
 
 #[derive(Default, Clone)]
 pub struct Stakes {
     /// vote accounts
-    vote_accounts: HashMap<Pubkey, (u64, Account)>,
+    vote_accounts: HashMap<BvmAddr, (u64, Account)>,
 
     /// stake_accounts
-    stake_accounts: HashMap<Pubkey, Account>,
+    stake_accounts: HashMap<BvmAddr, Account>,
 }
 
 impl Stakes {
     // sum the stakes that point to the given voter_pubkey
-    fn calculate_stake(&self, voter_pubkey: &Pubkey) -> u64 {
+    fn calculate_stake(&self, voter_pubkey: &BvmAddr) -> u64 {
         self.stake_accounts
             .iter()
             .filter(|(_, stake_account)| {
@@ -30,7 +30,7 @@ impl Stakes {
         morgan_vote_api::check_id(&account.owner) || morgan_stake_api::check_id(&account.owner)
     }
 
-    pub fn store(&mut self, pubkey: &Pubkey, account: &Account) {
+    pub fn store(&mut self, pubkey: &BvmAddr, account: &Account) {
         if morgan_vote_api::check_id(&account.owner) {
             if account.difs == 0 {
                 self.vote_accounts.remove(pubkey);
@@ -74,7 +74,7 @@ impl Stakes {
             }
         }
     }
-    pub fn vote_accounts(&self) -> &HashMap<Pubkey, (u64, Account)> {
+    pub fn vote_accounts(&self) -> &HashMap<BvmAddr, (u64, Account)> {
         &self.vote_accounts
     }
 }
@@ -82,14 +82,14 @@ impl Stakes {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_stake_api::stake_state;
     use morgan_vote_api::vote_state::{self, VoteState};
 
     //  set up some dummies  for a staked node    ((     vote      )  (     stake     ))
-    fn create_staked_node_accounts(stake: u64) -> ((Pubkey, Account), (Pubkey, Account)) {
-        let vote_pubkey = Pubkey::new_rand();
-        let vote_account = vote_state::create_account(&vote_pubkey, &Pubkey::new_rand(), 0, 1);
+    fn create_staked_node_accounts(stake: u64) -> ((BvmAddr, Account), (BvmAddr, Account)) {
+        let vote_pubkey = BvmAddr::new_rand();
+        let vote_account = vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 1);
         (
             (vote_pubkey, vote_account),
             create_stake_account(stake, &vote_pubkey),
@@ -97,9 +97,9 @@ mod tests {
     }
 
     //   add stake to a vote_pubkey                               (   stake    )
-    fn create_stake_account(stake: u64, vote_pubkey: &Pubkey) -> (Pubkey, Account) {
+    fn create_stake_account(stake: u64, vote_pubkey: &BvmAddr) -> (BvmAddr, Account) {
         (
-            Pubkey::new_rand(),
+            BvmAddr::new_rand(),
             stake_state::create_delegate_stake_account(&vote_pubkey, &VoteState::default(), stake),
         )
     }

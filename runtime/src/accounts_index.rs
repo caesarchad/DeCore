@@ -1,18 +1,18 @@
 use hashbrown::{HashMap, HashSet};
 use log::*;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 
 pub type Fork = u64;
 
 #[derive(Default)]
 pub struct AccountsIndex<T> {
-    account_maps: HashMap<Pubkey, Vec<(Fork, T)>>,
+    account_maps: HashMap<BvmAddr, Vec<(Fork, T)>>,
     roots: HashSet<Fork>,
     pub last_root: Fork,
 }
 
 impl<T: Clone> AccountsIndex<T> {
-    pub fn get(&self, pubkey: &Pubkey, ancestors: &HashMap<Fork, usize>) -> Option<(&T, Fork)> {
+    pub fn get(&self, pubkey: &BvmAddr, ancestors: &HashMap<Fork, usize>) -> Option<(&T, Fork)> {
         let list = self.account_maps.get(pubkey)?;
         let mut max = 0;
         let mut rv = None;
@@ -26,7 +26,7 @@ impl<T: Clone> AccountsIndex<T> {
         rv
     }
 
-    pub fn insert(&mut self, fork: Fork, pubkey: &Pubkey, account_info: T) -> Vec<(Fork, T)> {
+    pub fn insert(&mut self, fork: Fork, pubkey: &BvmAddr, account_info: T) -> Vec<(Fork, T)> {
         let mut rv = vec![];
         let mut fork_vec: Vec<(Fork, T)> = vec![];
         {

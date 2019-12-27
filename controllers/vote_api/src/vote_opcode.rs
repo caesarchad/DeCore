@@ -9,7 +9,7 @@ use serde_derive::{Deserialize, Serialize};
 use morgan_metricbot::datapoint_warn;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::{AccountMeta, OpCode, OpCodeErr};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::syscall::slot_hashes;
 use morgan_interface::sys_opcode;
 
@@ -17,19 +17,19 @@ use morgan_interface::sys_opcode;
 pub enum VoteOpCode {
     /// Initialize the VoteState for this `vote account`
     /// takes a node_pubkey and commission
-    InitializeAccount(Pubkey, u32),
+    InitializeAccount(BvmAddr, u32),
 
     /// Authorize a voter to send signed votes.
-    AuthorizeVoter(Pubkey),
+    AuthorizeVoter(BvmAddr),
 
     /// A Vote instruction with recent votes
     Vote(Vec<Vote>),
 }
 
 fn initialize_account(
-    from_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
-    node_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
+    node_pubkey: &BvmAddr,
     commission: u32,
 ) -> OpCode {
     let account_metas = vec![
@@ -44,9 +44,9 @@ fn initialize_account(
 }
 
 pub fn create_account(
-    from_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
-    node_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
+    node_pubkey: &BvmAddr,
     commission: u32,
     difs: u64,
 ) -> Vec<OpCode> {
@@ -58,9 +58,9 @@ pub fn create_account(
 }
 
 fn metas_for_authorized_signer(
-    from_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
-    authorized_voter_pubkey: &Pubkey, // currently authorized
+    from_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
+    authorized_voter_pubkey: &BvmAddr, // currently authorized
 ) -> Vec<AccountMeta> {
     let mut account_metas = vec![AccountMeta::new(*from_pubkey, true)]; // sender
 
@@ -75,10 +75,10 @@ fn metas_for_authorized_signer(
 }
 
 pub fn authorize_voter(
-    from_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
-    authorized_voter_pubkey: &Pubkey, // currently authorized
-    new_authorized_voter_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
+    authorized_voter_pubkey: &BvmAddr, // currently authorized
+    new_authorized_voter_pubkey: &BvmAddr,
 ) -> OpCode {
     let account_metas =
         metas_for_authorized_signer(from_pubkey, vote_pubkey, authorized_voter_pubkey);
@@ -91,9 +91,9 @@ pub fn authorize_voter(
 }
 
 pub fn vote(
-    from_pubkey: &Pubkey,
-    vote_pubkey: &Pubkey,
-    authorized_voter_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    vote_pubkey: &BvmAddr,
+    authorized_voter_pubkey: &BvmAddr,
     recent_votes: Vec<Vote>,
 ) -> OpCode {
     let mut account_metas =
@@ -106,7 +106,7 @@ pub fn vote(
 }
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_vote_process_instruction_decode_bail() {
         assert_eq!(
-            super::handle_opcode(&Pubkey::default(), &mut [], &[], 0,),
+            super::handle_opcode(&BvmAddr::default(), &mut [], &[], 0,),
             Err(OpCodeErr::BadOpCodeContext),
         );
     }
@@ -168,7 +168,7 @@ mod tests {
                 .map(|(meta, account)| KeyedAccount::new(&meta.pubkey, meta.is_signer, account))
                 .collect();
             super::handle_opcode(
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &mut keyed_accounts,
                 &instruction.data,
                 0,
@@ -179,9 +179,9 @@ mod tests {
     #[test]
     fn test_vote_process_instruction() {
         let instructions = create_account(
-            &Pubkey::default(),
-            &Pubkey::default(),
-            &Pubkey::default(),
+            &BvmAddr::default(),
+            &BvmAddr::default(),
+            &BvmAddr::default(),
             0,
             100,
         );
@@ -191,19 +191,19 @@ mod tests {
         );
         assert_eq!(
             handle_opcode(&vote(
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
                 vec![Vote::default()]
             )),
             Err(OpCodeErr::InvalidAccountData),
         );
         assert_eq!(
             handle_opcode(&authorize_voter(
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default(),
-                &Pubkey::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
+                &BvmAddr::default(),
             )),
             Err(OpCodeErr::InvalidAccountData),
         );

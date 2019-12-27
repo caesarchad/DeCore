@@ -5,7 +5,7 @@ use log::*;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -43,7 +43,7 @@ pub struct AccountInfo {
 type AppendVecId = usize;
 pub type AccountStorage = HashMap<usize, Arc<AccountStorageEntry>>;
 pub type OpCodeAcct = Vec<Account>;
-pub type OpCodeMounter = Vec<Vec<(Pubkey, Account)>>;
+pub type OpCodeMounter = Vec<Vec<(BvmAddr, Account)>>;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AccountStorageStatus {
@@ -202,7 +202,7 @@ impl AccountsDB {
         storage: &AccountStorage,
         ancestors: &HashMap<Fork, usize>,
         accounts_index: &AccountsIndex<AccountInfo>,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
     ) -> Option<(Account, Fork)> {
         let (info, fork) = accounts_index.get(pubkey, ancestors)?;
         storage
@@ -214,7 +214,7 @@ impl AccountsDB {
     pub fn load_slow(
         &self,
         ancestors: &HashMap<Fork, usize>,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
     ) -> Option<(Account, Fork)> {
         let accounts_index = self.accounts_index.read().unwrap();
         let storage = self.storage.read().unwrap();
@@ -258,7 +258,7 @@ impl AccountsDB {
         }
     }
 
-    fn store_accounts(&self, fork_id: Fork, accounts: &[(&Pubkey, &Account)]) -> Vec<AccountInfo> {
+    fn store_accounts(&self, fork_id: Fork, accounts: &[(&BvmAddr, &Account)]) -> Vec<AccountInfo> {
         let with_meta: Vec<(StorageMeta, &Account)> = accounts
             .iter()
             .map(|(pubkey, account)| {
@@ -299,7 +299,7 @@ impl AccountsDB {
         &self,
         fork_id: Fork,
         infos: Vec<AccountInfo>,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&BvmAddr, &Account)],
     ) -> Vec<(Fork, AccountInfo)> {
         let mut index = self.accounts_index.write().unwrap();
         let mut reclaims = vec![];
@@ -345,7 +345,7 @@ impl AccountsDB {
         }
     }
 
-    pub fn store(&self, fork_id: Fork, accounts: &[(&Pubkey, &Account)]) {
+    pub fn store(&self, fork_id: Fork, accounts: &[(&BvmAddr, &Account)]) {
         let infos = self.store_accounts(fork_id, accounts);
         let reclaims = self.update_index(fork_id, infos, accounts);
         trace!("reclaim: {}", reclaims.len());
@@ -418,7 +418,7 @@ mod tests {
         morgan_logger::setup();
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
-        let key = Pubkey::default();
+        let key = BvmAddr::default();
         let account0 = Account::new(1, 0, 0, &key);
 
         db.store(0, &[(&key, &account0)]);
@@ -432,7 +432,7 @@ mod tests {
         morgan_logger::setup();
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
-        let key = Pubkey::default();
+        let key = BvmAddr::default();
         let account0 = Account::new(1, 0, 0, &key);
 
         db.store(0, &[(&key, &account0)]);
@@ -452,7 +452,7 @@ mod tests {
         morgan_logger::setup();
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
-        let key = Pubkey::default();
+        let key = BvmAddr::default();
         let account0 = Account::new(1, 0, 0, &key);
 
         db.store(0, &[(&key, &account0)]);
@@ -473,7 +473,7 @@ mod tests {
         morgan_logger::setup();
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
-        let key = Pubkey::default();
+        let key = BvmAddr::default();
         let account0 = Account::new(1, 0, 0, &key);
 
         db.store(0, &[(&key, &account0)]);
@@ -500,7 +500,7 @@ mod tests {
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
 
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&db, &mut pubkeys, 0, 100, 0, 0);
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
@@ -531,7 +531,7 @@ mod tests {
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
 
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(
             &db,
             &mut pubkeys,
@@ -542,7 +542,7 @@ mod tests {
         );
         assert!(check_storage(&db, 2));
 
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let account = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 3, &pubkey);
         db.store(1, &[(&pubkey, &account)]);
         db.store(1, &[(&pubkeys[0], &account)]);
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_accounts_unsquashed() {
-        let key = Pubkey::default();
+        let key = BvmAddr::default();
 
         let paths = get_tmp_accounts_path!();
         let db0 = AccountsDB::new(&paths.paths);
@@ -581,14 +581,14 @@ mod tests {
 
     fn create_account(
         accounts: &AccountsDB,
-        pubkeys: &mut Vec<Pubkey>,
+        pubkeys: &mut Vec<BvmAddr>,
         fork: Fork,
         num: usize,
         space: usize,
         num_vote: usize,
     ) {
         for t in 0..num {
-            let pubkey = Pubkey::new_rand();
+            let pubkey = BvmAddr::new_rand();
             let account = Account::new((t + 1) as u64, 0, space, &Account::default().owner);
             pubkeys.push(pubkey.clone());
             let ancestors = vec![(fork, 0)].into_iter().collect();
@@ -596,7 +596,7 @@ mod tests {
             accounts.store(fork, &[(&pubkey, &account)]);
         }
         for t in 0..num_vote {
-            let pubkey = Pubkey::new_rand();
+            let pubkey = BvmAddr::new_rand();
             let account = Account::new((num + t + 1) as u64, 0, space, &morgan_vote_api::id());
             pubkeys.push(pubkey.clone());
             let ancestors = vec![(fork, 0)].into_iter().collect();
@@ -605,7 +605,7 @@ mod tests {
         }
     }
 
-    fn update_accounts(accounts: &AccountsDB, pubkeys: &Vec<Pubkey>, fork: Fork, range: usize) {
+    fn update_accounts(accounts: &AccountsDB, pubkeys: &Vec<BvmAddr>, fork: Fork, range: usize) {
         for _ in 1..1000 {
             let idx = thread_rng().gen_range(0, range);
             let ancestors = vec![(fork, 0)].into_iter().collect();
@@ -631,7 +631,7 @@ mod tests {
         stores[&0].count() == count
     }
 
-    fn check_accounts(accounts: &AccountsDB, pubkeys: &Vec<Pubkey>, fork: Fork) {
+    fn check_accounts(accounts: &AccountsDB, pubkeys: &Vec<BvmAddr>, fork: Fork) {
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(fork, 0)].into_iter().collect();
@@ -646,7 +646,7 @@ mod tests {
     fn test_account_one() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
         let account = accounts.load_slow(&ancestors, &pubkeys[0]).unwrap();
@@ -659,7 +659,7 @@ mod tests {
     fn test_account_many() {
         let paths = get_tmp_accounts_path("many0,many1");
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&accounts, &mut pubkeys, 0, 100, 0, 0);
         check_accounts(&accounts, &pubkeys, 0);
     }
@@ -668,7 +668,7 @@ mod tests {
     fn test_account_update() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&accounts, &mut pubkeys, 0, 100, 0, 0);
         update_accounts(&accounts, &pubkeys, 0, 99);
         assert_eq!(check_storage(&accounts, 100), true);
@@ -681,7 +681,7 @@ mod tests {
         let accounts = AccountsDB::new_with_file_size(&paths.paths, size);
         let mut keys = vec![];
         for i in 0..9 {
-            let key = Pubkey::new_rand();
+            let key = BvmAddr::new_rand();
             let account = Account::new(i + 1, 0, size as usize / 4, &key);
             accounts.store(0, &[(&key, &account)]);
             keys.push(key);
@@ -712,7 +712,7 @@ mod tests {
             AccountStorageStatus::StorageAvailable,
             AccountStorageStatus::StorageFull,
         ];
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey1 = BvmAddr::new_rand();
         let account1 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &pubkey1);
         accounts.store(0, &[(&pubkey1, &account1)]);
         {
@@ -722,7 +722,7 @@ mod tests {
             assert_eq!(stores[&0].status(), AccountStorageStatus::StorageAvailable);
         }
 
-        let pubkey2 = Pubkey::new_rand();
+        let pubkey2 = BvmAddr::new_rand();
         let account2 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &pubkey2);
         accounts.store(0, &[(&pubkey2, &account2)]);
         {
@@ -772,7 +772,7 @@ mod tests {
     fn test_purge_fork_not_root() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
         assert!(accounts.load_slow(&ancestors, &pubkeys[0]).is_some());;
@@ -784,7 +784,7 @@ mod tests {
     fn test_purge_fork_after_root() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<Pubkey> = vec![];
+        let mut pubkeys: Vec<BvmAddr> = vec![];
         create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
         accounts.add_root(0);
@@ -796,7 +796,7 @@ mod tests {
     fn test_lazy_gc_fork() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let account = Account::new(1, 0, 0, &Account::default().owner);
         accounts.store(0, &[(&pubkey, &account)]);
         let ancestors = vec![(0, 0)].into_iter().collect();

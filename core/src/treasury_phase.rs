@@ -21,7 +21,7 @@ use morgan_runtime::accounts_db::ErrorCounters;
 use morgan_runtime::treasury::Treasury;
 use morgan_runtime::locked_accounts_results::LockedAccountsResults;
 use morgan_interface::waterclock_config::WaterClockConfig;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::timing::{self, duration_as_us,};
 use morgan_interface::constants::{DEFAULT_DROPS_PER_SLOT, MAX_RECENT_TRANSACTION_SEALS,
     MAX_TRANSACTION_FORWARDING_DELAY,
@@ -146,7 +146,7 @@ impl TreasuryPhase {
     }
 
     pub fn consume_buffered_packets(
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         buffered_packets: &mut Vec<PacketsAndOffsets>,
     ) -> Result<UnprocessedPackets> {
@@ -216,10 +216,10 @@ impl TreasuryPhase {
     }
 
     fn consume_or_forward_packets(
-        leader_pubkey: Option<Pubkey>,
+        leader_pubkey: Option<BvmAddr>,
         treasury_is_available: bool,
         would_be_leader: bool,
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
     ) -> BufferedPacketsDecision {
         leader_pubkey.map_or(
             // If leader is not known, return the buffered packets as is
@@ -658,8 +658,8 @@ impl TreasuryPhase {
         treasury: &Arc<Treasury>,
         msgs: &BndlPkt,
         transaction_indexes: &[usize],
-        my_pubkey: &Pubkey,
-        next_leader: Option<Pubkey>,
+        my_pubkey: &BvmAddr,
+        next_leader: Option<BvmAddr>,
     ) -> Vec<usize> {
 
         if let Some(leader) = next_leader {
@@ -820,7 +820,7 @@ pub fn create_test_recorder(
         treasury.slot(),
         Some(4),
         treasury.drops_per_slot(),
-        &Pubkey::default(),
+        &BvmAddr::default(),
         block_buffer_pool,
         &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
         &waterclock_config,
@@ -966,16 +966,16 @@ mod tests {
             treasury.process_transaction(&fund_tx).unwrap();
 
             // good tx
-            let to = Pubkey::new_rand();
+            let to = BvmAddr::new_rand();
             let tx = sys_controller::create_user_account(&mint_keypair, &to, 1, start_hash);
 
             // good tx, but no verify
-            let to2 = Pubkey::new_rand();
+            let to2 = BvmAddr::new_rand();
             let tx_no_ver = sys_controller::create_user_account(&keypair, &to2, 2, start_hash);
 
             // bad tx, AccountNotFound
             let keypair = Keypair::new();
-            let to3 = Pubkey::new_rand();
+            let to3 = BvmAddr::new_rand();
             let tx_anf = sys_controller::create_user_account(&keypair, &to3, 1, start_hash);
 
             // send 'em over
@@ -1157,7 +1157,7 @@ mod tests {
                 treasury.slot(),
                 None,
                 treasury.drops_per_slot(),
-                &Pubkey::default(),
+                &BvmAddr::default(),
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
@@ -1165,9 +1165,9 @@ mod tests {
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
             waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
-            let pubkey = Pubkey::new_rand();
+            let pubkey = BvmAddr::new_rand();
             let keypair2 = Keypair::new();
-            let pubkey2 = Pubkey::new_rand();
+            let pubkey2 = BvmAddr::new_rand();
 
             let transactions = vec![
                 sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
@@ -1225,7 +1225,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
 
         let transactions = vec![
             None,
@@ -1306,7 +1306,7 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
 
         let transactions = vec![
             sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
@@ -1377,8 +1377,8 @@ mod tests {
 
     #[test]
     fn test_should_process_or_forward_packets() {
-        let my_pubkey = Pubkey::new_rand();
-        let my_pubkey1 = Pubkey::new_rand();
+        let my_pubkey = BvmAddr::new_rand();
+        let my_pubkey1 = BvmAddr::new_rand();
 
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(None, true, false, &my_pubkey),
@@ -1449,7 +1449,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
 
         let transactions = vec![sys_controller::transfer(
             &mint_keypair,
@@ -1538,8 +1538,8 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let pubkey = Pubkey::new_rand();
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
+        let pubkey1 = BvmAddr::new_rand();
 
         let transactions = vec![
             sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),

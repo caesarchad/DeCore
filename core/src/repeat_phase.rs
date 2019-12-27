@@ -19,7 +19,7 @@ use hashbrown::HashMap;
 use morgan_metricbot::{datapoint_warn, inc_new_counter_error, inc_new_counter_info};
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::hash::Hash;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::KeypairUtil;
 use morgan_interface::timing::{self, duration_as_ms};
 use morgan_interface::transaction::Transaction;
@@ -76,8 +76,8 @@ impl ForkProgress {
 impl RepeatPhase {
     #[allow(clippy::new_ret_no_self, clippy::too_many_arguments)]
     pub fn new<T>(
-        my_pubkey: &Pubkey,
-        vote_account: &Pubkey,
+        my_pubkey: &BvmAddr,
+        vote_account: &BvmAddr,
         voting_keypair: Option<&Arc<T>>,
         block_buffer_pool: Arc<BlockBufferPool>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
@@ -87,7 +87,7 @@ impl RepeatPhase {
         subscriptions: &Arc<RpcSubscriptions>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
-    ) -> (Self, Receiver<(u64, Pubkey)>, Receiver<Vec<u64>>)
+    ) -> (Self, Receiver<(u64, BvmAddr)>, Receiver<Vec<u64>>)
     where
         T: 'static + KeypairUtil + Send + Sync,
     {
@@ -215,7 +215,7 @@ impl RepeatPhase {
         (Self { t_replay }, slot_full_receiver, root_slot_receiver)
     }
     pub fn start_leader(
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -309,7 +309,7 @@ impl RepeatPhase {
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
         lock_stack: &mut LockStack,
         progress: &mut HashMap<u64, ForkProgress>,
-        vote_account: &Pubkey,
+        vote_account: &BvmAddr,
         voting_keypair: &Option<Arc<T>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         block_buffer_pool: &Arc<BlockBufferPool>,
@@ -367,7 +367,7 @@ impl RepeatPhase {
     }
 
     fn reset_waterclock_recorder(
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
         block_buffer_pool: &BlockBufferPool,
         treasury: &Arc<Treasury>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
@@ -394,10 +394,10 @@ impl RepeatPhase {
     fn replay_active_treasuries(
         block_buffer_pool: &Arc<BlockBufferPool>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
         drops_per_slot: &mut u64,
         progress: &mut HashMap<u64, ForkProgress>,
-        slot_full_sender: &Sender<(u64, Pubkey)>,
+        slot_full_sender: &Sender<(u64, BvmAddr)>,
     ) -> Result<()> {
         let active_treasuries = treasury_forks.read().unwrap().active_treasuries();
         trace!("active treasuries {:?}", active_treasuries);
@@ -604,9 +604,9 @@ impl RepeatPhase {
     }
 
     fn process_completed_treasury(
-        my_pubkey: &Pubkey,
+        my_pubkey: &BvmAddr,
         treasury: Arc<Treasury>,
-        slot_full_sender: &Sender<(u64, Pubkey)>,
+        slot_full_sender: &Sender<(u64, BvmAddr)>,
     ) {
         treasury.freeze();
         // info!("{}", Info(format!("treasury frozen {}", treasury.slot()).to_string()));

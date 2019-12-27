@@ -11,7 +11,7 @@ use crate::service::Service;
 use crate::bvm_types::*;
 use morgan_metricbot::datapoint_info;
 use morgan_runtime::epoch_schedule::RoundPlan;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::collections::BTreeSet;
 use std::net::UdpSocket;
 use std::ops::Bound::{Excluded, Unbounded};
@@ -327,7 +327,7 @@ impl FixService {
     }
 
     fn initialize_epoch_slots(
-        id: Pubkey,
+        id: BvmAddr,
         block_buffer_pool: &BlockBufferPool,
         slots_in_gossip: &mut BTreeSet<u64>,
         root: u64,
@@ -349,7 +349,7 @@ impl FixService {
     // Update the gossiped structure used for the "Repairmen" repair protocol. See book
     // for details.
     fn update_epoch_slots(
-        id: Pubkey,
+        id: BvmAddr,
         latest_known_root: u64,
         prev_root: &mut u64,
         slots_in_gossip: &mut BTreeSet<u64>,
@@ -730,14 +730,14 @@ mod test {
                 .unwrap();
 
             let mut completed_slots = BTreeSet::new();
-            let node_info = Node::new_localhost_with_pubkey(&Pubkey::default());
+            let node_info = Node::new_localhost_with_pubkey(&BvmAddr::default());
             let node_group_info = RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
                 node_info.info.clone(),
             ));
 
             while completed_slots.len() < num_slots as usize {
                 FixService::update_epoch_slots(
-                    Pubkey::default(),
+                    BvmAddr::default(),
                     root,
                     &mut root.clone(),
                     &mut completed_slots,
@@ -754,7 +754,7 @@ mod test {
             let (blobs, _) = compose_candidate_fscl_stmts(num_slots + 2, num_slots + 1, entries_per_slot);
             block_buffer_pool.insert_data_blobs(&blobs).unwrap();
             FixService::update_epoch_slots(
-                Pubkey::default(),
+                BvmAddr::default(),
                 root,
                 &mut 0,
                 &mut completed_slots,
@@ -774,11 +774,11 @@ mod test {
         let mut current_root = 0;
 
         let mut completed_slots = BTreeSet::new();
-        let node_info = Node::new_localhost_with_pubkey(&Pubkey::default());
+        let node_info = Node::new_localhost_with_pubkey(&BvmAddr::default());
         let node_group_info = RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             node_info.info.clone(),
         ));
-        let my_pubkey = Pubkey::new_rand();
+        let my_pubkey = BvmAddr::new_rand();
         let (completed_slots_sender, completed_slots_receiver) = channel();
 
         // Send a new slot before the root is updated

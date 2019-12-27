@@ -1633,7 +1633,7 @@ pub mod tests {
     use rand::thread_rng;
     use rand::Rng;
     use morgan_interface::hash::Hash;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use std::cmp::min;
     use std::collections::HashSet;
     use std::iter::once;
@@ -1771,7 +1771,7 @@ pub mod tests {
     fn test_read_blobs_bytes() {
         let shared_blobs = compose_s_fiscal_stmt_nohash(10).one_stmt_shard_blbs();
         let slot = 0;
-        packet::index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, slot, 0);
+        packet::index_blobs(&shared_blobs, &BvmAddr::new_rand(), 0, slot, 0);
 
         let blob_locks: Vec<_> = shared_blobs.iter().map(|b| b.read().unwrap()).collect();
         let blobs: Vec<&Blob> = blob_locks.iter().map(|b| &**b).collect();
@@ -2994,7 +2994,7 @@ pub mod tests {
         let fscl_stmt_cnt = 10;
         let shared_blobs = compose_s_fiscal_stmt_nohash(fscl_stmt_cnt).one_stmt_shard_blbs();
 
-        crate::packet::index_blobs(&shared_blobs, &Pubkey::new_rand(), 0, slot, 0);
+        crate::packet::index_blobs(&shared_blobs, &BvmAddr::new_rand(), 0, slot, 0);
 
         let blob_locks: Vec<_> = shared_blobs.iter().map(|b| b.read().unwrap()).collect();
         let blobs: Vec<&Blob> = blob_locks.iter().map(|b| &**b).collect();

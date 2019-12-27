@@ -1,6 +1,6 @@
 use memmap::MmapMut;
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 use std::mem;
@@ -22,7 +22,7 @@ pub struct StorageMeta {
     /// global write version
     pub write_version: u64,
     /// key for the account
-    pub pubkey: Pubkey,
+    pub pubkey: BvmAddr,
     pub data_len: u64,
 }
 
@@ -31,7 +31,7 @@ pub struct AccountBalance {
     /// difs in the account
     pub difs: u64,
     /// the program that owns this account. If executable, the program that loads this account.
-    pub owner: Pubkey,
+    pub owner: BvmAddr,
     /// this account's data contains a loaded program (and is now read-only)
     pub executable: bool,
     /// reputations in the account
@@ -251,7 +251,7 @@ pub mod test_utils {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
     use morgan_interface::account::Account;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use std::fs::create_dir_all;
     use std::path::PathBuf;
 
@@ -279,11 +279,11 @@ pub mod test_utils {
 
     pub fn create_test_account(sample: usize) -> (StorageMeta, Account) {
         let data_len = sample % 256;
-        let mut account = Account::new(sample as u64, 0, 0, &Pubkey::default());
+        let mut account = Account::new(sample as u64, 0, 0, &BvmAddr::default());
         account.data = (0..data_len).map(|_| data_len as u8).collect();
         let storage_meta = StorageMeta {
             write_version: 0,
-            pubkey: Pubkey::default(),
+            pubkey: BvmAddr::default(),
             data_len: data_len as u64,
         };
         (storage_meta, account)

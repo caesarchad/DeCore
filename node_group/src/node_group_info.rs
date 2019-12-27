@@ -2,7 +2,7 @@
 //! a gossip control plane.  The goal is to share small bits of off-chain information and detect and
 //! repair partitions.
 //!
-//! This CRDT only supports a very limited set of types.  A map of Pubkey -> Versioned Struct.
+//! This CRDT only supports a very limited set of types.  A map of BvmAddr -> Versioned Struct.
 //! The last version is always picked during an update.
 //!
 //! The network is arranged in layers:
@@ -36,7 +36,7 @@ use bitconch_netutil::{
 };
 use bitconch_runtime::bloom::Bloom;
 use bitconch_interface::hash::Hash;
-use bitconch_interface::pubkey::Pubkey;
+use bitconch_interface::pubkey::BvmAddr;
 use bitconch_interface::signature::{Keypair, KeypairUtil, Signable, Signature};
 use bitconch_interface::timing::{duration_as_ms, timestamp};
 use bitconch_interface::transaction::Transaction;
@@ -76,7 +76,7 @@ pub struct NodeGroupInfo {
     pub(crate) keypair: Arc<Keypair>,
     // TODO: remove gossip_leader_pubkey once all usage of `set_leader()` and `leader_data()` is
     // purged
-    gossip_leader_pubkey: Pubkey,
+    gossip_leader_pubkey: BvmAddr,
     /// The network entrypoint
     entrypoint: Option<ContactInfo>,
 }
@@ -107,24 +107,24 @@ impl fmt::Debug for LocalGroupInfo {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SlashMessage {
-    /// Pubkey of the node that sent this prune data
-    //pub pubkey: Pubkey,
-    pub sender_pubkey: Pubkey,
+    /// BvmAddr of the node that sent this prune data
+    //pub pubkey: BvmAddr,
+    pub sender_pubkey: BvmAddr,
     /// Pubkeys of nodes that should be pruned
-    //pub prunes: Vec<Pubkey>,
-    pub target_pubkeys: Vec<Pubkey>,
-    /// Signature of this Prune Message
+    //pub prunes: Vec<BvmAddr>,
+    pub target_pubkeys: Vec<BvmAddr>,
+    /// Signature of this Prune Context
     //pub signature: Signature,
     pub msg_signature: Signature,
-    /// The Pubkey of the intended node/destination for this message
-    //pub destination: Pubkey,
-    pub receiver_pubkey: Pubkey,
+    /// The BvmAddr of the intended node/destination for this message
+    //pub destination: BvmAddr,
+    pub receiver_pubkey: BvmAddr,
     /// Wallclock of the node that generated this message
     pub wallclock: u64,
 }
 
 impl Signable for SlashMessage {
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         //self.pubkey
         self.sender_pubkey
     }
@@ -133,14 +133,14 @@ impl Signable for SlashMessage {
         #[derive(Serialize)]
         struct SignData {
             /*
-            pubkey: Pubkey,
-            prunes: Vec<Pubkey>,
-            destination: Pubkey,
+            pubkey: BvmAddr,
+            prunes: Vec<BvmAddr>,
+            destination: BvmAddr,
             wallclock: u64,
             */
-            sender_pubkey: Pubkey,
-            target_pubkeys: Vec<Pubkey>,
-            receiver_pubkey: Pubkey,
+            sender_pubkey: BvmAddr,
+            target_pubkeys: Vec<BvmAddr>,
+            receiver_pubkey: BvmAddr,
             wallclock: u64,
         }
         let data = SignData {
@@ -174,9 +174,9 @@ impl Signable for SlashMessage {
 enum Protocol {
     /// Gossip protocol messages
     PullRequest(Bloom<Hash>, ContInfTblValue),
-    PullResponse(Pubkey, Vec<ContInfTblValue>),
-    PushMessage(Pubkey, Vec<ContInfTblValue>),
-    PruneMessage(Pubkey, SlashMessage),
+    PullResponse(BvmAddr, Vec<ContInfTblValue>),
+    PushMessage(BvmAddr, Vec<ContInfTblValue>),
+    PruneMessage(BvmAddr, SlashMessage),
 
     /// Window protocol messages
     /// TODO: move this message to a different module
@@ -195,7 +195,7 @@ impl NodeGroupInfo {
         let mut me = Self {
             gossip: NodeTbleGossip::default(),
             keypair,
-            gossip_leader_pubkey: Pubkey::default(),
+            gossip_leader_pubkey: BvmAddr::default(),
             entrypoint: None,
         };
         let id = contact_info.id;
@@ -213,7 +213,7 @@ impl NodeGroupInfo {
         }
     }
 
-    fn push_self(&mut self, stakes: &HashMap<Pubkey, u64>) {
+    fn push_self(&mut self, stakes: &HashMap<BvmAddr, u64>) {
         let mut my_data = self.my_data();
         let now = timestamp();
         my_data.wallclock = now;
@@ -234,11 +234,11 @@ impl NodeGroupInfo {
         self.entrypoint = Some(entrypoint)
     }
 
-    pub fn id(&self) -> Pubkey {
+    pub fn id(&self) -> BvmAddr {
         self.gossip.id
     }
 
-    pub fn lookup(&self, id: &Pubkey) -> Option<&ContactInfo> {
+    pub fn lookup(&self, id: &BvmAddr) -> Option<&ContactInfo> {
         let entry = ContInfTblValueTag::ContactInfo(*id);
         self.gossip
             .contact_info_table
@@ -253,7 +253,7 @@ impl NodeGroupInfo {
     // Deprecated: don't use leader_data().
     pub fn leader_data(&self) -> Option<&ContactInfo> {
         let leader_pubkey = self.gossip_leader_pubkey;
-        if leader_pubkey == Pubkey::default() {
+        if leader_pubkey == BvmAddr::default() {
             return None;
         }
         self.lookup(&leader_pubkey)
@@ -316,7 +316,7 @@ impl NodeGroupInfo {
     }
 
     /// Record the id of the current leader for use by `leader_transaction_digesting_module_via_blobs()`
-    pub fn set_leader(&mut self, leader_pubkey: &Pubkey) {
+    pub fn set_leader(&mut self, leader_pubkey: &BvmAddr) {
         if *leader_pubkey != self.gossip_leader_pubkey {
             // warn!(
             //     "{}",
@@ -335,7 +335,7 @@ impl NodeGroupInfo {
         }
     }
 
-    pub fn push_epoch_slots(&mut self, id: Pubkey, root: u64, slots: BTreeSet<u64>) {
+    pub fn push_epoch_slots(&mut self, id: BvmAddr, root: u64, slots: BTreeSet<u64>) {
         let now = timestamp();
         let mut entry = ContInfTblValue::EpochSlots(EpochSlots::new(id, root, slots, now));
         entry.sign(&self.keypair);
@@ -375,7 +375,7 @@ impl NodeGroupInfo {
 
     pub fn get_epoch_state_for_node(
         &self,
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         since: Option<u64>,
     ) -> Option<(&EpochSlots, u64)> {
         self.gossip
@@ -390,7 +390,7 @@ impl NodeGroupInfo {
             .map(|x| (x.value.epoch_slots().unwrap(), x.insert_timestamp))
     }
 
-    pub fn get_gossiped_root_for_node(&self, pubkey: &Pubkey, since: Option<u64>) -> Option<u64> {
+    pub fn get_gossiped_root_for_node(&self, pubkey: &BvmAddr, since: Option<u64>) -> Option<u64> {
         self.gossip
             .contact_info_table
             .table
@@ -403,7 +403,7 @@ impl NodeGroupInfo {
             .map(|x| x.value.epoch_slots().unwrap().root)
     }
 
-    pub fn get_contact_info_for_node(&self, pubkey: &Pubkey) -> Option<&ContactInfo> {
+    pub fn get_contact_info_for_node(&self, pubkey: &BvmAddr) -> Option<&ContactInfo> {
         self.gossip
             .contact_info_table
             .table
@@ -521,7 +521,7 @@ impl NodeGroupInfo {
 
     fn sort_by_stake<S: std::hash::BuildHasher>(
         peers: &[ContactInfo],
-        stakes: Option<&HashMap<Pubkey, u64, S>>,
+        stakes: Option<&HashMap<BvmAddr, u64, S>>,
     ) -> Vec<(u64, ContactInfo)> {
         let mut peers_with_stakes: Vec<_> = peers
             .iter()
@@ -546,7 +546,7 @@ impl NodeGroupInfo {
     /// Return sorted Retransmit peers and index of `Self.id()` as if it were in that list
     fn sorted_peers_and_index<S: std::hash::BuildHasher>(
         &self,
-        stakes: Option<&HashMap<Pubkey, u64, S>>,
+        stakes: Option<&HashMap<BvmAddr, u64, S>>,
     ) -> (usize, Vec<ContactInfo>) {
         let mut peers = self.retransmit_peers();
         peers.push(self.lookup(&self.id()).unwrap().clone());
@@ -567,7 +567,7 @@ impl NodeGroupInfo {
         (index, peers)
     }
 
-    pub fn ordered_blaze_node_lists(&self, stakes: Option<&HashMap<Pubkey, u64>>) -> Vec<ContactInfo> {
+    pub fn ordered_blaze_node_lists(&self, stakes: Option<&HashMap<BvmAddr, u64>>) -> Vec<ContactInfo> {
         let peers = self.fetch_blaze_node_list();
         let peers_with_stakes: Vec<_> = NodeGroupInfo::sort_by_stake(&peers, stakes);
         peers_with_stakes
@@ -722,7 +722,7 @@ impl NodeGroupInfo {
     /// broadcast messages from the leader to layer 1 nodes
     /// # Remarks
     pub fn broadcast(
-        id: &Pubkey,
+        id: &BvmAddr,
         contains_last_drop: bool,
         pyramid_node_grp_list: &[ContactInfo],
         s: &UdpSocket,
@@ -759,7 +759,7 @@ impl NodeGroupInfo {
         obj: &Arc<RwLock<Self>>,
         peers: &[ContactInfo],
         blob: &ArcBlb,
-        slot_leader_pubkey: Option<Pubkey>,
+        slot_leader_pubkey: Option<BvmAddr>,
         s: &UdpSocket,
         forwarded: bool,
     ) -> Result<()> {
@@ -809,7 +809,7 @@ impl NodeGroupInfo {
     }
 
     fn send_orders(
-        id: &Pubkey,
+        id: &BvmAddr,
         s: &UdpSocket,
         orders: Vec<(ArcBlb, Vec<&ContactInfo>)>,
     ) -> Vec<io::Result<usize>> {
@@ -951,7 +951,7 @@ impl NodeGroupInfo {
         Ok((addr, out))
     }
     // If the network entrypoint hasn't been discovered yet, add it to the contact_info_table table
-    fn add_entrypoint(&mut self, pulls: &mut Vec<(Pubkey, Bloom<Hash>, SocketAddr, ContInfTblValue)>) {
+    fn add_entrypoint(&mut self, pulls: &mut Vec<(BvmAddr, Bloom<Hash>, SocketAddr, ContInfTblValue)>) {
         match &self.entrypoint {
             Some(entrypoint) => {
                 let self_info = self
@@ -971,7 +971,7 @@ impl NodeGroupInfo {
         }
     }
 
-    fn new_pull_requests(&mut self, stakes: &HashMap<Pubkey, u64>) -> Vec<(SocketAddr, Protocol)> {
+    fn new_pull_requests(&mut self, stakes: &HashMap<BvmAddr, u64>) -> Vec<(SocketAddr, Protocol)> {
         let now = timestamp();
         let pulls: Vec<_> = self
             .gossip
@@ -1018,7 +1018,7 @@ impl NodeGroupInfo {
             .collect()
     }
 
-    fn gossip_request(&mut self, stakes: &HashMap<Pubkey, u64>) -> Vec<(SocketAddr, Protocol)> {
+    fn gossip_request(&mut self, stakes: &HashMap<BvmAddr, u64>) -> Vec<(SocketAddr, Protocol)> {
         let pulls: Vec<_> = self.new_pull_requests(stakes);
         let pushes: Vec<_> = self.new_push_requests();
         vec![pulls, pushes].into_iter().flat_map(|x| x).collect()
@@ -1027,7 +1027,7 @@ impl NodeGroupInfo {
     /// At random pick a node and try to get updated changes from them
     fn run_gossip(
         obj: &Arc<RwLock<Self>>,
-        stakes: &HashMap<Pubkey, u64>,
+        stakes: &HashMap<BvmAddr, u64>,
         blob_sender: &BlobSndr,
     ) -> Result<()> {
         let reqs = obj.write().unwrap().gossip_request(&stakes);
@@ -1228,7 +1228,7 @@ impl NodeGroupInfo {
         inc_new_counter_debug!("node_group_info-pull_request-rsp", len);
         to_shared_blob(rsp, from.gossip).ok().into_iter().collect()
     }
-    fn handle_pull_response(me: &Arc<RwLock<Self>>, from: &Pubkey, data: Vec<ContInfTblValue>) {
+    fn handle_pull_response(me: &Arc<RwLock<Self>>, from: &BvmAddr, data: Vec<ContInfTblValue>) {
         let len = data.len();
         let now = Instant::now();
         let self_id = me.read().unwrap().gossip.id;
@@ -1244,7 +1244,7 @@ impl NodeGroupInfo {
     }
     fn handle_push_message(
         me: &Arc<RwLock<Self>>,
-        from: &Pubkey,
+        from: &BvmAddr,
         data: Vec<ContInfTblValue>,
     ) -> Vec<ArcBlb> {
         let self_id = me.read().unwrap().gossip.id;
@@ -1516,7 +1516,7 @@ impl NodeGroupInfo {
     }
 
     /// An alternative to Spy Node that has a valid gossip address and fully participate in Gossip.
-    pub fn gossip_node(id: &Pubkey, gossip_addr: &SocketAddr) -> (ContactInfo, UdpSocket) {
+    pub fn gossip_node(id: &BvmAddr, gossip_addr: &SocketAddr) -> (ContactInfo, UdpSocket) {
         let (port, gossip_socket) = Node::get_gossip_port(gossip_addr, FULLNODE_PORT_RANGE);
         let daddr = socketaddr_any!();
 
@@ -1535,7 +1535,7 @@ impl NodeGroupInfo {
     }
 
     /// A Node with invalid ports to spy on gossip via pull requests
-    pub fn spy_node(id: &Pubkey) -> (ContactInfo, UdpSocket) {
+    pub fn spy_node(id: &BvmAddr) -> (ContactInfo, UdpSocket) {
         let (_, gossip_socket) = bind_in_range(FULLNODE_PORT_RANGE).unwrap();
         let daddr = socketaddr_any!();
 
@@ -1563,7 +1563,7 @@ impl NodeGroupInfo {
 
 /// Returns Neighbor Nodes and Children Nodes `(neighbors, children)` for a given node based on its stake (Treasury Balance)
 pub fn compute_retransmit_peers<S: std::hash::BuildHasher>(
-    stakes: Option<&HashMap<Pubkey, u64, S>>,
+    stakes: Option<&HashMap<BvmAddr, u64, S>>,
     node_group_info: &Arc<RwLock<NodeGroupInfo>>,
     fanout: usize,
 ) -> (Vec<ContactInfo>, Vec<ContactInfo>) {
@@ -1611,10 +1611,10 @@ pub struct Node {
 
 impl Node {
     pub fn new_localhost() -> Self {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         Self::new_localhost_with_pubkey(&pubkey)
     }
-    pub fn new_localhost_storage_miner(pubkey: &Pubkey) -> Self {
+    pub fn new_localhost_storage_miner(pubkey: &BvmAddr) -> Self {
         let gossip = UdpSocket::bind("127.0.0.1:0").unwrap();
         let blaze_unit = UdpSocket::bind("127.0.0.1:0").unwrap();
         let storage = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -1649,7 +1649,7 @@ impl Node {
             },
         }
     }
-    pub fn new_localhost_with_pubkey(pubkey: &Pubkey) -> Self {
+    pub fn new_localhost_with_pubkey(pubkey: &BvmAddr) -> Self {
         let transaction_digesting_module = UdpSocket::bind("127.0.0.1:0").unwrap();
         let gossip = UdpSocket::bind("127.0.0.1:0").unwrap();
         let blaze_unit = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -1705,7 +1705,7 @@ impl Node {
         bind_in_range(port_range).expect("Failed to bind")
     }
     pub fn new_with_external_ip(
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         gossip_addr: &SocketAddr,
         port_range: PortRange,
     ) -> Node {
@@ -1750,7 +1750,7 @@ impl Node {
         }
     }
     pub fn new_miner_with_external_ip(
-        pubkey: &Pubkey,
+        pubkey: &BvmAddr,
         gossip_addr: &SocketAddr,
         port_range: PortRange,
     ) -> Node {
@@ -1803,10 +1803,10 @@ mod tests {
     #[test]
     fn test_gossip_node() {
         //check that a gossip nodes always show up as spies
-        let (node, _) = NodeGroupInfo::spy_node(&Pubkey::new_rand());
+        let (node, _) = NodeGroupInfo::spy_node(&BvmAddr::new_rand());
         assert!(NodeGroupInfo::is_spy_node(&node));
         let (node, _) =
-            NodeGroupInfo::gossip_node(&Pubkey::new_rand(), &"1.1.1.1:1111".parse().unwrap());
+            NodeGroupInfo::gossip_node(&BvmAddr::new_rand(), &"1.1.1.1:1111".parse().unwrap());
         assert!(NodeGroupInfo::is_spy_node(&node));
     }
 
@@ -1814,7 +1814,7 @@ mod tests {
     fn test_cluster_spy_gossip() {
         //check that gossip doesn't try to push to invalid addresses
         let node = Node::new_localhost();
-        let (spy, _) = NodeGroupInfo::spy_node(&Pubkey::new_rand());
+        let (spy, _) = NodeGroupInfo::spy_node(&BvmAddr::new_rand());
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             node.info,
         )));
@@ -1838,43 +1838,43 @@ mod tests {
 
     #[test]
     fn test_cluster_info_new() {
-        let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let d = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(d.clone());
         assert_eq!(d.id, node_group_info.my_data().id);
     }
 
     #[test]
     fn insert_info_test() {
-        let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let d = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(d);
-        let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let d = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         let label = ContInfTblValueTag::ContactInfo(d.id);
         node_group_info.insert_info(d);
         assert!(node_group_info.gossip.contact_info_table.lookup(&label).is_some());
     }
     #[test]
     fn test_insert_self() {
-        let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let d = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(d.clone());
         let entry_label = ContInfTblValueTag::ContactInfo(node_group_info.id());
         assert!(node_group_info.gossip.contact_info_table.lookup(&entry_label).is_some());
 
         // inserting something else shouldn't work
-        let d = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let d = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         node_group_info.insert_self(d.clone());
         let label = ContInfTblValueTag::ContactInfo(d.id);
         assert!(node_group_info.gossip.contact_info_table.lookup(&label).is_none());
     }
     #[test]
     fn window_index_request() {
-        let me = ContactInfo::new_localhost(&Pubkey::new_rand(), timestamp());
+        let me = ContactInfo::new_localhost(&BvmAddr::new_rand(), timestamp());
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(me);
         let rv = node_group_info.repair_request(&FixPlanType::Blob(0, 0));
         assert_matches!(rv, Err(Error::NodeGroupInfoError(NodeGroupInfoError::NoPeers)));
 
         let gossip_addr = socketaddr!([127, 0, 0, 1], 1234);
         let nxt = ContactInfo::new(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             gossip_addr,
             socketaddr!([127, 0, 0, 1], 1235),
             socketaddr!([127, 0, 0, 1], 1236),
@@ -1893,7 +1893,7 @@ mod tests {
 
         let gossip_addr2 = socketaddr!([127, 0, 0, 2], 1234);
         let nxt = ContactInfo::new(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             gossip_addr2,
             socketaddr!([127, 0, 0, 1], 1235),
             socketaddr!([127, 0, 0, 1], 1236),
@@ -1929,7 +1929,7 @@ mod tests {
         {
             let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(&ledger_path).unwrap());
             let me = ContactInfo::new(
-                &Pubkey::new_rand(),
+                &BvmAddr::new_rand(),
                 socketaddr!("127.0.0.1:1234"),
                 socketaddr!("127.0.0.1:1235"),
                 socketaddr!("127.0.0.1:1236"),
@@ -2067,7 +2067,7 @@ mod tests {
     #[test]
     fn test_default_leader() {
         bitconch_logger::setup();
-        let contact_info = ContactInfo::new_localhost(&Pubkey::new_rand(), 0);
+        let contact_info = ContactInfo::new_localhost(&BvmAddr::new_rand(), 0);
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(contact_info);
         let ntwk_connection_pnt =
             ContactInfo::new_gossip_connection_url(&socketaddr!("127.0.0.1:1239"));
@@ -2107,7 +2107,7 @@ mod tests {
     fn new_with_external_ip_test_random() {
         let ip = Ipv4Addr::from(0);
         let node = Node::new_with_external_ip(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             &socketaddr!(ip, 0),
             FULLNODE_PORT_RANGE,
         );
@@ -2124,7 +2124,7 @@ mod tests {
                 .0
         };
         let node = Node::new_with_external_ip(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             &socketaddr!(0, port),
             FULLNODE_PORT_RANGE,
         );
@@ -2138,7 +2138,7 @@ mod tests {
     fn new_storage_miner_external_ip_test() {
         let ip = Ipv4Addr::from(0);
         let node = Node::new_miner_with_external_ip(
-            &Pubkey::new_rand(),
+            &BvmAddr::new_rand(),
             &socketaddr!(ip, 0),
             FULLNODE_PORT_RANGE,
         );
@@ -2357,7 +2357,7 @@ fn test_add_entrypoint() {
         ContactInfo::new_localhost(&node_keypair.pubkey(), timestamp()),
         node_keypair,
     );
-    let entrypoint_pubkey = Pubkey::new_rand();
+    let entrypoint_pubkey = BvmAddr::new_rand();
     let entrypoint = ContactInfo::new_localhost(&entrypoint_pubkey, timestamp());
     node_group_info.set_entrypoint(entrypoint.clone());
     let pulls = node_group_info.new_pull_requests(&HashMap::new());

@@ -1,5 +1,5 @@
 use crate::hash::Hash;
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::signature::{Keypair, KeypairUtil};
 use crate::sys_opcode;
 use crate::transaction::Transaction;
@@ -8,22 +8,22 @@ const SYSTEM_PROGRAM_ID: [u8; 32] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-pub fn id() -> Pubkey {
-    Pubkey::new(&SYSTEM_PROGRAM_ID)
+pub fn id() -> BvmAddr {
+    BvmAddr::new(&SYSTEM_PROGRAM_ID)
 }
 
-pub fn check_id(program_id: &Pubkey) -> bool {
+pub fn check_id(program_id: &BvmAddr) -> bool {
     program_id.as_ref() == SYSTEM_PROGRAM_ID
 }
 
 /// Create and sign new SysOpCode::CreateAccount transaction
 pub fn create_account(
     from_keypair: &Keypair,
-    to: &Pubkey,
+    to: &BvmAddr,
     recent_transaction_seal: Hash,
     difs: u64,
     space: u64,
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
 ) -> Transaction {
     let from_pubkey = from_keypair.pubkey();
     let op_create =
@@ -35,7 +35,7 @@ pub fn create_account(
 /// Create and sign a transaction to create a system account
 pub fn create_user_account(
     from_keypair: &Keypair,
-    to: &Pubkey,
+    to: &BvmAddr,
     difs: u64,
     recent_transaction_seal: Hash,
 ) -> Transaction {
@@ -44,7 +44,7 @@ pub fn create_user_account(
 }
 
 /// Create and sign new sys_opcode::Assign transaction
-pub fn assign(from_keypair: &Keypair, recent_transaction_seal: Hash, program_id: &Pubkey) -> Transaction {
+pub fn assign(from_keypair: &Keypair, recent_transaction_seal: Hash, program_id: &BvmAddr) -> Transaction {
     let from_pubkey = from_keypair.pubkey();
     let op_assign = sys_opcode::assign(&from_pubkey, program_id);
     let op_vec = vec![op_assign];
@@ -54,7 +54,7 @@ pub fn assign(from_keypair: &Keypair, recent_transaction_seal: Hash, program_id:
 /// Create and sign new sys_opcode::Transfer transaction
 pub fn transfer(
     from_keypair: &Keypair,
-    to: &Pubkey,
+    to: &BvmAddr,
     difs: u64,
     recent_transaction_seal: Hash,
 ) -> Transaction {

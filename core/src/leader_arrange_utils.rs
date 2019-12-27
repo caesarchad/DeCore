@@ -1,7 +1,7 @@
 use crate::leader_arrange::LeaderSchedule;
 use crate::staking_utils;
 use morgan_runtime::treasury::Treasury;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::constants::NUM_CONSECUTIVE_LEADER_SLOTS;
 use proptest::{
     strategy::{Strategy, ValueTree},
@@ -25,7 +25,7 @@ pub fn leader_schedule(epoch_height: u64, treasury: &Treasury) -> Option<LeaderS
 }
 
 /// Return the leader for the given slot.
-pub fn slot_leader_at(slot: u64, treasury: &Treasury) -> Option<Pubkey> {
+pub fn slot_leader_at(slot: u64, treasury: &Treasury) -> Option<BvmAddr> {
     let (epoch, slot_index) = treasury.get_epoch_and_slot_index(slot);
 
     leader_schedule(epoch, treasury).map(|leader_schedule| leader_schedule[slot_index])
@@ -80,7 +80,7 @@ impl ValueGenerator {
     }
 }
 
-fn sort_stakes(stakes: &mut Vec<(Pubkey, u64)>) {
+fn sort_stakes(stakes: &mut Vec<(BvmAddr, u64)>) {
     // Sort first by stake. If stakes are the same, sort by pubkey to ensure a
     // deterministic result.
     // Note: Use unstable sort, because we dedup right after to remove the equal elements.
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_leader_schedule_via_treasury() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let genesis_block =
             create_genesis_block_with_leader(0, &pubkey, BOOTSTRAP_LEADER_DIFS).genesis_block;
         let treasury = Treasury::new(&genesis_block);
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_leader_scheduler1_basic() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
             &pubkey,
@@ -140,8 +140,8 @@ mod tests {
 
     #[test]
     fn test_sort_stakes_basic() {
-        let pubkey0 = Pubkey::new_rand();
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey0 = BvmAddr::new_rand();
+        let pubkey1 = BvmAddr::new_rand();
         let mut stakes = vec![(pubkey0, 1), (pubkey1, 2)];
         sort_stakes(&mut stakes);
         assert_eq!(stakes, vec![(pubkey1, 2), (pubkey0, 1)]);
@@ -149,8 +149,8 @@ mod tests {
 
     #[test]
     fn test_sort_stakes_with_dup() {
-        let pubkey0 = Pubkey::new_rand();
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey0 = BvmAddr::new_rand();
+        let pubkey1 = BvmAddr::new_rand();
         let mut stakes = vec![(pubkey0, 1), (pubkey1, 2), (pubkey0, 1)];
         sort_stakes(&mut stakes);
         assert_eq!(stakes, vec![(pubkey1, 2), (pubkey0, 1)]);
@@ -158,8 +158,8 @@ mod tests {
 
     #[test]
     fn test_sort_stakes_with_equal_stakes() {
-        let pubkey0 = Pubkey::default();
-        let pubkey1 = Pubkey::new_rand();
+        let pubkey0 = BvmAddr::default();
+        let pubkey1 = BvmAddr::new_rand();
         let mut stakes = vec![(pubkey0, 1), (pubkey1, 1)];
         sort_stakes(&mut stakes);
         assert_eq!(stakes, vec![(pubkey1, 1), (pubkey0, 1)]);

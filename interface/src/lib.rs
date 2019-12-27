@@ -13,7 +13,7 @@ pub mod mounter_opcode;
 pub mod message;
 pub mod bultin_mounter;
 pub mod waterclock_config;
-pub mod pubkey;
+pub mod bvm_address;
 pub mod short_vec;
 pub mod signature;
 pub mod syscall;

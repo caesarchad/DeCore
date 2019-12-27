@@ -10,7 +10,7 @@ use crate::data_filter;
 use crate::bvm_types::*;
 use rand::{thread_rng, Rng};
 use morgan_client::slim_account_host::{create_client, SlimAccountHost};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use std::net::SocketAddr;
 use std::net::UdpSocket;
@@ -74,7 +74,7 @@ pub fn discover(
     connection_url: &SocketAddr,
     num_nodes: Option<usize>,
     timeout: Option<u64>,
-    find_node: Option<Pubkey>,
+    find_node: Option<BvmAddr>,
     gossip_addr: Option<&SocketAddr>,
 ) -> std::io::Result<(Vec<ContactInfo>, Vec<ContactInfo>)> {
     let exit = Arc::new(AtomicBool::new(false));
@@ -256,7 +256,7 @@ fn spy(
     spy_ref: Arc<RwLock<NodeGroupInfo>>,
     num_nodes: Option<usize>,
     timeout: Option<u64>,
-    find_node: Option<Pubkey>,
+    find_node: Option<BvmAddr>,
 ) -> (bool, u64, Vec<ContactInfo>, Vec<ContactInfo>) {
     let now = Instant::now();
     let mut met_criteria = false;
@@ -390,8 +390,8 @@ mod tests {
     #[test]
     fn test_gossip_services_spy() {
         let keypair = Keypair::new();
-        let peer0 = Pubkey::new_rand();
-        let peer1 = Pubkey::new_rand();
+        let peer0 = BvmAddr::new_rand();
+        let peer1 = BvmAddr::new_rand();
         let contact_info = ContactInfo::new_localhost(&keypair.pubkey(), 0);
         let peer0_info = ContactInfo::new_localhost(&peer0, 0);
         let peer1_info = ContactInfo::new_localhost(&peer1, 0);
@@ -415,7 +415,7 @@ mod tests {
         // Find specific node by pubkey
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), None, None, Some(peer0));
         assert_eq!(met_criteria, true);
-        let (met_criteria, _, _, _) = spy(spy_ref.clone(), None, Some(0), Some(Pubkey::new_rand()));
+        let (met_criteria, _, _, _) = spy(spy_ref.clone(), None, Some(0), Some(BvmAddr::new_rand()));
         assert_eq!(met_criteria, false);
 
         // Find num_nodes *and* specific node by pubkey
@@ -424,7 +424,7 @@ mod tests {
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), Some(3), Some(0), Some(peer0));
         assert_eq!(met_criteria, false);
         let (met_criteria, _, _, _) =
-            spy(spy_ref.clone(), Some(1), Some(0), Some(Pubkey::new_rand()));
+            spy(spy_ref.clone(), Some(1), Some(0), Some(BvmAddr::new_rand()));
         assert_eq!(met_criteria, false);
     }
 }

@@ -3,7 +3,7 @@ use crate::storage_contract::{CheckedProof, STORAGE_ACCOUNT_SPACE};
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::{AccountMeta, OpCode};
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::sys_opcode;
 use std::collections::HashMap;
@@ -37,13 +37,13 @@ pub enum StorageOpCode {
     },
     ProofValidation {
         segment: u64,
-        proofs: Vec<(Pubkey, Vec<CheckedProof>)>,
+        proofs: Vec<(BvmAddr, Vec<CheckedProof>)>,
     },
 }
 
 pub fn create_validator_storage_account(
-    from_pubkey: &Pubkey,
-    storage_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    storage_pubkey: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
@@ -63,8 +63,8 @@ pub fn create_validator_storage_account(
 }
 
 pub fn create_miner_storage_account(
-    from_pubkey: &Pubkey,
-    storage_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    storage_pubkey: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
@@ -84,8 +84,8 @@ pub fn create_miner_storage_account(
 }
 
 pub fn create_mining_pool_account(
-    from_pubkey: &Pubkey,
-    storage_pubkey: &Pubkey,
+    from_pubkey: &BvmAddr,
+    storage_pubkey: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
@@ -105,7 +105,7 @@ pub fn create_mining_pool_account(
 }
 
 pub fn mining_proof(
-    storage_pubkey: &Pubkey,
+    storage_pubkey: &BvmAddr,
     sha_state: Hash,
     slot: u64,
     signature: Signature,
@@ -120,7 +120,7 @@ pub fn mining_proof(
 }
 
 pub fn advertise_recent_transaction_seal(
-    storage_pubkey: &Pubkey,
+    storage_pubkey: &BvmAddr,
     storage_hash: Hash,
     slot: u64,
 ) -> OpCode {
@@ -133,9 +133,9 @@ pub fn advertise_recent_transaction_seal(
 }
 
 pub fn proof_validation<S: std::hash::BuildHasher>(
-    storage_pubkey: &Pubkey,
+    storage_pubkey: &BvmAddr,
     segment: u64,
-    checked_proofs: HashMap<Pubkey, Vec<CheckedProof>, S>,
+    checked_proofs: HashMap<BvmAddr, Vec<CheckedProof>, S>,
 ) -> OpCode {
     let mut account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
     let mut proofs = vec![];
@@ -148,8 +148,8 @@ pub fn proof_validation<S: std::hash::BuildHasher>(
 }
 
 pub fn claim_reward(
-    storage_pubkey: &Pubkey,
-    mining_pool_pubkey: &Pubkey,
+    storage_pubkey: &BvmAddr,
+    mining_pool_pubkey: &BvmAddr,
     slot: u64,
 ) -> OpCode {
     let storage_opcode = StorageOpCode::ClaimStorageReward { slot };

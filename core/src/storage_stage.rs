@@ -16,8 +16,8 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCode;
-use morgan_interface::message::Message;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::message::Context;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;
 use morgan_storage_api::storage_contract::{CheckedProof, Proof, ProofStatus};
@@ -38,7 +38,7 @@ use morgan_helper::logHelper::*;
 // Vec of [ledger blocks] x [keys]
 type StorageResults = Vec<Hash>;
 type StorageKeys = Vec<u8>;
-type StorageMinerMap = Vec<HashMap<Pubkey, Vec<Proof>>>;
+type StorageMinerMap = Vec<HashMap<BvmAddr, Vec<Proof>>>;
 
 #[derive(Default)]
 pub struct StorageStateInner {
@@ -114,7 +114,7 @@ impl StorageState {
         self.state.read().unwrap().slot
     }
 
-    pub fn get_pubkeys_for_slot(&self, slot: u64) -> Vec<Pubkey> {
+    pub fn get_pubkeys_for_slot(&self, slot: u64) -> Vec<BvmAddr> {
         const MAX_PUBKEYS_TO_RETURN: usize = 5;
         let index = get_segment_from_slot(slot) as usize;
         let storage_miner_map = &self.state.read().unwrap().storage_miner_map;
@@ -308,7 +308,7 @@ impl StoragePhase {
         }
 
         let signer_keys = vec![keypair.as_ref(), storage_keypair.as_ref()];
-        let message = Message::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
+        let message = Context::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
         let transaction = Transaction::new(&signer_keys, message, transaction_seal);
 
         account_host_socket.send_to(
@@ -409,7 +409,7 @@ impl StoragePhase {
         slot: u64,
         storage_state: &Arc<RwLock<StorageStateInner>>,
         current_key_idx: &mut usize,
-        storage_account_key: Pubkey,
+        storage_account_key: BvmAddr,
     ) {
         match deserialize(data) {
             Ok(StorageOpCode::SubmitMiningProof {
@@ -590,7 +590,7 @@ mod tests {
     use rayon::prelude::*;
     use morgan_runtime::treasury::Treasury;
     use morgan_interface::hash::{Hash, Hasher};
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_storage_api::SLOTS_PER_SEGMENT;
     use std::cmp::{max, min};
@@ -628,7 +628,7 @@ mod tests {
         storage_stage.join().unwrap();
     }
 
-    fn test_node_group_info(id: &Pubkey) -> Arc<RwLock<NodeGroupInfo>> {
+    fn test_node_group_info(id: &BvmAddr) -> Arc<RwLock<NodeGroupInfo>> {
         let contact_info = ContactInfo::new_localhost(id, 0);
         let node_group_info = NodeGroupInfo::new_with_invalid_keypair(contact_info);
         Arc::new(RwLock::new(node_group_info))

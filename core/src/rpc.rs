@@ -13,7 +13,7 @@ use morgan_tokenbot::drone::{request_airdrop_transaction, request_reputation_air
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
 use morgan_interface::gas_cost::GasCost;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::Signature;
 use morgan_interface::transaction::{self, Transaction};
 use morgan_vote_api::vote_state::VoteState;
@@ -66,17 +66,17 @@ impl JsonRpcRequestProcessor {
         }
     }
 
-    pub fn get_account_info(&self, pubkey: &Pubkey) -> Result<Account> {
+    pub fn get_account_info(&self, pubkey: &BvmAddr) -> Result<Account> {
         self.treasury()
             .get_account(&pubkey)
             .ok_or_else(Error::invalid_request)
     }
 
-    pub fn get_balance(&self, pubkey: &Pubkey) -> u64 {
+    pub fn get_balance(&self, pubkey: &BvmAddr) -> u64 {
         self.treasury().get_balance(&pubkey)
     }
 
-    pub fn get_reputation(&self, pubkey: &Pubkey) -> u64 {
+    pub fn get_reputation(&self, pubkey: &BvmAddr) -> u64 {
         self.treasury().get_reputation(&pubkey)
     }
 
@@ -108,7 +108,7 @@ impl JsonRpcRequestProcessor {
         Ok(self.treasury().transaction_count() as u64)
     }
 
-    fn get_epoch_vote_accounts(&self) -> Result<Vec<(Pubkey, u64, VoteState)>> {
+    fn get_epoch_vote_accounts(&self) -> Result<Vec<(BvmAddr, u64, VoteState)>> {
         let treasury = self.treasury();
         Ok(treasury
             .epoch_vote_accounts(treasury.get_stakers_epoch(treasury.slot()))
@@ -126,7 +126,7 @@ impl JsonRpcRequestProcessor {
         Ok(self.storage_state.get_slot())
     }
 
-    fn get_storage_pubkeys_for_slot(&self, slot: u64) -> Result<Vec<Pubkey>> {
+    fn get_storage_pubkeys_for_slot(&self, slot: u64) -> Result<Vec<BvmAddr>> {
         Ok(self.storage_state.get_pubkeys_for_slot(slot))
     }
 
@@ -154,7 +154,7 @@ fn get_transaction_digesting_module_addr(node_group_info: &Arc<RwLock<NodeGroupI
     Ok(contact_info.transaction_digesting_module)
 }
 
-fn verify_pubkey(input: String) -> Result<Pubkey> {
+fn verify_pubkey(input: String) -> Result<BvmAddr> {
     input.parse().map_err(|_e| Error::invalid_request())
 }
 
@@ -226,7 +226,7 @@ pub trait RpcSol {
     fn get_slot_leader(&self, _: Self::Metadata) -> Result<String>;
 
     #[rpc(meta, name = "getEpochVoteAccounts")]
-    fn get_epoch_vote_accounts(&self, _: Self::Metadata) -> Result<Vec<(Pubkey, u64, VoteState)>>;
+    fn get_epoch_vote_accounts(&self, _: Self::Metadata) -> Result<Vec<(BvmAddr, u64, VoteState)>>;
 
     #[rpc(meta, name = "getStorageTransactionSeal")]
     fn get_storage_transaction_seal(&self, _: Self::Metadata) -> Result<String>;
@@ -235,7 +235,7 @@ pub trait RpcSol {
     fn get_storage_slot(&self, _: Self::Metadata) -> Result<u64>;
 
     #[rpc(meta, name = "getStoragePubkeysForSlot")]
-    fn get_storage_pubkeys_for_slot(&self, _: Self::Metadata, _: u64) -> Result<Vec<Pubkey>>;
+    fn get_storage_pubkeys_for_slot(&self, _: Self::Metadata, _: u64) -> Result<Vec<BvmAddr>>;
 
     #[rpc(meta, name = "fullnodeQuit")]
     fn fullnode_exit(&self, _: Self::Metadata) -> Result<bool>;
@@ -601,7 +601,7 @@ impl RpcSol for RpcSolImpl {
     fn get_epoch_vote_accounts(
         &self,
         meta: Self::Metadata,
-    ) -> Result<Vec<(Pubkey, u64, VoteState)>> {
+    ) -> Result<Vec<(BvmAddr, u64, VoteState)>> {
         meta.request_processor
             .read()
             .unwrap()
@@ -619,7 +619,7 @@ impl RpcSol for RpcSolImpl {
         meta.request_processor.read().unwrap().get_storage_slot()
     }
 
-    fn get_storage_pubkeys_for_slot(&self, meta: Self::Metadata, slot: u64) -> Result<Vec<Pubkey>> {
+    fn get_storage_pubkeys_for_slot(&self, meta: Self::Metadata, slot: u64) -> Result<Vec<BvmAddr>> {
         meta.request_processor
             .read()
             .unwrap()
@@ -645,8 +645,8 @@ mod tests {
     use std::thread;
 
     fn start_rpc_handler_with_tx(
-        pubkey: &Pubkey,
-    ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, Pubkey) {
+        pubkey: &BvmAddr,
+    ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, BvmAddr) {
         let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
         let exit = Arc::new(AtomicBool::new(false));
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_rpc_request_processor_new() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
         let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_balance() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_reputation() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_cluster_nodes() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getClusterNodes"}}"#);
@@ -761,7 +761,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_slot_leader() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getRoundLeader"}}"#);
@@ -777,7 +777,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_tx_count() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getTxnCnt"}}"#);
@@ -792,7 +792,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_account_info() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(
@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_rpc_confirm_tx() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
         let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
@@ -839,7 +839,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_signature_status() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
         let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
 
@@ -903,7 +903,7 @@ mod tests {
 
     #[test]
     fn test_rpc_get_recent_transaction_seal() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getLatestTransactionSeal"}}"#);
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_rpc_fail_request_airdrop() {
-        let bob_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
         let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
 
         // Expect internal error because no drone is available
@@ -986,7 +986,7 @@ mod tests {
 
     #[test]
     fn test_rpc_verify_pubkey() {
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         assert_eq!(verify_pubkey(pubkey.to_string()).unwrap(), pubkey);
         let bad_pubkey = "a1b2c3d4";
         assert_eq!(
@@ -997,7 +997,7 @@ mod tests {
 
     #[test]
     fn test_rpc_verify_signature() {
-        let tx = sys_controller::transfer(&Keypair::new(), &Pubkey::new_rand(), 20, hash(&[0]));
+        let tx = sys_controller::transfer(&Keypair::new(), &BvmAddr::new_rand(), 20, hash(&[0]));
         assert_eq!(
             verify_signature(&tx.signatures[0].to_string()).unwrap(),
             tx.signatures[0]

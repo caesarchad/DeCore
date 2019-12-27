@@ -208,14 +208,14 @@ mod tests {
     use super::*;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
     use morgan_interface::hash::Hash;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
 
     #[test]
     fn test_treasury_forks() {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
-        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &BvmAddr::default(), 1);
         child_treasury.register_drop(&Hash::default());
         treasury_forks.insert(child_treasury);
         assert_eq!(treasury_forks[1u64].drop_height(), 1);
@@ -228,9 +228,9 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
         let treasury0 = treasury_forks[0].clone();
-        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        let treasury = Treasury::new_from_parent(&treasury0, &BvmAddr::default(), 1);
         treasury_forks.insert(treasury);
-        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 2);
+        let treasury = Treasury::new_from_parent(&treasury0, &BvmAddr::default(), 2);
         treasury_forks.insert(treasury);
         let descendants = treasury_forks.descendants();
         let children: Vec<u64> = descendants[&0].iter().cloned().collect();
@@ -245,9 +245,9 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
         let treasury0 = treasury_forks[0].clone();
-        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 1);
+        let treasury = Treasury::new_from_parent(&treasury0, &BvmAddr::default(), 1);
         treasury_forks.insert(treasury);
-        let treasury = Treasury::new_from_parent(&treasury0, &Pubkey::default(), 2);
+        let treasury = Treasury::new_from_parent(&treasury0, &BvmAddr::default(), 2);
         treasury_forks.insert(treasury);
         let ancestors = treasury_forks.ancestors();
         assert!(ancestors[&0].is_empty());
@@ -262,7 +262,7 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
-        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &BvmAddr::default(), 1);
         treasury_forks.insert(child_treasury);
         assert!(treasury_forks.frozen_treasuries().get(&0).is_some());
         assert!(treasury_forks.frozen_treasuries().get(&1).is_none());
@@ -273,7 +273,7 @@ mod tests {
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
         let mut treasury_forks = TreasuryForks::new(0, treasury);
-        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &Pubkey::default(), 1);
+        let child_treasury = Treasury::new_from_parent(&treasury_forks[0u64], &BvmAddr::default(), 1);
         treasury_forks.insert(child_treasury);
         assert_eq!(treasury_forks.active_treasuries(), vec![1]);
     }

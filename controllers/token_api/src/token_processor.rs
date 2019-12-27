@@ -2,11 +2,11 @@ use crate::token_state::TokenState;
 use log::*;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_helper::logHelper::*;
 
 pub fn handle_opcode(
-    program_id: &Pubkey,
+    program_id: &BvmAddr,
     info: &mut [KeyedAccount],
     input: &[u8],
     _drop_height: u64,

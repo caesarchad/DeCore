@@ -236,7 +236,7 @@ pub mod test {
         BLOB_DATA_SIZE, 
         BLOB_HEADER_SIZE,
     };
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use std::borrow::Borrow;
 
@@ -699,7 +699,7 @@ pub mod test {
             })
             .collect();
 
-        index_blobs(&blobs, &Pubkey::new_rand(), offset as u64, 0, 0);
+        index_blobs(&blobs, &BvmAddr::new_rand(), offset as u64, 0, 0);
 
         blobs
     }

@@ -20,8 +20,8 @@ use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::opcodes_utils::DecodeError;
 use morgan_interface::mounter_opcode;
-use morgan_interface::message::Message;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::message::Context;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{read_keypair, Keypair, KeypairUtil, Signature};
 use morgan_interface::sys_opcode::SystemError;
 use morgan_interface::sys_controller;
@@ -44,37 +44,37 @@ const USERDATA_CHUNK_SIZE: usize = 229; // Keep program chunks under PACKET_DATA
 pub enum WalletCommand {
     Address,
     Airdrop(u64),
-    Balance(Pubkey),
-    Cancel(Pubkey),
+    Balance(BvmAddr),
+    Cancel(BvmAddr),
     Confirm(Signature),
-    AuthorizeVoter(Pubkey, Keypair, Pubkey),
-    CreateVoteAccount(Pubkey, Pubkey, u32, u64),
-    ShowVoteAccount(Pubkey),
-    CreateStakeAccount(Pubkey, u64),
-    CreateMiningPoolAccount(Pubkey, u64),
-    DelegateStake(Keypair, Pubkey),
-    RedeemVoteCredits(Pubkey, Pubkey, Pubkey),
-    ShowStakeAccount(Pubkey),
-    CreateStorageMiningPoolAccount(Pubkey, u64),
-    CreateMinerStorageAccount(Pubkey),
-    CreateValidatorStorageAccount(Pubkey),
-    ClaimStorageReward(Pubkey, Pubkey, u64),
-    ShowStorageAccount(Pubkey),
+    AuthorizeVoter(BvmAddr, Keypair, BvmAddr),
+    CreateVoteAccount(BvmAddr, BvmAddr, u32, u64),
+    ShowVoteAccount(BvmAddr),
+    CreateStakeAccount(BvmAddr, u64),
+    CreateMiningPoolAccount(BvmAddr, u64),
+    DelegateStake(Keypair, BvmAddr),
+    RedeemVoteCredits(BvmAddr, BvmAddr, BvmAddr),
+    ShowStakeAccount(BvmAddr),
+    CreateStorageMiningPoolAccount(BvmAddr, u64),
+    CreateMinerStorageAccount(BvmAddr),
+    CreateValidatorStorageAccount(BvmAddr),
+    ClaimStorageReward(BvmAddr, BvmAddr, u64),
+    ShowStorageAccount(BvmAddr),
     Deploy(String),
     GetTransactionCount,
     // Pay(difs, to, timestamp, timestamp_pubkey, witness(es), cancelable)
     Pay(
         u64,
-        Pubkey,
+        BvmAddr,
         Option<DateTime<Utc>>,
-        Option<Pubkey>,
-        Option<Vec<Pubkey>>,
-        Option<Pubkey>,
+        Option<BvmAddr>,
+        Option<Vec<BvmAddr>>,
+        Option<BvmAddr>,
     ),
     // TimeElapsed(to, process_id, timestamp)
-    TimeElapsed(Pubkey, Pubkey, DateTime<Utc>),
+    TimeElapsed(BvmAddr, BvmAddr, DateTime<Utc>),
     // Endorsement(to, process_id)
-    Endorsement(Pubkey, Pubkey),
+    Endorsement(BvmAddr, BvmAddr),
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +114,7 @@ pub struct WalletConfig {
 impl Default for WalletConfig {
     fn default() -> WalletConfig {
         WalletConfig {
-            command: WalletCommand::Balance(Pubkey::default()),
+            command: WalletCommand::Balance(BvmAddr::default()),
             drone_host: None,
             drone_port: DRONE_PORT,
             json_rpc_url: "http://testnet.morgan.com:10099".to_string(),
@@ -143,15 +143,15 @@ impl WalletConfig {
 }
 
 // Return the pubkey for an argument with `name` or None if not present.
-fn pubkey_of(matches: &ArgMatches<'_>, name: &str) -> Option<Pubkey> {
-    matches.value_of(name).map(|x| x.parse::<Pubkey>().unwrap())
+fn pubkey_of(matches: &ArgMatches<'_>, name: &str) -> Option<BvmAddr> {
+    matches.value_of(name).map(|x| x.parse::<BvmAddr>().unwrap())
 }
 
 // Return the pubkeys for arguments with `name` or None if none present.
-fn pubkeys_of(matches: &ArgMatches<'_>, name: &str) -> Option<Vec<Pubkey>> {
+fn pubkeys_of(matches: &ArgMatches<'_>, name: &str) -> Option<Vec<BvmAddr>> {
     matches
         .values_of(name)
-        .map(|xs| xs.map(|x| x.parse::<Pubkey>().unwrap()).collect())
+        .map(|xs| xs.map(|x| x.parse::<BvmAddr>().unwrap()).collect())
 }
 
 // Return the keypair for an argument with filename `name` or None if not present.
@@ -160,7 +160,7 @@ fn keypair_of(matches: &ArgMatches<'_>, name: &str) -> Option<Keypair> {
 }
 
 pub fn parse_command(
-    pubkey: &Pubkey,
+    pubkey: &BvmAddr,
     matches: &ArgMatches<'_>,
 ) -> Result<WalletCommand, Box<dyn error::Error>> {
     let response = match matches.subcommand() {
@@ -411,7 +411,7 @@ fn process_airdrop(
     Ok(format!("Your balance is: {:?}", current_balance))
 }
 
-fn process_balance(pubkey: &Pubkey, rpc_client: &RpcClient) -> ProcessResult {
+fn process_balance(pubkey: &BvmAddr, rpc_client: &RpcClient) -> ProcessResult {
     let balance = rpc_client.retry_get_balance(pubkey, 5)?;
     match balance {
         Some(difs) => {
@@ -446,8 +446,8 @@ fn process_confirm(rpc_client: &RpcClient, signature: &Signature) -> ProcessResu
 fn process_create_vote_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    voting_account_pubkey: &Pubkey,
-    node_pubkey: &Pubkey,
+    voting_account_pubkey: &BvmAddr,
+    node_pubkey: &BvmAddr,
     commission: u32,
     difs: u64,
 ) -> ProcessResult {
@@ -467,9 +467,9 @@ fn process_create_vote_account(
 fn process_authorize_voter(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    voting_account_pubkey: &Pubkey,
+    voting_account_pubkey: &BvmAddr,
     authorized_voter_keypair: &Keypair,
-    new_authorized_voter_pubkey: &Pubkey,
+    new_authorized_voter_pubkey: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ixs = vec![vote_opcode::authorize_voter(
@@ -491,7 +491,7 @@ fn process_authorize_voter(
 fn process_show_vote_account(
     rpc_client: &RpcClient,
     _config: &WalletConfig,
-    voting_account_pubkey: &Pubkey,
+    voting_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     use morgan_vote_api::vote_state::VoteState;
     let vote_account_difs = rpc_client.retry_get_balance(voting_account_pubkey, 5)?;
@@ -535,7 +535,7 @@ fn process_show_vote_account(
 fn process_create_stake_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    staking_account_pubkey: &Pubkey,
+    staking_account_pubkey: &BvmAddr,
     difs: u64,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
@@ -552,7 +552,7 @@ fn process_create_stake_account(
 fn process_create_mining_pool_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    mining_pool_account_pubkey: &Pubkey,
+    mining_pool_account_pubkey: &BvmAddr,
     difs: u64,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
@@ -570,7 +570,7 @@ fn process_delegate_stake(
     rpc_client: &RpcClient,
     config: &WalletConfig,
     staking_account_keypair: &Keypair,
-    voting_account_pubkey: &Pubkey,
+    voting_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ixs = vec![stake_opcode::delegate_stake(
@@ -591,9 +591,9 @@ fn process_delegate_stake(
 fn process_redeem_vote_credits(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    mining_pool_account_pubkey: &Pubkey,
-    staking_account_pubkey: &Pubkey,
-    voting_account_pubkey: &Pubkey,
+    mining_pool_account_pubkey: &BvmAddr,
+    staking_account_pubkey: &BvmAddr,
+    voting_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ixs = vec![stake_opcode::redeem_vote_credits(
@@ -610,7 +610,7 @@ fn process_redeem_vote_credits(
 fn process_show_stake_account(
     rpc_client: &RpcClient,
     _config: &WalletConfig,
-    staking_account_pubkey: &Pubkey,
+    staking_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     use morgan_stake_api::stake_state::StakeState;
     let stake_account = rpc_client.get_account(staking_account_pubkey)?;
@@ -637,7 +637,7 @@ fn process_show_stake_account(
 fn process_create_storage_mining_pool_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    storage_account_pubkey: &Pubkey,
+    storage_account_pubkey: &BvmAddr,
     difs: u64,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
@@ -654,7 +654,7 @@ fn process_create_storage_mining_pool_account(
 fn process_create_miner_storage_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    storage_account_pubkey: &Pubkey,
+    storage_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ixs = storage_opcode::create_miner_storage_account(
@@ -670,7 +670,7 @@ fn process_create_miner_storage_account(
 fn process_create_validator_storage_account(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    storage_account_pubkey: &Pubkey,
+    storage_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ixs = storage_opcode::create_validator_storage_account(
@@ -686,8 +686,8 @@ fn process_create_validator_storage_account(
 fn process_claim_storage_reward(
     rpc_client: &RpcClient,
     config: &WalletConfig,
-    storage_mining_pool_account_pubkey: &Pubkey,
-    storage_account_pubkey: &Pubkey,
+    storage_mining_pool_account_pubkey: &BvmAddr,
+    storage_account_pubkey: &BvmAddr,
     slot: u64,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
@@ -698,7 +698,7 @@ fn process_claim_storage_reward(
         slot,
     );
     let signers = [&config.keypair];
-    let message = Message::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+    let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
 
     let mut transaction = Transaction::new(&signers, message, recent_transaction_seal);
     let signature_str = rpc_client.send_and_confirm_transaction(&mut transaction, &signers)?;
@@ -708,7 +708,7 @@ fn process_claim_storage_reward(
 fn process_show_storage_account(
     rpc_client: &RpcClient,
     _config: &WalletConfig,
-    storage_account_pubkey: &Pubkey,
+    storage_account_pubkey: &BvmAddr,
 ) -> ProcessResult {
     use morgan_storage_api::storage_contract::StorageContract;
     let account = rpc_client.get_account(storage_account_pubkey)?;
@@ -776,7 +776,7 @@ fn process_deploy(
                 (i * USERDATA_CHUNK_SIZE) as u32,
                 chunk.to_vec(),
             );
-            let message = Message::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+            let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
             Transaction::new(&signers, message, transaction_seal)
         })
         .collect();
@@ -784,7 +784,7 @@ fn process_deploy(
 
     trace!("Finalizing program account");
     let instruction = morgan_interface::mounter_opcode::finalize(&program_id.pubkey(), &bvm_controller::id());
-    let message = Message::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
+    let message = Context::new_with_payer(vec![instruction], Some(&signers[0].pubkey()));
     let mut tx = Transaction::new(&signers, message, transaction_seal);
     rpc_client
         .send_and_confirm_transaction(&mut tx, &signers)
@@ -802,11 +802,11 @@ fn process_pay(
     rpc_client: &RpcClient,
     config: &WalletConfig,
     difs: u64,
-    to: &Pubkey,
+    to: &BvmAddr,
     timestamp: Option<DateTime<Utc>>,
-    timestamp_pubkey: Option<Pubkey>,
-    witnesses: &Option<Vec<Pubkey>>,
-    cancelable: Option<Pubkey>,
+    timestamp_pubkey: Option<BvmAddr>,
+    witnesses: &Option<Vec<BvmAddr>>,
+    cancelable: Option<BvmAddr>,
 ) -> ProcessResult {
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
 
@@ -879,7 +879,7 @@ fn process_pay(
     }
 }
 
-fn process_cancel(rpc_client: &RpcClient, config: &WalletConfig, pubkey: &Pubkey) -> ProcessResult {
+fn process_cancel(rpc_client: &RpcClient, config: &WalletConfig, pubkey: &BvmAddr) -> ProcessResult {
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
     let ix = sc_opcode::apply_signature(
         &config.keypair.pubkey(),
@@ -901,8 +901,8 @@ fn process_time_elapsed(
     rpc_client: &RpcClient,
     config: &WalletConfig,
     drone_addr: SocketAddr,
-    to: &Pubkey,
-    pubkey: &Pubkey,
+    to: &BvmAddr,
+    pubkey: &BvmAddr,
     dt: DateTime<Utc>,
 ) -> ProcessResult {
     let balance = rpc_client.retry_get_balance(&config.keypair.pubkey(), 5)?;
@@ -925,8 +925,8 @@ fn process_witness(
     rpc_client: &RpcClient,
     config: &WalletConfig,
     drone_addr: SocketAddr,
-    to: &Pubkey,
-    pubkey: &Pubkey,
+    to: &BvmAddr,
+    pubkey: &BvmAddr,
 ) -> ProcessResult {
     let balance = rpc_client.retry_get_balance(&config.keypair.pubkey(), 5)?;
 
@@ -972,7 +972,7 @@ pub fn process_command(config: &WalletConfig) -> ProcessResult {
         // Check client balance
         WalletCommand::Balance(pubkey) => process_balance(&pubkey, &rpc_client),
 
-        // Cancel a contract by contract Pubkey
+        // Cancel a contract by contract BvmAddr
         WalletCommand::Cancel(pubkey) => process_cancel(&rpc_client, config, &pubkey),
 
         // Confirm the last client transaction by signature
@@ -1129,7 +1129,7 @@ struct DroneKeypair {
 impl DroneKeypair {
     fn new_keypair(
         drone_addr: &SocketAddr,
-        to_pubkey: &Pubkey,
+        to_pubkey: &BvmAddr,
         difs: u64,
         transaction_seal: Hash,
     ) -> Result<Self, Box<dyn error::Error>> {
@@ -1148,7 +1148,7 @@ impl KeypairUtil for DroneKeypair {
     }
 
     /// Return the public key of the keypair used to sign votes
-    fn pubkey(&self) -> Pubkey {
+    fn pubkey(&self) -> BvmAddr {
         self.transaction.message().account_keys[0]
     }
 
@@ -1160,7 +1160,7 @@ impl KeypairUtil for DroneKeypair {
 pub fn request_and_confirm_airdrop(
     rpc_client: &RpcClient,
     drone_addr: &SocketAddr,
-    to_pubkey: &Pubkey,
+    to_pubkey: &BvmAddr,
     difs: u64,
 ) -> Result<(), Box<dyn error::Error>> {
     let (transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
@@ -1229,7 +1229,7 @@ where
 
 // Return an error if a pubkey cannot be parsed.
 fn is_pubkey(string: String) -> Result<(), String> {
-    match string.parse::<Pubkey>() {
+    match string.parse::<BvmAddr>() {
         Ok(_) => Ok(()),
         Err(err) => Err(format!("{:?}", err)),
     }
@@ -1718,11 +1718,11 @@ mod tests {
     fn test_wallet_parse_command() {
         let test_commands = app("test", "desc", "version");
 
-        let pubkey = Pubkey::new_rand();
+        let pubkey = BvmAddr::new_rand();
         let pubkey_string = format!("{}", pubkey);
-        let witness0 = Pubkey::new_rand();
+        let witness0 = BvmAddr::new_rand();
         let witness0_string = format!("{}", witness0);
-        let witness1 = Pubkey::new_rand();
+        let witness1 = BvmAddr::new_rand();
         let witness1_string = format!("{}", witness1);
         let dt = Utc.ymd(2018, 9, 19).and_hms(17, 30, 59);
 
@@ -1783,7 +1783,7 @@ mod tests {
         );
 
         // Test CreateVoteAccount SubCommand
-        let node_pubkey = Pubkey::new_rand();
+        let node_pubkey = BvmAddr::new_rand();
         let node_pubkey_string = format!("{}", node_pubkey);
         let test_create_vote_account = test_commands.clone().get_matches_from(vec![
             "test",
@@ -1991,7 +1991,7 @@ mod tests {
         config.command = WalletCommand::Balance(config.keypair.pubkey());
         assert_eq!(process_command(&config).unwrap(), "50 difs");
 
-        let process_id = Pubkey::new_rand();
+        let process_id = BvmAddr::new_rand();
         config.command = WalletCommand::Cancel(process_id);
         assert_eq!(process_command(&config).unwrap(), SIGNATURE);
 
@@ -1999,8 +1999,8 @@ mod tests {
         config.command = WalletCommand::Confirm(good_signature);
         assert_eq!(process_command(&config).unwrap(), "Confirmed");
 
-        let bob_pubkey = Pubkey::new_rand();
-        let node_pubkey = Pubkey::new_rand();
+        let bob_pubkey = BvmAddr::new_rand();
+        let node_pubkey = BvmAddr::new_rand();
         config.command = WalletCommand::CreateVoteAccount(bob_pubkey, node_pubkey, 0, 10);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -2015,7 +2015,7 @@ mod tests {
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
         let bob_keypair = Keypair::new();
-        let node_pubkey = Pubkey::new_rand();
+        let node_pubkey = BvmAddr::new_rand();
         config.command = WalletCommand::DelegateStake(bob_keypair.into(), node_pubkey);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -2049,7 +2049,7 @@ mod tests {
             SIGNATURE.to_string()
         );
 
-        let witness = Pubkey::new_rand();
+        let witness = BvmAddr::new_rand();
         config.command = WalletCommand::Pay(
             10,
             bob_pubkey,
@@ -2070,12 +2070,12 @@ mod tests {
             SIGNATURE.to_string()
         );
 
-        let process_id = Pubkey::new_rand();
+        let process_id = BvmAddr::new_rand();
         config.command = WalletCommand::TimeElapsed(bob_pubkey, process_id, dt);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
-        let witness = Pubkey::new_rand();
+        let witness = BvmAddr::new_rand();
         config.command = WalletCommand::Endorsement(bob_pubkey, witness);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -2089,7 +2089,7 @@ mod tests {
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
 
-        let witness = Pubkey::new_rand();
+        let witness = BvmAddr::new_rand();
         config.command = WalletCommand::Endorsement(bob_pubkey, witness);
         let signature = process_command(&config);
         assert_eq!(signature.unwrap(), SIGNATURE.to_string());
@@ -2181,7 +2181,7 @@ mod tests {
             .as_str()
             .unwrap();
 
-        assert!(program_id.parse::<Pubkey>().is_ok());
+        assert!(program_id.parse::<BvmAddr>().is_ok());
 
         // Failure cases
         config.rpc_client = Some(RpcClient::new_mock("airdrop".to_string()));

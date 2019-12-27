@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use morgan_runtime::treasury::Treasury;
 use morgan_interface::account::Account;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_vote_api::vote_state::VoteState;
 use std::borrow::Borrow;
 use lazy_static::lazy_static;
@@ -20,7 +20,7 @@ pub fn get_supermajority_slot(treasury: &Treasury, epoch_height: u64) -> Option<
     find_supermajority_slot(supermajority_stake, stakes_and_lockouts.iter())
 }
 
-pub fn vote_account_stakes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
+pub fn vote_account_stakes(treasury: &Treasury) -> HashMap<BvmAddr, u64> {
     treasury.vote_accounts()
         .into_iter()
         .map(|(id, (stake, _))| (id, stake))
@@ -28,7 +28,7 @@ pub fn vote_account_stakes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
 }
 
 /// Collect the staked nodes, as named by staked vote accounts from the given treasury
-pub fn staked_nodes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
+pub fn staked_nodes(treasury: &Treasury) -> HashMap<BvmAddr, u64> {
     to_staked_nodes(to_vote_states(treasury.vote_accounts().into_iter()))
 }
 
@@ -37,7 +37,7 @@ pub fn staked_nodes(treasury: &Treasury) -> HashMap<Pubkey, u64> {
 pub fn vote_account_stakes_at_epoch(
     treasury: &Treasury,
     epoch_height: u64,
-) -> Option<HashMap<Pubkey, u64>> {
+) -> Option<HashMap<BvmAddr, u64>> {
     treasury.epoch_vote_accounts(epoch_height).map(|accounts| {
         accounts
             .iter()
@@ -48,7 +48,7 @@ pub fn vote_account_stakes_at_epoch(
 
 /// At the specified epoch, collect the delegate account balance and vote states for delegates
 /// that have non-zero balance in any of their managed staking accounts
-pub fn staked_nodes_at_epoch(treasury: &Treasury, epoch_height: u64) -> Option<HashMap<Pubkey, u64>> {
+pub fn staked_nodes_at_epoch(treasury: &Treasury, epoch_height: u64) -> Option<HashMap<BvmAddr, u64>> {
     treasury.epoch_vote_accounts(epoch_height)
         .map(|vote_accounts| to_staked_nodes(to_vote_states(vote_accounts.into_iter())))
 }
@@ -119,7 +119,7 @@ pub fn pop_last_entries() -> Vec<JsonLogEntry> {
 
 // input (vote_pubkey, (stake, vote_account)) => (stake, vote_state)
 fn to_vote_states(
-    node_staked_accounts: impl Iterator<Item = (impl Borrow<Pubkey>, impl Borrow<(u64, Account)>)>,
+    node_staked_accounts: impl Iterator<Item = (impl Borrow<BvmAddr>, impl Borrow<(u64, Account)>)>,
 ) -> impl Iterator<Item = (u64, VoteState)> {
     node_staked_accounts.filter_map(|(_, stake_account)| {
         VoteState::deserialize(&stake_account.borrow().1.data)
@@ -131,8 +131,8 @@ fn to_vote_states(
 // (stake, vote_state) => (node, stake)
 fn to_staked_nodes(
     node_staked_accounts: impl Iterator<Item = (u64, VoteState)>,
-) -> HashMap<Pubkey, u64> {
-    let mut map: HashMap<Pubkey, u64> = HashMap::new();
+) -> HashMap<BvmAddr, u64> {
+    let mut map: HashMap<BvmAddr, u64> = HashMap::new();
     node_staked_accounts.for_each(|(stake, state)| {
         map.entry(state.node_pubkey)
             .and_modify(|s| *s += stake)
@@ -185,7 +185,7 @@ pub(crate) mod tests {
     };
     use hashbrown::HashSet;
     use morgan_interface::opcodes::OpCode;
-    use morgan_interface::pubkey::Pubkey;
+    use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::transaction::Transaction;
     use morgan_stake_api::stake_opcode;
@@ -194,7 +194,7 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     fn new_from_parent(parent: &Arc<Treasury>, slot: u64) -> Treasury {
-        Treasury::new_from_parent(parent, &Pubkey::default(), slot)
+        Treasury::new_from_parent(parent, &BvmAddr::default(), slot)
     }
 
     #[test]
@@ -203,7 +203,7 @@ pub(crate) mod tests {
             genesis_block,
             voting_keypair,
             ..
-        } = create_genesis_block_with_leader(1, &Pubkey::new_rand(), BOOTSTRAP_LEADER_DIFS);
+        } = create_genesis_block_with_leader(1, &BvmAddr::new_rand(), BOOTSTRAP_LEADER_DIFS);
 
         let treasury = Treasury::new(&genesis_block);
 
@@ -225,8 +225,8 @@ pub(crate) mod tests {
     pub(crate) fn setup_vote_and_stake_accounts(
         treasury: &Treasury,
         from_account: &Keypair,
-        vote_pubkey: &Pubkey,
-        node_pubkey: &Pubkey,
+        vote_pubkey: &BvmAddr,
+        node_pubkey: &BvmAddr,
         amount: u64,
     ) {
         fn process_instructions<T: KeypairUtil>(
@@ -290,7 +290,7 @@ pub(crate) mod tests {
         } = create_genesis_block(10_000);
 
         let treasury = Treasury::new(&genesis_block);
-        let vote_pubkey = Pubkey::new_rand();
+        let vote_pubkey = BvmAddr::new_rand();
 
         // Give the validator some stake but don't setup a staking account
         // Validator has no difs staked, so they get filtered out. Only the bootstrap leader
@@ -379,16 +379,16 @@ pub(crate) mod tests {
     #[test]
     fn test_to_staked_nodes() {
         let mut stakes = Vec::new();
-        let node1 = Pubkey::new_rand();
-        let node2 = Pubkey::new_rand();
+        let node1 = BvmAddr::new_rand();
+        let node2 = BvmAddr::new_rand();
 
         // Node 1 has stake of 3
         for i in 0..3 {
-            stakes.push((i, VoteState::new(&Pubkey::new_rand(), &node1, 0)));
+            stakes.push((i, VoteState::new(&BvmAddr::new_rand(), &node1, 0)));
         }
 
         // Node 1 has stake of 5
-        stakes.push((5, VoteState::new(&Pubkey::new_rand(), &node2, 0)));
+        stakes.push((5, VoteState::new(&BvmAddr::new_rand(), &node2, 0)));
 
         let result = to_staked_nodes(stakes.into_iter());
         assert_eq!(result.len(), 2);

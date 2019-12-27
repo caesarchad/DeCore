@@ -41,7 +41,7 @@ where
 mod tests {
     use super::*;
     use crate::account::Account;
-    use crate::pubkey::Pubkey;
+    use crate::bvm_address::BvmAddr;
 
     #[test]
     fn test_account_state() {
@@ -51,7 +51,7 @@ mod tests {
         let res = Account::default().state() as Result<u64, OpCodeErr>;
         assert!(res.is_err());
 
-        let mut account = Account::new(0, 0, std::mem::size_of::<u64>(), &Pubkey::default());
+        let mut account = Account::new(0, 0, std::mem::size_of::<u64>(), &BvmAddr::default());
 
         assert!(account.set_state(&state).is_ok());
         let stored_state: u64 = account.state().unwrap();

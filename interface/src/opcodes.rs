@@ -1,6 +1,6 @@
 //! Defines a composable Instruction type and a memory-efficient EncodedOpCodes.
 
-use crate::pubkey::Pubkey;
+use crate::bvm_address::BvmAddr;
 use crate::short_vec;
 use crate::sys_opcode::SystemError;
 use bincode::serialize;
@@ -66,8 +66,8 @@ impl OpCodeErr {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct OpCode {
-    /// Pubkey of the instruction processor that executes this instruction
-    pub program_ids_index: Pubkey,
+    /// BvmAddr of the instruction processor that executes this instruction
+    pub program_ids_index: BvmAddr,
     /// Metadata for what accounts should be passed to the instruction processor
     pub accounts: Vec<AccountMeta>,
     /// Opaque data passed to the instruction processor
@@ -76,7 +76,7 @@ pub struct OpCode {
 
 impl OpCode {
     pub fn new<T: Serialize>(
-        program_ids_index: Pubkey,
+        program_ids_index: BvmAddr,
         data: &T,
         accounts: Vec<AccountMeta>,
     ) -> Self {
@@ -93,7 +93,7 @@ impl OpCode {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct AccountMeta {
     /// An account's public key
-    pub pubkey: Pubkey,
+    pub pubkey: BvmAddr,
     /// True if an Instruciton requires a Transaction signature matching `pubkey`.
     pub is_signer: bool,
     /// True if the `pubkey` can be loaded as a credit-debit account.
@@ -101,7 +101,7 @@ pub struct AccountMeta {
 }
 
 impl AccountMeta {
-    pub fn new(pubkey: Pubkey, is_signer: bool) -> Self {
+    pub fn new(pubkey: BvmAddr, is_signer: bool) -> Self {
         Self {
             pubkey,
             is_signer,
@@ -109,7 +109,7 @@ impl AccountMeta {
         }
     }
 
-    pub fn new_credit_only(pubkey: Pubkey, is_signer: bool) -> Self {
+    pub fn new_credit_only(pubkey: BvmAddr, is_signer: bool) -> Self {
         Self {
             pubkey,
             is_signer,
@@ -141,7 +141,7 @@ impl EncodedOpCodes {
         }
     }
 
-    pub fn program_id<'a>(&self, program_ids: &'a [Pubkey]) -> &'a Pubkey {
+    pub fn program_id<'a>(&self, program_ids: &'a [BvmAddr]) -> &'a BvmAddr {
         &program_ids[self.program_ids_index as usize]
     }
 }

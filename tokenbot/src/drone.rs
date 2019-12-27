@@ -11,9 +11,9 @@ use log::*;
 use serde_derive::{Deserialize, Serialize};
 use morgan_metricbot::datapoint_info;
 use morgan_interface::hash::Hash;
-use morgan_interface::message::Message;
+use morgan_interface::message::Context;
 use morgan_interface::constants::PACKET_DATA_SIZE;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::sys_opcode;
 use morgan_interface::transaction::Transaction;
@@ -49,12 +49,12 @@ pub const DRONE_PORT: u16 = 11100;
 pub enum DroneRequest {
     GetAirdrop {
         difs: u64,
-        to: Pubkey,
+        to: BvmAddr,
         transaction_seal: Hash,
     },
     GetReputation {
         reputations: u64,
-        to: Pubkey,
+        to: BvmAddr,
         transaction_seal: Hash,
     },
 }
@@ -136,7 +136,7 @@ impl Drone {
                         &to,
                         difs,
                     );
-                    let message = Message::new(vec![create_instruction]);
+                    let message = Context::new(vec![create_instruction]);
                     Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
                 } else {
                     Err(Error::new(
@@ -172,7 +172,7 @@ impl Drone {
                         &to,
                         reputations,
                     );
-                    let message = Message::new(vec![create_instruction]);
+                    let message = Context::new(vec![create_instruction]);
                     Ok(Transaction::new(&[&self.mint_keypair], message, transaction_seal))
                 } else {
                     Err(Error::new(
@@ -247,7 +247,7 @@ impl Drop for Drone {
 
 pub fn request_airdrop_transaction(
     drone_addr: &SocketAddr,
-    id: &Pubkey,
+    id: &BvmAddr,
     difs: u64,
     transaction_seal: Hash,
 ) -> Result<Transaction, Error> {
@@ -332,7 +332,7 @@ pub fn request_airdrop_transaction(
 
 pub fn request_reputation_airdrop_transaction(
     drone_addr: &SocketAddr,
-    id: &Pubkey,
+    id: &BvmAddr,
     reputations: u64,
     transaction_seal: Hash,
 ) -> Result<Transaction, Error> {
@@ -552,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_drone_build_airdrop_transaction() {
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::default();
         let request = DroneRequest::GetAirdrop {
             difs: 2,
@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
             message.account_keys,
-            vec![mint_pubkey, to, Pubkey::default()]
+            vec![mint_pubkey, to, BvmAddr::default()]
         );
         assert_eq!(message.recent_transaction_seal, transaction_seal);
 
@@ -582,7 +582,7 @@ mod tests {
                 difs: 2,
                 reputations: 0,
                 space: 0,
-                program_id: Pubkey::default()
+                program_id: BvmAddr::default()
             }
         );
 
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn test_drone_build_reputation_airdrop_transaction() {
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::default();
         let request = DroneRequest::GetReputation {
             reputations: 2,
@@ -612,7 +612,7 @@ mod tests {
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
             message.account_keys,
-            vec![mint_pubkey, to, Pubkey::default()]
+            vec![mint_pubkey, to, BvmAddr::default()]
         );
         assert_eq!(message.recent_transaction_seal, transaction_seal);
 
@@ -623,7 +623,7 @@ mod tests {
             SysOpCode::CreateAccountWithReputation {
                 reputations: 2,
                 space: 0,
-                program_id: Pubkey::default()
+                program_id: BvmAddr::default()
             }
         );
 
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn test_process_drone_request() {
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::new(&to.as_ref());
         let difs = 50;
         let req = DroneRequest::GetAirdrop {
@@ -650,7 +650,7 @@ mod tests {
         let keypair = Keypair::new();
         let expected_instruction =
             sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
-        let message = Message::new(vec![expected_instruction]);
+        let message = Context::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn test_process_reputation_drone_request() {
-        let to = Pubkey::new_rand();
+        let to = BvmAddr::new_rand();
         let transaction_seal = Hash::new(&to.as_ref());
         let reputations = 50;
         let req = DroneRequest::GetReputation {
@@ -684,7 +684,7 @@ mod tests {
         let keypair = Keypair::new();
         let expected_instruction =
             sys_opcode::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
-        let message = Message::new(vec![expected_instruction]);
+        let message = Context::new(vec![expected_instruction]);
         let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];

@@ -3,11 +3,11 @@
 use log::*;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
-use morgan_interface::pubkey::Pubkey;
+use morgan_interface::bvm_address::BvmAddr;
 use morgan_helper::logHelper::*;
 
 pub fn handle_opcode(
-    _program_id: &Pubkey,
+    _program_id: &BvmAddr,
     keyed_accounts: &mut [KeyedAccount],
     data: &[u8],
     _drop_height: u64,
@@ -50,7 +50,7 @@ mod tests {
     use morgan_runtime::treasury_client::TreasuryClient;
     use morgan_interface::account_host::OnlineAccount;
     use morgan_interface::genesis_block::create_genesis_block;
-    use morgan_interface::message::Message;
+    use morgan_interface::message::Context;
     use morgan_interface::signature::{Keypair, KeypairUtil};
     use morgan_interface::sys_opcode;
 
@@ -124,7 +124,7 @@ mod tests {
         let my_config = MyConfig::new(42);
 
         let instruction = config_instruction::store(&config_pubkey, &my_config);
-        let message = Message::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
+        let message = Context::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
         treasury_client
             .send_online_msg(&[&mint_keypair, &config_keypair], message)
             .unwrap();
@@ -150,7 +150,7 @@ mod tests {
 
         let mut instruction = config_instruction::store(&config_pubkey, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
-        let message = Message::new(vec![instruction]);
+        let message = Context::new(vec![instruction]);
         treasury_client
             .send_online_msg(&[&config_keypair], message)
             .unwrap_err();
@@ -168,12 +168,12 @@ mod tests {
         let config_pubkey = config_keypair.pubkey();
 
         let transfer_instruction =
-            sys_opcode::transfer(&system_pubkey, &Pubkey::new_rand(), 42);
+            sys_opcode::transfer(&system_pubkey, &BvmAddr::new_rand(), 42);
         let my_config = MyConfig::new(42);
         let mut store_instruction = config_instruction::store(&config_pubkey, &my_config);
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
-        let message = Message::new(vec![transfer_instruction, store_instruction]);
+        let message = Context::new(vec![transfer_instruction, store_instruction]);
         treasury_client
             .send_online_msg(&[&system_keypair], message)
             .unwrap_err();
