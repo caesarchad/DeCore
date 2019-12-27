@@ -2,7 +2,7 @@
 //! system wide clock.
 use crate::fiscal_statement_info::FsclStmt;
 use crate::expunge::{self, Session};
-use crate::packet::{Blob, SharedBlob};
+use crate::packet::{Blob, ArcBlb};
 use crate::result::{Error, Result};
 use crate::bvm_types::*;
 use bincode::deserialize;
@@ -202,7 +202,7 @@ impl BlockBufferPool {
     pub fn record_public_objs<I>(&self, shared_blobs: I) -> Result<()>
     where
         I: IntoIterator,
-        I::Item: Borrow<SharedBlob>,
+        I::Item: Borrow<ArcBlb>,
     {
         let c_blobs: Vec<_> = shared_blobs
             .into_iter()
@@ -571,7 +571,7 @@ impl BlockBufferPool {
         Ok(())
     }
 
-    pub fn insert_multiple_coding_blob_bytes(&self, coding_blobs: &[SharedBlob]) -> Result<()> {
+    pub fn insert_multiple_coding_blob_bytes(&self, coding_blobs: &[ArcBlb]) -> Result<()> {
         for shared_coding_blob in coding_blobs {
             let blob = shared_coding_blob.read().unwrap();
             assert!(blob.is_coding());
@@ -3168,8 +3168,8 @@ pub mod tests {
         use rand::{thread_rng, Rng};
         use std::sync::RwLock;
 
-        impl Into<SharedBlob> for Blob {
-            fn into(self) -> SharedBlob {
+        impl Into<ArcBlb> for Blob {
+            fn into(self) -> ArcBlb {
                 Arc::new(RwLock::new(self))
             }
         }

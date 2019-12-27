@@ -61,7 +61,7 @@ impl ClusterInfoVoteListener {
             if waterclock_recorder.lock().unwrap().treasury().is_some() {
                 last_ts = new_ts;
                 inc_new_counter_debug!("node_group_info_vote_listener-recv_count", votes.len());
-                let msgs = packet::to_packets(&votes);
+                let msgs = packet::pkt_bndl(&votes);
                 if !msgs.is_empty() {
                     let r = if sigverify_disabled {
                         signature_verify::ed25519_verify_disabled(&msgs)
@@ -154,7 +154,7 @@ mod tests {
                 module_path!().to_string()
             )
         );
-        let msgs = packet::to_packets(&[vote_tx]); // panics if won't fit
+        let msgs = packet::pkt_bndl(&[vote_tx]); // panics if won't fit
 
         assert_eq!(msgs.len(), 1);
     }

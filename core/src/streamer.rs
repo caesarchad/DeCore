@@ -2,7 +2,7 @@
 //!
 
 use crate::packet::{
-    deserialize_packets_in_blob, Blob, Meta, Packets, SharedBlobs, 
+    de_pkts_in_blb, Blob, Meta, BndlPkt, ArcBlbBndl, 
 };
 use morgan_interface::constants::PACKET_DATA_SIZE;
 use crate::result::{Error, Result};
@@ -17,21 +17,21 @@ use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 use walkdir::WalkDir;
 
-pub type PcktAcptr = Receiver<Packets>;
-pub type PcktSndr = Sender<Packets>;
-pub type BlobSndr = Sender<SharedBlobs>;
-pub type BlobAcptr = Receiver<SharedBlobs>;
+pub type PcktAcptr = Receiver<BndlPkt>;
+pub type PcktSndr = Sender<BndlPkt>;
+pub type BlobSndr = Sender<ArcBlbBndl>;
+pub type BlobAcptr = Receiver<ArcBlbBndl>;
 
 fn recv_loop(sock: &UdpSocket, exit: Arc<AtomicBool>, channel: &PcktSndr) -> Result<()> {
     loop {
-        let mut msgs = Packets::default();
+        let mut msgs = BndlPkt::default();
         loop {
             // Check for exit signal, even if socket is busy
             // (for instance the leader trasaction socket)
             if exit.load(Ordering::Relaxed) {
                 return Ok(());
             }
-            if let Ok(_len) = msgs.recv_from(sock) {
+            if let Ok(_len) = msgs.listen_to(sock) {
                 channel.send(msgs)?;
                 break;
             }
@@ -64,7 +64,7 @@ fn recv_send(sock: &UdpSocket, r: &BlobAcptr) -> Result<()> {
     Ok(())
 }
 
-pub fn recv_batch(recvr: &PcktAcptr, max_batch: usize) -> Result<(Vec<Packets>, usize, u64)> {
+pub fn recv_batch(recvr: &PcktAcptr, max_batch: usize) -> Result<(Vec<BndlPkt>, usize, u64)> {
     let timer = Duration::new(1, 0);
     let msgs = recvr.recv_timeout(timer)?;
     let recv_start = Instant::now();
@@ -110,9 +110,9 @@ pub fn responder(name: &'static str, sock: Arc<UdpSocket>, r: BlobAcptr) -> Join
 
 //TODO, we would need to stick block authentication before we create the
 //window.
-fn recv_blobs(sock: &UdpSocket, s: &BlobSndr) -> Result<()> {
-    trace!("recv_blobs: receiving on {}", sock.local_addr().unwrap());
-    let dq = Blob::recv_from(sock)?;
+fn acpt_bndl_blob(sock: &UdpSocket, s: &BlobSndr) -> Result<()> {
+    trace!("acpt_bndl_blob: receiving on {}", sock.local_addr().unwrap());
+    let dq = Blob::listen_to(sock)?;
     if !dq.is_empty() {
         s.send(dq)?;
     }
@@ -136,7 +136,7 @@ pub fn blob_receiver(
             if exit.load(Ordering::Relaxed) {
                 break;
             }
-            let _ = recv_blobs(&sock, &s);
+            let _ = acpt_bndl_blob(&sock, &s);
         })
         .unwrap()
 }
@@ -182,7 +182,7 @@ fn recv_blob_packets(sock: &UdpSocket, s: &PcktSndr) -> Result<()> {
     let meta = Meta::default();
     let serialized_meta_size = bincode::serialized_size(&meta)? as usize;
     let serialized_packet_size = serialized_meta_size + PACKET_DATA_SIZE;
-    let blobs = Blob::recv_from(sock)?;
+    let blobs = Blob::listen_to(sock)?;
     for blob in blobs {
         let r_blob = blob.read().unwrap();
         let data = {
@@ -191,14 +191,14 @@ fn recv_blob_packets(sock: &UdpSocket, s: &PcktSndr) -> Result<()> {
         };
 
         let packets =
-            deserialize_packets_in_blob(data, serialized_packet_size, serialized_meta_size);
+            de_pkts_in_blb(data, serialized_packet_size, serialized_meta_size);
 
         if packets.is_err() {
             continue;
         }
 
         let packets = packets?;
-        s.send(Packets::new(packets))?;
+        s.send(BndlPkt::new(packets))?;
     }
 
     Ok(())
@@ -229,7 +229,7 @@ pub fn blob_packet_receiver(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::packet::{Blob, Packet, Packets, SharedBlob};
+    use crate::packet::{Blob, Pkt, BndlPkt, ArcBlb};
     use morgan_interface::constants::PACKET_DATA_SIZE;
     use crate::data_filter::{receiver, responder};
     use std::io;
@@ -255,8 +255,8 @@ mod test {
     }
     #[test]
     fn streamer_debug() {
-        write!(io::sink(), "{:?}", Packet::default()).unwrap();
-        write!(io::sink(), "{:?}", Packets::default()).unwrap();
+        write!(io::sink(), "{:?}", Pkt::default()).unwrap();
+        write!(io::sink(), "{:?}", BndlPkt::default()).unwrap();
         write!(io::sink(), "{:?}", Blob::default()).unwrap();
     }
     #[test]
@@ -274,7 +274,7 @@ mod test {
             let t_responder = responder("streamer_send_test", Arc::new(send), r_responder);
             let mut msgs = Vec::new();
             for i in 0..5 {
-                let b = SharedBlob::default();
+                let b = ArcBlb::default();
                 {
                     let mut w = b.write().unwrap();
                     w.data[0] = i as u8;

@@ -29,7 +29,7 @@ pub enum Error {
     Serialize(std::boxed::Box<bincode::ErrorKind>),
     TransactionError(transaction::TransactionError),
     NodeGroupInfoError(node_group_info::NodeGroupInfoError),
-    BlobError(packet::BlobError),
+    BlobErr(packet::BlobErr),
     ErasureError(reed_solomon_erasure::Error),
     SendError,
     WaterClockRecorderErr(water_clock_recorder::WaterClockRecorderErr),

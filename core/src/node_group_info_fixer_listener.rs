@@ -477,7 +477,7 @@ mod tests {
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::tests::compose_candidate_fscl_stmts_in_batch;
     use crate::node_group_info::Node;
-    use crate::packet::{Blob, SharedBlob};
+    use crate::packet::{Blob, ArcBlb};
     use crate::data_filter;
     use std::collections::BTreeSet;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -489,7 +489,7 @@ mod tests {
 
     struct MockRepairee {
         id: Pubkey,
-        receiver: Receiver<Vec<SharedBlob>>,
+        receiver: Receiver<Vec<ArcBlb>>,
         blaze_node_url: SocketAddr,
         repairee_exit: Arc<AtomicBool>,
         repairee_receiver_thread_hdl: JoinHandle<()>,
@@ -498,7 +498,7 @@ mod tests {
     impl MockRepairee {
         pub fn new(
             id: Pubkey,
-            receiver: Receiver<Vec<SharedBlob>>,
+            receiver: Receiver<Vec<ArcBlb>>,
             blaze_node_url: SocketAddr,
             repairee_exit: Arc<AtomicBool>,
             repairee_receiver_thread_hdl: JoinHandle<()>,

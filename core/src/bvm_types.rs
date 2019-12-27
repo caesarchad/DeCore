@@ -1,6 +1,6 @@
 
 use crate::packet::{
-    deserialize_packets_in_blob, Blob, Meta, Packets, SharedBlobs, 
+    de_pkts_in_blb, Blob, PktMeta, BndlPkt, ArcBlbBndl, 
 };
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
 use morgan_netutil::PortRange;
@@ -9,10 +9,10 @@ use std::time::Duration;
 use std::mem::size_of;
 use morgan_interface::pubkey::Pubkey;
 use morgan_interface::hash::Hash;
-pub type PcktAcptr = Receiver<Packets>;
-pub type PcktSndr = Sender<Packets>;
-pub type BlobSndr = Sender<SharedBlobs>;
-pub type BlobAcptr = Receiver<SharedBlobs>;
+pub type PcktAcptr = Receiver<BndlPkt>;
+pub type PcktSndr = Sender<BndlPkt>;
+pub type BlobSndr = Sender<ArcBlbBndl>;
+pub type BlobAcptr = Receiver<ArcBlbBndl>;
 macro_rules! align {
     ($x:expr, $align:expr) => {
         $x + ($align - 1) & !($align - 1)

@@ -21,13 +21,13 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 use morgan_helper::logHelper::*;
 
-pub type SharedBlob = Arc<RwLock<Blob>>;
-pub type SharedBlobs = Vec<SharedBlob>;
+pub type ArcBlb = Arc<RwLock<Blob>>;
+pub type ArcBlbBndl = Vec<ArcBlb>;
 
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
-pub struct Meta {
+pub struct PktMeta {
     pub size: usize,
     pub forward: bool,
     pub addr: [u16; 8],
@@ -37,46 +37,46 @@ pub struct Meta {
 
 #[derive(Clone)]
 #[repr(C)]
-pub struct Packet {
+pub struct Pkt {
     pub data: [u8; PACKET_DATA_SIZE],
-    pub meta: Meta,
+    pub meta: PktMeta,
 }
 
-impl Packet {
-    pub fn new(data: [u8; PACKET_DATA_SIZE], meta: Meta) -> Self {
+impl Pkt {
+    pub fn new(data: [u8; PACKET_DATA_SIZE], meta: PktMeta) -> Self {
         Self { data, meta }
     }
 }
 
-impl fmt::Debug for Packet {
+impl fmt::Debug for Pkt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Packet {{ size: {:?}, addr: {:?} }}",
+            "Pkt {{ size: {:?}, addr: {:?} }}",
             self.meta.size,
             self.meta.addr()
         )
     }
 }
 
-impl Default for Packet {
-    fn default() -> Packet {
-        Packet {
+impl Default for Pkt {
+    fn default() -> Pkt {
+        Pkt {
             data: unsafe { std::mem::uninitialized() },
-            meta: Meta::default(),
+            meta: PktMeta::default(),
         }
     }
 }
 
-impl PartialEq for Packet {
-    fn eq(&self, other: &Packet) -> bool {
+impl PartialEq for Pkt {
+    fn eq(&self, other: &Pkt) -> bool {
         let self_data: &[u8] = self.data.as_ref();
         let other_data: &[u8] = other.data.as_ref();
         self.meta == other.meta && self_data == other_data
     }
 }
 
-impl Meta {
+impl PktMeta {
     pub fn addr(&self) -> SocketAddr {
         if !self.v6 {
             let addr = [
@@ -117,21 +117,20 @@ impl Meta {
 }
 
 #[derive(Debug, Clone)]
-pub struct Packets {
-    pub packets: Vec<Packet>,
+pub struct BndlPkt {
+    pub packets: Vec<Pkt>,
 }
 
-//auto derive doesn't support large arrays
-impl Default for Packets {
-    fn default() -> Packets {
-        Packets {
+impl Default for BndlPkt {
+    fn default() -> BndlPkt {
+        BndlPkt {
             packets: Vec::with_capacity(NUM_RCVMMSGS),
         }
     }
 }
 
-impl Packets {
-    pub fn new(packets: Vec<Packet>) -> Self {
+impl BndlPkt {
+    pub fn new(packets: Vec<Pkt>) -> Self {
         Self { packets }
     }
 
@@ -142,36 +141,36 @@ impl Packets {
     }
 }
 
-#[repr(align(16))] // 16 === BLOB_DATA_ALIGN
-pub struct BlobData {
+#[repr(align(16))] 
+pub struct BlobContext {
     pub data: [u8; BLOB_SIZE],
 }
 
-impl Clone for BlobData {
+impl Clone for BlobContext {
     fn clone(&self) -> Self {
-        BlobData { data: self.data }
+        BlobContext { data: self.data }
     }
 }
 
-impl Default for BlobData {
+impl Default for BlobContext {
     fn default() -> Self {
-        BlobData {
+        BlobContext {
             data: [0u8; BLOB_SIZE],
         }
     }
 }
 
-impl PartialEq for BlobData {
-    fn eq(&self, other: &BlobData) -> bool {
+impl PartialEq for BlobContext {
+    fn eq(&self, other: &BlobContext) -> bool {
         let self_data: &[u8] = self.data.as_ref();
         let other_data: &[u8] = other.data.as_ref();
         self_data == other_data
     }
 }
 
-// this code hides _data, maps it to _data.data
+
 impl Deref for Blob {
-    type Target = BlobData;
+    type Target = BlobContext;
 
     fn deref(&self) -> &Self::Target {
         &self._data
@@ -185,8 +184,8 @@ impl DerefMut for Blob {
 
 #[derive(Clone, Default, PartialEq)]
 pub struct Blob {
-    _data: BlobData, // hidden member, passed through by Deref
-    pub meta: Meta,
+    _data: BlobContext, 
+    pub meta: PktMeta,
 }
 
 impl fmt::Debug for Blob {
@@ -201,32 +200,24 @@ impl fmt::Debug for Blob {
 }
 
 #[derive(Debug)]
-pub enum BlobError {
-    /// the Blob's meta and data are not self-consistent
+pub enum BlobErr {
     BadState,
-    /// Blob verification failed
     VerificationFailed,
 }
 
-impl Packets {
-    pub fn recv_from(&mut self, socket: &UdpSocket) -> Result<usize> {
+impl BndlPkt {
+    pub fn listen_to(&mut self, socket: &UdpSocket) -> Result<usize> {
         let mut i = 0;
-        //DOCUMENTED SIDE-EFFECT
-        //Performance out of the IO without poll
-        //  * block on the socket until it's readable
-        //  * set the socket to non blocking
-        //  * read until it fails
-        //  * set it back to blocking before returning
         socket.set_nonblocking(false)?;
         trace!("receiving on {}", socket.local_addr().unwrap());
         loop {
-            self.packets.resize(i + NUM_RCVMMSGS, Packet::default());
+            self.packets.resize(i + NUM_RCVMMSGS, Pkt::default());
             match recvmmsg(socket, &mut self.packets[i..]) {
                 Err(_) if i > 0 => {
                     break;
                 }
                 Err(e) => {
-                    trace!("recv_from err {:?}", e);
+                    trace!("listen_to err {:?}", e);
                     return Err(Error::IO(e));
                 }
                 Ok(npkts) => {
@@ -246,7 +237,7 @@ impl Packets {
         Ok(i)
     }
 
-    pub fn send_to(&self, socket: &UdpSocket) -> Result<()> {
+    pub fn snd_pkt(&self, socket: &UdpSocket) -> Result<()> {
         for p in &self.packets {
             let a = p.meta.addr();
             socket.send_to(&p.data[..p.meta.size], &a)?;
@@ -255,11 +246,11 @@ impl Packets {
     }
 }
 
-pub fn to_packets_chunked<T: Serialize>(xs: &[T], chunks: usize) -> Vec<Packets> {
+pub fn pkt_chunk<T: Serialize>(xs: &[T], chunks: usize) -> Vec<BndlPkt> {
     let mut out = vec![];
     for x in xs.chunks(chunks) {
-        let mut p = Packets::default();
-        p.packets.resize(x.len(), Packet::default());
+        let mut p = BndlPkt::default();
+        p.packets.resize(x.len(), Pkt::default());
         for (i, o) in x.iter().zip(p.packets.iter_mut()) {
             let mut wr = io::Cursor::new(&mut o.data[..]);
             bincode::serialize_into(&mut wr, &i).expect("serialize request");
@@ -271,11 +262,11 @@ pub fn to_packets_chunked<T: Serialize>(xs: &[T], chunks: usize) -> Vec<Packets>
     out
 }
 
-pub fn to_packets<T: Serialize>(xs: &[T]) -> Vec<Packets> {
-    to_packets_chunked(xs, NUM_PACKETS)
+pub fn pkt_bndl<T: Serialize>(xs: &[T]) -> Vec<BndlPkt> {
+    pkt_chunk(xs, NUM_PACKETS)
 }
 
-pub fn to_blob<T: Serialize>(resp: T, rsp_addr: SocketAddr) -> Result<Blob> {
+pub fn blb_from_strm<T: Serialize>(resp: T, rsp_addr: SocketAddr) -> Result<Blob> {
     let mut b = Blob::default();
     let v = bincode::serialize(&resp)?;
     let len = v.len();
@@ -286,28 +277,28 @@ pub fn to_blob<T: Serialize>(resp: T, rsp_addr: SocketAddr) -> Result<Blob> {
     Ok(b)
 }
 
-pub fn to_blobs<T: Serialize>(rsps: Vec<(T, SocketAddr)>) -> Result<Vec<Blob>> {
+pub fn blb_bndl<T: Serialize>(rsps: Vec<(T, SocketAddr)>) -> Result<Vec<Blob>> {
     let mut blobs = Vec::new();
     for (resp, rsp_addr) in rsps {
-        blobs.push(to_blob(resp, rsp_addr)?);
+        blobs.push(blb_from_strm(resp, rsp_addr)?);
     }
     Ok(blobs)
 }
 
-pub fn to_shared_blob<T: Serialize>(resp: T, rsp_addr: SocketAddr) -> Result<SharedBlob> {
-    let blob = Arc::new(RwLock::new(to_blob(resp, rsp_addr)?));
+pub fn arc_blb<T: Serialize>(resp: T, rsp_addr: SocketAddr) -> Result<ArcBlb> {
+    let blob = Arc::new(RwLock::new(blb_from_strm(resp, rsp_addr)?));
     Ok(blob)
 }
 
-pub fn to_shared_blobs<T: Serialize>(rsps: Vec<(T, SocketAddr)>) -> Result<SharedBlobs> {
+pub fn arc_blb_bndl<T: Serialize>(rsps: Vec<(T, SocketAddr)>) -> Result<ArcBlbBndl> {
     let mut blobs = Vec::new();
     for (resp, rsp_addr) in rsps {
-        blobs.push(to_shared_blob(resp, rsp_addr)?);
+        blobs.push(arc_blb(resp, rsp_addr)?);
     }
     Ok(blobs)
 }
 
-pub fn packets_to_blobs<T: Borrow<Packet>>(packets: &[T]) -> Vec<Blob> {
+pub fn packets_to_blobs<T: Borrow<Pkt>>(packets: &[T]) -> Vec<Blob> {
     let mut current_index = 0;
     let mut blobs = vec![];
     while current_index < packets.len() {
@@ -319,15 +310,15 @@ pub fn packets_to_blobs<T: Borrow<Packet>>(packets: &[T]) -> Vec<Blob> {
     blobs
 }
 
-pub fn deserialize_packets_in_blob(
+pub fn de_pkts_in_blb(
     data: &[u8],
     serialized_packet_size: usize,
     serialized_meta_size: usize,
-) -> Result<Vec<Packet>> {
-    let mut packets: Vec<Packet> = Vec::with_capacity(data.len() / serialized_packet_size);
+) -> Result<Vec<Pkt>> {
+    let mut packets: Vec<Pkt> = Vec::with_capacity(data.len() / serialized_packet_size);
     let mut pos = 0;
     while pos + serialized_packet_size <= data.len() {
-        let packet = deserialize_single_packet_in_blob(
+        let packet = de_singleton_pkt(
             &data[pos..pos + serialized_packet_size],
             serialized_meta_size,
         )?;
@@ -337,12 +328,12 @@ pub fn deserialize_packets_in_blob(
     Ok(packets)
 }
 
-fn deserialize_single_packet_in_blob(data: &[u8], serialized_meta_size: usize) -> Result<Packet> {
+fn de_singleton_pkt(data: &[u8], serialized_meta_size: usize) -> Result<Pkt> {
     let meta = bincode::deserialize(&data[..serialized_meta_size])?;
     let mut packet_data = [0; PACKET_DATA_SIZE];
     packet_data
         .copy_from_slice(&data[serialized_meta_size..serialized_meta_size + PACKET_DATA_SIZE]);
-    Ok(Packet::new(packet_data, meta))
+    Ok(Pkt::new(packet_data, meta))
 }
 
 
@@ -394,8 +385,6 @@ impl Blob {
         LittleEndian::write_u64(&mut self.data[INDEX_RANGE], ix);
     }
 
-    /// sender id, we use this for identifying if its a blob from the leader that we should
-    /// retransmit.  eventually blobs should have a signature that we can use for spam filtering
     pub fn id(&self) -> Pubkey {
         Pubkey::new(&self.data[ID_RANGE])
     }
@@ -404,14 +393,10 @@ impl Blob {
         self.data[ID_RANGE].copy_from_slice(id.as_ref())
     }
 
-    /// Used to determine whether or not this blob should be forwarded in retransmit
-    /// A bool is used here instead of a flag because this item is not intended to be signed when
-    /// blob signatures are introduced
     pub fn should_forward(&self) -> bool {
         self.data[FORWARDED_RANGE][0] & 0x1 == 0
     }
 
-    /// Mark this blob's forwarded status
     pub fn set_forwarded(&mut self, forward: bool) {
         self.data[FORWARDED_RANGE][0] = u8::from(forward)
     }
@@ -479,7 +464,7 @@ impl Blob {
         self.set_data_size(new_size as u64);
     }
 
-    pub fn store_packets<T: Borrow<Packet>>(&mut self, packets: &[T]) -> u64 {
+    pub fn store_packets<T: Borrow<Pkt>>(&mut self, packets: &[T]) -> u64 {
         let size = self.size();
         let mut cursor = Cursor::new(&mut self.data_mut()[size..]);
         let mut written = 0;
@@ -500,7 +485,7 @@ impl Blob {
         last_index
     }
 
-    pub fn recv_blob(socket: &UdpSocket, r: &SharedBlob) -> io::Result<()> {
+    pub fn recv_blob(socket: &UdpSocket, r: &ArcBlb) -> io::Result<()> {
         let mut p = r.write().unwrap();
         trace!("receiving on {}", socket.local_addr().unwrap());
 
@@ -511,17 +496,11 @@ impl Blob {
         Ok(())
     }
 
-    pub fn recv_from(socket: &UdpSocket) -> Result<SharedBlobs> {
+    pub fn listen_to(socket: &UdpSocket) -> Result<ArcBlbBndl> {
         let mut v = Vec::new();
-        //DOCUMENTED SIDE-EFFECT
-        //Performance out of the IO without poll
-        //  * block on the socket until it's readable
-        //  * set the socket to non blocking
-        //  * read until it fails
-        //  * set it back to blocking before returning
         socket.set_nonblocking(false)?;
         for i in 0..NUM_BLOBS {
-            let r = SharedBlob::default();
+            let r = ArcBlb::default();
 
             match Blob::recv_blob(socket, &r) {
                 Err(_) if i > 0 => {
@@ -530,10 +509,9 @@ impl Blob {
                 }
                 Err(e) => {
                     if e.kind() != io::ErrorKind::WouldBlock {
-                        // info!("{}", Info(format!("recv_from err {:?}", e).to_string()));
                         println!("{}",
                             printLn(
-                                format!("recv_from err {:?}", e).to_string(),
+                                format!("listen_to err {:?}", e).to_string(),
                                 module_path!().to_string()
                             )
                         );
@@ -550,16 +528,13 @@ impl Blob {
         }
         Ok(v)
     }
-    pub fn send_to(socket: &UdpSocket, v: SharedBlobs) -> Result<()> {
+    pub fn snd_pkt(socket: &UdpSocket, v: ArcBlbBndl) -> Result<()> {
         for r in v {
             {
                 let p = r.read().unwrap();
                 let a = p.meta.addr();
                 if let Err(e) = socket.send_to(&p.data[..p.meta.size], &a) {
-                    // warn!(
-                    //     "error sending {} byte packet to {:?}: {:?}",
-                    //     p.meta.size, a, e
-                    // );
+
                     println!(
                         "{}",
                         Warn(
@@ -576,19 +551,18 @@ impl Blob {
     }
 }
 
-pub fn index_blobs(blobs: &[SharedBlob], id: &Pubkey, blob_index: u64, slot: u64, parent: u64) {
+pub fn index_blobs(blobs: &[ArcBlb], id: &Pubkey, blob_index: u64, slot: u64, parent: u64) {
     index_blobs_with_genesis(blobs, id, &Hash::default(), blob_index, slot, parent)
 }
 
 pub fn index_blobs_with_genesis(
-    blobs: &[SharedBlob],
+    blobs: &[ArcBlb],
     id: &Pubkey,
     genesis: &Hash,
     mut blob_index: u64,
     slot: u64,
     parent: u64,
 ) {
-    // enumerate all the blobs, those are the indices
     for blob in blobs.iter() {
         let mut blob = blob.write().unwrap();
 
@@ -615,10 +589,9 @@ mod tests {
 
     #[test]
     fn test_packets_set_addr() {
-        // test that the address is actually being updated
         let send_addr = socketaddr!([127, 0, 0, 1], 123);
-        let packets = vec![Packet::default()];
-        let mut msgs = Packets { packets };
+        let packets = vec![Pkt::default()];
+        let mut msgs = BndlPkt { packets };
         msgs.set_addr(&send_addr);
         assert_eq!(SocketAddr::from(msgs.packets[0].meta.addr()), send_addr);
     }
@@ -630,17 +603,17 @@ mod tests {
         let addr = recv_socket.local_addr().unwrap();
         let send_socket = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let saddr = send_socket.local_addr().unwrap();
-        let mut p = Packets::default();
+        let mut p = BndlPkt::default();
 
-        p.packets.resize(10, Packet::default());
+        p.packets.resize(10, Pkt::default());
 
         for m in p.packets.iter_mut() {
             m.meta.set_addr(&addr);
             m.meta.size = PACKET_DATA_SIZE;
         }
-        p.send_to(&send_socket).unwrap();
+        p.snd_pkt(&send_socket).unwrap();
 
-        let recvd = p.recv_from(&recv_socket).unwrap();
+        let recvd = p.listen_to(&recv_socket).unwrap();
 
         assert_eq!(recvd, p.packets.len());
 
@@ -655,15 +628,15 @@ mod tests {
         let keypair = Keypair::new();
         let hash = Hash::new(&[1; 32]);
         let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 1, hash);
-        let rv = to_packets(&vec![tx.clone(); 1]);
+        let rv = pkt_bndl(&vec![tx.clone(); 1]);
         assert_eq!(rv.len(), 1);
         assert_eq!(rv[0].packets.len(), 1);
 
-        let rv = to_packets(&vec![tx.clone(); NUM_PACKETS]);
+        let rv = pkt_bndl(&vec![tx.clone(); NUM_PACKETS]);
         assert_eq!(rv.len(), 1);
         assert_eq!(rv[0].packets.len(), NUM_PACKETS);
 
-        let rv = to_packets(&vec![tx.clone(); NUM_PACKETS + 1]);
+        let rv = pkt_bndl(&vec![tx.clone(); NUM_PACKETS + 1]);
         assert_eq!(rv.len(), 2);
         assert_eq!(rv[0].packets.len(), NUM_PACKETS);
         assert_eq!(rv[1].packets.len(), 1);
@@ -675,14 +648,14 @@ mod tests {
         let reader = UdpSocket::bind("127.0.0.1:0").expect("bind");
         let addr = reader.local_addr().unwrap();
         let sender = UdpSocket::bind("127.0.0.1:0").expect("bind");
-        let p = SharedBlob::default();
+        let p = ArcBlb::default();
         p.write().unwrap().meta.set_addr(&addr);
         p.write().unwrap().meta.size = 1024;
         let v = vec![p];
-        Blob::send_to(&sender, v).unwrap();
-        trace!("send_to");
-        let rv = Blob::recv_from(&reader).unwrap();
-        trace!("recv_from");
+        Blob::snd_pkt(&sender, v).unwrap();
+        trace!("snd_pkt");
+        let rv = Blob::listen_to(&reader).unwrap();
+        trace!("listen_to");
         assert_eq!(rv.len(), 1);
         assert_eq!(rv[0].read().unwrap().meta.size, 1024);
     }
@@ -693,21 +666,21 @@ mod tests {
         let reader = UdpSocket::bind("[::1]:0").expect("bind");
         let addr = reader.local_addr().unwrap();
         let sender = UdpSocket::bind("[::1]:0").expect("bind");
-        let p = SharedBlob::default();
+        let p = ArcBlb::default();
         p.as_mut().unwrap().meta.set_addr(&addr);
         p.as_mut().unwrap().meta.size = 1024;
         let mut v = VecDeque::default();
         v.push_back(p);
-        Blob::send_to(&r, &sender, &mut v).unwrap();
-        let mut rv = Blob::recv_from(&reader).unwrap();
+        Blob::snd_pkt(&r, &sender, &mut v).unwrap();
+        let mut rv = Blob::listen_to(&reader).unwrap();
         let rp = rv.pop_front().unwrap();
         assert_eq!(rp.as_mut().meta.size, 1024);
     }
 
     #[test]
     pub fn debug_trait() {
-        write!(io::sink(), "{:?}", Packet::default()).unwrap();
-        write!(io::sink(), "{:?}", Packets::default()).unwrap();
+        write!(io::sink(), "{:?}", Pkt::default()).unwrap();
+        write!(io::sink(), "{:?}", BndlPkt::default()).unwrap();
         write!(io::sink(), "{:?}", Blob::default()).unwrap();
     }
     #[test]
@@ -718,7 +691,7 @@ mod tests {
         b.data_mut()[0] = 1;
         assert_eq!(b.data()[0], 1);
         assert_eq!(b.index(), <u64>::max_value());
-        assert_eq!(b.meta, Meta::default());
+        assert_eq!(b.meta, PktMeta::default());
     }
     #[test]
     fn test_blob_forward() {
@@ -730,44 +703,34 @@ mod tests {
 
     #[test]
     fn test_store_blobs_max() {
-        let meta = Meta::default();
+        let meta = PktMeta::default();
         let serialized_meta_size = bincode::serialized_size(&meta).unwrap() as usize;
         let serialized_packet_size = serialized_meta_size + PACKET_DATA_SIZE;
         let num_packets = (BLOB_SIZE - BLOB_HEADER_SIZE) / serialized_packet_size + 1;
         let mut blob = Blob::default();
-        let packets: Vec<_> = (0..num_packets).map(|_| Packet::default()).collect();
-
-        // Everything except the last packet should have been written
+        let packets: Vec<_> = (0..num_packets).map(|_| Pkt::default()).collect();
         assert_eq!(blob.store_packets(&packets[..]), (num_packets - 1) as u64);
-
         blob = Blob::default();
-        // Store packets such that blob only has room for one more
         assert_eq!(
             blob.store_packets(&packets[..num_packets - 2]),
             (num_packets - 2) as u64
         );
-
-        // Fill the last packet in the blob
         assert_eq!(blob.store_packets(&packets[..num_packets - 2]), 1);
-
-        // Blob is now full
         assert_eq!(blob.store_packets(&packets), 0);
     }
 
     #[test]
     fn test_packets_to_blobs() {
         let mut rng = rand::thread_rng();
-        let meta = Meta::default();
+        let meta = PktMeta::default();
         let serialized_meta_size = bincode::serialized_size(&meta).unwrap() as usize;
         let serialized_packet_size = serialized_meta_size + PACKET_DATA_SIZE;
-
         let packets_per_blob = (BLOB_SIZE - BLOB_HEADER_SIZE) / serialized_packet_size;
         assert!(packets_per_blob > 1);
         let num_packets = packets_per_blob * 10 + packets_per_blob - 1;
-
         let packets: Vec<_> = (0..num_packets)
             .map(|_| {
-                let mut packet = Packet::default();
+                let mut packet = Pkt::default();
                 for i in 0..packet.meta.addr.len() {
                     packet.meta.addr[i] = rng.gen_range(1, std::u16::MAX);
                 }
@@ -777,14 +740,13 @@ mod tests {
                 packet
             })
             .collect();
-
         let blobs = packets_to_blobs(&packets[..]);
         assert_eq!(blobs.len(), 11);
 
-        let reconstructed_packets: Vec<Packet> = blobs
+        let reconstructed_packets: Vec<Pkt> = blobs
             .iter()
             .flat_map(|b| {
-                deserialize_packets_in_blob(
+                de_pkts_in_blb(
                     &b.data()[..b.size()],
                     serialized_packet_size,
                     serialized_meta_size,
@@ -798,14 +760,14 @@ mod tests {
 
     #[test]
     fn test_deserialize_packets_in_blob() {
-        let meta = Meta::default();
+        let meta = PktMeta::default();
         let serialized_meta_size = bincode::serialized_size(&meta).unwrap() as usize;
         let serialized_packet_size = serialized_meta_size + PACKET_DATA_SIZE;
         let num_packets = 10;
         let mut rng = rand::thread_rng();
         let packets: Vec<_> = (0..num_packets)
             .map(|_| {
-                let mut packet = Packet::default();
+                let mut packet = Pkt::default();
                 for i in 0..packet.meta.addr.len() {
                     packet.meta.addr[i] = rng.gen_range(1, std::u16::MAX);
                 }
@@ -818,7 +780,7 @@ mod tests {
 
         let mut blob = Blob::default();
         assert_eq!(blob.store_packets(&packets[..]), num_packets);
-        let result = deserialize_packets_in_blob(
+        let result = de_pkts_in_blb(
             &blob.data()[..blob.size()],
             serialized_packet_size,
             serialized_meta_size,
@@ -830,13 +792,13 @@ mod tests {
 
     #[test]
     fn test_blob_data_align() {
-        assert_eq!(std::mem::align_of::<BlobData>(), BLOB_DATA_ALIGN);
+        assert_eq!(std::mem::align_of::<BlobContext>(), BLOB_DATA_ALIGN);
     }
 
     #[test]
     fn test_packet_partial_eq() {
-        let p1 = Packet::default();
-        let mut p2 = Packet::default();
+        let p1 = Pkt::default();
+        let mut p2 = Pkt::default();
 
         assert!(p1 == p2);
         p2.data[1] = 4;

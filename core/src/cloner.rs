@@ -5,7 +5,7 @@ use crate::chacha::{chacha_cbc_encrypt_ledger, CHACHA_BLOCK_SIZE};
 use crate::node_group_info::{NodeGroupInfo, Node};
 use crate::connection_info::ContactInfo;
 use crate::gossip_service::GossipService;
-use crate::packet::to_shared_blob;
+use crate::packet::arc_blb;
 use crate::fix_missing_spot_service::{FixSlotLength, FixPlan};
 use crate::result::Result;
 use crate::service::Service;
@@ -144,7 +144,7 @@ fn create_request_processor(
                     deserialize(&packet.data[..packet.meta.size]);
                 match req {
                     Ok(StorageMinerRequest::GetSlotHeight(from)) => {
-                        if let Ok(blob) = to_shared_blob(slot, from) {
+                        if let Ok(blob) = arc_blb(slot, from) {
                             let _ = s_responder.send(vec![blob]);
                         }
                     }

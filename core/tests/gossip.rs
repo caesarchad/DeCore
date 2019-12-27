@@ -4,8 +4,7 @@ extern crate log;
 use rayon::iter::*;
 use morgan::node_group_info::{NodeGroupInfo, Node};
 use morgan::gossip_service::GossipService;
-
-use morgan::packet::{Blob, SharedBlob};
+use morgan::packet::{Blob, ArcBlb};
 use morgan::result;
 use morgan::service::Service;
 use morgan_interface::signature::{Keypair, KeypairUtil};
@@ -174,7 +173,7 @@ pub fn cluster_info_retransmit() -> result::Result<()> {
         sleep(Duration::new(1, 0));
     }
     assert!(done);
-    let b = SharedBlob::default();
+    let b = ArcBlb::default();
     b.write().unwrap().meta.size = 10;
     let peers = c1.read().unwrap().retransmit_peers();
     NodeGroupInfo::retransmit_to(&c1, &peers, &b, None, &tn1, false)?;

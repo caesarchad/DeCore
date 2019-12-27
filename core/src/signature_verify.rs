@@ -4,7 +4,7 @@
 //! offloaded to the GPU.
 //!
 
-use crate::packet::{Packet, Packets};
+use crate::packet::{Pkt, BndlPkt};
 use crate::result::Result;
 use bincode::serialized_size;
 use morgan_metricbot::inc_new_counter_debug;
@@ -21,7 +21,7 @@ type TxOffsets = (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<Vec<u32>>);
 #[cfg(feature = "cuda")]
 #[repr(C)]
 struct Elems {
-    elems: *const Packet,
+    elems: *const Pkt,
     num: u32,
 }
 
@@ -66,7 +66,7 @@ pub fn init() {
     // stub
 }
 
-fn verify_packet(packet: &Packet) -> u8 {
+fn verify_packet(packet: &Pkt) -> u8 {
     let (sig_len, sig_start, msg_start, pubkey_start) = get_packet_offsets(packet, 0);
     let mut sig_start = sig_start as usize;
     let mut pubkey_start = pubkey_start as usize;
@@ -98,16 +98,16 @@ fn verify_packet(packet: &Packet) -> u8 {
     1
 }
 
-fn batch_size(batches: &[Packets]) -> usize {
+fn batch_size(batches: &[BndlPkt]) -> usize {
     batches.iter().map(|p| p.packets.len()).sum()
 }
 
 #[cfg(not(feature = "cuda"))]
-pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
+pub fn ed25519_verify(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
     ed25519_verify_cpu(batches)
 }
 
-pub fn get_packet_offsets(packet: &Packet, current_offset: u32) -> (u32, u32, u32, u32) {
+pub fn get_packet_offsets(packet: &Pkt, current_offset: u32) -> (u32, u32, u32, u32) {
     let (sig_len, sig_size) = des_lenth(&packet.data);
     let msg_start_offset = sig_size + sig_len * size_of::<Signature>();
 
@@ -126,7 +126,7 @@ pub fn get_packet_offsets(packet: &Packet, current_offset: u32) -> (u32, u32, u3
     )
 }
 
-pub fn generate_offsets(batches: &[Packets]) -> Result<TxOffsets> {
+pub fn generate_offsets(batches: &[BndlPkt]) -> Result<TxOffsets> {
     let mut signature_offsets: Vec<_> = Vec::new();
     let mut pubkey_offsets: Vec<_> = Vec::new();
     let mut msg_start_offsets: Vec<_> = Vec::new();
@@ -136,7 +136,7 @@ pub fn generate_offsets(batches: &[Packets]) -> Result<TxOffsets> {
     batches.iter().for_each(|p| {
         let mut sig_lens = Vec::new();
         p.packets.iter().for_each(|packet| {
-            let current_offset = current_packet as u32 * size_of::<Packet>() as u32;
+            let current_offset = current_packet as u32 * size_of::<Pkt>() as u32;
 
             let (sig_len, sig_start, msg_start_offset, pubkey_offset) =
                 get_packet_offsets(packet, current_offset);
@@ -170,7 +170,7 @@ pub fn generate_offsets(batches: &[Packets]) -> Result<TxOffsets> {
     ))
 }
 
-pub fn ed25519_verify_cpu(batches: &[Packets]) -> Vec<Vec<u8>> {
+pub fn ed25519_verify_cpu(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
     use rayon::prelude::*;
     let count = batch_size(batches);
     debug!("CPU ECDSA for {}", batch_size(batches));
@@ -182,7 +182,7 @@ pub fn ed25519_verify_cpu(batches: &[Packets]) -> Vec<Vec<u8>> {
     rv
 }
 
-pub fn ed25519_verify_disabled(batches: &[Packets]) -> Vec<Vec<u8>> {
+pub fn ed25519_verify_disabled(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
     use rayon::prelude::*;
     let count = batch_size(batches);
     debug!("disabled ECDSA for {}", batch_size(batches));
@@ -206,7 +206,7 @@ pub fn init() {
 }
 
 #[cfg(feature = "cuda")]
-pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
+pub fn ed25519_verify(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
     use morgan_interface::constants::PACKET_DATA_SIZE;
     let count = batch_size(batches);
 
@@ -236,14 +236,14 @@ pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
     out.resize(signature_offsets.len(), 0);
     trace!("Starting verify num packets: {}", num_packets);
     trace!("elem len: {}", elems.len() as u32);
-    trace!("packet sizeof: {}", size_of::<Packet>() as u32);
+    trace!("packet sizeof: {}", size_of::<Pkt>() as u32);
     trace!("len offset: {}", PACKET_DATA_SIZE as u32);
     const USE_NON_DEFAULT_STREAM: u8 = 1;
     unsafe {
         let res = ed25519_verify_many(
             elems.as_ptr(),
             elems.len() as u32,
-            size_of::<Packet>() as u32,
+            size_of::<Pkt>() as u32,
             num_packets as u32,
             signature_offsets.len() as u32,
             msg_sizes.as_ptr(),
@@ -279,11 +279,11 @@ pub fn ed25519_verify(batches: &[Packets]) -> Vec<Vec<u8>> {
 }
 
 #[cfg(test)]
-pub fn make_packet_from_transaction(tx: Transaction) -> Packet {
+pub fn make_packet_from_transaction(tx: Transaction) -> Pkt {
     use bincode::serialize;
 
     let tx_bytes = serialize(&tx).unwrap();
-    let mut packet = Packet::default();
+    let mut packet = Pkt::default();
     packet.meta.size = tx_bytes.len();
     packet.data[..packet.meta.size].copy_from_slice(&tx_bytes);
     return packet;
@@ -291,7 +291,7 @@ pub fn make_packet_from_transaction(tx: Transaction) -> Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{Packet, Packets};
+    use crate::packet::{Pkt, BndlPkt};
     use crate::signature_verify;
     use crate::test_tx::{test_multisig_tx, test_tx};
     use bincode::{deserialize, serialize};
@@ -401,15 +401,15 @@ mod tests {
     }
 
     fn generate_packet_vec(
-        packet: &Packet,
+        packet: &Pkt,
         num_packets_per_batch: usize,
         num_batches: usize,
-    ) -> Vec<Packets> {
+    ) -> Vec<BndlPkt> {
         // generate packet vector
         let batches: Vec<_> = (0..num_batches)
             .map(|_| {
-                let mut packets = Packets::default();
-                packets.packets.resize(0, Packet::default());
+                let mut packets = BndlPkt::default();
+                packets.packets.resize(0, Pkt::default());
                 for _ in 0..num_packets_per_batch {
                     packets.packets.push(packet.clone());
                 }

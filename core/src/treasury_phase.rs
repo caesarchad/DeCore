@@ -7,7 +7,7 @@ use crate::fiscal_statement_info;
 use crate::fiscal_statement_info::{seal_block, FsclStmt};
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::packet;
-use crate::packet::{Packet, Packets};
+use crate::packet::{Pkt, BndlPkt};
 use crate::water_clock_recorder::{WaterClockRecorder, WaterClockRecorderErr, WorkingTreasuryEntries};
 use crate::water_clock_service::WaterClockService;
 use crate::result::{Error, Result};
@@ -37,7 +37,7 @@ use std::time::Instant;
 use sys_info;
 use morgan_helper::logHelper::*;
 
-type PacketsAndOffsets = (Packets, Vec<usize>);
+type PacketsAndOffsets = (BndlPkt, Vec<usize>);
 pub type UnprocessedPackets = Vec<PacketsAndOffsets>;
 
 // number of threads is 1 until mt treasury is ready
@@ -122,7 +122,7 @@ impl TreasuryPhase {
         Self { treasury_thread_hdls }
     }
 
-    fn filter_valid_packets_for_forwarding(all_packets: &[PacketsAndOffsets]) -> Vec<&Packet> {
+    fn filter_valid_packets_for_forwarding(all_packets: &[PacketsAndOffsets]) -> Vec<&Pkt> {
         all_packets
             .iter()
             .flat_map(|(p, valid_indexes)| valid_indexes.iter().map(move |x| &p.packets[*x]))
@@ -365,7 +365,7 @@ impl TreasuryPhase {
     }
 
     /// Convert the transactions from a blob of binary data to a vector of transactions
-    fn deserialize_transactions(p: &Packets) -> Vec<Option<Transaction>> {
+    fn deserialize_transactions(p: &BndlPkt) -> Vec<Option<Transaction>> {
         p.packets
             .iter()
             .map(|x| deserialize(&x.data[0..x.meta.size]).ok())
@@ -523,12 +523,6 @@ impl TreasuryPhase {
             trace!("process_transactions: {:?}", result);
             unprocessed_txs.extend_from_slice(&unprocessed_txs_in_chunk);
             if let Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached)) = result {
-                // info!(
-                //     "{}",
-                //     Info(format!("process transactions: max height reached slot: {} height: {}",
-                //     treasury.slot(),
-                //     treasury.drop_height()).to_string())
-                // );
                 let loginfo: String = format!("process transactions: max height reached slot: {} height: {}",
                     treasury.slot(),
                     treasury.drop_height()).to_string();
@@ -550,8 +544,6 @@ impl TreasuryPhase {
         Ok((chunk_start, unprocessed_txs))
     }
 
-    // This function returns a vector of transactions that are not None. It also returns a vector
-    // with position of the transaction in the input list
     fn filter_transaction_indexes(
         transactions: Vec<Option<Transaction>>,
         indexes: &[usize],
@@ -566,8 +558,7 @@ impl TreasuryPhase {
             .unzip()
     }
 
-    // This function creates a filter of transaction results with Ok() for every pending
-    // transaction. The non-pending transactions are marked with TransactionError
+
     fn prepare_filter_for_pending_transactions(
         transactions: &[Transaction],
         pending_tx_indexes: &[usize],
@@ -577,8 +568,6 @@ impl TreasuryPhase {
         mask
     }
 
-    // This function returns a vector containing index of all valid transactions. A valid
-    // transaction has result Ok() as the value
     fn filter_valid_transaction_indexes(
         valid_txs: &[transaction::Result<()>],
         transaction_indexes: &[usize],
@@ -595,12 +584,11 @@ impl TreasuryPhase {
             .collect()
     }
 
-    // This function deserializes packets into transactions and returns non-None transactions
     fn transactions_from_packets(
-        msgs: &Packets,
+        msgs: &BndlPkt,
         transaction_indexes: &[usize],
     ) -> (Vec<Transaction>, Vec<usize>) {
-        let packets = Packets::new(
+        let packets = BndlPkt::new(
             transaction_indexes
                 .iter()
                 .map(|x| msgs.packets[*x].to_owned())
@@ -612,7 +600,6 @@ impl TreasuryPhase {
         Self::filter_transaction_indexes(transactions, &transaction_indexes)
     }
 
-    // This function  filters pending transactions that are still valid
     fn filter_pending_transactions(
         treasury: &Arc<Treasury>,
         transactions: &[Transaction],
@@ -635,7 +622,7 @@ impl TreasuryPhase {
     fn process_received_packets(
         treasury: &Arc<Treasury>,
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
-        msgs: &Packets,
+        msgs: &BndlPkt,
         transaction_indexes: Vec<usize>,
     ) -> Result<(usize, usize, Vec<usize>)> {
         let (transactions, transaction_indexes) =
@@ -669,14 +656,12 @@ impl TreasuryPhase {
 
     fn filter_unprocessed_packets(
         treasury: &Arc<Treasury>,
-        msgs: &Packets,
+        msgs: &BndlPkt,
         transaction_indexes: &[usize],
         my_pubkey: &Pubkey,
         next_leader: Option<Pubkey>,
     ) -> Vec<usize> {
-        // Check if we are the next leader. If so, let's not filter the packets
-        // as we'll filter it again while processing the packets.
-        // Filtering helps if we were going to forward the packets to some other node
+
         if let Some(leader) = next_leader {
             if leader == *my_pubkey {
                 return transaction_indexes.to_vec();
@@ -711,7 +696,6 @@ impl TreasuryPhase {
             .collect()
     }
 
-    /// Process the incoming packets
     pub fn process_packets(
         verified_receiver: &Arc<Mutex<Receiver<VerifiedPackets>>>,
         waterclock: &Arc<Mutex<WaterClockRecorder>>,
@@ -754,13 +738,11 @@ impl TreasuryPhase {
 
             new_tx_count += processed;
 
-            // Collect any unprocessed transactions in this batch for forwarding
             Self::push_unprocessed(&mut unprocessed_packets, msgs, unprocessed_indexes);
 
             if processed < verified_txs_len {
                 let next_leader = waterclock.lock().unwrap().next_slot_leader();
                 let my_pubkey = node_group_info.read().unwrap().id();
-                // Walk thru rest of the transactions and filter out the invalid (e.g. too old) ones
                 while let Some((msgs, vers)) = mms_iter.next() {
                     let packet_indexes = Self::generate_packet_indexes(vers);
                     let unprocessed_indexes = Self::filter_unprocessed_packets(
@@ -801,7 +783,7 @@ impl TreasuryPhase {
 
     fn push_unprocessed(
         unprocessed_packets: &mut UnprocessedPackets,
-        packets: Packets,
+        packets: BndlPkt,
         packet_indexes: Vec<usize>,
     ) {
         if !packet_indexes.is_empty() {
@@ -858,7 +840,7 @@ mod tests {
     use crate::node_group_info::Node;
     use crate::fiscal_statement_info::FsclStmtSlc;
     use crate::genesis_utils::{create_genesis_block, GenesisBlockInfo};
-    use crate::packet::to_packets;
+    use crate::packet::pkt_bndl;
     use crate::water_clock_recorder::WorkingTreasury;
     use crate::{fetch_interim_ledger_location, tmp_ledger_name};
     use itertools::Itertools;
@@ -974,8 +956,6 @@ mod tests {
                 verified_receiver,
                 vote_receiver,
             );
-
-            // fund another account so we can send 2 good transactions in a single batch.
             let keypair = Keypair::new();
             let fund_tx = sys_controller::create_user_account(
                 &mint_keypair,
@@ -999,7 +979,7 @@ mod tests {
             let tx_anf = sys_controller::create_user_account(&keypair, &to3, 1, start_hash);
 
             // send 'em over
-            let packets = to_packets(&[tx_no_ver, tx_anf, tx]);
+            let packets = pkt_bndl(&[tx_no_ver, tx_anf, tx]);
 
             // glad they all fit
             assert_eq!(packets.len(), 1);
@@ -1077,7 +1057,7 @@ mod tests {
             genesis_block.hash(),
         );
 
-        let packets = to_packets(&[tx]);
+        let packets = pkt_bndl(&[tx]);
         let packets = packets
             .into_iter()
             .map(|packets| (packets, vec![1u8]))
@@ -1091,7 +1071,7 @@ mod tests {
             1,
             genesis_block.hash(),
         );
-        let packets = to_packets(&[tx]);
+        let packets = pkt_bndl(&[tx]);
         let packets = packets
             .into_iter()
             .map(|packets| (packets, vec![1u8]))
@@ -1609,10 +1589,10 @@ mod tests {
 
         let all_packets = (0..16)
             .map(|packets_id| {
-                let packets = Packets::new(
+                let packets = BndlPkt::new(
                     (0..32)
                         .map(|packet_id| {
-                            let mut p = Packet::default();
+                            let mut p = Pkt::default();
                             p.meta.port = packets_id << 8 | packet_id;
                             p
                         })

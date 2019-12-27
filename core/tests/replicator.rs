@@ -6,14 +6,15 @@ extern crate morgan;
 
 use bincode::{deserialize, serialize};
 use morgan::block_buffer_pool::{create_new_tmp_ledger, BlockBufferPool};
-use morgan::node_group_info::{NodeGroupInfo, Node, FULLNODE_PORT_RANGE};
+use morgan::node_group_info::{NodeGroupInfo, Node, };
+use morgan::bvm_types::FULLNODE_PORT_RANGE;
 use morgan::connection_info::ContactInfo;
 use morgan::gossip_service::find_node_group_host;
 use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
 use morgan::cloner::StorageMiner;
 use morgan::cloner::StorageMinerRequest;
-use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
-use morgan::data_filter::blob_receiver;
+use morgan::bvm_types::STORAGE_ROTATE_TEST_COUNT;
+use morgan::data_filter::acptr_srvc;
 use morgan::verifier::ValidatorConfig;
 use morgan_client::slim_account_host::create_client;
 use morgan_interface::genesis_block::create_genesis_block;
@@ -68,7 +69,7 @@ fn check_miner_connection(storage_miner_info: &ContactInfo) {
     let exit = Arc::new(AtomicBool::new(false));
     let (s_reader, r_reader) = channel();
     let fix_socket = Arc::new(tn.sockets.repair);
-    let t_receiver = blob_receiver(fix_socket.clone(), &exit, s_reader);
+    let t_receiver = acptr_srvc(fix_socket.clone(), &exit, s_reader);
 
     println!("{}",
         printLn(

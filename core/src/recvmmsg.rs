@@ -1,6 +1,6 @@
 //! The `recvmmsg` module provides recvmmsg() API implementation
 
-use crate::packet::Packet;
+use crate::packet::Pkt;
 use crate::bvm_types::*;
 use std::cmp;
 use std::io;
@@ -10,12 +10,12 @@ use std::collections::HashMap;
 
 
 #[cfg(not(target_os = "linux"))]
-pub fn recvmmsg(socket: &UdpSocket, packets: &mut [Packet]) -> io::Result<usize> {
+pub fn recvmmsg(socket: &UdpSocket, packets: &mut [Pkt]) -> io::Result<usize> {
     let mut i = 0;
     let count = cmp::min(NUM_RCVMMSGS, packets.len());
     for p in packets.iter_mut().take(count) {
         p.meta.size = 0;
-        match socket.recv_from(&mut p.data) {
+        match socket.listen_to(&mut p.data) {
             Err(_) if i > 0 => {
                 break;
             }
@@ -47,7 +47,7 @@ fn add_revision_hash(mut json_metrics: HashMap<String, String>) -> HashMap<Strin
 }
 
 #[cfg(target_os = "linux")]
-pub fn recvmmsg(sock: &UdpSocket, packets: &mut [Packet]) -> io::Result<usize> {
+pub fn recvmmsg(sock: &UdpSocket, packets: &mut [Pkt]) -> io::Result<usize> {
     use libc::{
         c_void, iovec, mmsghdr, recvmmsg, sockaddr_in, socklen_t, time_t, timespec, MSG_WAITFORONE,
     };
@@ -113,7 +113,7 @@ mod tests {
             sender.send_to(&data[..], &addr).unwrap();
         }
 
-        let mut packets = vec![Packet::default(); NUM_RCVMMSGS];
+        let mut packets = vec![Pkt::default(); NUM_RCVMMSGS];
         let recv = recvmmsg(&reader, &mut packets[..]).unwrap();
         assert_eq!(sent, recv);
         for i in 0..recv {
@@ -134,7 +134,7 @@ mod tests {
             sender.send_to(&data[..], &addr).unwrap();
         }
 
-        let mut packets = vec![Packet::default(); NUM_RCVMMSGS * 2];
+        let mut packets = vec![Pkt::default(); NUM_RCVMMSGS * 2];
         let recv = recvmmsg(&reader, &mut packets[..]).unwrap();
         assert_eq!(NUM_RCVMMSGS, recv);
         for i in 0..recv {
@@ -165,7 +165,7 @@ mod tests {
         }
 
         let start = Instant::now();
-        let mut packets = vec![Packet::default(); NUM_RCVMMSGS * 2];
+        let mut packets = vec![Pkt::default(); NUM_RCVMMSGS * 2];
         let recv = recvmmsg(&reader, &mut packets[..]).unwrap();
         assert_eq!(NUM_RCVMMSGS, recv);
         for i in 0..recv {
@@ -201,7 +201,7 @@ mod tests {
             sender2.send_to(&data[..], &addr).unwrap();
         }
 
-        let mut packets = vec![Packet::default(); NUM_RCVMMSGS * 2];
+        let mut packets = vec![Pkt::default(); NUM_RCVMMSGS * 2];
 
         let recv = recvmmsg(&reader, &mut packets[..]).unwrap();
         assert_eq!(NUM_RCVMMSGS, recv);

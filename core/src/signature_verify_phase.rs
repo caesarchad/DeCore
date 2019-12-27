@@ -5,7 +5,7 @@
 //! transaction. All processing is done on the CPU by default and on a GPU
 //! if the `cuda` feature is enabled with `--features=cuda`.
 
-use crate::packet::Packets;
+use crate::packet::BndlPkt;
 use crate::result::{Error, Result};
 use crate::service::Service;
 use crate::signature_verify;
@@ -29,7 +29,7 @@ const RECV_BATCH_MAX: usize = 60_000;
 #[cfg(not(feature = "cuda"))]
 const RECV_BATCH_MAX: usize = 1000;
 
-pub type VerifiedPackets = Vec<(Packets, Vec<u8>)>;
+pub type VerifiedPackets = Vec<(BndlPkt, Vec<u8>)>;
 
 pub struct SigVerifyPhase {
     thread_hdls: Vec<JoinHandle<()>>,
@@ -38,7 +38,7 @@ pub struct SigVerifyPhase {
 impl SigVerifyPhase {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        packet_receiver: Receiver<Packets>,
+        packet_receiver: Receiver<BndlPkt>,
         sigverify_disabled: bool,
         verified_sender: Sender<VerifiedPackets>,
     ) -> Self {
@@ -48,7 +48,7 @@ impl SigVerifyPhase {
         Self { thread_hdls }
     }
 
-    fn verify_batch(batch: Vec<Packets>, sigverify_disabled: bool) -> VerifiedPackets {
+    fn verify_batch(batch: Vec<BndlPkt>, sigverify_disabled: bool) -> VerifiedPackets {
         let r = if sigverify_disabled {
             signature_verify::ed25519_verify_disabled(&batch)
         } else {

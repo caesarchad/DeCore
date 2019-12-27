@@ -9,7 +9,7 @@ use crate::fiscal_statement_info::{FsclStmt, FsclStmtSlc};
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
 use crate::leader_arrange_utils;
 use crate::fork_selection::{LockStack, StakeLockout};
-use crate::packet::BlobError;
+use crate::packet::BlobErr;
 use crate::water_clock_recorder::WaterClockRecorder;
 use crate::result::{Error, Result};
 use crate::rpc_subscriptions::RpcSubscriptions;
@@ -588,7 +588,7 @@ impl RepeatPhase {
                 tail_fscl_stmt,
                 treasury.last_transaction_seal()
             );
-            return Err(Error::BlobError(BlobError::VerificationFailed));
+            return Err(Error::BlobErr(BlobErr::VerificationFailed));
         }
         block_buffer_pool_processor::handle_fiscal_stmts(treasury, entries)?;
 

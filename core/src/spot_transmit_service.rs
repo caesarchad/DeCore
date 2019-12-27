@@ -4,7 +4,7 @@
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::node_group_info::NodeGroupInfo;
 use crate::leader_arrange_cache::LdrSchBufferPoolList;
-use crate::packet::{Blob, SharedBlob, };
+use crate::packet::{Blob, ArcBlb, };
 use crate::bvm_types::BLOB_HEADER_SIZE;
 use crate::fix_missing_spot_service::{FixService, FixPlan};
 use crate::result::{Error, Result};
@@ -23,8 +23,8 @@ use std::thread::{self, Builder, JoinHandle};
 use std::time::{Duration, Instant};
 use morgan_helper::logHelper::*;
 
-fn replay_blobs(blobs: &[SharedBlob], retransmit: &BlobSndr, id: &Pubkey) -> Result<()> {
-    let mut retransmit_queue: Vec<SharedBlob> = Vec::new();
+fn replay_blobs(blobs: &[ArcBlb], retransmit: &BlobSndr, id: &Pubkey) -> Result<()> {
+    let mut retransmit_queue: Vec<ArcBlb> = Vec::new();
     for blob in blobs {
         if blob.read().unwrap().id() != *id {
             let mut w_blob = blob.write().unwrap();
@@ -46,7 +46,7 @@ fn replay_blobs(blobs: &[SharedBlob], retransmit: &BlobSndr, id: &Pubkey) -> Res
     Ok(())
 }
 
-fn handle_data_blob(blobs: &[SharedBlob], block_buffer_pool: &Arc<BlockBufferPool>) -> Result<()> {
+fn handle_data_blob(blobs: &[ArcBlb], block_buffer_pool: &Arc<BlockBufferPool>) -> Result<()> {
     let blobs: Vec<_> = blobs.iter().map(move |blob| blob.read().unwrap()).collect();
 
     block_buffer_pool.insert_data_blobs(blobs.iter().filter_map(|blob| {

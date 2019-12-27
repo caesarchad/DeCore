@@ -1,4 +1,4 @@
-use crate::packet::{Blob, SharedBlob};
+use crate::packet::{Blob, ArcBlb};
 use crate::bvm_types::*;
 use std::cmp;
 use std::convert::AsMut;
@@ -16,7 +16,7 @@ pub struct Session(ReedSolomon);
 #[derive(Debug, Clone)]
 pub struct CodingGenerator {
    
-    leftover: Vec<SharedBlob>,
+    leftover: Vec<ArcBlb>,
     session: Arc<Session>,
 }
 
@@ -138,7 +138,7 @@ impl CodingGenerator {
     ///
     /// If used improperly, it my return garbage coding blobs, but will not give an
     /// error.
-    pub fn next(&mut self, next_data: &[SharedBlob]) -> Vec<SharedBlob> {
+    pub fn next(&mut self, next_data: &[ArcBlb]) -> Vec<ArcBlb> {
         let (num_data, num_coding) = self.session.dimensions();
         let mut next_coding =
             Vec::with_capacity((self.leftover.len() + next_data.len()) / num_data * num_coding);
@@ -231,7 +231,7 @@ pub mod test {
     use super::*;
     use crate::block_buffer_pool::fetch_interim_ledger_location;
     use crate::block_buffer_pool::BlockBufferPool;
-    use crate::packet::{index_blobs, SharedBlob,};
+    use crate::packet::{index_blobs, ArcBlb,};
     use crate::bvm_types::{
         BLOB_DATA_SIZE, 
         BLOB_HEADER_SIZE,
@@ -271,8 +271,8 @@ pub mod test {
     pub struct ErasureSetModel {
         pub set_index: u64,
         pub start_index: u64,
-        pub coding: Vec<SharedBlob>,
-        pub data: Vec<SharedBlob>,
+        pub coding: Vec<ArcBlb>,
+        pub data: Vec<ArcBlb>,
     }
 
     #[test]
@@ -328,21 +328,21 @@ pub mod test {
 
     fn test_toss_and_recover(
         session: &Session,
-        data_blobs: &[SharedBlob],
-        coding_blobs: &[SharedBlob],
+        data_blobs: &[ArcBlb],
+        coding_blobs: &[ArcBlb],
         block_start_idx: usize,
     ) {
         let size = coding_blobs[0].read().unwrap().size();
 
-        let mut blobs: Vec<SharedBlob> = Vec::with_capacity(ERASURE_SET_SIZE);
+        let mut blobs: Vec<ArcBlb> = Vec::with_capacity(ERASURE_SET_SIZE);
 
-        blobs.push(SharedBlob::default()); // empty data, erasure at zero
+        blobs.push(ArcBlb::default()); // empty data, erasure at zero
         for blob in &data_blobs[block_start_idx + 1..block_start_idx + NUM_DATA] {
             // skip first blob
             blobs.push(blob.clone());
         }
 
-        blobs.push(SharedBlob::default()); // empty coding, erasure at zero
+        blobs.push(ArcBlb::default()); // empty coding, erasure at zero
         for blob in &coding_blobs[1..NUM_CODING] {
             blobs.push(blob.clone());
         }
@@ -541,14 +541,14 @@ pub mod test {
 
                             let mut blobs = Vec::with_capacity(ERASURE_SET_SIZE);
 
-                            blobs.push(SharedBlob::default());
-                            blobs.push(SharedBlob::default());
-                            blobs.push(SharedBlob::default());
+                            blobs.push(ArcBlb::default());
+                            blobs.push(ArcBlb::default());
+                            blobs.push(ArcBlb::default());
                             for blob in erasure_set.data.into_iter().skip(3) {
                                 blobs.push(blob);
                             }
 
-                            blobs.push(SharedBlob::default());
+                            blobs.push(ArcBlb::default());
                             for blob in erasure_set.coding.into_iter().skip(1) {
                                 blobs.push(blob);
                             }
@@ -677,7 +677,7 @@ pub mod test {
         block_buffer_pool
     }
 
-    //    fn verify_test_blobs(offset: usize, blobs: &[SharedBlob]) -> bool {
+    //    fn verify_test_blobs(offset: usize, blobs: &[ArcBlb]) -> bool {
     //        let data: Vec<_> = (0..BLOB_DATA_SIZE).into_iter().map(|i| i as u8).collect();
     //
     //        blobs.iter().enumerate().all(|(i, blob)| {
@@ -686,7 +686,7 @@ pub mod test {
     //        })
     //    }
     //
-    fn generate_test_blobs(offset: usize, num_blobs: usize) -> Vec<SharedBlob> {
+    fn generate_test_blobs(offset: usize, num_blobs: usize) -> Vec<ArcBlb> {
         let data: Vec<_> = (0..BLOB_DATA_SIZE).into_iter().map(|i| i as u8).collect();
 
         let blobs: Vec<_> = (0..num_blobs)
@@ -707,7 +707,7 @@ pub mod test {
     impl Session {
         fn reconstruct_shared_blobs(
             &self,
-            blobs: &mut [SharedBlob],
+            blobs: &mut [ArcBlb],
             present: &[bool],
             size: usize,
             block_start_idx: u64,

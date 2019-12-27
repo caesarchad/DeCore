@@ -13,7 +13,7 @@ use morgan::packet::index_blobs;
 use morgan::rpc_subscriptions::RpcSubscriptions;
 use morgan::service::Service;
 use morgan::storage_stage::StorageState;
-use morgan::storage_stage::STORAGE_ROTATE_TEST_COUNT;
+use morgan::bvm_types::STORAGE_ROTATE_TEST_COUNT;
 use morgan::data_filter;
 use morgan::transaction_verify_centre::{Sockets, BlazeUnit};
 use morgan::verifier;
@@ -64,11 +64,11 @@ fn test_replay() {
     let (s_reader, r_reader) = channel();
     let blob_sockets: Vec<Arc<UdpSocket>> = target2.sockets.blaze_unit.into_iter().map(Arc::new).collect();
 
-    let t_receiver = data_filter::blob_receiver(blob_sockets[0].clone(), &exit, s_reader);
+    let t_receiver = data_filter::acptr_srvc(blob_sockets[0].clone(), &exit, s_reader);
 
     // simulate leader sending messages
     let (s_responder, r_responder) = channel();
-    let t_responder = data_filter::responder(
+    let t_responder = data_filter::handle_forward_srvc(
         "test_replay",
         Arc::new(leader.sockets.retransmit),
         r_responder,

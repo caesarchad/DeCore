@@ -20,7 +20,7 @@ use crate::gossip::NodeTbleGossip;
 use crate::gossip_error_type::NodeTbleErr;
 use crate::pull_from_gossip::NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag, EpochSlots, Vote};
-use crate::packet::{to_shared_blob, Blob, SharedBlob, BLOB_SIZE};
+use crate::packet::{to_shared_blob, Blob, ArcBlb, BLOB_SIZE};
 use crate::fix_missing_spot_service::FixPlanType;
 use crate::result::Result;
 use crate::staking_utils;
@@ -726,7 +726,7 @@ impl NodeGroupInfo {
         contains_last_drop: bool,
         pyramid_node_grp_list: &[ContactInfo],
         s: &UdpSocket,
-        blobs: &[SharedBlob],
+        blobs: &[ArcBlb],
     ) -> Result<()> {
         if pyramid_node_grp_list.is_empty() {
             debug!("{}:not enough peers in node_group_info table", id);
@@ -758,7 +758,7 @@ impl NodeGroupInfo {
     pub fn retransmit_to(
         obj: &Arc<RwLock<Self>>,
         peers: &[ContactInfo],
-        blob: &SharedBlob,
+        blob: &ArcBlb,
         slot_leader_pubkey: Option<Pubkey>,
         s: &UdpSocket,
         forwarded: bool,
@@ -811,7 +811,7 @@ impl NodeGroupInfo {
     fn send_orders(
         id: &Pubkey,
         s: &UdpSocket,
-        orders: Vec<(SharedBlob, Vec<&ContactInfo>)>,
+        orders: Vec<(ArcBlb, Vec<&ContactInfo>)>,
     ) -> Vec<io::Result<usize>> {
         orders
             .into_iter()
@@ -1087,7 +1087,7 @@ impl NodeGroupInfo {
         me: &ContactInfo,
         slot: u64,
         blob_index: u64,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the requested index in one of the slots
             let blob = block_buffer_pool.fetch_data_blob(slot, blob_index);
@@ -1117,7 +1117,7 @@ impl NodeGroupInfo {
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
         slot: u64,
         highest_index: u64,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the requested index in one of the slots
             let meta = block_buffer_pool.meta(slot);
@@ -1143,7 +1143,7 @@ impl NodeGroupInfo {
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
         mut slot: u64,
         max_responses: usize,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         let mut res = vec![];
         if let Some(block_buffer_pool) = block_buffer_pool {
             // Try to find the next "n" parent slots of the input slot
@@ -1172,7 +1172,7 @@ impl NodeGroupInfo {
         obj: &Arc<RwLock<Self>>,
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
         blob: &Blob,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         deserialize(&blob.data[..blob.meta.size])
             .into_iter()
             .flat_map(|request| {
@@ -1186,7 +1186,7 @@ impl NodeGroupInfo {
         filter: Bloom<Hash>,
         caller: ContInfTblValue,
         from_addr: &SocketAddr,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         let self_id = me.read().unwrap().gossip.id;
         inc_new_counter_debug!("node_group_info-pull_request", 1);
         if caller.contact_info().is_none() {
@@ -1246,7 +1246,7 @@ impl NodeGroupInfo {
         me: &Arc<RwLock<Self>>,
         from: &Pubkey,
         data: Vec<ContInfTblValue>,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         let self_id = me.read().unwrap().gossip.id;
         inc_new_counter_debug!("node_group_info-push_message", 1, 0, 1000);
 
@@ -1313,7 +1313,7 @@ impl NodeGroupInfo {
         from_addr: &SocketAddr,
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
         request: Protocol,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         let now = Instant::now();
 
         //TODO this doesn't depend on node_group_info module, could be moved
@@ -1396,7 +1396,7 @@ impl NodeGroupInfo {
         from_addr: &SocketAddr,
         block_buffer_pool: Option<&Arc<BlockBufferPool>>,
         request: Protocol,
-    ) -> Vec<SharedBlob> {
+    ) -> Vec<ArcBlb> {
         match request {
             // TODO verify messages faster
             Protocol::PullRequest(filter, caller) => {
@@ -1949,7 +1949,7 @@ mod tests {
             );
             assert!(rv.is_empty());
             let data_size = 1;
-            let blob = SharedBlob::default();
+            let blob = ArcBlb::default();
             {
                 let mut w_blob = blob.write().unwrap();
                 w_blob.set_size(data_size);

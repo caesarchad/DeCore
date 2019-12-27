@@ -2,7 +2,7 @@
 //! unique ID that is the hash of the FsclStmt before it, plus the hash of the
 //! transactions within it. Entries cannot be reordered, and its field `num_hashes`
 //! represents an approximate amount of time since the last FsclStmt was created.
-use crate::packet::{Blob, SharedBlob,};
+use crate::packet::{Blob, ArcBlb,};
 use crate::bvm_types::BLOB_DATA_SIZE;
 use crate::water_clock::WaterClock;
 use crate::result::Result;
@@ -71,7 +71,7 @@ impl FsclStmt {
         }
     }
 
-    pub fn to_shared_blob(&self) -> SharedBlob {
+    pub fn to_shared_blob(&self) -> ArcBlb {
         let blob = self.to_blob();
         Arc::new(RwLock::new(blob))
     }
@@ -190,10 +190,10 @@ where
 
 pub trait  FsclStmtSlc  {
     fn verify(&self, start_hash: &Hash) -> bool;
-    fn to_shared_blobs(&self) -> Vec<SharedBlob>;
+    fn to_shared_blobs(&self) -> Vec<ArcBlb>;
     fn to_blobs(&self) -> Vec<Blob>;
     fn one_stmt_blbs(&self) -> Vec<Blob>;
-    fn one_stmt_shard_blbs(&self) -> Vec<SharedBlob>;
+    fn one_stmt_shard_blbs(&self) -> Vec<ArcBlb>;
 }
 
 impl FsclStmtSlc for [FsclStmt] {
@@ -232,14 +232,14 @@ impl FsclStmtSlc for [FsclStmt] {
         )
     }
 
-    fn to_shared_blobs(&self) -> Vec<SharedBlob> {
+    fn to_shared_blobs(&self) -> Vec<ArcBlb> {
         self.to_blobs()
             .into_iter()
             .map(|b| Arc::new(RwLock::new(b)))
             .collect()
     }
 
-    fn one_stmt_shard_blbs(&self) -> Vec<SharedBlob> {
+    fn one_stmt_shard_blbs(&self) -> Vec<ArcBlb> {
         self.one_stmt_blbs()
             .into_iter()
             .map(|b| Arc::new(RwLock::new(b)))
@@ -387,7 +387,7 @@ pub fn make_consecutive_blobs(
     start_height: u64,
     start_hash: Hash,
     addr: &std::net::SocketAddr,
-) -> Vec<SharedBlob> {
+) -> Vec<ArcBlb> {
     let entries = create_drops(num_blobs_to_make, start_hash);
 
     let blobs = entries.one_stmt_shard_blbs();
@@ -418,7 +418,7 @@ pub fn next_entry(prev_hash: &Hash, num_hashes: u64, transactions: Vec<Transacti
 mod tests {
     use super::*;
     use crate::fiscal_statement_info::FsclStmt;
-    use crate::packet::to_blobs;
+    use crate::packet::blb_bndl;
     use crate::bvm_types::BLOB_DATA_SIZE;
     use morgan_interface::constants::PACKET_DATA_SIZE;
     use morgan_interface::hash::hash;
@@ -620,7 +620,7 @@ mod tests {
     fn test_bad_blobs_attack() {
         morgan_logger::setup();
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8000);
-        let blobs_q = to_blobs(vec![(0, addr)]).unwrap(); // <-- attack!
+        let blobs_q = blb_bndl(vec![(0, addr)]).unwrap(); // <-- attack!
         assert!(restore_fscl_stmt_by_data(blobs_q).is_err());
     }
 

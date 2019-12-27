@@ -2,7 +2,7 @@
 //!
 
 use crate::packet::{
-    deserialize_packets_in_blob, Blob, Meta, Packets, 
+    de_pkts_in_blb, Blob, PktMeta, BndlPkt, 
 };
 use crate::bvm_types::{
     PcktAcptr,
@@ -26,14 +26,14 @@ use walkdir::WalkDir;
 
 fn acpt_window(sock: &UdpSocket, exit: Arc<AtomicBool>, channel: &PcktSndr) -> Result<()> {
     loop {
-        let mut msgs = Packets::default();
+        let mut msgs = BndlPkt::default();
         loop {
             // Check for exit signal, even if socket is busy
             // (for instance the leader trasaction socket)
             if exit.load(Ordering::Relaxed) {
                 return Ok(());
             }
-            if let Ok(_len) = msgs.recv_from(sock) {
+            if let Ok(_len) = msgs.listen_to(sock) {
                 channel.send(msgs)?;
                 break;
             }
@@ -62,11 +62,11 @@ pub fn acptor(
 fn forward_msg(sock: &UdpSocket, r: &BlobAcptr) -> Result<()> {
     let timer = Duration::new(1, 0);
     let msgs = r.recv_timeout(timer)?;
-    Blob::send_to(sock, msgs)?;
+    Blob::snd_pkt(sock, msgs)?;
     Ok(())
 }
 
-pub fn batch_forward(recvr: &PcktAcptr, max_batch: usize) -> Result<(Vec<Packets>, usize, u64)> {
+pub fn batch_forward(recvr: &PcktAcptr, max_batch: usize) -> Result<(Vec<BndlPkt>, usize, u64)> {
     let timer = Duration::new(1, 0);
     let msgs = recvr.recv_timeout(timer)?;
     let recv_start = Instant::now();
@@ -114,7 +114,7 @@ pub fn handle_forward_srvc(name: &'static str, sock: Arc<UdpSocket>, r: BlobAcpt
 //window.
 fn blob_catcher(sock: &UdpSocket, s: &BlobSndr) -> Result<()> {
     trace!("blob_catcher is listening to {}", sock.local_addr().unwrap());
-    let dq = Blob::recv_from(sock)?;
+    let dq = Blob::listen_to(sock)?;
     if !dq.is_empty() {
         s.send(dq)?;
     }
@@ -181,10 +181,10 @@ fn blob_filter(sock: &UdpSocket, s: &PcktSndr) -> Result<()> {
         sock.local_addr().unwrap()
     );
 
-    let meta = Meta::default();
+    let meta = PktMeta::default();
     let se_met_sz = bincode::serialized_size(&meta)? as usize;
     let se_pkt_sz = se_met_sz + PACKET_DATA_SIZE;
-    let blobs = Blob::recv_from(sock)?;
+    let blobs = Blob::listen_to(sock)?;
     for blob in blobs {
         let r_blob = blob.read().unwrap();
         let data = {
@@ -193,14 +193,14 @@ fn blob_filter(sock: &UdpSocket, s: &PcktSndr) -> Result<()> {
         };
 
         let packets =
-            deserialize_packets_in_blob(data, se_pkt_sz, se_met_sz);
+            de_pkts_in_blb(data, se_pkt_sz, se_met_sz);
 
         if packets.is_err() {
             continue;
         }
 
         let packets = packets?;
-        s.send(Packets::new(packets))?;
+        s.send(BndlPkt::new(packets))?;
     }
 
     Ok(())
@@ -231,7 +231,7 @@ pub fn blob_filter_window(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::packet::{Blob, Packet, Packets, SharedBlob};
+    use crate::packet::{Blob, Pkt, BndlPkt, ArcBlb};
     use morgan_interface::constants::PACKET_DATA_SIZE;
     use crate::data_filter::{acptor, handle_forward_srvc};
     use std::io;
@@ -257,8 +257,8 @@ mod test {
     }
     #[test]
     fn streamer_debug() {
-        write!(io::sink(), "{:?}", Packet::default()).unwrap();
-        write!(io::sink(), "{:?}", Packets::default()).unwrap();
+        write!(io::sink(), "{:?}", Pkt::default()).unwrap();
+        write!(io::sink(), "{:?}", BndlPkt::default()).unwrap();
         write!(io::sink(), "{:?}", Blob::default()).unwrap();
     }
     #[test]
@@ -276,7 +276,7 @@ mod test {
             let t_responder = handle_forward_srvc("streamer_send_test", Arc::new(send), r_responder);
             let mut msgs = Vec::new();
             for i in 0..5 {
-                let b = SharedBlob::default();
+                let b = ArcBlb::default();
                 {
                     let mut w = b.write().unwrap();
                     w.data[0] = i as u8;
