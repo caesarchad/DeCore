@@ -12,7 +12,7 @@
 use crate::connection_info::ContactInfo;
 use crate::connection_info_table::ContactInfoTable;
 use crate::gossip::{get_stake, get_weight,};
-use crate::gossip_error_type::NodeTbleErr;
+use crate::ndtb_err::NodeTbleErr;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag};
 use crate::bvm_types::*;
 use bincode::serialized_size;

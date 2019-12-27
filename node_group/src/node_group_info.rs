@@ -17,7 +17,7 @@ use crate::treasury_forks::TreasuryForks;
 use crate::block_buffer_pool::BlockBufferPool;
 use crate::connection_info::ContactInfo;
 use crate::gossip::NodeTbleGossip;
-use crate::gossip_error_type::NodeTbleErr;
+use crate::ndtb_err::NodeTbleErr;
 use crate::pull_from_gossip::NDTB_GOSSIP_PULL_CRDS_TIMEOUT_MS;
 use crate::propagation_value::{ContInfTblValue, ContInfTblValueTag, EpochSlots, Vote};
 use crate::packet::{to_shared_blob, Blob, ArcBlb, BLOB_SIZE};

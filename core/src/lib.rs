@@ -19,7 +19,7 @@ pub mod node_group_info_voter_listener;
 pub mod connection_info;
 pub mod connection_info_table;
 pub mod gossip;
-pub mod gossip_error_type;
+pub mod ndtb_err;
 pub mod pull_from_gossip;
 pub mod push_to_gossip;
 pub mod propagation_value;

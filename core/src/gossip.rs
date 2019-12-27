@@ -4,7 +4,7 @@
 //! packet::BLOB_DATA_SIZE size.
 
 use crate::connection_info_table::ContactInfoTable;
-use crate::gossip_error_type::NodeTbleErr;
+use crate::ndtb_err::NodeTbleErr;
 use crate::pull_from_gossip::NodeTbleGspPull;
 use crate::push_to_gossip::NodeTbleGspPush;
 use crate::propagation_value::ContInfTblValue;

@@ -4,7 +4,7 @@ use log::*;
 use rayon::prelude::*;
 use morgan::connection_info::ContactInfo;
 use morgan::gossip::*;
-use morgan::gossip_error_type::NodeTbleErr;
+use morgan::ndtb_err::NodeTbleErr;
 use morgan::bvm_types::NDTB_GOSSIP_PUSH_MSG_TIMEOUT_MS;
 use morgan::propagation_value::ContInfTblValue;
 use morgan::propagation_value::ContInfTblValueTag;
