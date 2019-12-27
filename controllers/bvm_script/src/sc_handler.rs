@@ -178,7 +178,7 @@ mod tests {
         let instructions = sc_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
         let context = Context::new(instructions);
         treasury_client
-            .send_online_msg(&[&alice_keypair], context)
+            .snd_online_context(&[&alice_keypair], context)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 100);
     }
@@ -203,7 +203,7 @@ mod tests {
         );
         let context = Context::new(instructions);
         treasury_client
-            .send_online_msg(&[&alice_keypair], context)
+            .snd_online_context(&[&alice_keypair], context)
             .unwrap();
 
         // Attack! Part 1: Sign a witness transaction with a random key.
@@ -224,7 +224,7 @@ mod tests {
         // Ensure the transaction fails because of the unsigned key.
         assert_eq!(
             treasury_client
-                .send_online_msg(&[&mallory_keypair], context)
+                .snd_online_context(&[&mallory_keypair], context)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
@@ -252,7 +252,7 @@ mod tests {
         );
         let context = Context::new(instructions);
         treasury_client
-            .send_online_msg(&[&alice_keypair], context)
+            .snd_online_context(&[&alice_keypair], context)
             .unwrap();
 
         // Attack! Part 1: Sign a timestamp transaction with a random key.
@@ -273,7 +273,7 @@ mod tests {
         // Ensure the transaction fails because of the unsigned key.
         assert_eq!(
             treasury_client
-                .send_online_msg(&[&mallory_keypair], context)
+                .snd_online_context(&[&mallory_keypair], context)
                 .unwrap_err()
                 .unwrap(),
             TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
@@ -300,7 +300,7 @@ mod tests {
         );
         let context = Context::new(instructions);
         treasury_client
-            .send_online_msg(&[&alice_keypair], context)
+            .snd_online_context(&[&alice_keypair], context)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
         assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
@@ -369,7 +369,7 @@ mod tests {
         );
         let context = Context::new(instructions);
         treasury_client
-            .send_online_msg(&[&alice_keypair], context)
+            .snd_online_context(&[&alice_keypair], context)
             .unwrap();
         assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 2);
         assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);

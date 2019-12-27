@@ -673,7 +673,7 @@ mod tests {
 
         let keypair = Keypair::new();
         let hash = Hash::default();
-        let signature = keypair.sign_message(&hash.as_ref());
+        let signature = keypair.sign_context(&hash.as_ref());
         let mut result = storage_state.get_mining_result(&signature);
         assert_eq!(result, Hash::default());
 
@@ -774,7 +774,7 @@ mod tests {
             &keypair.pubkey(),
             Hash::default(),
             0,
-            keypair.sign_message(b"test"),
+            keypair.sign_context(b"test"),
         );
         let mining_proof_tx = Transaction::new_u_opcodes(vec![mining_proof_ix]);
         let mining_txs = vec![mining_proof_tx];
@@ -823,7 +823,7 @@ mod tests {
                 .for_each(move |_| {
                     let keypair = Keypair::new();
                     let hash = hasher.clone().result();
-                    let signature = keypair.sign_message(&hash.as_ref());
+                    let signature = keypair.sign_context(&hash.as_ref());
                     let ix = get_identity_index_from_signature(&signature);
                     hist[ix].fetch_add(1, Ordering::Relaxed);
                 });

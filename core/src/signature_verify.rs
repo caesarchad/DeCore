@@ -323,7 +323,7 @@ mod tests {
     fn test_system_transaction_layout() {
         let tx = test_tx();
         let tx_bytes = serialize(&tx).unwrap();
-        let message_data = tx.message_data();
+        let context_data = tx.context_data();
         let packet = signature_verify::make_packet_from_transaction(tx.clone());
 
         let (sig_len, sig_start, msg_start_offset, pubkey_offset) =
@@ -338,7 +338,7 @@ mod tests {
             Some(pubkey_offset as usize)
         );
         assert_eq!(
-            memfind(&tx_bytes, &message_data),
+            memfind(&tx_bytes, &context_data),
             Some(msg_start_offset as usize)
         );
         assert_eq!(
@@ -352,8 +352,8 @@ mod tests {
     fn test_system_transaction_data_layout() {
         use morgan_interface::constants::PACKET_DATA_SIZE;
         let mut tx0 = test_tx();
-        tx0.message.instructions[0].data = vec![1, 2, 3];
-        let message0a = tx0.message_data();
+        tx0.context.instructions[0].data = vec![1, 2, 3];
+        let context0a = tx0.context_data();
         let tx_bytes = serialize(&tx0).unwrap();
         assert!(tx_bytes.len() < PACKET_DATA_SIZE);
         assert_eq!(
@@ -364,9 +364,9 @@ mod tests {
         assert_eq!(tx0, tx1);
         assert_eq!(tx1.self_context().instructions[0].data, vec![1, 2, 3]);
 
-        tx0.message.instructions[0].data = vec![1, 2, 4];
-        let message0b = tx0.message_data();
-        assert_ne!(message0a, message0b);
+        tx0.context.instructions[0].data = vec![1, 2, 4];
+        let context0b = tx0.context_data();
+        assert_ne!(context0a, context0b);
     }
 
     // Just like get_packet_offsets, but not returning redundant information.

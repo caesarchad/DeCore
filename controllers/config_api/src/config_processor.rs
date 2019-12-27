@@ -126,7 +126,7 @@ mod tests {
         let instruction = config_instruction::store(&config_pubkey, &my_config);
         let context = Context::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
         treasury_client
-            .send_online_msg(&[&mint_keypair, &config_keypair], message)
+            .snd_online_context(&[&mint_keypair, &config_keypair], context)
             .unwrap();
 
         let config_account_data = treasury_client
@@ -152,7 +152,7 @@ mod tests {
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let context = Context::new(vec![instruction]);
         treasury_client
-            .send_online_msg(&[&config_keypair], message)
+            .snd_online_context(&[&config_keypair], context)
             .unwrap_err();
     }
 
@@ -175,7 +175,7 @@ mod tests {
 
         let context = Context::new(vec![transfer_instruction, store_instruction]);
         treasury_client
-            .send_online_msg(&[&system_keypair], message)
+            .snd_online_context(&[&system_keypair], context)
             .unwrap_err();
     }
 }

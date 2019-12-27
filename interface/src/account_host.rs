@@ -24,7 +24,7 @@ pub trait AccountHost: OnlineAccount + OfflineAccount {
 pub trait OnlineAccount {
     /// Create a transaction from the given message, and send it to the
     /// server, retrying as-needed.
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> Result<Signature>;
+    fn snd_online_context(&self, keypairs: &[&Keypair], context: Context) -> Result<Signature>;
 
     /// Create a transaction from a single instruction that only requires
     /// a single signer. Then send it to the server, retrying as-needed.
@@ -74,10 +74,10 @@ pub trait OfflineAccount {
 
     /// Create a transaction from the given message, and send it to the
     /// server, but don't wait for to see if the server accepted it.
-    fn send_offline_message(
+    fn snd_offline_context(
         &self,
         keypairs: &[&Keypair],
-        message: Context,
+        context: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 

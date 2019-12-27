@@ -1152,7 +1152,7 @@ impl KeypairUtil for DroneKeypair {
         self.transaction.self_context().account_keys[0]
     }
 
-    fn sign_message(&self, _msg: &[u8]) -> Signature {
+    fn sign_context(&self, _msg: &[u8]) -> Signature {
         self.transaction.signatures[0]
     }
 }

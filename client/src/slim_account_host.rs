@@ -168,7 +168,7 @@ impl AccountHost for SlimAccountHost {
 }
 
 impl OnlineAccount for SlimAccountHost {
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> TransportResult<Signature> {
+    fn snd_online_context(&self, keypairs: &[&Keypair], message: Context) -> TransportResult<Signature> {
         let (transaction_seal, _fee_calculator) = self.get_recent_transaction_seal()?;
         let mut transaction = Transaction::new(&keypairs, message, transaction_seal);
         let signature = self.send_and_confirm_transaction(keypairs, &mut transaction, 5, 0)?;
@@ -181,7 +181,7 @@ impl OnlineAccount for SlimAccountHost {
         instruction: OpCode,
     ) -> TransportResult<Signature> {
         let context = Context::new(vec![instruction]);
-        self.send_online_msg(&[keypair], context)
+        self.snd_online_context(&[keypair], context)
     }
 
     fn online_transfer(
@@ -260,7 +260,7 @@ impl OfflineAccount for SlimAccountHost {
             .send_to(&buf[..], &self.account_host_url)?;
         Ok(transaction.signatures[0])
     }
-    fn send_offline_message(
+    fn snd_offline_context(
         &self,
         keypairs: &[&Keypair],
         context: Context,
@@ -276,7 +276,7 @@ impl OfflineAccount for SlimAccountHost {
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let context = Context::new(vec![instruction]);
-        self.send_offline_message(&[keypair], context, recent_transaction_seal)
+        self.snd_offline_context(&[keypair], context, recent_transaction_seal)
     }
     fn offline_transfer(
         &self,

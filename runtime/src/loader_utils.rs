@@ -35,7 +35,7 @@ pub fn load_program(
             morgan_interface::mounter_opcode::write(&program_pubkey, loader_pubkey, offset, chunk.to_vec());
         let context = Context::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
         treasury_client
-            .send_online_msg(&[from_keypair, &program_keypair], context)
+            .snd_online_context(&[from_keypair, &program_keypair], context)
             .unwrap();
         offset += chunk_size as u32;
     }
@@ -43,7 +43,7 @@ pub fn load_program(
     let instruction = morgan_interface::mounter_opcode::finalize(&program_pubkey, loader_pubkey);
     let context = Context::new_with_payer(vec![instruction], Some(&from_keypair.pubkey()));
     treasury_client
-        .send_online_msg(&[from_keypair, &program_keypair], context)
+        .snd_online_context(&[from_keypair, &program_keypair], context)
         .unwrap();
 
     program_pubkey

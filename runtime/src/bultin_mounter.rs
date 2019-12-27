@@ -1,5 +1,5 @@
 //! Native loader
-use crate::message_processor::SymbolCache;
+use crate::context_handler::SymbolCache;
 use bincode::deserialize;
 #[cfg(unix)]
 use libloading::os::unix::*;

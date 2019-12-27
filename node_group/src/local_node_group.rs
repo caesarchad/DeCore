@@ -541,7 +541,7 @@ impl LocalNodeGroup {
         );
         let signer_keys = vec![from_keypair.as_ref()];
         let transaction_seal = client.get_recent_transaction_seal().unwrap().0;
-        let mut transaction = Transaction::new(&signer_keys, message, transaction_seal);
+        let mut transaction = Transaction::new(&signer_keys, context, transaction_seal);
         client
             .retry_transfer(&from_keypair, &mut transaction, 5)
             .map(|_signature| ())

@@ -152,7 +152,7 @@ impl Transaction {
         let context_data = self.context_data();
         self.signatures = keypairs
             .iter()
-            .map(|keypair| keypair.sign_message(&context_data))
+            .map(|keypair| keypair.sign_context(&context_data))
             .collect();
     }
 
@@ -188,7 +188,7 @@ impl Transaction {
                 .position(|pubkey| pubkey == &keypair.pubkey())
                 .expect("keypair-pubkey mismatch");
 
-            self.signatures[i] = keypair.sign_message(&self.context_data())
+            self.signatures[i] = keypair.sign_context(&self.context_data())
         }
     }
 

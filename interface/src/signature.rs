@@ -41,7 +41,7 @@ impl Signature {
 pub trait Signable {
     fn sign(&mut self, keypair: &Keypair) {
         let data = self.signable_data();
-        self.set_signature(keypair.sign_message(&data));
+        self.set_signature(keypair.sign_context(&data));
     }
     fn verify(&self) -> bool {
         self.get_signature()
@@ -96,7 +96,7 @@ impl FromStr for Signature {
 pub trait KeypairUtil {
     fn new() -> Self;
     fn pubkey(&self) -> BvmAddr;
-    fn sign_message(&self, message: &[u8]) -> Signature;
+    fn sign_context(&self, context: &[u8]) -> Signature;
 }
 
 impl KeypairUtil for Keypair {
@@ -111,8 +111,8 @@ impl KeypairUtil for Keypair {
         BvmAddr::new(&self.public.as_ref())
     }
 
-    fn sign_message(&self, message: &[u8]) -> Signature {
-        Signature::new(&self.sign(message).to_bytes())
+    fn sign_context(&self, context: &[u8]) -> Signature {
+        Signature::new(&self.sign(context).to_bytes())
     }
 }
 
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_signature_fromstr() {
-        let signature = Keypair::new().sign_message(&[0u8]);
+        let signature = Keypair::new().sign_context(&[0u8]);
 
         let mut signature_base58_str = bs58::encode(signature).into_string();
 

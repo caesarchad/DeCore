@@ -565,17 +565,17 @@ mod tests {
         let mut drone = Drone::new(mint, None, None);
 
         let tx = drone.build_airdrop_transaction(request).unwrap();
-        let message = tx.self_context();
+        let context = tx.self_context();
 
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
-            message.account_keys,
+            context.account_keys,
             vec![mint_pubkey, to, BvmAddr::default()]
         );
-        assert_eq!(message.recent_transaction_seal, transaction_seal);
+        assert_eq!(context.recent_transaction_seal, transaction_seal);
 
-        assert_eq!(message.instructions.len(), 1);
-        let instruction: SysOpCode = deserialize(&message.instructions[0].data).unwrap();
+        assert_eq!(context.instructions.len(), 1);
+        let instruction: SysOpCode = deserialize(&context.instructions[0].data).unwrap();
         assert_eq!(
             instruction,
             SysOpCode::CreateAccount {
@@ -607,17 +607,17 @@ mod tests {
         let mut drone = Drone::new(mint, None, None);
 
         let tx = drone.build_airdrop_transaction(request).unwrap();
-        let message = tx.self_context();
+        let context = tx.self_context();
 
         assert_eq!(tx.signatures.len(), 1);
         assert_eq!(
-            message.account_keys,
+            context.account_keys,
             vec![mint_pubkey, to, BvmAddr::default()]
         );
-        assert_eq!(message.recent_transaction_seal, transaction_seal);
+        assert_eq!(context.recent_transaction_seal, transaction_seal);
 
-        assert_eq!(message.instructions.len(), 1);
-        let instruction: SysOpCode = deserialize(&message.instructions[0].data).unwrap();
+        assert_eq!(context.instructions.len(), 1);
+        let instruction: SysOpCode = deserialize(&context.instructions[0].data).unwrap();
         assert_eq!(
             instruction,
             SysOpCode::CreateAccountWithReputation {
@@ -651,7 +651,7 @@ mod tests {
         let expected_instruction =
             sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
         let context = Context::new(vec![expected_instruction]);
-        let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
+        let expected_tx = Transaction::new(&[&keypair], context, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
         LittleEndian::write_u16(&mut expected_vec_with_length, expected_bytes.len() as u16);
@@ -685,7 +685,7 @@ mod tests {
         let expected_instruction =
             sys_opcode::create_user_account_with_reputation(&keypair.pubkey(), &to, reputations);
         let context = Context::new(vec![expected_instruction]);
-        let expected_tx = Transaction::new(&[&keypair], message, transaction_seal);
+        let expected_tx = Transaction::new(&[&keypair], context, transaction_seal);
         let expected_bytes = serialize(&expected_tx).unwrap();
         let mut expected_vec_with_length = vec![0; 2];
         LittleEndian::write_u16(&mut expected_vec_with_length, expected_bytes.len() as u16);

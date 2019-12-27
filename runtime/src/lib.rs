@@ -10,7 +10,7 @@ pub mod epoch_schedule;
 pub mod genesis_utils;
 pub mod loader_utils;
 pub mod locked_accounts_results;
-pub mod message_processor;
+pub mod context_handler;
 mod bultin_mounter;
 pub mod stakes;
 mod status_cache;

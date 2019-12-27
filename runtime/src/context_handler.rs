@@ -19,7 +19,7 @@ use libloading::os::windows::*;
 /// Return true if the slice has any duplicate elements
 pub fn has_duplicates<T: PartialEq>(xs: &[T]) -> bool {
     // Note: This is an O(n^2) algorithm, but requires no heap allocations. The benchmark
-    // `bench_has_duplicates` in benches/message_processor.rs shows that this implementation is
+    // `bench_has_duplicates` in benches/context_handler.rs shows that this implementation is
     // ~50 times faster than using HashSet for very short slices.
     for i in 1..xs.len() {
         if xs[i..].contains(&xs[i - 1]) {
@@ -86,12 +86,12 @@ pub type HandleOpCode =
 
 pub type SymbolCache = RwLock<HashMap<Vec<u8>, Symbol<opcodes_utils::Entrypoint>>>;
 
-pub struct MessageHandler {
+pub struct ContextHandler {
     opcode_handler: Vec<(BvmAddr, HandleOpCode)>,
     symbol_cache: SymbolCache,
 }
 
-impl Default for MessageHandler {
+impl Default for ContextHandler {
     fn default() -> Self {
         let opcode_handler: Vec<(BvmAddr, HandleOpCode)> = vec![(
             sys_controller::id(),
@@ -105,7 +105,7 @@ impl Default for MessageHandler {
     }
 }
 
-impl MessageHandler {
+impl ContextHandler {
     /// Add a static entrypoint to intercept intructions before the dynamic loader.
     pub fn add_opcode_handler(
         &mut self,
@@ -120,21 +120,21 @@ impl MessageHandler {
     /// This method calls the instruction's program entrypoint method
     fn handle_opcode(
         &self,
-        message: &Context,
+        context: &Context,
         instruction: &EncodedOpCodes,
         executable_accounts: &mut [(BvmAddr, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
     ) -> Result<(), OpCodeErr> {
-        let program_id = instruction.program_id(&message.account_keys);
+        let program_id = instruction.program_id(&context.account_keys);
         let mut keyed_accounts = create_keyed_accounts(executable_accounts);
         let mut keyed_accounts2: Vec<_> = instruction
             .accounts
             .iter()
             .map(|&index| {
                 let index = index as usize;
-                let key = &message.account_keys[index];
-                (key, index < message.header.num_required_signatures as usize)
+                let key = &context.account_keys[index];
+                (key, index < context.header.num_required_signatures as usize)
             })
             .zip(program_accounts.iter_mut())
             .map(|((key, is_signer), account)| KeyedAccount::new(key, is_signer, account))
@@ -167,13 +167,13 @@ impl MessageHandler {
     /// The accounts are committed back to the treasury only if this function returns Ok(_).
     fn execute_instruction(
         &self,
-        message: &Context,
+        context: &Context,
         instruction: &EncodedOpCodes,
         executable_accounts: &mut [(BvmAddr, Account)],
         program_accounts: &mut [&mut Account],
         drop_height: u64,
     ) -> Result<(), OpCodeErr> {
-        let program_id = instruction.program_id(&message.account_keys);
+        let program_id = instruction.program_id(&context.account_keys);
         // TODO: the runtime should be checking read/write access to memory
         // we are trusting the hard-coded programs not to clobber or allocate
         let pre_total: u64 = program_accounts.iter().map(|a| a.difs).sum();
@@ -183,7 +183,7 @@ impl MessageHandler {
             .collect();
 
         self.handle_opcode(
-            message,
+            context,
             instruction,
             executable_accounts,
             program_accounts,
@@ -215,13 +215,13 @@ impl MessageHandler {
     /// The accounts are committed back to the treasury only if every instruction succeeds
     pub fn process_message(
         &self,
-        message: &Context,
+        context: &Context,
         loaders: &mut [Vec<(BvmAddr, Account)>],
         accounts: &mut [Account],
         drop_height: u64,
     ) -> Result<(), TransactionError> {
-        for (instruction_index, instruction) in message.instructions.iter().enumerate() {
-            let executable_index = message
+        for (instruction_index, instruction) in context.instructions.iter().enumerate() {
+            let executable_index = context
                 .program_position(instruction.program_ids_index as usize)
                 .ok_or(TransactionError::InvalidAccountIndex)?;
             let executable_accounts = &mut loaders[executable_index];
@@ -231,7 +231,7 @@ impl MessageHandler {
             // account is also included as a regular account for an instruction, because the
             // executable account is not passed in as part of the accounts slice
             self.execute_instruction(
-                message,
+                context,
                 instruction,
                 executable_accounts,
                 &mut program_accounts,

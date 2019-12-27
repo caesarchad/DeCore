@@ -4,7 +4,7 @@ use crate::accounts_db::{
 };
 use crate::accounts_index::{AccountsIndex, Fork};
 use crate::append_vec::StoredAccount;
-use crate::message_processor::has_duplicates;
+use crate::context_handler::has_duplicates;
 use bincode::serialize;
 use hashbrown::{HashMap, HashSet};
 use log::*;
@@ -167,12 +167,12 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
     ) -> Result<Vec<Account>> {
         // Copy all the accounts
-        let message = tx.self_context();
+        let context = tx.self_context();
         if tx.signatures.is_empty() && fee != 0 {
             Err(TransactionError::MissingSignatureForFee)
         } else {
             // Check for unique account keys
-            if has_duplicates(&message.account_keys) {
+            if has_duplicates(&context.account_keys) {
                 error_counters.account_loaded_twice += 1;
                 return Err(TransactionError::AccountLoadedTwice);
             }
@@ -180,8 +180,8 @@ impl Accounts {
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut called_accounts: Vec<Account> = vec![];
-            for key in &message.account_keys {
-                if !message.program_ids().contains(&key) {
+            for key in &context.account_keys {
+                if !context.program_ids().contains(&key) {
                     called_accounts.push(
                         AccountsDB::load(storage, ancestors, accounts_index, key)
                             .map(|(account, _)| account)
@@ -256,16 +256,16 @@ impl Accounts {
         tx: &Transaction,
         error_counters: &mut ErrorCounters,
     ) -> Result<Vec<Vec<(BvmAddr, Account)>>> {
-        let message = tx.self_context();
-        message
+        let context = tx.self_context();
+        context
             .instructions
             .iter()
             .map(|ix| {
-                if message.account_keys.len() <= ix.program_ids_index as usize {
+                if context.account_keys.len() <= ix.program_ids_index as usize {
                     error_counters.account_not_found += 1;
                     return Err(TransactionError::AccountNotFound);
                 }
-                let program_id = message.account_keys[ix.program_ids_index as usize];
+                let program_id = context.account_keys[ix.program_ids_index as usize];
                 Self::load_executable_accounts(
                     storage,
                     ancestors,

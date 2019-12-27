@@ -8,7 +8,7 @@ use crate::accounts_index::Fork;
 use crate::transaction_seal_queue::TransactionSealQueue;
 use crate::epoch_schedule::RoundPlan;
 use crate::locked_accounts_results::LockedAccountsResults;
-use crate::message_processor::{MessageHandler, HandleOpCode};
+use crate::context_handler::{ContextHandler, HandleOpCode};
 use crate::stakes::Stakes;
 use crate::status_cache::StatusCache;
 use bincode::serialize;
@@ -101,7 +101,7 @@ pub struct Treasury {
     is_delta: AtomicBool,
 
     /// The Context processor
-    message_processor: MessageHandler,
+    context_handler: ContextHandler,
 }
 
 impl Default for TransactionSealQueue {
@@ -298,7 +298,7 @@ impl Treasury {
             genesis_block.epoch_warmup,
         );
 
-        // Add native programs mandatory for the MessageHandler to function
+        // Add native programs mandatory for the ContextHandler to function
         self.register_native_instruction_processor(
             "morgan_system_program",
             &morgan_interface::sys_controller::id(),
@@ -667,7 +667,7 @@ impl Treasury {
                 .map(|(accs, tx)| match accs {
                     Err(e) => Err(e.clone()),
                     Ok((ref mut accounts, ref mut loaders)) => self
-                        .message_processor
+                        .context_handler
                         .process_message(tx.self_context(), loaders, accounts, drop_height),
                 })
                 .collect();
@@ -721,13 +721,13 @@ impl Treasury {
             .zip(executed.iter())
             .map(|(tx, res)| {
                 let fee = self.fee_calculator.calculate_fee(tx.self_context());
-                let message = tx.self_context();
+                let context = tx.self_context();
                 match *res {
                     Err(TransactionError::OpCodeErr(_, _)) => {
                         // credit the transaction fee even in case of OpCodeErr
                         // necessary to withdraw from account[0] here because previous
                         // work of doing so (in accounts.load()) is ignored by store()
-                        self.withdraw(&message.account_keys[0], fee)?;
+                        self.withdraw(&context.account_keys[0], fee)?;
                         fees += fee;
                         Ok(())
                     }
@@ -967,10 +967,10 @@ impl Treasury {
                 continue;
             }
 
-            let message = &txs[i].self_context();
+            let context = &txs[i].self_context();
             let acc = raccs.as_ref().unwrap();
 
-            for (pubkey, account) in message
+            for (pubkey, account) in context
                 .account_keys
                 .iter()
                 .zip(acc.0.iter())
@@ -1013,7 +1013,7 @@ impl Treasury {
         program_id: BvmAddr,
         handle_opcode: HandleOpCode,
     ) {
-        self.message_processor
+        self.context_handler
             .add_opcode_handler(program_id, handle_opcode);
 
         // Register a bogus executable account, which will be loaded and ignored.
@@ -1302,7 +1302,7 @@ mod tests {
         let mut tx =
             sys_controller::transfer(&mint_keypair, &key2.pubkey(), 1, genesis_block.hash());
         // send a bogus instruction to sys_controller, cause an instruction error
-        tx.message.instructions[0].data[0] = 40;
+        tx.context.instructions[0].data[0] = 40;
 
         treasury.process_transaction(&tx)
             .expect_err("instruction error"); // fails with an instruction error
@@ -1448,14 +1448,14 @@ mod tests {
             sys_controller::transfer(&mint_keypair, &keypair.pubkey(), 1, genesis_block.hash());
 
         let mut tx_invalid_program_index = tx.clone();
-        tx_invalid_program_index.message.instructions[0].program_ids_index = 42;
+        tx_invalid_program_index.context.instructions[0].program_ids_index = 42;
         assert_eq!(
             treasury.process_transaction(&tx_invalid_program_index),
             Err(TransactionError::InvalidAccountIndex)
         );
 
         let mut tx_invalid_account_index = tx.clone();
-        tx_invalid_account_index.message.instructions[0].accounts[0] = 42;
+        tx_invalid_account_index.context.instructions[0].accounts[0] = 42;
         assert_eq!(
             treasury.process_transaction(&tx_invalid_account_index),
             Err(TransactionError::InvalidAccountIndex)

@@ -36,13 +36,13 @@ impl OfflineAccount for TreasuryClient {
         Ok(signature)
     }
 
-    fn send_offline_message(
+    fn snd_offline_context(
         &self,
         keypairs: &[&Keypair],
-        message: Context,
+        context: Context,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
-        let transaction = Transaction::new(&keypairs, message, recent_transaction_seal);
+        let transaction = Transaction::new(&keypairs, context, recent_transaction_seal);
         self.send_offline_transaction(transaction)
     }
 
@@ -53,7 +53,7 @@ impl OfflineAccount for TreasuryClient {
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let context = Context::new(vec![instruction]);
-        self.send_offline_message(&[keypair], context, recent_transaction_seal)
+        self.snd_offline_context(&[keypair], context, recent_transaction_seal)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -71,9 +71,9 @@ impl OfflineAccount for TreasuryClient {
 }
 
 impl OnlineAccount for TreasuryClient {
-    fn send_online_msg(&self, keypairs: &[&Keypair], message: Context) -> Result<Signature> {
+    fn snd_online_context(&self, keypairs: &[&Keypair], context: Context) -> Result<Signature> {
         let transaction_seal = self.treasury.last_transaction_seal();
-        let transaction = Transaction::new(&keypairs, message, transaction_seal);
+        let transaction = Transaction::new(&keypairs, context, transaction_seal);
         self.treasury.process_transaction(&transaction)?;
         Ok(transaction.signatures.get(0).cloned().unwrap_or_default())
     }
@@ -81,7 +81,7 @@ impl OnlineAccount for TreasuryClient {
     /// Create and process a transaction from a single instruction.
     fn snd_online_instruction(&self, keypair: &Keypair, instruction: OpCode) -> Result<Signature> {
         let context = Context::new(vec![instruction]);
-        self.send_online_msg(&[keypair], context)
+        self.snd_online_context(&[keypair], context)
     }
 
     /// Transfer `difs` from `keypair` to `pubkey`
@@ -237,7 +237,7 @@ mod tests {
             .push(AccountMeta::new(jane_pubkey, true));
 
         let context = Context::new(vec![transfer_instruction]);
-        treasury_client.send_online_msg(&doe_keypairs, context).unwrap();
+        treasury_client.snd_online_context(&doe_keypairs, context).unwrap();
         assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
     }
 }

@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use morgan_runtime::message_processor::*;
+use morgan_runtime::context_handler::*;
 use test::Bencher;
 
 #[bench]
