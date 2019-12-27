@@ -15,11 +15,11 @@ extern crate rand;
 extern crate serde;
 extern crate sha2;
 
-mod constants;
+mod cstnts;
 mod bitconch_curve;
-mod errors;
-mod public;
-mod private;
-mod signature;
+mod errs;
+mod pb;
+mod scrt;
+mod sgn;
 
 pub use crate::bitconch_curve::*;

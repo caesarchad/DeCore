@@ -4,44 +4,44 @@ use core::fmt;
 use core::fmt::Display;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub(crate) enum InternalError {
-    PointDecompressionError,
-    ScalarFormatError,
-    BytesLengthError {
-        name: &'static str,
-        length: usize,
+pub(crate) enum IntrEr {
+    PntDepErr,
+    SclFmtErr,
+    BytLgthErr {
+        nm: &'static str,
+        lng: usize,
     },
-    VerifyError,
+    VrfErr,
 }
 
-impl Display for InternalError {
+impl Display for IntrEr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            InternalError::PointDecompressionError
+            IntrEr::PntDepErr
                 => write!(f, "Cannot decompress Edwards point"),
-            InternalError::ScalarFormatError
+            IntrEr::SclFmtErr
                 => write!(f, "Cannot use scalar with high-bit set"),
-            InternalError::BytesLengthError{ name: n, length: l}
-                => write!(f, "{} must be {} bytes in length", n, l),
-            InternalError::VerifyError
+            IntrEr::BytLgthErr{ nm: n, lng: l}
+                => write!(f, "{} must be {} octets in lng", n, l),
+            IntrEr::VrfErr
                 => write!(f, "Verification equation was not satisfied"),
         }
     }
 }
 
-impl ::failure::Fail for InternalError {}
+impl ::failure::Fail for IntrEr {}
 
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct SignatureError(pub(crate) InternalError);
+pub struct SngErr(pub(crate) IntrEr);
 
-impl Display for SignatureError {
+impl Display for SngErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl ::failure::Fail for SignatureError {
+impl ::failure::Fail for SngErr {
     fn cause(&self) -> Option<&dyn (::failure::Fail)> {
         Some(&self.0)
     }

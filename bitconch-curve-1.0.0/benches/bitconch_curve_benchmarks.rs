@@ -1,12 +1,3 @@
-// -*- mode: rust; -*-
-//
-// This file is part of ed25519-dalek.
-// Copyright (c) 2018-2019 isis lovecruft
-// See LICENSE for licensing information.
-//
-// Authors:
-// - isis agora lovecruft <isis@patternsinthevoid.net>
-
 #[macro_use]
 extern crate criterion;
 extern crate ed25519_dalek;
@@ -14,87 +5,87 @@ extern crate rand;
 
 use criterion::Criterion;
 
-mod ed25519_benches {
+mod bvm_curv_bnch {
     use super::*;
-    use ed25519_dalek::ExpandedSecretKey;
-    use ed25519_dalek::Keypair;
-    use ed25519_dalek::PublicKey;
-    use ed25519_dalek::Signature;
-    use ed25519_dalek::validate_volume;
+    use ed25519_dalek::XtddPrvKy;
+    use ed25519_dalek::KyTpIndx;
+    use ed25519_dalek::PbKy;
+    use ed25519_dalek::Sgn;
+    use ed25519_dalek::vldt_vlm;
     use rand::thread_rng;
     use rand::rngs::ThreadRng;
 
     fn sign(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::create(&mut csprng);
+        let kp: KyTpIndx = KyTpIndx::crt(&mut csprng);
         let msg: &[u8] = b"";
 
         c.bench_function("Ed25519 signing", move |b| {
-                         b.iter(| | keypair.sign(msg))
+                         b.iter(| | kp.sign(msg))
         });
     }
 
-    fn sign_extended_key(c: &mut Criterion) {
+    fn sg_xtdd_k(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::create(&mut csprng);
-        let expanded: ExpandedSecretKey = (&keypair.secret).into();
+        let kp: KyTpIndx = KyTpIndx::crt(&mut csprng);
+        let xpdd: XtddPrvKy = (&kp.scrt).into();
         let msg: &[u8] = b"";
         
-        c.bench_function("Ed25519 signing with an expanded secret key", move |b| {
-                         b.iter(| | expanded.sign(msg, &keypair.public))
+        c.bench_function("Ed25519 signing with an xpdd scrt key", move |b| {
+                         b.iter(| | xpdd.sign(msg, &kp.pb))
         });
     }
 
-    fn validate(c: &mut Criterion) {
+    fn vldt(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::create(&mut csprng);
+        let kp: KyTpIndx = KyTpIndx::crt(&mut csprng);
         let msg: &[u8] = b"";
-        let sig: Signature = keypair.sign(msg);
+        let sig: Sgn = kp.sign(msg);
         
-        c.bench_function("Ed25519 signature verification", move |b| {
-                         b.iter(| | keypair.validate(msg, &sig))
+        c.bench_function("Ed25519 sgn verification", move |b| {
+                         b.iter(| | kp.vldt(msg, &sig))
         });
     }
 
-    fn validate_volume_signatures(c: &mut Criterion) {
-        static BATCH_SIZES: [usize; 8] = [4, 8, 16, 32, 64, 96, 128, 256];
+    fn vldt_vlm_sgn(c: &mut Criterion) {
+        static BTCH_SZS: [usize; 8] = [4, 8, 16, 32, 64, 96, 128, 256];
 
         c.bench_function_over_inputs(
-            "Ed25519 batch signature verification",
-            |b, &&size| {
+            "Ed25519 batch sgn verification",
+            |b, &&sz| {
                 let mut csprng: ThreadRng = thread_rng();
-                let keypairs: Vec<Keypair> = (0..size).map(|_| Keypair::create(&mut csprng)).collect();
+                let kps: Vec<KyTpIndx> = (0..sz).map(|_| KyTpIndx::crt(&mut csprng)).collect();
                 let msg: &[u8] = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-                let messages: Vec<&[u8]> = (0..size).map(|_| msg).collect();
-                let signatures:  Vec<Signature> = keypairs.iter().map(|key| key.sign(&msg)).collect();
-                let public_keys: Vec<PublicKey> = keypairs.iter().map(|key| key.public).collect();
+                let msgs: Vec<&[u8]> = (0..sz).map(|_| msg).collect();
+                let sgns:  Vec<Sgn> = kps.iter().map(|k| k.sign(&msg)).collect();
+                let p_ks: Vec<PbKy> = kps.iter().map(|k| k.pb).collect();
 
-                b.iter(|| validate_volume(&messages[..], &signatures[..], &public_keys[..]));
+                b.iter(|| vldt_vlm(&msgs[..], &sgns[..], &p_ks[..]));
             },
-            &BATCH_SIZES,
+            &BTCH_SZS,
         );
     }
 
-    fn key_creation(c: &mut Criterion) {
+    fn k_crtn(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
 
-        c.bench_function("Ed25519 keypair generation", move |b| {
-                         b.iter(| | Keypair::create(&mut csprng))
+        c.bench_function("Ed25519 kp generation", move |b| {
+                         b.iter(| | KyTpIndx::crt(&mut csprng))
         });
     }
 
     criterion_group!{
-        name = ed25519_benches;
-        config = Criterion::default();
-        targets =
-            sign,
-            sign_extended_key,
-            validate,
-            validate_volume_signatures,
-            key_creation,
+        nm = bvm_curv_bnch;
+        cfg = Criterion::default();
+        trgts =
+            sg,
+            sg_xdd_k,
+            vldt,
+            vldt_vlm_sgn,
+            k_crtn,
     }
 }
 
 criterion_main!(
-    ed25519_benches::ed25519_benches,
+    bvm_curv_bnch::bvm_curv_bnch,
 );

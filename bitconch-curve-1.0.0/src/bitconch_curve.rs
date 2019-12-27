@@ -21,25 +21,25 @@ use curve25519_dalek::constants;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 
-pub use crate::constants::*;
-pub use crate::errors::*;
-pub use crate::public::*;
-pub use crate::private::*;
-pub use crate::signature::*;
+pub use crate::cstnts::*;
+pub use crate::errs::*;
+pub use crate::pb::*;
+pub use crate::scrt::*;
+pub use crate::sgn::*;
 
 
 #[cfg(any(feature = "alloc", feature = "std"))]
 #[allow(non_snake_case)]
-pub fn validate_volume(
-    messages: &[&[u8]],
-    signatures: &[Signature],
-    public_keys: &[PublicKey],
-) -> Result<(), SignatureError>
+pub fn vldt_vlm(
+    msgs: &[&[u8]],
+    sgns: &[Sgn],
+    p_ks: &[PbKy],
+) -> Result<(), SngErr>
 {
-    const ASSERT_MESSAGE: &'static [u8] = b"The number of messages, signatures, and public keys must be equal.";
-    assert!(signatures.len()  == messages.len(),    ASSERT_MESSAGE);
-    assert!(signatures.len()  == public_keys.len(), ASSERT_MESSAGE);
-    assert!(public_keys.len() == messages.len(),    ASSERT_MESSAGE);
+    const ASSRT_MSG: &'static [u8] = b"The number of msgs, sgns, and pb keys must be equal.";
+    assert!(sgns.len()  == msgs.len(),    ASSRT_MSG);
+    assert!(sgns.len()  == p_ks.len(), ASSRT_MSG);
+    assert!(p_ks.len() == msgs.len(),    ASSRT_MSG);
 
     #[cfg(feature = "alloc")]
     use alloc::vec::Vec;
@@ -52,172 +52,172 @@ pub fn validate_volume(
     use curve25519_dalek::traits::IsIdentity;
     use curve25519_dalek::traits::VartimeMultiscalarMul;
 
-    let zs: Vec<Scalar> = signatures
+    let zs: Vec<Scalar> = sgns
         .iter()
         .map(|_| Scalar::from(thread_rng().gen::<u128>()))
         .collect();
 
-    let B_coefficient: Scalar = signatures
+    let B_coefficient: Scalar = sgns
         .iter()
         .map(|sig| sig.s)
         .zip(zs.iter())
         .map(|(s, z)| z * s)
         .sum();
 
-    let hrams = (0..signatures.len()).map(|i| {
+    let hrams = (0..sgns.len()).map(|i| {
         let mut h: Sha512 = Sha512::default();
-        h.input(signatures[i].R.as_bytes());
-        h.input(public_keys[i].as_octets());
-        h.input(&messages[i]);
+        h.input(sgns[i].R.as_bytes());
+        h.input(p_ks[i].as_octts());
+        h.input(&msgs[i]);
         Scalar::from_hash(h)
     });
 
     let zhrams = hrams.zip(zs.iter()).map(|(hram, z)| hram * z);
 
-    let Rs = signatures.iter().map(|sig| sig.R.decompress());
-    let As = public_keys.iter().map(|pk| Some(pk.1));
+    let Rs = sgns.iter().map(|sig| sig.R.decompress());
+    let As = p_ks.iter().map(|pk| Some(pk.1));
     let B = once(Some(constants::ED25519_BASEPOINT_POINT));
 
     let id = EdwardsPoint::optional_multiscalar_mul(
         once(-B_coefficient).chain(zs.iter().cloned()).chain(zhrams),
         B.chain(Rs).chain(As),
-    ).ok_or_else(|| SignatureError(InternalError::VerifyError))?;
+    ).ok_or_else(|| SngErr(IntrEr::VrfErr))?;
 
     if id.is_identity() {
         Ok(())
     } else {
-        Err(SignatureError(InternalError::VerifyError))
+        Err(SngErr(IntrEr::VrfErr))
     }
 }
 
 #[derive(Debug, Default)]
-pub struct Keypair {
-    pub secret: PrivateKey,
-    pub public: PublicKey,
+pub struct KyTpIndx {
+    pub scrt: PvKy,
+    pub pb: PbKy,
 }
 
-impl Keypair {
+impl KyTpIndx {
 
-    pub fn to_octets(&self) -> [u8; KEYPAIR_LENGTH] {
-        let mut bytes: [u8; KEYPAIR_LENGTH] = [0u8; KEYPAIR_LENGTH];
+    pub fn to_octts(&self) -> [u8; K_TP_SZ] {
+        let mut octets: [u8; K_TP_SZ] = [0u8; K_TP_SZ];
 
-        bytes[..SECRET_KEY_LENGTH].copy_from_slice(self.secret.as_octets());
-        bytes[SECRET_KEY_LENGTH..].copy_from_slice(self.public.as_octets());
-        bytes
+        octets[..SCRT_K_SZ].copy_from_slice(self.scrt.as_octts());
+        octets[SCRT_K_SZ..].copy_from_slice(self.pb.as_octts());
+        octets
     }
 
-    pub fn from_octets<'a>(bytes: &'a [u8]) -> Result<Keypair, SignatureError> {
-        if bytes.len() != KEYPAIR_LENGTH {
-            return Err(SignatureError(InternalError::BytesLengthError {
-                name: "Keypair",
-                length: KEYPAIR_LENGTH,
+    pub fn frm_octts<'a>(octets: &'a [u8]) -> Result<KyTpIndx, SngErr> {
+        if octets.len() != K_TP_SZ {
+            return Err(SngErr(IntrEr::BytLgthErr {
+                nm: "KyTpIndx",
+                lng: K_TP_SZ,
             }));
         }
-        let secret = PrivateKey::from_octets(&bytes[..SECRET_KEY_LENGTH])?;
-        let public = PublicKey::from_octets(&bytes[SECRET_KEY_LENGTH..])?;
+        let scrt = PvKy::frm_octts(&octets[..SCRT_K_SZ])?;
+        let pb = PbKy::frm_octts(&octets[SCRT_K_SZ..])?;
 
-        Ok(Keypair{ secret: secret, public: public })
+        Ok(KyTpIndx{ scrt: scrt, pb: pb })
     }
 
-    pub fn create<R>(csprng: &mut R) -> Keypair
+    pub fn crt<R>(csprng: &mut R) -> KyTpIndx
     where
         R: CryptoRng + Rng,
     {
-        let sk: PrivateKey = PrivateKey::create(csprng);
-        let pk: PublicKey = (&sk).into();
+        let sk: PvKy = PvKy::crt(csprng);
+        let pk: PbKy = (&sk).into();
 
-        Keypair{ public: pk, secret: sk }
+        KyTpIndx{ pb: pk, scrt: sk }
     }
 
-    pub fn sign(&self, message: &[u8]) -> Signature {
-        let expanded: ExpandedSecretKey = (&self.secret).into();
+    pub fn sign(&self, msg: &[u8]) -> Sgn {
+        let xpdd: XtddPrvKy = (&self.scrt).into();
 
-        expanded.sign(&message, &self.public)
+        xpdd.sign(&msg, &self.pb)
     }
 
-    pub fn sign_already_hashed<D>(
+    pub fn sg_prhsd<D>(
         &self,
-        prehashed_message: D,
-        context: Option<&'static [u8]>,
-    ) -> Signature
+        prhsd_msg: D,
+        cntxt: Option<&'static [u8]>,
+    ) -> Sgn
     where
         D: Digest<OutputSize = U64>,
     {
-        let expanded: ExpandedSecretKey = (&self.secret).into();
+        let xpdd: XtddPrvKy = (&self.scrt).into();
 
-        expanded.sign_already_hashed(prehashed_message, &self.public, context)
+        xpdd.sg_prhsd(prhsd_msg, &self.pb, cntxt)
     }
 
-    pub fn validate(
+    pub fn vldt(
         &self,
-        message: &[u8],
-        signature: &Signature
-    ) -> Result<(), SignatureError>
+        msg: &[u8],
+        sgn: &Sgn
+    ) -> Result<(), SngErr>
     {
-        self.public.validate(message, signature)
+        self.pb.vldt(msg, sgn)
     }
 
-    pub fn validate_already_hashed<D>(
+    pub fn vldt_prhsd<D>(
         &self,
-        prehashed_message: D,
-        context: Option<&[u8]>,
-        signature: &Signature,
-    ) -> Result<(), SignatureError>
+        prhsd_msg: D,
+        cntxt: Option<&[u8]>,
+        sgn: &Sgn,
+    ) -> Result<(), SngErr>
     where
         D: Digest<OutputSize = U64>,
     {
-        self.public.validate_already_hashed(prehashed_message, context, signature)
+        self.pb.vldt_prhsd(prhsd_msg, cntxt, sgn)
     }
 }
 
-impl PartialEq for Keypair {
+impl PartialEq for KyTpIndx {
     fn eq(&self, other: &Self) -> bool {
-        self.public.as_ref() == other.public.as_ref()
+        self.pb.as_ref() == other.pb.as_ref()
     }
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for Keypair {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl Serialize for KyTpIndx {
+    fn serialize<S>(&self, srlzr: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(&self.to_octets()[..])
+        srlzr.serialize_bytes(&self.to_octts()[..])
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'d> Deserialize<'d> for Keypair {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl<'d> Deserialize<'d> for KyTpIndx {
+    fn deserialize<D>(dsrlzr: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'d>,
     {
-        struct KeypairVisitor;
+        struct KyTplAcsr;
 
-        impl<'d> Visitor<'d> for KeypairVisitor {
-            type Value = Keypair;
+        impl<'d> Visitor<'d> for KyTplAcsr {
+            type Value = KyTpIndx;
 
-            fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                formatter.write_str("An ed25519 keypair, 64 bytes in total where the secret key is \
-                                     the first 32 bytes and is in unexpanded form, and the second \
-                                     32 bytes is a compressed point for a public key.")
+            fn expecting(&self, fmttr: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                fmttr.write_str("An ed25519 kp, 64 octets in total where the scrt key is \
+                                     the first 32 octets and is in unexpanded form, and the second \
+                                     32 octets is a cmprssd pnt for a pb key.")
             }
 
-            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Keypair, E>
+            fn vst_octts<E>(self, octets: &[u8]) -> Result<KyTpIndx, E>
             where
                 E: SerdeError,
             {
-                let secret_key = PrivateKey::from_octets(&bytes[..SECRET_KEY_LENGTH]);
-                let public_key = PublicKey::from_octets(&bytes[SECRET_KEY_LENGTH..]);
+                let scrt_k = PvKy::frm_octts(&octets[..SCRT_K_SZ]);
+                let p_k = PbKy::frm_octts(&octets[SCRT_K_SZ..]);
 
-                if secret_key.is_ok() && public_key.is_ok() {
-                    Ok(Keypair{ secret: secret_key.unwrap(), public: public_key.unwrap() })
+                if scrt_k.is_ok() && p_k.is_ok() {
+                    Ok(KyTpIndx{ scrt: scrt_k.unwrap(), pb: p_k.unwrap() })
                 } else {
-                    Err(SerdeError::invalid_length(bytes.len(), &self))
+                    Err(SerdeError::invalid_length(octets.len(), &self))
                 }
             }
         }
-        deserializer.deserialize_bytes(KeypairVisitor)
+        dsrlzr.deserialize_bytes(KyTplAcsr)
     }
 }
 
@@ -228,18 +228,18 @@ mod test {
     use clear_on_drop::clear::Clear;
 
     #[test]
-    fn keypair_trim_upon_tick() {
-        let mut keypair: Keypair = Keypair::from_octets(&[1u8; KEYPAIR_LENGTH][..]).unwrap();
+    fn kp_cl_n_drp() {
+        let mut kp: KyTpIndx = KyTpIndx::frm_octts(&[1u8; K_TP_SZ][..]).unwrap();
 
-        keypair.clear();
+        kp.clear();
 
-        fn as_octets<T>(x: &T) -> &[u8] {
+        fn as_octts<T>(x: &T) -> &[u8] {
             use std::mem;
             use std::slice;
 
             unsafe { slice::from_raw_parts(x as *const T as *const u8, mem::size_of_val(x)) }
         }
 
-        assert!(!as_octets(&keypair).contains(&0x15));
+        assert!(!as_octts(&kp).contains(&0x15));
     }
 }
