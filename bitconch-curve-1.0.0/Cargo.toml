@@ -1,0 +1,53 @@
+[package]
+name = "bitconch-curve"
+version = "1.0.0"
+authors = ["bitconch maintainers <maintainers@bitconch>"]
+exclude = [".gitignore", "TESTVECTORS", "res/*"]
+
+[[bench]]
+name = "bitconch_curve_benchmarks"
+harness = false
+[dependencies.clear_on_drop]
+version = "0.2"
+
+[dependencies.curve25519-dalek]
+version = "1"
+default-features = false
+
+[dependencies.failure]
+version = "^0.1.1"
+default-features = false
+
+[dependencies.rand]
+version = "0.6"
+features = ["i128_support"]
+
+[dependencies.serde]
+version = "^1.0"
+optional = true
+
+[dependencies.sha2]
+version = "^0.8"
+default-features = false
+[dev-dependencies.bincode]
+version = "^0.9"
+
+[dev-dependencies.criterion]
+version = "0.2"
+
+[dev-dependencies.hex]
+version = "^0.3"
+
+[features]
+alloc = ["curve25519-dalek/alloc"]
+asm = ["sha2/asm"]
+avx2_backend = ["curve25519-dalek/avx2_backend"]
+default = ["std", "u64_backend"]
+nightly = ["curve25519-dalek/nightly", "rand/nightly", "clear_on_drop/nightly"]
+std = ["curve25519-dalek/std", "rand/std", "sha2/std"]
+u32_backend = ["curve25519-dalek/u32_backend"]
+u64_backend = ["curve25519-dalek/u64_backend"]
+yolocrypto = ["curve25519-dalek/yolocrypto"]
+[badges.travis-ci]
+branch = "master"
+repository = "dalek-cryptography/ed25519-dalek"
