@@ -80,7 +80,7 @@ pub fn discover(
     let exit = Arc::new(AtomicBool::new(false));
     let (gossip_service, spy_ref) = make_gossip_node(connection_url, &exit, gossip_addr);
 
-    let id = spy_ref.read().unwrap().keypair.pubkey();
+    let id = spy_ref.read().unwrap().keypair.address();
     // info!("{}", Info(format!("Gossip connection url: {:?}", connection_url).to_string()));
     // info!("{}", Info(format!("Spy node id: {:?}", id).to_string()));
     println!("{}",
@@ -281,11 +281,11 @@ fn spy(
         miners = spy_ref.read().unwrap().storage_peers();
         if let Some(num) = num_nodes {
             if fetch_blaze_node_list.len() + miners.len() >= num {
-                if let Some(pubkey) = find_node {
+                if let Some(address) = find_node {
                     if fetch_blaze_node_list
                         .iter()
                         .chain(miners.iter())
-                        .any(|x| x.id == pubkey)
+                        .any(|x| x.id == address)
                     {
                         met_criteria = true;
                         break;
@@ -296,12 +296,12 @@ fn spy(
                 }
             }
         }
-        if let Some(pubkey) = find_node {
+        if let Some(address) = find_node {
             if num_nodes.is_none()
                 && fetch_blaze_node_list
                     .iter()
                     .chain(miners.iter())
-                    .any(|x| x.id == pubkey)
+                    .any(|x| x.id == address)
             {
                 met_criteria = true;
                 break;
@@ -344,9 +344,9 @@ fn make_gossip_node(
 ) -> (GossipService, Arc<RwLock<NodeGroupInfo>>) {
     let keypair = Arc::new(Keypair::new());
     let (node, gossip_socket) = if let Some(gossip_addr) = gossip_addr {
-        NodeGroupInfo::gossip_node(&keypair.pubkey(), gossip_addr)
+        NodeGroupInfo::gossip_node(&keypair.address(), gossip_addr)
     } else {
-        NodeGroupInfo::spy_node(&keypair.pubkey())
+        NodeGroupInfo::spy_node(&keypair.address())
     };
     let mut node_group_info = NodeGroupInfo::new(node, keypair);
     node_group_info.set_entrypoint(ContactInfo::new_gossip_connection_url(connection_url));
@@ -392,7 +392,7 @@ mod tests {
         let keypair = Keypair::new();
         let peer0 = BvmAddr::new_rand();
         let peer1 = BvmAddr::new_rand();
-        let contact_info = ContactInfo::new_localhost(&keypair.pubkey(), 0);
+        let contact_info = ContactInfo::new_localhost(&keypair.address(), 0);
         let peer0_info = ContactInfo::new_localhost(&peer0, 0);
         let peer1_info = ContactInfo::new_localhost(&peer1, 0);
         let mut node_group_info = NodeGroupInfo::new(contact_info.clone(), Arc::new(keypair));
@@ -412,13 +412,13 @@ mod tests {
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), Some(2), None, None);
         assert_eq!(met_criteria, true);
 
-        // Find specific node by pubkey
+        // Find specific node by address
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), None, None, Some(peer0));
         assert_eq!(met_criteria, true);
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), None, Some(0), Some(BvmAddr::new_rand()));
         assert_eq!(met_criteria, false);
 
-        // Find num_nodes *and* specific node by pubkey
+        // Find num_nodes *and* specific node by address
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), Some(1), None, Some(peer0));
         assert_eq!(met_criteria, true);
         let (met_criteria, _, _, _) = spy(spy_ref.clone(), Some(3), Some(0), Some(peer0));

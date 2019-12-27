@@ -173,30 +173,30 @@ mod tests {
     fn test_budget_payment() {
         let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = TreasuryClient::new(treasury);
-        let alice_pubkey = alice_keypair.pubkey();
-        let bob_pubkey = BvmAddr::new_rand();
-        let instructions = sc_opcode::payment(&alice_pubkey, &bob_pubkey, 100);
+        let alice = alice_keypair.address();
+        let bob = BvmAddr::new_rand();
+        let instructions = sc_opcode::payment(&alice, &bob, 100);
         let context = Context::new(instructions);
         treasury_client
             .snd_online_context(&[&alice_keypair], context)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 100);
+        assert_eq!(treasury_client.get_balance(&bob).unwrap(), 100);
     }
 
     #[test]
     fn test_unsigned_witness_key() {
         let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = TreasuryClient::new(treasury);
-        let alice_pubkey = alice_keypair.pubkey();
+        let alice = alice_keypair.address();
 
         // Initialize BudgetState
-        let budget_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
+        let budget_address = BvmAddr::new_rand();
+        let bob = BvmAddr::new_rand();
         let witness = BvmAddr::new_rand();
         let instructions = sc_opcode::when_signed(
-            &alice_pubkey,
-            &bob_pubkey,
-            &budget_pubkey,
+            &alice,
+            &bob,
+            &budget_address,
             &witness,
             None,
             1,
@@ -208,16 +208,16 @@ mod tests {
 
         // Attack! Part 1: Sign a witness transaction with a random key.
         let mallory_keypair = Keypair::new();
-        let mallory_pubkey = mallory_keypair.pubkey();
+        let mallory = mallory_keypair.address();
         treasury_client
-            .online_transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory)
             .unwrap();
         let instruction =
-            sc_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            sc_opcode::apply_signature(&mallory, &budget_address, &bob);
         let mut context = Context::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
-        context.account_keys.insert(3, alice_pubkey);
+        context.account_keys.insert(3, alice);
         context.instructions[0].accounts[0] = 3;
         context.instructions[0].program_ids_index = 4;
 
@@ -235,18 +235,18 @@ mod tests {
     fn test_unsigned_timestamp() {
         let (treasury, alice_keypair) = create_treasury(10_000);
         let treasury_client = TreasuryClient::new(treasury);
-        let alice_pubkey = alice_keypair.pubkey();
+        let alice_address = alice_keypair.address();
 
         // Initialize BudgetState
-        let budget_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
+        let budget_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let dt = Utc::now();
         let instructions = sc_opcode::on_date(
-            &alice_pubkey,
-            &bob_pubkey,
-            &budget_pubkey,
+            &alice_address,
+            &bob_address,
+            &budget_address,
             dt,
-            &alice_pubkey,
+            &alice_address,
             None,
             1,
         );
@@ -257,16 +257,16 @@ mod tests {
 
         // Attack! Part 1: Sign a timestamp transaction with a random key.
         let mallory_keypair = Keypair::new();
-        let mallory_pubkey = mallory_keypair.pubkey();
+        let mallory_address = mallory_keypair.address();
         treasury_client
-            .online_transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory_address)
             .unwrap();
         let instruction =
-            sc_opcode::apply_timestamp(&mallory_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            sc_opcode::apply_timestamp(&mallory_address, &budget_address, &bob_address, dt);
         let mut context = Context::new(vec![instruction]);
 
         // Attack! Part 2: Point the instruction to the expected, but unsigned, key.
-        context.account_keys.insert(3, alice_pubkey);
+        context.account_keys.insert(3, alice_address);
         context.instructions[0].accounts[0] = 3;
         context.instructions[0].program_ids_index = 4;
 
@@ -284,17 +284,17 @@ mod tests {
     fn test_pay_on_date() {
         let (treasury, alice_keypair) = create_treasury(2);
         let treasury_client = TreasuryClient::new(treasury);
-        let alice_pubkey = alice_keypair.pubkey();
-        let budget_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
-        let mallory_pubkey = BvmAddr::new_rand();
+        let alice_address = alice_keypair.address();
+        let budget_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
+        let mallory_address = BvmAddr::new_rand();
         let dt = Utc::now();
         let instructions = sc_opcode::on_date(
-            &alice_pubkey,
-            &bob_pubkey,
-            &budget_pubkey,
+            &alice_address,
+            &bob_address,
+            &budget_address,
             dt,
-            &alice_pubkey,
+            &alice_address,
             None,
             1,
         );
@@ -302,19 +302,19 @@ mod tests {
         treasury_client
             .snd_online_context(&[&alice_keypair], context)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&budget_address).unwrap(), 1);
 
         let contract_account = treasury_client
-            .get_account_data(&budget_pubkey)
+            .get_account_data(&budget_address)
             .unwrap()
             .unwrap();
         let script_state = BudgetState::deserialize(&contract_account).unwrap();
         assert!(script_state.is_pending());
 
-        // Attack! Try to payout to mallory_pubkey
+        // Attack! Try to payout to mallory_address
         let instruction =
-            sc_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &mallory_pubkey, dt);
+            sc_opcode::apply_timestamp(&alice_address, &budget_address, &mallory_address, dt);
         assert_eq!(
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
@@ -325,57 +325,57 @@ mod tests {
                 OpCodeErr::CustomError(BudgetError::DestinationMissing as u32)
             )
         );
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 0);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&budget_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&bob_address).unwrap(), 0);
 
         let contract_account = treasury_client
-            .get_account_data(&budget_pubkey)
+            .get_account_data(&budget_address)
             .unwrap()
             .unwrap();
         let script_state = BudgetState::deserialize(&contract_account).unwrap();
         assert!(script_state.is_pending());
 
         // Now, acknowledge the time in the condition occurred and
-        // that pubkey's funds are now available.
+        // that address's funds are now available.
         let instruction =
-            sc_opcode::apply_timestamp(&alice_pubkey, &budget_pubkey, &bob_pubkey, dt);
+            sc_opcode::apply_timestamp(&alice_address, &budget_address, &bob_address, dt);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 0);
-        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_account_data(&budget_pubkey).unwrap(), None);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&budget_address).unwrap(), 0);
+        assert_eq!(treasury_client.get_balance(&bob_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_account_data(&budget_address).unwrap(), None);
     }
 
     #[test]
     fn test_cancel_payment() {
         let (treasury, alice_keypair) = create_treasury(3);
         let treasury_client = TreasuryClient::new(treasury);
-        let alice_pubkey = alice_keypair.pubkey();
-        let budget_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
+        let alice_address = alice_keypair.address();
+        let budget_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let dt = Utc::now();
 
         let instructions = sc_opcode::on_date(
-            &alice_pubkey,
-            &bob_pubkey,
-            &budget_pubkey,
+            &alice_address,
+            &bob_address,
+            &budget_address,
             dt,
-            &alice_pubkey,
-            Some(alice_pubkey),
+            &alice_address,
+            Some(alice_address),
             1,
         );
         let context = Context::new(instructions);
         treasury_client
             .snd_online_context(&[&alice_keypair], context)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 2);
-        assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 2);
+        assert_eq!(treasury_client.get_balance(&budget_address).unwrap(), 1);
 
         let contract_account = treasury_client
-            .get_account_data(&budget_pubkey)
+            .get_account_data(&budget_address)
             .unwrap()
             .unwrap();
         let script_state = BudgetState::deserialize(&contract_account).unwrap();
@@ -383,30 +383,30 @@ mod tests {
 
         // Attack! try to put the difs into the wrong account with cancel
         let mallory_keypair = Keypair::new();
-        let mallory_pubkey = mallory_keypair.pubkey();
+        let mallory_address = mallory_keypair.address();
         treasury_client
-            .online_transfer(1, &alice_keypair, &mallory_pubkey)
+            .online_transfer(1, &alice_keypair, &mallory_address)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 1);
 
         let instruction =
-            sc_opcode::apply_signature(&mallory_pubkey, &budget_pubkey, &bob_pubkey);
+            sc_opcode::apply_signature(&mallory_address, &budget_address, &bob_address);
         treasury_client
             .snd_online_instruction(&mallory_keypair, instruction)
             .unwrap();
         // nothing should be changed because apply witness didn't finalize a payment
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_balance(&budget_pubkey).unwrap(), 1);
-        assert_eq!(treasury_client.get_account_data(&bob_pubkey).unwrap(), None);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_balance(&budget_address).unwrap(), 1);
+        assert_eq!(treasury_client.get_account_data(&bob_address).unwrap(), None);
 
         // Now, cancel the transaction. mint gets her funds back
         let instruction =
-            sc_opcode::apply_signature(&alice_pubkey, &budget_pubkey, &alice_pubkey);
+            sc_opcode::apply_signature(&alice_address, &budget_address, &alice_address);
         treasury_client
             .snd_online_instruction(&alice_keypair, instruction)
             .unwrap();
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 2);
-        assert_eq!(treasury_client.get_account_data(&budget_pubkey).unwrap(), None);
-        assert_eq!(treasury_client.get_account_data(&bob_pubkey).unwrap(), None);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 2);
+        assert_eq!(treasury_client.get_account_data(&budget_address).unwrap(), None);
+        assert_eq!(treasury_client.get_account_data(&bob_address).unwrap(), None);
     }
 }

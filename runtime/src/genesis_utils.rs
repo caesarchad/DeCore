@@ -16,7 +16,7 @@ pub struct GenesisBlockInfo {
 
 pub fn create_genesis_block_with_leader(
     mint_difs: u64,
-    bootstrap_leader_pubkey: &BvmAddr,
+    bootstrap_leader_address: &BvmAddr,
     bootstrap_leader_stake_difs: u64,
 ) -> GenesisBlockInfo {
     let mint_keypair = Keypair::new();
@@ -24,32 +24,32 @@ pub fn create_genesis_block_with_leader(
     let staking_keypair = Keypair::new();
 
     let (vote_account, vote_state) = vote_state::create_bootstrap_leader_account(
-        &voting_keypair.pubkey(),
-        &bootstrap_leader_pubkey,
+        &voting_keypair.address(),
+        &bootstrap_leader_address,
         0,
         bootstrap_leader_stake_difs,
     );
 
     let genesis_block = GenesisBlock::new(
-        &bootstrap_leader_pubkey,
+        &bootstrap_leader_address,
         &[
             (
-                mint_keypair.pubkey(),
+                mint_keypair.address(),
                 Account::new(mint_difs, 0, 0, &sys_controller::id()),
             ),
             // node needs an account to issue votes and storage proofs from, this will require
             //  airdrops at some point to cover fees...
             (
-                *bootstrap_leader_pubkey,
+                *bootstrap_leader_address,
                 Account::new(42, 0, 0, &sys_controller::id()),
             ),
             // where votes go to
-            (voting_keypair.pubkey(), vote_account),
+            (voting_keypair.address(), vote_account),
             // passive bootstrap leader stake, duplicates above temporarily
             (
-                staking_keypair.pubkey(),
+                staking_keypair.address(),
                 stake_state::create_delegate_stake_account(
-                    &voting_keypair.pubkey(),
+                    &voting_keypair.address(),
                     &vote_state,
                     bootstrap_leader_stake_difs,
                 ),

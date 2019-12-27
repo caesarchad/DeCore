@@ -47,7 +47,7 @@ mod bpf {
 
             // Call user program
             let program_id = load_program(&treasury_client, &alice_keypair, &bvm_controller::id(), elf);
-            let instruction = compose_call_opcode(alice_keypair.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(alice_keypair.address(), program_id, &1u8);
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)
                 .unwrap();
@@ -76,7 +76,7 @@ mod bpf {
                 let treasury = Treasury::new(&genesis_block);
                 let treasury_client = TreasuryClient::new(treasury);
 
-                let loader_pubkey = load_program(
+                let ldr_addr = load_program(
                     &treasury_client,
                     &alice_keypair,
                     &bultin_mounter::id(),
@@ -84,9 +84,9 @@ mod bpf {
                 );
 
                 // Call user program
-                let program_id = load_program(&treasury_client, &alice_keypair, &loader_pubkey, elf);
+                let program_id = load_program(&treasury_client, &alice_keypair, &ldr_addr, elf);
                 let instruction =
-                    compose_call_opcode(alice_keypair.pubkey(), program_id, &1u8);
+                    compose_call_opcode(alice_keypair.address(), program_id, &1u8);
                 treasury_client
                     .snd_online_instruction(&alice_keypair, instruction)
                     .unwrap();
@@ -122,7 +122,7 @@ mod bpf {
                 let treasury = Treasury::new(&genesis_block);
                 let treasury_client = TreasuryClient::new(treasury);
 
-                let loader_pubkey = load_program(
+                let ldr_addr = load_program(
                     &treasury_client,
                     &alice_keypair,
                     &bultin_mounter::id(),
@@ -130,10 +130,10 @@ mod bpf {
                 );
 
                 // Call user program
-                let program_id = load_program(&treasury_client, &alice_keypair, &loader_pubkey, elf);
+                let program_id = load_program(&treasury_client, &alice_keypair, &ldr_addr, elf);
                 let account_metas = vec![
-                    AccountMeta::new(alice_keypair.pubkey(), true),
-                    AccountMeta::new(Keypair::new().pubkey(), false),
+                    AccountMeta::new(alice_keypair.address(), true),
+                    AccountMeta::new(Keypair::new().address(), false),
                 ];
                 let instruction = OpCode::new(program_id, &1u8, account_metas);
                 treasury_client

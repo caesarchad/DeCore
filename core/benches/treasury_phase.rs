@@ -53,7 +53,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
     let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(100_000);
     let treasury = Arc::new(Treasury::new(&genesis_block));
     let ledger_path = fetch_interim_ledger_location!();
-    let my_pubkey = BvmAddr::new_rand();
+    let my_address = BvmAddr::new_rand();
     {
         let block_buffer_pool = Arc::new(
             BlockBufferPool::open_ledger_file(&ledger_path).expect("Expected to be able to open database ledger"),
@@ -74,7 +74,7 @@ fn bench_consume_buffered(bencher: &mut Bencher) {
         // If the packet buffers are copied, performance will be poor.
         bencher.iter(move || {
             let _ignored =
-                TreasuryPhase::consume_buffered_packets(&my_pubkey, &waterclock_recorder, &mut packets);
+                TreasuryPhase::consume_buffered_packets(&my_address, &waterclock_recorder, &mut packets);
         });
 
         exit.store(true, Ordering::Relaxed);
@@ -103,8 +103,8 @@ fn bench_treasury_phase_multi_accounts(bencher: &mut Bencher) {
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
-    let to_pubkey = BvmAddr::new_rand();
-    let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
+    let to_address = BvmAddr::new_rand();
+    let dummy = sys_controller::transfer(&mint_keypair, &to_address, 1, genesis_block.hash());
     trace!("txs: {}", txes);
     let transactions: Vec<_> = (0..txes)
         .into_par_iter()
@@ -214,8 +214,8 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
     let (verified_sender, verified_receiver) = channel();
     let (vote_sender, vote_receiver) = channel();
     let treasury = Arc::new(Treasury::new(&genesis_block));
-    let to_pubkey = BvmAddr::new_rand();
-    let dummy = sys_controller::transfer(&mint_keypair, &to_pubkey, 1, genesis_block.hash());
+    let to_address = BvmAddr::new_rand();
+    let dummy = sys_controller::transfer(&mint_keypair, &to_address, 1, genesis_block.hash());
     let transactions: Vec<_> = (0..txes)
         .into_par_iter()
         .map(|_| {

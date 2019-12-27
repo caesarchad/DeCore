@@ -129,7 +129,7 @@ mod tests {
             .iter()
             .zip(program_accounts.iter_mut())
             .map(|(account_meta, account)| {
-                KeyedAccount::new(&account_meta.pubkey, account_meta.is_signer, account)
+                KeyedAccount::new(&account_meta.address, account_meta.is_signer, account)
             })
             .collect();
 
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_proof_bounds() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut account = Account {
             data: vec![0; STORAGE_ACCOUNT_SPACE as usize],
             ..Account::default()
@@ -158,7 +158,7 @@ mod tests {
         }
 
         let ix = storage_opcode::mining_proof(
-            &pubkey,
+            &address,
             Hash::default(),
             SLOTS_PER_SEGMENT,
             Signature::default(),
@@ -174,21 +174,21 @@ mod tests {
 
     #[test]
     fn test_storage_tx() {
-        let pubkey = BvmAddr::new_rand();
-        let mut accounts = [(pubkey, Account::default())];
+        let address = BvmAddr::new_rand();
+        let mut accounts = [(address, Account::default())];
         let mut keyed_accounts = create_keyed_accounts(&mut accounts);
         assert!(handle_opcode(&id(), &mut keyed_accounts, &[], 42).is_err());
     }
 
     #[test]
     fn test_serialize_overflow() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut keyed_accounts = Vec::new();
         let mut user_account = Account::default();
-        keyed_accounts.push(KeyedAccount::new(&pubkey, true, &mut user_account));
+        keyed_accounts.push(KeyedAccount::new(&address, true, &mut user_account));
 
         let ix = storage_opcode::advertise_recent_transaction_seal(
-            &pubkey,
+            &address,
             Hash::default(),
             SLOTS_PER_SEGMENT,
         );
@@ -201,11 +201,11 @@ mod tests {
 
     #[test]
     fn test_invalid_accounts_len() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut accounts = [Account::default()];
 
         let ix =
-            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -219,13 +219,13 @@ mod tests {
     #[test]
     fn test_submit_mining_invalid_slot() {
         morgan_logger::setup();
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
         accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
         accounts[1].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
 
         let ix =
-            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
 
         // submitting a proof for a slot in the past, so this should fail
         assert!(test_instruction(&ix, &mut accounts, 0).is_err());
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn test_submit_mining_ok() {
         morgan_logger::setup();
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
         accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
         {
@@ -243,7 +243,7 @@ mod tests {
         }
 
         let ix =
-            storage_opcode::mining_proof(&pubkey, Hash::default(), 0, Signature::default());
+            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -257,19 +257,19 @@ mod tests {
     fn test_validate_mining() {
         morgan_logger::setup();
         let (genesis_block, mint_keypair) = create_genesis_block(1000);
-        let mint_pubkey = mint_keypair.pubkey();
+        let mint_address = mint_keypair.address();
 
         let miner_1_storage_keypair = Keypair::new();
-        let miner_1_storage_id = miner_1_storage_keypair.pubkey();
+        let miner_1_storage_id = miner_1_storage_keypair.address();
 
         let miner_2_storage_keypair = Keypair::new();
-        let miner_2_storage_id = miner_2_storage_keypair.pubkey();
+        let miner_2_storage_id = miner_2_storage_keypair.address();
 
         let validator_storage_keypair = Keypair::new();
-        let validator_storage_id = validator_storage_keypair.pubkey();
+        let validator_storage_id = validator_storage_keypair.address();
 
         let mining_pool_keypair = Keypair::new();
-        let mining_pool_pubkey = mining_pool_keypair.pubkey();
+        let mining_pool_address = mining_pool_keypair.address();
 
         let mut treasury = Treasury::new(&genesis_block);
         treasury.add_opcode_handler(id(), handle_opcode);
@@ -285,8 +285,8 @@ mod tests {
             10,
         );
         let context = Context::new(storage_opcode::create_mining_pool_account(
-            &mint_pubkey,
-            &mining_pool_pubkey,
+            &mint_address,
+            &mining_pool_address,
             100,
         ));
         treasury_client.snd_online_context(&[&mint_keypair], context).unwrap();
@@ -304,7 +304,7 @@ mod tests {
                 Hash::default(),
                 SLOTS_PER_SEGMENT,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
         assert_matches!(
             treasury_client.snd_online_context(&[&mint_keypair, &validator_storage_keypair], context),
@@ -339,7 +339,7 @@ mod tests {
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 2,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
 
         let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
@@ -358,7 +358,7 @@ mod tests {
                 get_segment_from_slot(slot) as u64,
                 checked_proofs,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
 
         assert_matches!(
@@ -372,7 +372,7 @@ mod tests {
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 3,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
 
         let next_storage_segment_drop_height = DROPS_IN_SEGMENT;
@@ -390,10 +390,10 @@ mod tests {
         let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &validator_storage_id,
-                &mining_pool_pubkey,
+                &mining_pool_address,
                 slot,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
         assert_matches!(treasury_client.snd_online_context(&[&mint_keypair], context), Ok(_));
         assert_eq!(
@@ -414,20 +414,20 @@ mod tests {
         let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_1_storage_id,
-                &mining_pool_pubkey,
+                &mining_pool_address,
                 slot,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
         assert_matches!(treasury_client.snd_online_context(&[&mint_keypair], context), Ok(_));
 
         let context = Context::new_with_payer(
             vec![storage_opcode::claim_reward(
                 &miner_2_storage_id,
-                &mining_pool_pubkey,
+                &mining_pool_address,
                 slot,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
         assert_matches!(treasury_client.snd_online_context(&[&mint_keypair], context), Ok(_));
 
@@ -449,7 +449,7 @@ mod tests {
             .into_iter()
             .flat_map(|account| {
                 storage_opcode::create_validator_storage_account(
-                    &mint.pubkey(),
+                    &mint.address(),
                     account,
                     difs,
                 )
@@ -459,7 +459,7 @@ mod tests {
             .into_iter()
             .for_each(|account| {
                 ixs.append(&mut storage_opcode::create_miner_storage_account(
-                    &mint.pubkey(),
+                    &mint.address(),
                     account,
                     difs,
                 ))
@@ -513,12 +513,12 @@ mod tests {
         let sha_state = Hash::new(BvmAddr::new_rand().as_ref());
         let context = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
-                &storage_keypair.pubkey(),
+                &storage_keypair.address(),
                 sha_state,
                 slot,
                 Signature::default(),
             )],
-            Some(&mint_keypair.pubkey()),
+            Some(&mint_keypair.address()),
         );
 
         assert_matches!(
@@ -552,11 +552,11 @@ mod tests {
     #[test]
     fn test_treasury_storage() {
         let (genesis_block, mint_keypair) = create_genesis_block(1000);
-        let mint_pubkey = mint_keypair.pubkey();
+        let mint_address = mint_keypair.address();
         let miner_keypair = Keypair::new();
-        let miner_pubkey = miner_keypair.pubkey();
+        let miner_address = miner_keypair.address();
         let validator_keypair = Keypair::new();
-        let validator_pubkey = validator_keypair.pubkey();
+        let validator_address = validator_keypair.address();
 
         let mut treasury = Treasury::new(&genesis_block);
         treasury.add_opcode_handler(id(), handle_opcode);
@@ -572,30 +572,30 @@ mod tests {
         let storage_transaction_seal = hash(&[x2]);
 
         treasury_client
-            .online_transfer(10, &mint_keypair, &miner_pubkey)
+            .online_transfer(10, &mint_keypair, &miner_address)
             .unwrap();
 
         let context = Context::new(storage_opcode::create_miner_storage_account(
-            &mint_pubkey,
-            &miner_pubkey,
+            &mint_address,
+            &miner_address,
             1,
         ));
         treasury_client.snd_online_context(&[&mint_keypair], context).unwrap();
 
         let context = Context::new(storage_opcode::create_validator_storage_account(
-            &mint_pubkey,
-            &validator_pubkey,
+            &mint_address,
+            &validator_address,
             1,
         ));
         treasury_client.snd_online_context(&[&mint_keypair], context).unwrap();
 
         let context = Context::new_with_payer(
             vec![storage_opcode::advertise_recent_transaction_seal(
-                &validator_pubkey,
+                &validator_address,
                 storage_transaction_seal,
                 SLOTS_PER_SEGMENT,
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
 
         assert_matches!(
@@ -606,12 +606,12 @@ mod tests {
         let slot = 0;
         let context = Context::new_with_payer(
             vec![storage_opcode::mining_proof(
-                &miner_pubkey,
+                &miner_address,
                 Hash::default(),
                 slot,
                 Signature::default(),
             )],
-            Some(&mint_pubkey),
+            Some(&mint_address),
         );
         assert_matches!(
             treasury_client.snd_online_context(&[&mint_keypair, &miner_keypair], context),
@@ -619,11 +619,11 @@ mod tests {
         );
 
         assert_eq!(
-            get_storage_slot(&treasury_client, &validator_pubkey),
+            get_storage_slot(&treasury_client, &validator_address),
             SLOTS_PER_SEGMENT
         );
         assert_eq!(
-            get_storage_transaction_seal(&treasury_client, &validator_pubkey),
+            get_storage_transaction_seal(&treasury_client, &validator_address),
             storage_transaction_seal
         );
     }

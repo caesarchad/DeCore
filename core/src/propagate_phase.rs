@@ -334,7 +334,7 @@ mod test {
     }
 
     fn setup_dummy_broadcast_service(
-        leader_pubkey: &BvmAddr,
+        leader_addr: &BvmAddr,
         ledger_path: &str,
         entry_receiver: Receiver<WorkingTreasuryEntries>,
     ) -> FakePyramidPhase {
@@ -342,11 +342,11 @@ mod test {
         let block_buffer_pool = Arc::new(BlockBufferPool::open_ledger_file(ledger_path).unwrap());
 
         // Make the leader node and scheduler
-        let leader_info = Node::new_localhost_with_pubkey(leader_pubkey);
+        let leader_info = Node::new_localhost_with_address(leader_addr);
 
         // Make a node to broadcast to
         let buddy_keypair = Keypair::new();
-        let broadcast_buddy = Node::new_localhost_with_pubkey(&buddy_keypair.pubkey());
+        let broadcast_buddy = Node::new_localhost_with_address(&buddy_keypair.address());
 
         // Fill the node_group_info with the buddy's info
         let mut node_group_info = NodeGroupInfo::new_with_invalid_keypair(leader_info.info.clone());
@@ -386,7 +386,7 @@ mod test {
 
             let (entry_sender, entry_receiver) = channel();
             let propagate_thread = setup_dummy_broadcast_service(
-                &leader_keypair.pubkey(),
+                &leader_keypair.address(),
                 &ledger_path,
                 entry_receiver,
             );

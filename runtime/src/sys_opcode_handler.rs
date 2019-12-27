@@ -418,22 +418,22 @@ mod tests {
     #[test]
     fn test_system_unsigned_transaction() {
         let (genesis_block, alice_keypair) = create_genesis_block(100);
-        let alice_pubkey = alice_keypair.pubkey();
+        let alice_address = alice_keypair.address();
         let mallory_keypair = Keypair::new();
-        let mallory_pubkey = mallory_keypair.pubkey();
+        let mallory_address = mallory_keypair.address();
 
         // Fund to account to bypass AccountNotFound error
         let treasury = Treasury::new(&genesis_block);
         let treasury_client = TreasuryClient::new(treasury);
         treasury_client
-            .online_transfer(50, &alice_keypair, &mallory_pubkey)
+            .online_transfer(50, &alice_keypair, &mallory_address)
             .unwrap();
 
         // Erroneously sign transaction with recipient account key
         // No signature case is tested by treasury `test_zero_signatures()`
         let account_metas = vec![
-            AccountMeta::new(alice_pubkey, false),
-            AccountMeta::new(mallory_pubkey, true),
+            AccountMeta::new(alice_address, false),
+            AccountMeta::new(mallory_address, true),
         ];
         let malicious_instruction = OpCode::new(
             sys_controller::id(),
@@ -447,7 +447,7 @@ mod tests {
                 .unwrap(),
             TransactionError::OpCodeErr(0, OpCodeErr::MissingRequiredSignature)
         );
-        assert_eq!(treasury_client.get_balance(&alice_pubkey).unwrap(), 50);
-        assert_eq!(treasury_client.get_balance(&mallory_pubkey).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&alice_address).unwrap(), 50);
+        assert_eq!(treasury_client.get_balance(&mallory_address).unwrap(), 50);
     }
 }

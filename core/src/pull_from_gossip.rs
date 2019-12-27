@@ -114,7 +114,7 @@ impl NodeTbleGspPull {
         now: u64,
     ) -> Vec<ContInfTblValue> {
         let rv = self.filter_crds_values(contact_info_table, &mut filter);
-        let key = caller.label().pubkey();
+        let key = caller.label().address();
         let old = contact_info_table.insert(caller, now);
         if let Some(val) = old.ok().and_then(|opt| opt) {
             self.purged_values
@@ -133,7 +133,7 @@ impl NodeTbleGspPull {
     ) -> usize {
         let mut failed = 0;
         for r in response {
-            let owner = r.label().pubkey();
+            let owner = r.label().address();
             let old = contact_info_table.insert(r, now);
             failed += old.is_err() as usize;
             old.ok().map(|opt| {
@@ -184,7 +184,7 @@ impl NodeTbleGspPull {
         let old = contact_info_table.find_old_labels(min_ts);
         let mut purged: VecDeque<_> = old
             .iter()
-            .filter(|label| label.pubkey() != *self_id)
+            .filter(|label| label.address() != *self_id)
             .filter_map(|label| {
                 let rv = contact_info_table
                     .lookup_versioned(label)
@@ -219,12 +219,12 @@ mod test {
         contact_info_table.insert(me.clone(), 0).unwrap();
         for i in 1..=30 {
             let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-            let id = entry.label().pubkey();
+            let id = entry.label().address();
             contact_info_table.insert(entry.clone(), 0).unwrap();
             stakes.insert(id, i * 100);
         }
         let now = 1024;
-        let mut options = node.pull_options(&contact_info_table, &me.label().pubkey(), now, &stakes);
+        let mut options = node.pull_options(&contact_info_table, &me.label().address(), now, &stakes);
         assert!(!options.is_empty());
         options.sort_by(|(weight_l, _), (weight_r, _)| weight_r.partial_cmp(weight_l).unwrap());
         // check that the highest stake holder is also the heaviest weighted.
@@ -238,7 +238,7 @@ mod test {
     fn test_new_pull_request() {
         let mut contact_info_table = ContactInfoTable::default();
         let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-        let id = entry.label().pubkey();
+        let id = entry.label().address();
         let node = NodeTbleGspPull::default();
         assert_eq!(
             node.new_pull_request(&contact_info_table, &id, 0, &HashMap::new()),
@@ -255,7 +255,7 @@ mod test {
         contact_info_table.insert(new.clone(), 0).unwrap();
         let req = node.new_pull_request(&contact_info_table, &id, 0, &HashMap::new());
         let (to, _, self_info) = req.unwrap();
-        assert_eq!(to, new.label().pubkey());
+        assert_eq!(to, new.label().address());
         assert_eq!(self_info, entry);
     }
 
@@ -263,7 +263,7 @@ mod test {
     fn test_new_mark_creation_time() {
         let mut contact_info_table = ContactInfoTable::default();
         let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-        let node_pubkey = entry.label().pubkey();
+        let node_address = entry.label().address();
         let mut node = NodeTbleGspPull::default();
         contact_info_table.insert(entry.clone(), 0).unwrap();
         let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
@@ -272,13 +272,13 @@ mod test {
         contact_info_table.insert(new.clone(), 0).unwrap();
 
         // set request creation time to max_value
-        node.mark_pull_request_creation_time(&new.label().pubkey(), u64::max_value());
+        node.mark_pull_request_creation_time(&new.label().address(), u64::max_value());
 
         // odds of getting the other request should be 1 in u64::max_value()
         for _ in 0..10 {
-            let req = node.new_pull_request(&contact_info_table, &node_pubkey, u64::max_value(), &HashMap::new());
+            let req = node.new_pull_request(&contact_info_table, &node_address, u64::max_value(), &HashMap::new());
             let (to, _, self_info) = req.unwrap();
-            assert_eq!(to, old.label().pubkey());
+            assert_eq!(to, old.label().address());
             assert_eq!(self_info, entry);
         }
     }
@@ -287,12 +287,12 @@ mod test {
     fn test_process_pull_request() {
         let mut node_contact_table = ContactInfoTable::default();
         let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-        let node_pubkey = entry.label().pubkey();
+        let node_address = entry.label().address();
         let node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
         let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         node_contact_table.insert(new.clone(), 0).unwrap();
-        let req = node.new_pull_request(&node_contact_table, &node_pubkey, 0, &HashMap::new());
+        let req = node.new_pull_request(&node_contact_table, &node_address, 0, &HashMap::new());
 
         let mut dest_crds = ContactInfoTable::default();
         let mut dest = NodeTbleGspPull::default();
@@ -319,7 +319,7 @@ mod test {
     fn test_process_pull_request_response() {
         let mut node_contact_table = ContactInfoTable::default();
         let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-        let node_pubkey = entry.label().pubkey();
+        let node_address = entry.label().address();
         let mut node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
 
@@ -347,7 +347,7 @@ mod test {
         let mut done = false;
         for _ in 0..30 {
             // there is a chance of a false positive with bloom filters
-            let req = node.new_pull_request(&node_contact_table, &node_pubkey, 0, &HashMap::new());
+            let req = node.new_pull_request(&node_contact_table, &node_address, 0, &HashMap::new());
             let (_, filter, caller) = req.unwrap();
             let rsp = dest.process_pull_request(&mut dest_crds, caller, filter, 0);
             // if there is a false positive this is empty
@@ -357,7 +357,7 @@ mod test {
             }
 
             assert_eq!(rsp.len(), 1);
-            let failed = node.process_pull_response(&mut node_contact_table, &node_pubkey, rsp, 1);
+            let failed = node.process_pull_response(&mut node_contact_table, &node_address, rsp, 1);
             assert_eq!(failed, 0);
             assert_eq!(
                 node_contact_table
@@ -384,7 +384,7 @@ mod test {
         let mut node_contact_table = ContactInfoTable::default();
         let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
         let node_label = entry.label();
-        let node_pubkey = node_label.pubkey();
+        let node_address = node_label.address();
         let mut node = NodeTbleGspPull::default();
         node_contact_table.insert(entry.clone(), 0).unwrap();
         let old = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
@@ -395,7 +395,7 @@ mod test {
         assert_eq!(node_contact_table.lookup(&node_label).unwrap().label(), node_label);
 
         // purge
-        node.purge_active(&mut node_contact_table, &node_pubkey, 1);
+        node.purge_active(&mut node_contact_table, &node_address, 1);
 
         //verify self is still valid after purge
         assert_eq!(node_contact_table.lookup(&node_label).unwrap().label(), node_label);

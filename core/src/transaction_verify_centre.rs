@@ -116,7 +116,7 @@ impl BlazeUnit {
         );
 
         let (replay_phase, slot_full_receiver, root_slot_receiver) = RepeatPhase::new(
-            &keypair.pubkey(),
+            &keypair.address(),
             vote_account,
             voting_keypair,
             block_buffer_pool.clone(),
@@ -246,7 +246,7 @@ pub mod tests {
         morgan_logger::setup();
         let leader = Node::new_localhost();
         let target1_keypair = Keypair::new();
-        let target1 = Node::new_localhost_with_pubkey(&target1_keypair.pubkey());
+        let target1 = Node::new_localhost_with_address(&target1_keypair.address());
 
         let starting_balance = 10_000;
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(starting_balance);
@@ -270,7 +270,7 @@ pub mod tests {
         let storage_keypair = Arc::new(Keypair::new());
         let leader_schedule_cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
         let blaze_unit = BlazeUnit::new(
-            &voting_keypair.pubkey(),
+            &voting_keypair.address(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
             &Arc::new(RwLock::new(treasury_forks)),

@@ -172,7 +172,7 @@ mod test {
     #[test]
     fn test_blockstream_service_process_entries() {
         let drops_per_slot = 5;
-        let leader_pubkey = BvmAddr::new_rand();
+        let leader_addr = BvmAddr::new_rand();
 
         // Set up genesis block and block_buffer_pool
         let GenesisBlockInfo {
@@ -196,7 +196,7 @@ mod test {
         let mut transaction_seal = entries[3].hash;
         let tx = sys_controller::create_user_account(
             &keypair,
-            &keypair.pubkey(),
+            &keypair.address(),
             1,
             Hash::default(),
         );
@@ -213,7 +213,7 @@ mod test {
             .update_fscl_stmts(1, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
-        slot_full_sender.send((1, leader_pubkey)).unwrap();
+        slot_full_sender.send((1, leader_addr)).unwrap();
         NodeSyncSrvc::handle_fiscal_stmts(
             &slot_full_receiver,
             &Arc::new(block_buffer_pool),

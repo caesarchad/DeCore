@@ -95,7 +95,7 @@ impl Accounts {
             "{}/{}/{}/{}",
             out_dir,
             ACCOUNTSDB_DIR,
-            keypair.pubkey(),
+            keypair.address(),
             dir.to_string()
         )
     }
@@ -320,10 +320,10 @@ impl Accounts {
     pub fn load_slow(
         &self,
         ancestors: &HashMap<Fork, usize>,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
     ) -> Option<(Account, Fork)> {
         self.accounts_db
-            .load_slow(ancestors, pubkey)
+            .load_slow(ancestors, address)
             .filter(|(acc, _)| acc.difs != 0)
     }
 
@@ -333,7 +333,7 @@ impl Accounts {
             |stored_account: &StoredAccount, accum: &mut Vec<(BvmAddr, u64, Account)>| {
                 if stored_account.balance.owner == *program_id {
                     let val = (
-                        stored_account.meta.pubkey,
+                        stored_account.meta.address,
                         stored_account.meta.write_version,
                         stored_account.clone_account(),
                     );
@@ -349,8 +349,8 @@ impl Accounts {
     }
 
     /// Slow because lock is held for 1 operation instead of many
-    pub fn store_slow(&self, fork: Fork, pubkey: &BvmAddr, account: &Account) {
-        self.accounts_db.store(fork, &[(pubkey, account)]);
+    pub fn store_slow(&self, fork: Fork, address: &BvmAddr, account: &Account) {
+        self.accounts_db.store(fork, &[(address, account)]);
     }
 
     fn lock_account(
@@ -443,7 +443,7 @@ impl Accounts {
             fork_id,
             |stored_account: &StoredAccount, accum: &mut Vec<(BvmAddr, u64, Hash)>| {
                 accum.push((
-                    stored_account.meta.pubkey,
+                    stored_account.meta.address,
                     stored_account.meta.write_version,
                     Self::hash_account(stored_account),
                 ));
@@ -675,7 +675,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
 
         let account = Account::new(1, 0, 1, &BvmAddr::default());
@@ -709,7 +709,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
 
         let account = Account::new(1, 0, 1, &BvmAddr::default());
         accounts.push((key0, account));
@@ -743,7 +743,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
 
         let account = Account::new(1, 0, 1, &BvmAddr::new_rand()); // <-- owner is not the system program
         accounts.push((key0, account));
@@ -773,7 +773,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
 
         let account = Account::new(1, 0, 1, &BvmAddr::default());
@@ -812,7 +812,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
         let key2 = BvmAddr::new(&[6u8; 32]);
         let key3 = BvmAddr::new(&[7u8; 32]);
@@ -875,7 +875,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
 
         let account = Account::new(1, 0, 1, &BvmAddr::default());
@@ -908,7 +908,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
 
         let account = Account::new(1, 0, 1, &BvmAddr::default());
@@ -940,7 +940,7 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let key0 = keypair.pubkey();
+        let key0 = keypair.address();
         let key1 = BvmAddr::new(&[5u8; 32]);
         let key2 = BvmAddr::new(&[6u8; 32]);
         let key3 = BvmAddr::new(&[7u8; 32]);
@@ -1003,16 +1003,16 @@ mod tests {
         let mut error_counters = ErrorCounters::default();
 
         let keypair = Keypair::new();
-        let pubkey = keypair.pubkey();
+        let address = keypair.address();
 
         let account = Account::new(10, 0, 1, &BvmAddr::default());
-        accounts.push((pubkey, account));
+        accounts.push((address, account));
 
         let instructions = vec![EncodedOpCodes::new(0, &(), vec![0, 1])];
         // Simulate pay-to-self transaction, which loads the same account twice
         let tx = Transaction::new_with_encoded_opcodes(
             &[&keypair],
-            &[pubkey],
+            &[address],
             Hash::default(),
             vec![bultin_mounter::id()],
             instructions,
@@ -1033,20 +1033,20 @@ mod tests {
         let accounts = Accounts::new(None);
 
         // Load accounts owned by various programs into AccountsDB
-        let pubkey0 = BvmAddr::new_rand();
+        let address0 = BvmAddr::new_rand();
         let account0 = Account::new(1, 0, 0, &BvmAddr::new(&[2; 32]));
-        accounts.store_slow(0, &pubkey0, &account0);
-        let pubkey1 = BvmAddr::new_rand();
+        accounts.store_slow(0, &address0, &account0);
+        let address1 = BvmAddr::new_rand();
         let account1 = Account::new(1, 0, 0, &BvmAddr::new(&[2; 32]));
-        accounts.store_slow(0, &pubkey1, &account1);
-        let pubkey2 = BvmAddr::new_rand();
+        accounts.store_slow(0, &address1, &account1);
+        let address2 = BvmAddr::new_rand();
         let account2 = Account::new(1, 0, 0, &BvmAddr::new(&[3; 32]));
-        accounts.store_slow(0, &pubkey2, &account2);
+        accounts.store_slow(0, &address2, &account2);
 
         let loaded = accounts.load_by_program(0, &BvmAddr::new(&[2; 32]));
         assert_eq!(loaded.len(), 2);
         let loaded = accounts.load_by_program(0, &BvmAddr::new(&[3; 32]));
-        assert_eq!(loaded, vec![(pubkey2, account2)]);
+        assert_eq!(loaded, vec![(address2, account2)]);
         let loaded = accounts.load_by_program(0, &BvmAddr::new(&[4; 32]));
         assert_eq!(loaded, vec![]);
     }
@@ -1081,9 +1081,9 @@ mod tests {
     #[test]
     fn test_parent_locked_record_accounts() {
         let mut parent = Accounts::new(None);
-        let locked_pubkey = Keypair::new().pubkey();
+        let locked_address = Keypair::new().address();
         let mut locked_accounts = HashSet::new();
-        locked_accounts.insert(locked_pubkey);
+        locked_accounts.insert(locked_address);
         parent.record_locks = Mutex::new((Arc::new(Mutex::new(locked_accounts.clone())), vec![]));
         let parent = Arc::new(parent);
         let child = Accounts::new_from_parent(&parent);
@@ -1115,7 +1115,7 @@ mod tests {
                     &mut child.account_locks.lock().unwrap(),
                     &mut child.record_locks.lock().unwrap().1
                 ),
-                &vec![locked_pubkey],
+                &vec![locked_address],
                 &mut ErrorCounters::default()
             ),
             Ok(())

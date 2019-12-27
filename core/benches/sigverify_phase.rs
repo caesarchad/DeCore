@@ -33,15 +33,15 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
         let tx = test_tx();
         pkt_chunk(&vec![tx; len], chunk_size)
     } else {
-        let from_keypair = Keypair::new();
+        let from_acct = Keypair::new();
         let to_keypair = Keypair::new();
         let txs: Vec<_> = (0..len)
             .into_iter()
             .map(|_| {
                 let amount = thread_rng().gen();
                 let tx = sys_controller::transfer(
-                    &from_keypair,
-                    &to_keypair.pubkey(),
+                    &from_acct,
+                    &to_keypair.address(),
                     amount,
                     Hash::default(),
                 );

@@ -93,25 +93,25 @@ impl OpCode {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct AccountMeta {
     /// An account's public key
-    pub pubkey: BvmAddr,
-    /// True if an Instruciton requires a Transaction signature matching `pubkey`.
+    pub address: BvmAddr,
+    /// True if an Instruciton requires a Transaction signature matching `address`.
     pub is_signer: bool,
-    /// True if the `pubkey` can be loaded as a credit-debit account.
+    /// True if the `address` can be loaded as a credit-debit account.
     pub is_debitable: bool,
 }
 
 impl AccountMeta {
-    pub fn new(pubkey: BvmAddr, is_signer: bool) -> Self {
+    pub fn new(address: BvmAddr, is_signer: bool) -> Self {
         Self {
-            pubkey,
+            address,
             is_signer,
             is_debitable: true,
         }
     }
 
-    pub fn new_credit_only(pubkey: BvmAddr, is_signer: bool) -> Self {
+    pub fn new_credit_only(address: BvmAddr, is_signer: bool) -> Self {
         Self {
-            pubkey,
+            address,
             is_signer,
             is_debitable: false,
         }

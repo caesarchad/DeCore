@@ -22,7 +22,7 @@ pub struct StorageMeta {
     /// global write version
     pub write_version: u64,
     /// key for the account
-    pub pubkey: BvmAddr,
+    pub address: BvmAddr,
     pub data_len: u64,
 }
 
@@ -283,7 +283,7 @@ pub mod test_utils {
         account.data = (0..data_len).map(|_| data_len as u8).collect();
         let storage_meta = StorageMeta {
             write_version: 0,
-            pubkey: BvmAddr::default(),
+            address: BvmAddr::default(),
             data_len: data_len as u64,
         };
         (storage_meta, account)

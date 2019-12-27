@@ -143,8 +143,8 @@ where
 }
 
 fn notify_program(accounts: Vec<(BvmAddr, Account)>, sink: &Sink<(String, Account)>, _root: u64) {
-    for (pubkey, account) in accounts.iter() {
-        sink.notify(Ok((pubkey.to_string(), account.clone())))
+    for (address, account) in accounts.iter() {
+        sink.notify(Ok((address.to_string(), account.clone())))
             .wait()
             .unwrap();
     }
@@ -169,14 +169,14 @@ impl Default for RpcSubscriptions {
 impl RpcSubscriptions {
     pub fn check_account(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         current_slot: u64,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
     ) {
         let subscriptions = self.account_subscriptions.read().unwrap();
         check_confirmations_and_notify(
             &subscriptions,
-            pubkey,
+            address,
             current_slot,
             treasury_forks,
             Treasury::get_account_modified_since_parent,
@@ -221,13 +221,13 @@ impl RpcSubscriptions {
 
     pub fn add_account_subscription(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         confirmations: Option<Confirmations>,
         sub_id: &SubscriptionId,
         sink: &Sink<Account>,
     ) {
         let mut subscriptions = self.account_subscriptions.write().unwrap();
-        add_subscription(&mut subscriptions, pubkey, confirmations, sub_id, sink);
+        add_subscription(&mut subscriptions, address, confirmations, sub_id, sink);
     }
 
     pub fn remove_account_subscription(&self, id: &SubscriptionId) -> bool {
@@ -270,12 +270,12 @@ impl RpcSubscriptions {
     /// Notify subscribers of changes to any accounts or new signatures since
     /// the treasury's last checkpoint.
     pub fn notify_subscribers(&self, current_slot: u64, treasury_forks: &Arc<RwLock<TreasuryForks>>) {
-        let pubkeys: Vec<_> = {
+        let addresss: Vec<_> = {
             let subs = self.account_subscriptions.read().unwrap();
             subs.keys().cloned().collect()
         };
-        for pubkey in &pubkeys {
-            self.check_account(pubkey, current_slot, treasury_forks);
+        for address in &addresss {
+            self.check_account(address, current_slot, treasury_forks);
         }
 
         let programs: Vec<_> = {
@@ -319,7 +319,7 @@ pub mod tests {
         let alice = Keypair::new();
         let tx = sys_controller::create_account(
             &mint_keypair,
-            &alice.pubkey(),
+            &alice.address(),
             transaction_seal,
             1,
             16,
@@ -338,15 +338,15 @@ pub mod tests {
         let sub_id = SubscriptionId::Number(0 as u64);
         let sink = subscriber.assign_id(sub_id.clone()).unwrap();
         let subscriptions = RpcSubscriptions::default();
-        subscriptions.add_account_subscription(&alice.pubkey(), None, &sub_id, &sink);
+        subscriptions.add_account_subscription(&alice.address(), None, &sub_id, &sink);
 
         assert!(subscriptions
             .account_subscriptions
             .read()
             .unwrap()
-            .contains_key(&alice.pubkey()));
+            .contains_key(&alice.address()));
 
-        subscriptions.check_account(&alice.pubkey(), 0, &treasury_forks);
+        subscriptions.check_account(&alice.address(), 0, &treasury_forks);
         let string = transport_receiver.poll();
         println!("response : {:?}", string);
         if let Async::Ready(Some(response)) = string.unwrap() {
@@ -359,7 +359,7 @@ pub mod tests {
             .account_subscriptions
             .read()
             .unwrap()
-            .contains_key(&alice.pubkey()));
+            .contains_key(&alice.address()));
     }
 
     #[test]
@@ -375,7 +375,7 @@ pub mod tests {
         let alice = Keypair::new();
         let tx = sys_controller::create_account(
             &mint_keypair,
-            &alice.pubkey(),
+            &alice.address(),
             transaction_seal,
             1,
             16,
@@ -405,7 +405,7 @@ pub mod tests {
         subscriptions.check_program(&morgan_bvm_script::id(), 0, &treasury_forks);
         let string = transport_receiver.poll();
         if let Async::Ready(Some(response)) = string.unwrap() {
-            let expected = format!(r#"{{"jsonrpc":"2.0","method":"programNotification","params":{{"result":["{:?}",{{"data":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"difs":1,"executable":false,"owner":[2,203,81,223,225,24,34,35,203,214,138,130,144,208,35,77,63,16,87,51,47,198,115,123,98,188,19,160,0,0,0,0],"reputations":0}}],"subscription":0}}}}"#, alice.pubkey());
+            let expected = format!(r#"{{"jsonrpc":"2.0","method":"programNotification","params":{{"result":["{:?}",{{"data":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"difs":1,"executable":false,"owner":[2,203,81,223,225,24,34,35,203,214,138,130,144,208,35,77,63,16,87,51,47,198,115,123,98,188,19,160,0,0,0,0],"reputations":0}}],"subscription":0}}}}"#, alice.address());
             assert_eq!(expected, response);
         }
 
@@ -427,7 +427,7 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
         let alice = Keypair::new();
-        let tx = sys_controller::transfer(&mint_keypair, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&mint_keypair, &alice.address(), 20, transaction_seal);
         let signature = tx.signatures[0];
         treasury_forks
             .write()

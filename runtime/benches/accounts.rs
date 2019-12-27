@@ -9,14 +9,14 @@ use morgan_interface::bvm_address::BvmAddr;
 use std::sync::Arc;
 use test::Bencher;
 
-fn deposit_many(treasury: &Treasury, pubkeys: &mut Vec<BvmAddr>, num: usize) {
+fn deposit_many(treasury: &Treasury, addresss: &mut Vec<BvmAddr>, num: usize) {
     for t in 0..num {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let account = Account::new((t + 1) as u64, 0, 0, &Account::default().owner);
-        pubkeys.push(pubkey.clone());
-        assert!(treasury.get_account(&pubkey).is_none());
-        treasury.deposit(&pubkey, (t + 1) as u64);
-        assert_eq!(treasury.get_account(&pubkey).unwrap(), account);
+        addresss.push(address.clone());
+        assert!(treasury.get_account(&address).is_none());
+        treasury.deposit(&address, (t + 1) as u64);
+        assert_eq!(treasury.get_account(&address).unwrap(), account);
     }
 }
 
@@ -25,8 +25,8 @@ fn test_accounts_create(bencher: &mut Bencher) {
     let (genesis_block, _) = create_genesis_block(10_000);
     let treasury0 = Treasury::new_with_paths(&genesis_block, Some("bench_a0".to_string()));
     bencher.iter(|| {
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        deposit_many(&treasury0, &mut pubkeys, 1000);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        deposit_many(&treasury0, &mut addresss, 1000);
     });
 }
 
@@ -38,8 +38,8 @@ fn test_accounts_squash(bencher: &mut Bencher) {
         &genesis_block,
         Some("bench_a1".to_string()),
     )));
-    let mut pubkeys: Vec<BvmAddr> = vec![];
-    deposit_many(&treasuries[0], &mut pubkeys, 250000);
+    let mut addresss: Vec<BvmAddr> = vec![];
+    deposit_many(&treasuries[0], &mut addresss, 250000);
     treasuries[0].freeze();
     // Measures the performance of the squash operation merging the accounts
     // with the majority of the accounts present in the parent treasury that is
@@ -51,7 +51,7 @@ fn test_accounts_squash(bencher: &mut Bencher) {
             1u64,
         )));
         for accounts in 0..10000 {
-            treasuries[1].deposit(&pubkeys[accounts], (accounts + 1) as u64);
+            treasuries[1].deposit(&addresss[accounts], (accounts + 1) as u64);
         }
         treasuries[1].squash();
     });

@@ -42,14 +42,14 @@ pub enum StorageOpCode {
 }
 
 pub fn create_validator_storage_account(
-    from_pubkey: &BvmAddr,
-    storage_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    storage_address: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
         sys_opcode::create_account(
-            from_pubkey,
-            storage_pubkey,
+            from_address,
+            storage_address,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
@@ -57,20 +57,20 @@ pub fn create_validator_storage_account(
         OpCode::new(
             id(),
             &StorageOpCode::InitializeValidatorStorage,
-            vec![AccountMeta::new(*storage_pubkey, false)],
+            vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
 }
 
 pub fn create_miner_storage_account(
-    from_pubkey: &BvmAddr,
-    storage_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    storage_address: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
         sys_opcode::create_account(
-            from_pubkey,
-            storage_pubkey,
+            from_address,
+            storage_address,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
@@ -78,20 +78,20 @@ pub fn create_miner_storage_account(
         OpCode::new(
             id(),
             &StorageOpCode::InitializeMinerStorage,
-            vec![AccountMeta::new(*storage_pubkey, false)],
+            vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
 }
 
 pub fn create_mining_pool_account(
-    from_pubkey: &BvmAddr,
-    storage_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    storage_address: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
         sys_opcode::create_account(
-            from_pubkey,
-            storage_pubkey,
+            from_address,
+            storage_address,
             difs,
             STORAGE_ACCOUNT_SPACE,
             &id(),
@@ -99,13 +99,13 @@ pub fn create_mining_pool_account(
         OpCode::new(
             id(),
             &StorageOpCode::InitializeMiningPool,
-            vec![AccountMeta::new(*storage_pubkey, false)],
+            vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
 }
 
 pub fn mining_proof(
-    storage_pubkey: &BvmAddr,
+    storage_address: &BvmAddr,
     sha_state: Hash,
     slot: u64,
     signature: Signature,
@@ -115,12 +115,12 @@ pub fn mining_proof(
         slot,
         signature,
     };
-    let account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
+    let account_metas = vec![AccountMeta::new(*storage_address, true)];
     OpCode::new(id(), &storage_opcode, account_metas)
 }
 
 pub fn advertise_recent_transaction_seal(
-    storage_pubkey: &BvmAddr,
+    storage_address: &BvmAddr,
     storage_hash: Hash,
     slot: u64,
 ) -> OpCode {
@@ -128,16 +128,16 @@ pub fn advertise_recent_transaction_seal(
         hash: storage_hash,
         slot,
     };
-    let account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
+    let account_metas = vec![AccountMeta::new(*storage_address, true)];
     OpCode::new(id(), &storage_opcode, account_metas)
 }
 
 pub fn proof_validation<S: std::hash::BuildHasher>(
-    storage_pubkey: &BvmAddr,
+    storage_address: &BvmAddr,
     segment: u64,
     checked_proofs: HashMap<BvmAddr, Vec<CheckedProof>, S>,
 ) -> OpCode {
-    let mut account_metas = vec![AccountMeta::new(*storage_pubkey, true)];
+    let mut account_metas = vec![AccountMeta::new(*storage_address, true)];
     let mut proofs = vec![];
     checked_proofs.into_iter().for_each(|(id, p)| {
         proofs.push((id, p));
@@ -148,14 +148,14 @@ pub fn proof_validation<S: std::hash::BuildHasher>(
 }
 
 pub fn claim_reward(
-    storage_pubkey: &BvmAddr,
-    mining_pool_pubkey: &BvmAddr,
+    storage_address: &BvmAddr,
+    mining_pool_address: &BvmAddr,
     slot: u64,
 ) -> OpCode {
     let storage_opcode = StorageOpCode::ClaimStorageReward { slot };
     let account_metas = vec![
-        AccountMeta::new(*storage_pubkey, false),
-        AccountMeta::new(*mining_pool_pubkey, false),
+        AccountMeta::new(*storage_address, false),
+        AccountMeta::new(*mining_pool_address, false),
     ];
     OpCode::new(id(), &storage_opcode, account_metas)
 }

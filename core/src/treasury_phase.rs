@@ -146,7 +146,7 @@ impl TreasuryPhase {
     }
 
     pub fn consume_buffered_packets(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         buffered_packets: &mut Vec<PacketsAndOffsets>,
     ) -> Result<UnprocessedPackets> {
@@ -188,7 +188,7 @@ impl TreasuryPhase {
                         &treasury,
                         &msgs,
                         &unprocessed_indexes,
-                        my_pubkey,
+                        my_address,
                         next_leader,
                     );
                     Self::push_unprocessed(&mut unprocessed_packets, msgs, unprocessed_indexes);
@@ -216,12 +216,12 @@ impl TreasuryPhase {
     }
 
     fn consume_or_forward_packets(
-        leader_pubkey: Option<BvmAddr>,
+        leader_addr: Option<BvmAddr>,
         treasury_is_available: bool,
         would_be_leader: bool,
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
     ) -> BufferedPacketsDecision {
-        leader_pubkey.map_or(
+        leader_addr.map_or(
             // If leader is not known, return the buffered packets as is
             BufferedPacketsDecision::Hold,
             // else process the packets
@@ -232,7 +232,7 @@ impl TreasuryPhase {
                 } else if would_be_leader {
                     // If the node will be the leader soon, hold the packets for now
                     BufferedPacketsDecision::Hold
-                } else if x != *my_pubkey {
+                } else if x != *my_address {
                     // If the current node is not the leader, forward the buffered packets
                     BufferedPacketsDecision::Forward
                 } else {
@@ -278,9 +278,9 @@ impl TreasuryPhase {
             }
             BufferedPacketsDecision::Forward => {
                 if enable_forwarding {
-                    next_leader.map_or(Ok(()), |leader_pubkey| {
+                    next_leader.map_or(Ok(()), |leader_addr| {
                         r_node_group_info
-                            .lookup(&leader_pubkey)
+                            .lookup(&leader_addr)
                             .map_or(Ok(()), |leader| {
                                 let _ = Self::forward_buffered_packets(
                                     &socket,
@@ -658,12 +658,12 @@ impl TreasuryPhase {
         treasury: &Arc<Treasury>,
         msgs: &BndlPkt,
         transaction_indexes: &[usize],
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         next_leader: Option<BvmAddr>,
     ) -> Vec<usize> {
 
         if let Some(leader) = next_leader {
-            if leader == *my_pubkey {
+            if leader == *my_address {
                 return transaction_indexes.to_vec();
             }
         }
@@ -742,14 +742,14 @@ impl TreasuryPhase {
 
             if processed < verified_txs_len {
                 let next_leader = waterclock.lock().unwrap().next_slot_leader();
-                let my_pubkey = node_group_info.read().unwrap().id();
+                let my_address = node_group_info.read().unwrap().id();
                 while let Some((msgs, vers)) = mms_iter.next() {
                     let packet_indexes = Self::generate_packet_indexes(vers);
                     let unprocessed_indexes = Self::filter_unprocessed_packets(
                         &treasury,
                         &msgs,
                         &packet_indexes,
-                        &my_pubkey,
+                        &my_address,
                         next_leader,
                     );
                     Self::push_unprocessed(&mut unprocessed_packets, msgs, unprocessed_indexes);
@@ -959,7 +959,7 @@ mod tests {
             let keypair = Keypair::new();
             let fund_tx = sys_controller::create_user_account(
                 &mint_keypair,
-                &keypair.pubkey(),
+                &keypair.address(),
                 2,
                 start_hash,
             );
@@ -1052,7 +1052,7 @@ mod tests {
         let alice = Keypair::new();
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &alice.pubkey(),
+            &alice.address(),
             2,
             genesis_block.hash(),
         );
@@ -1067,7 +1067,7 @@ mod tests {
         // Process a second batch that spends one of those difs.
         let tx = sys_controller::create_user_account(
             &alice,
-            &mint_keypair.pubkey(),
+            &mint_keypair.address(),
             1,
             genesis_block.hash(),
         );
@@ -1102,7 +1102,7 @@ mod tests {
                 );
 
                 // wait for treasury_phase to eat the packets
-                while treasury.get_balance(&alice.pubkey()) != 1 {
+                while treasury.get_balance(&alice.address()) != 1 {
                     sleep(Duration::from_millis(100));
                 }
                 exit.store(true, Ordering::Relaxed);
@@ -1129,7 +1129,7 @@ mod tests {
             // Assert the user holds one dif, not two. If the phase only outputs one
             // entry, then the second transaction will be rejected, because it drives
             // the account balance below zero before the credit is added.
-            assert_eq!(treasury.get_balance(&alice.pubkey()), 1);
+            assert_eq!(treasury.get_balance(&alice.address()), 1);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1165,13 +1165,13 @@ mod tests {
             let waterclock_recorder = Arc::new(Mutex::new(waterclock_recorder));
 
             waterclock_recorder.lock().unwrap().set_working_treasury(working_treasury);
-            let pubkey = BvmAddr::new_rand();
+            let address = BvmAddr::new_rand();
             let keypair2 = Keypair::new();
-            let pubkey2 = BvmAddr::new_rand();
+            let address2 = BvmAddr::new_rand();
 
             let transactions = vec![
-                sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-                sys_controller::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
+                sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+                sys_controller::transfer(&keypair2, &address2, 1, genesis_block.hash()),
             ];
 
             let mut results = vec![Ok(()), Ok(())];
@@ -1225,47 +1225,47 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
 
         let transactions = vec![
             None,
             Some(sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
+                &address,
                 1,
                 genesis_block.hash(),
             )),
             Some(sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
+                &address,
                 1,
                 genesis_block.hash(),
             )),
             Some(sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
-                1,
-                genesis_block.hash(),
-            )),
-            None,
-            None,
-            Some(sys_controller::transfer(
-                &mint_keypair,
-                &pubkey,
+                &address,
                 1,
                 genesis_block.hash(),
             )),
             None,
+            None,
             Some(sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
+                &address,
                 1,
                 genesis_block.hash(),
             )),
             None,
             Some(sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
+                &address,
+                1,
+                genesis_block.hash(),
+            )),
+            None,
+            Some(sys_controller::transfer(
+                &mint_keypair,
+                &address,
                 1,
                 genesis_block.hash(),
             )),
@@ -1274,12 +1274,12 @@ mod tests {
         ];
 
         let filtered_transactions = vec![
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
         ];
 
         assert_eq!(
@@ -1306,15 +1306,15 @@ mod tests {
             mint_keypair,
             ..
         } = create_genesis_block(10_000);
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
 
         let transactions = vec![
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
         ];
 
         assert_eq!(
@@ -1377,64 +1377,64 @@ mod tests {
 
     #[test]
     fn test_should_process_or_forward_packets() {
-        let my_pubkey = BvmAddr::new_rand();
-        let my_pubkey1 = BvmAddr::new_rand();
+        let my_address = BvmAddr::new_rand();
+        let my_address1 = BvmAddr::new_rand();
 
         assert_eq!(
-            TreasuryPhase::consume_or_forward_packets(None, true, false, &my_pubkey),
+            TreasuryPhase::consume_or_forward_packets(None, true, false, &my_address),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_pubkey),
+            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_address),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
-            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_pubkey1),
+            TreasuryPhase::consume_or_forward_packets(None, false, false, &my_address1),
             BufferedPacketsDecision::Hold
         );
 
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(
-                Some(my_pubkey1.clone()),
+                Some(my_address1.clone()),
                 false,
                 false,
-                &my_pubkey
+                &my_address
             ),
             BufferedPacketsDecision::Forward
         );
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(
-                Some(my_pubkey1.clone()),
+                Some(my_address1.clone()),
                 false,
                 true,
-                &my_pubkey
+                &my_address
             ),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(
-                Some(my_pubkey1.clone()),
+                Some(my_address1.clone()),
                 true,
                 false,
-                &my_pubkey
+                &my_address
             ),
             BufferedPacketsDecision::Consume
         );
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(
-                Some(my_pubkey1.clone()),
+                Some(my_address1.clone()),
                 false,
                 false,
-                &my_pubkey1
+                &my_address1
             ),
             BufferedPacketsDecision::Hold
         );
         assert_eq!(
             TreasuryPhase::consume_or_forward_packets(
-                Some(my_pubkey1.clone()),
+                Some(my_address1.clone()),
                 true,
                 false,
-                &my_pubkey1
+                &my_address1
             ),
             BufferedPacketsDecision::Consume
         );
@@ -1449,11 +1449,11 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
 
         let transactions = vec![sys_controller::transfer(
             &mint_keypair,
-            &pubkey,
+            &address,
             1,
             genesis_block.hash(),
         )];
@@ -1473,7 +1473,7 @@ mod tests {
                 treasury.slot(),
                 Some(4),
                 treasury.drops_per_slot(),
-                &pubkey,
+                &address,
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),
@@ -1494,7 +1494,7 @@ mod tests {
                     if !entry.is_drop() {
                         trace!("got entry");
                         assert_eq!(entry.transactions.len(), transactions.len());
-                        assert_eq!(treasury.get_balance(&pubkey), 1);
+                        assert_eq!(treasury.get_balance(&address), 1);
                         done = true;
                     }
                 }
@@ -1508,7 +1508,7 @@ mod tests {
 
             let transactions = vec![sys_controller::transfer(
                 &mint_keypair,
-                &pubkey,
+                &address,
                 2,
                 genesis_block.hash(),
             )];
@@ -1524,7 +1524,7 @@ mod tests {
                 Err(Error::WaterClockRecorderErr(WaterClockRecorderErr::MaxHeightReached))
             );
 
-            assert_eq!(treasury.get_balance(&pubkey), 1);
+            assert_eq!(treasury.get_balance(&address), 1);
         }
         BlockBufferPool::remove_ledger_file(&ledger_path).unwrap();
     }
@@ -1538,12 +1538,12 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
-        let pubkey = BvmAddr::new_rand();
-        let pubkey1 = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
+        let address1 = BvmAddr::new_rand();
 
         let transactions = vec![
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&mint_keypair, &pubkey1, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address1, 1, genesis_block.hash()),
         ];
 
         let working_treasury = WorkingTreasury {
@@ -1561,7 +1561,7 @@ mod tests {
                 treasury.slot(),
                 Some(4),
                 treasury.drops_per_slot(),
-                &pubkey,
+                &address,
                 &Arc::new(block_buffer_pool),
                 &Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury)),
                 &Arc::new(WaterClockConfig::default()),

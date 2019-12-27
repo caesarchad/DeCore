@@ -1544,7 +1544,7 @@ where
         .map(|(idx, entry)| {
             let mut b = entry.borrow().to_blob();
             b.set_index(idx as u64);
-            b.set_id(&keypair.pubkey());
+            b.set_id(&keypair.address());
             b.set_slot(0);
             b
         })
@@ -1573,7 +1573,7 @@ pub fn fetch_interim_ledger_location(name: &str) -> String {
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string());
     let keypair = Keypair::new();
 
-    let path = format!("{}/tmp/ledger/{}-{}", out_dir, name, keypair.pubkey());
+    let path = format!("{}/tmp/ledger/{}-{}", out_dir, name, keypair.address());
 
     // whack any possible collision
     let _ignored = fs::remove_dir_all(&path);

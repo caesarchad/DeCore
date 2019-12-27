@@ -89,12 +89,12 @@ impl WaterClockRecorder {
 
     pub fn would_be_leader(&self, within_next_n_drops: u64) -> bool {
         let close_to_leader_drop = self.start_leader_at_drop.map_or(false, |leader_drop| {
-            let leader_pubkeyeal_start_drop =
+            let leader_addresseal_start_drop =
                 leader_drop.saturating_sub(self. max_last_leader_grace_drops);
 
             self.drop_height() <= self.last_leader_drop.unwrap_or(0)
                 && self.drop_height()
-                    >= leader_pubkeyeal_start_drop.saturating_sub(within_next_n_drops)
+                    >= leader_addresseal_start_drop.saturating_sub(within_next_n_drops)
         });
 
         self.working_treasury.is_some() || close_to_leader_drop
@@ -130,7 +130,7 @@ impl WaterClockRecorder {
                     self. max_last_leader_grace_drops
                 );
 
-                let leader_pubkeyeal_start_drop =
+                let leader_addresseal_start_drop =
                     target_drop.saturating_sub(self. max_last_leader_grace_drops);
                 // Is the current _drop in the same slot as the target _drop?
                 // Check if either grace period has expired,
@@ -143,7 +143,7 @@ impl WaterClockRecorder {
                     return (
                         true,
                         self.drop_height()
-                            .saturating_sub(leader_pubkeyeal_start_drop),
+                            .saturating_sub(leader_addresseal_start_drop),
                     );
                 }
 

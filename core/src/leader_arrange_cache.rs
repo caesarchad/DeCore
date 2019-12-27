@@ -50,7 +50,7 @@ impl LdrSchBufferPoolList {
     /// Return the next slot after the given current_slot that the given node will be leader
     pub fn next_leader_slot(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         mut current_slot: u64,
         treasury: &Treasury,
         block_buffer_pool: Option<&BlockBufferPool>,
@@ -68,7 +68,7 @@ impl LdrSchBufferPoolList {
             #[allow(clippy::needless_range_loop)]
             for i in start_index..treasury.get_slots_in_epoch(epoch) {
                 current_slot += 1;
-                if *pubkey == leader_schedule[i] {
+                if *address == leader_schedule[i] {
                     if let Some(block_buffer_pool) = block_buffer_pool {
                         if let Some(meta) = block_buffer_pool.meta(current_slot).unwrap() {
                             // We have already sent a blob for this slot, so skip it
@@ -261,10 +261,10 @@ mod tests {
 
     #[test]
     fn test_next_leader_slot() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
-            &pubkey,
+            &address,
             BOOTSTRAP_LEADER_DIFS,
         )
         .genesis_block;
@@ -275,13 +275,13 @@ mod tests {
 
         assert_eq!(
             cache.slot_leader_at(treasury.slot(), Some(&treasury)).unwrap(),
-            pubkey
+            address
         );
-        assert_eq!(cache.next_leader_slot(&pubkey, 0, &treasury, None), Some(1));
-        assert_eq!(cache.next_leader_slot(&pubkey, 1, &treasury, None), Some(2));
+        assert_eq!(cache.next_leader_slot(&address, 0, &treasury, None), Some(1));
+        assert_eq!(cache.next_leader_slot(&address, 1, &treasury, None), Some(2));
         assert_eq!(
             cache.next_leader_slot(
-                &pubkey,
+                &address,
                 2 * genesis_block.candidate_each_round - 1, // no schedule generated for epoch 2
                 &treasury,
                 None
@@ -302,10 +302,10 @@ mod tests {
 
     #[test]
     fn test_next_leader_slot_block_buffer() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let mut genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
-            &pubkey,
+            &address,
             BOOTSTRAP_LEADER_DIFS,
         )
         .genesis_block;
@@ -321,11 +321,11 @@ mod tests {
 
             assert_eq!(
                 cache.slot_leader_at(treasury.slot(), Some(&treasury)).unwrap(),
-                pubkey
+                address
             );
             // Check that the next leader slot after 0 is slot 1
             assert_eq!(
-                cache.next_leader_slot(&pubkey, 0, &treasury, Some(&block_buffer_pool)),
+                cache.next_leader_slot(&address, 0, &treasury, Some(&block_buffer_pool)),
                 Some(1)
             );
 
@@ -334,7 +334,7 @@ mod tests {
             let (blobs, _) = compose_candidate_fscl_stmts(2, 1, 1);
             block_buffer_pool.update_blobs(&blobs[..]).unwrap();
             assert_eq!(
-                cache.next_leader_slot(&pubkey, 0, &treasury, Some(&block_buffer_pool)),
+                cache.next_leader_slot(&address, 0, &treasury, Some(&block_buffer_pool)),
                 Some(1)
             );
 
@@ -344,14 +344,14 @@ mod tests {
             // Check that slot 1 and 2 are skipped
             block_buffer_pool.update_blobs(&blobs[..]).unwrap();
             assert_eq!(
-                cache.next_leader_slot(&pubkey, 0, &treasury, Some(&block_buffer_pool)),
+                cache.next_leader_slot(&address, 0, &treasury, Some(&block_buffer_pool)),
                 Some(3)
             );
 
             // Integrity checks
             assert_eq!(
                 cache.next_leader_slot(
-                    &pubkey,
+                    &address,
                     2 * genesis_block.candidate_each_round - 1, // no schedule generated for epoch 2
                     &treasury,
                     Some(&block_buffer_pool)
@@ -385,13 +385,13 @@ mod tests {
         let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         // Create new vote account
-        let node_pubkey = BvmAddr::new_rand();
-        let vote_pubkey = BvmAddr::new_rand();
+        let node_address = BvmAddr::new_rand();
+        let vote_address = BvmAddr::new_rand();
         setup_vote_and_stake_accounts(
             &treasury,
             &mint_keypair,
-            &vote_pubkey,
-            &node_pubkey,
+            &vote_address,
+            &node_address,
             BOOTSTRAP_LEADER_DIFS,
         );
 
@@ -412,14 +412,14 @@ mod tests {
 
         let schedule = cache.compute_epoch_schedule(epoch, &treasury).unwrap();
         let mut index = 0;
-        while schedule[index] != node_pubkey {
+        while schedule[index] != node_address {
             index += 1;
             assert_ne!(index, genesis_block.candidate_each_round);
         }
         expected_slot += index;
 
         assert_eq!(
-            cache.next_leader_slot(&node_pubkey, 0, &treasury, None),
+            cache.next_leader_slot(&node_address, 0, &treasury, None),
             Some(expected_slot),
         );
     }

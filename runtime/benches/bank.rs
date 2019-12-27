@@ -47,10 +47,10 @@ pub fn create_builtin_transactions(
             // Seed the signer account
             let rando0 = Keypair::new();
             treasury_client
-                .transfer(10_000, &mint_keypair, &rando0.pubkey())
+                .transfer(10_000, &mint_keypair, &rando0.address())
                 .expect(&format!("{}:{}", line!(), file!()));
 
-            let instruction = compose_call_opcode(rando0.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(rando0.address(), program_id, &1u8);
             let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
             Transaction::new_s_opcodes(&[&rando0], vec![instruction], transaction_seal)
         })
@@ -70,10 +70,10 @@ pub fn create_native_loader_transactions(
             // Seed the signer account©41
             let rando0 = Keypair::new();
             treasury_client
-                .transfer(10_000, &mint_keypair, &rando0.pubkey())
+                .transfer(10_000, &mint_keypair, &rando0.address())
                 .expect(&format!("{}:{}", line!(), file!()));
 
-            let instruction = compose_call_opcode(rando0.pubkey(), program_id, &1u8);
+            let instruction = compose_call_opcode(rando0.address(), program_id, &1u8);
             let (transaction_seal, _fee_calculator) = treasury_client.get_recent_transaction_seal().unwrap();
             Transaction::new_s_opcodes(&[&rando0], vec![instruction], transaction_seal)
         })

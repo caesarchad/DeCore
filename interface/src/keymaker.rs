@@ -114,17 +114,17 @@ mod tests {
         );
     }
 
-    fn gen_n_pubkeys(seed: [u8; 32], n: u64) -> HashSet<BvmAddr> {
+    fn gen_n_addresss(seed: [u8; 32], n: u64) -> HashSet<BvmAddr> {
         ChaKeys::new(seed)
             .ed25519_keypair_vec(n)
             .into_iter()
-            .map(|x| x.pubkey())
+            .map(|x| x.address())
             .collect()
     }
 
     #[test]
-    fn test_gen_n_pubkeys_deterministic() {
+    fn test_gen_n_addresss_deterministic() {
         let seed = [0u8; 32];
-        assert_eq!(gen_n_pubkeys(seed, 50), gen_n_pubkeys(seed, 50));
+        assert_eq!(gen_n_addresss(seed, 50), gen_n_addresss(seed, 50));
     }
 }

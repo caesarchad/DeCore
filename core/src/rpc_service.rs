@@ -206,7 +206,7 @@ mod tests {
                 .request_processor
                 .read()
                 .unwrap()
-                .get_balance(&mint_keypair.pubkey())
+                .get_balance(&mint_keypair.address())
         );
         exit.store(true, Ordering::Relaxed);
         rpc_service.join().unwrap();

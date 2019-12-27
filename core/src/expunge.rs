@@ -624,7 +624,7 @@ pub mod test {
                     let mut blobs = generate_test_blobs(0, NUM_DATA);
                     index_blobs(
                         &blobs,
-                        &Keypair::new().pubkey(),
+                        &Keypair::new().address(),
                         start_index as u64,
                         slot,
                         0,

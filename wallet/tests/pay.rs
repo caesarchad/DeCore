@@ -13,15 +13,15 @@ use std::sync::mpsc::channel;
 #[cfg(test)]
 use morgan::verifier::new_validator_for_tests;
 
-fn check_balance(expected_balance: u64, client: &RpcClient, pubkey: &BvmAddr) {
-    let balance = client.retry_get_balance(pubkey, 1).unwrap().unwrap();
+fn check_balance(expected_balance: u64, client: &RpcClient, address: &BvmAddr) {
+    let balance = client.retry_get_balance(address, 1).unwrap().unwrap();
     assert_eq!(balance, expected_balance);
 }
 
 #[test]
 fn test_wallet_timestamp_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = BvmAddr::new_rand();
+    let bob_address = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -39,22 +39,22 @@ fn test_wallet_timestamp_tx() {
     config_witness.json_rpc_url = config_payer.json_rpc_url.clone();
 
     assert_ne!(
-        config_payer.keypair.pubkey(),
-        config_witness.keypair.pubkey()
+        config_payer.keypair.address(),
+        config_witness.keypair.address()
     );
 
-    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.pubkey(), 50)
+    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.address(), 50)
         .unwrap();
-    check_balance(50, &rpc_client, &config_payer.keypair.pubkey());
+    check_balance(50, &rpc_client, &config_payer.keypair.address());
 
-    // Make transaction (from config_payer to bob_pubkey) requiring timestamp from config_witness
+    // Make transaction (from config_payer to bob_address) requiring timestamp from config_witness
     let date_string = "\"2018-09-19T17:30:59Z\"";
     let dt: DateTime<Utc> = serde_json::from_str(&date_string).unwrap();
     config_payer.command = WalletCommand::Pay(
         10,
-        bob_pubkey,
+        bob_address,
         Some(dt),
-        Some(config_witness.keypair.pubkey()),
+        Some(config_witness.keypair.address()),
         None,
         None,
     );
@@ -67,17 +67,17 @@ fn test_wallet_timestamp_tx() {
         .expect("base58-encoded public key");
     let process_id = BvmAddr::new(&process_id_vec);
 
-    check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(40, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance
-    check_balance(0, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(0, &rpc_client, &bob_address); // recipient balance
 
     // Sign transaction by config_witness
-    config_witness.command = WalletCommand::TimeElapsed(bob_pubkey, process_id, dt);
+    config_witness.command = WalletCommand::TimeElapsed(bob_address, process_id, dt);
     process_command(&config_witness).unwrap();
 
-    check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(40, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(0, &rpc_client, &process_id); // contract balance
-    check_balance(10, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(10, &rpc_client, &bob_address); // recipient balance
 
     server.close().unwrap();
     remove_dir_all(ledger_path).unwrap();
@@ -86,7 +86,7 @@ fn test_wallet_timestamp_tx() {
 #[test]
 fn test_wallet_witness_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = BvmAddr::new_rand();
+    let bob_address = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -104,20 +104,20 @@ fn test_wallet_witness_tx() {
     config_witness.json_rpc_url = config_payer.json_rpc_url.clone();
 
     assert_ne!(
-        config_payer.keypair.pubkey(),
-        config_witness.keypair.pubkey()
+        config_payer.keypair.address(),
+        config_witness.keypair.address()
     );
 
-    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.pubkey(), 50)
+    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.address(), 50)
         .unwrap();
 
-    // Make transaction (from config_payer to bob_pubkey) requiring witness signature from config_witness
+    // Make transaction (from config_payer to bob_address) requiring witness signature from config_witness
     config_payer.command = WalletCommand::Pay(
         10,
-        bob_pubkey,
+        bob_address,
         None,
         None,
-        Some(vec![config_witness.keypair.pubkey()]),
+        Some(vec![config_witness.keypair.address()]),
         None,
     );
     let sig_response = process_command(&config_payer);
@@ -129,17 +129,17 @@ fn test_wallet_witness_tx() {
         .expect("base58-encoded public key");
     let process_id = BvmAddr::new(&process_id_vec);
 
-    check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(40, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance
-    check_balance(0, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(0, &rpc_client, &bob_address); // recipient balance
 
     // Sign transaction by config_witness
-    config_witness.command = WalletCommand::Endorsement(bob_pubkey, process_id);
+    config_witness.command = WalletCommand::Endorsement(bob_address, process_id);
     process_command(&config_witness).unwrap();
 
-    check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(40, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(0, &rpc_client, &process_id); // contract balance
-    check_balance(10, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(10, &rpc_client, &bob_address); // recipient balance
 
     server.close().unwrap();
     remove_dir_all(ledger_path).unwrap();
@@ -148,7 +148,7 @@ fn test_wallet_witness_tx() {
 #[test]
 fn test_wallet_cancel_tx() {
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = BvmAddr::new_rand();
+    let bob_address = BvmAddr::new_rand();
 
     let (sender, receiver) = channel();
     run_local_drone(alice, sender, None);
@@ -166,21 +166,21 @@ fn test_wallet_cancel_tx() {
     config_witness.json_rpc_url = config_payer.json_rpc_url.clone();
 
     assert_ne!(
-        config_payer.keypair.pubkey(),
-        config_witness.keypair.pubkey()
+        config_payer.keypair.address(),
+        config_witness.keypair.address()
     );
 
-    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.pubkey(), 50)
+    request_and_confirm_airdrop(&rpc_client, &drone_addr, &config_payer.keypair.address(), 50)
         .unwrap();
 
-    // Make transaction (from config_payer to bob_pubkey) requiring witness signature from config_witness
+    // Make transaction (from config_payer to bob_address) requiring witness signature from config_witness
     config_payer.command = WalletCommand::Pay(
         10,
-        bob_pubkey,
+        bob_address,
         None,
         None,
-        Some(vec![config_witness.keypair.pubkey()]),
-        Some(config_payer.keypair.pubkey()),
+        Some(vec![config_witness.keypair.address()]),
+        Some(config_payer.keypair.address()),
     );
     let sig_response = process_command(&config_payer).unwrap();
 
@@ -191,17 +191,17 @@ fn test_wallet_cancel_tx() {
         .expect("base58-encoded public key");
     let process_id = BvmAddr::new(&process_id_vec);
 
-    check_balance(40, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(40, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(10, &rpc_client, &process_id); // contract balance
-    check_balance(0, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(0, &rpc_client, &bob_address); // recipient balance
 
     // Sign transaction by config_witness
     config_payer.command = WalletCommand::Cancel(process_id);
     process_command(&config_payer).unwrap();
 
-    check_balance(50, &rpc_client, &config_payer.keypair.pubkey()); // config_payer balance
+    check_balance(50, &rpc_client, &config_payer.keypair.address()); // config_payer balance
     check_balance(0, &rpc_client, &process_id); // contract balance
-    check_balance(0, &rpc_client, &bob_pubkey); // recipient balance
+    check_balance(0, &rpc_client, &bob_address); // recipient balance
 
     server.close().unwrap();
     remove_dir_all(ledger_path).unwrap();

@@ -39,14 +39,14 @@ pub struct ValidatorInfo {
 }
 
 pub struct StorageMinerInfo {
-    pub miner_storage_pubkey: BvmAddr,
+    pub miner_storage_address: BvmAddr,
     pub ledger_path: String,
 }
 
 impl StorageMinerInfo {
-    fn new(storage_pubkey: BvmAddr, ledger_path: String) -> Self {
+    fn new(storage_address: BvmAddr, ledger_path: String) -> Self {
         Self {
-            miner_storage_pubkey: storage_pubkey,
+            miner_storage_address: storage_address,
             ledger_path,
         }
     }
@@ -121,19 +121,19 @@ impl LocalNodeGroup {
 
     pub fn new(config: &NodeGroupConfig) -> Self {
         let leader_keypair = Arc::new(Keypair::new());
-        let leader_pubkey = leader_keypair.pubkey();
-        let leader_node = Node::new_localhost_with_pubkey(&leader_keypair.pubkey());
+        let leader_addr = leader_keypair.address();
+        let leader_node = Node::new_localhost_with_address(&leader_keypair.address());
         let GenesisBlockInfo {
             mut genesis_block,
             mint_keypair,
             voting_keypair,
         } = create_genesis_block_with_leader(
             config.node_group_difs,
-            &leader_pubkey,
+            &leader_addr,
             config.node_stakes[0],
         );
         let storage_keypair = Keypair::new();
-        genesis_block.add_storage_controller(&storage_keypair.pubkey());
+        genesis_block.add_storage_controller(&storage_keypair.address());
         genesis_block.drops_per_slot = config.drops_per_slot;
         genesis_block.candidate_each_round = config.candidate_each_round;
         genesis_block.stake_place_holder = config.stake_place_holder;
@@ -151,7 +151,7 @@ impl LocalNodeGroup {
             leader_node,
             &leader_keypair,
             &leader_ledger_path,
-            &leader_voting_keypair.pubkey(),
+            &leader_voting_keypair.address(),
             &leader_voting_keypair,
             &leader_storage_keypair,
             None,
@@ -160,9 +160,9 @@ impl LocalNodeGroup {
 
         let mut fullnodes = HashMap::new();
         let mut fullnode_infos = HashMap::new();
-        fullnodes.insert(leader_pubkey, leader_server);
+        fullnodes.insert(leader_addr, leader_server);
         fullnode_infos.insert(
-            leader_pubkey,
+            leader_addr,
             ValidatorInfo {
                 keypair: leader_keypair,
                 voting_keypair: leader_voting_keypair,
@@ -240,16 +240,16 @@ impl LocalNodeGroup {
         let validator_keypair = Arc::new(Keypair::new());
         let voting_keypair = Keypair::new();
         let storage_keypair = Arc::new(Keypair::new());
-        let validator_pubkey = validator_keypair.pubkey();
-        let validator_node = Node::new_localhost_with_pubkey(&validator_keypair.pubkey());
+        let validator_address = validator_keypair.address();
+        let validator_node = Node::new_localhost_with_address(&validator_keypair.address());
         let ledger_path = tmp_copy_block_buffer!(&self.genesis_ledger_path);
 
         if validator_config.voting_disabled {
             // setup as a listener
-            // info!("{}", Info(format!("listener {} ", validator_pubkey,).to_string()));
+            // info!("{}", Info(format!("listener {} ", validator_address,).to_string()));
             println!("{}",
                 printLn(
-                    format!("listener {} ", validator_pubkey).to_string(),
+                    format!("listener {} ", validator_address).to_string(),
                     module_path!().to_string()
                 )
             );
@@ -258,18 +258,18 @@ impl LocalNodeGroup {
             let validator_balance = Self::transfer_with_client(
                 &client,
                 &self.funding_keypair,
-                &validator_pubkey,
+                &validator_address,
                 stake * 2 + 2,
             );
             // info!(
             //     "{}",
             //     Info(format!("validator {} balance {}",
-            //     validator_pubkey, validator_balance).to_string())
+            //     validator_address, validator_balance).to_string())
             // );
             println!("{}",
                 printLn(
                     format!("validator {} balance {}",
-                        validator_pubkey, validator_balance
+                        validator_address, validator_balance
                     ).to_string(),
                     module_path!().to_string()
                 )
@@ -291,7 +291,7 @@ impl LocalNodeGroup {
             validator_node,
             &validator_keypair,
             &ledger_path,
-            &voting_keypair.pubkey(),
+            &voting_keypair.address(),
             &voting_keypair,
             &storage_keypair,
             Some(&self.connection_url_inf),
@@ -299,10 +299,10 @@ impl LocalNodeGroup {
         );
 
         self.fullnodes
-            .insert(validator_keypair.pubkey(), validator_server);
+            .insert(validator_keypair.address(), validator_server);
         if validator_config.voting_disabled {
             self.listener_infos.insert(
-                validator_keypair.pubkey(),
+                validator_keypair.address(),
                 ValidatorInfo {
                     keypair: validator_keypair,
                     voting_keypair,
@@ -312,7 +312,7 @@ impl LocalNodeGroup {
             );
         } else {
             self.fullnode_infos.insert(
-                validator_keypair.pubkey(),
+                validator_keypair.address(),
                 ValidatorInfo {
                     keypair: validator_keypair,
                     voting_keypair,
@@ -325,9 +325,9 @@ impl LocalNodeGroup {
 
     fn add_miner(&mut self) {
         let storage_miner_keypair = Arc::new(Keypair::new());
-        let storage_miner_pubkey = storage_miner_keypair.pubkey();
+        let storage_miner_address = storage_miner_keypair.address();
         let storage_keypair = Arc::new(Keypair::new());
-        let storage_pubkey = storage_keypair.pubkey();
+        let storage_address = storage_keypair.address();
         let client = create_client(
             self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
@@ -337,10 +337,10 @@ impl LocalNodeGroup {
         Self::transfer_with_client(
             &client,
             &self.funding_keypair,
-            &storage_miner_keypair.pubkey(),
+            &storage_miner_keypair.address(),
             42,
         );
-        let storage_miner_node = Node::new_localhost_storage_miner(&storage_miner_pubkey);
+        let storage_miner_node = Node::new_localhost_storage_miner(&storage_miner_address);
 
         Self::setup_storage_account(&client, &storage_keypair, &storage_miner_keypair, true).unwrap();
 
@@ -356,8 +356,8 @@ impl LocalNodeGroup {
 
         self.miners.push(storage_miner);
         self.storage_miner_infos.insert(
-            storage_miner_pubkey,
-            StorageMinerInfo::new(storage_pubkey, miner_ledger_path),
+            storage_miner_address,
+            StorageMinerInfo::new(storage_address, miner_ledger_path),
         );
     }
 
@@ -374,25 +374,25 @@ impl LocalNodeGroup {
         }
     }
 
-    pub fn transfer(&self, source_keypair: &Keypair, dest_pubkey: &BvmAddr, difs: u64) -> u64 {
+    pub fn transfer(&self, source_keypair: &Keypair, dest_address: &BvmAddr, difs: u64) -> u64 {
         let client = create_client(
             self.connection_url_inf.client_facing_addr(),
             FULLNODE_PORT_RANGE,
         );
-        Self::transfer_with_client(&client, source_keypair, dest_pubkey, difs)
+        Self::transfer_with_client(&client, source_keypair, dest_address, difs)
     }
 
     fn transfer_with_client(
         client: &SlimAccountHost,
         source_keypair: &Keypair,
-        dest_pubkey: &BvmAddr,
+        dest_address: &BvmAddr,
         difs: u64,
     ) -> u64 {
         trace!("getting leader transaction_seal");
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut tx = sys_controller::create_user_account(
             &source_keypair,
-            dest_pubkey,
+            dest_address,
             difs,
             transaction_seal,
         );
@@ -400,15 +400,15 @@ impl LocalNodeGroup {
         //     "{}",
         //     Info(format!("executing transfer of {} from {} to {}",
         //     difs,
-        //     source_keypair.pubkey(),
-        //     *dest_pubkey).to_string())
+        //     source_keypair.address(),
+        //     *dest_address).to_string())
         // );
         println!("{}",
             printLn(
                 format!("executing transfer of {} from {} to {}",
                     difs,
-                    source_keypair.pubkey(),
-                    *dest_pubkey
+                    source_keypair.address(),
+                    *dest_address
                 ).to_string(),
                 module_path!().to_string()
             )
@@ -417,7 +417,7 @@ impl LocalNodeGroup {
             .retry_transfer(&source_keypair, &mut tx, 5)
             .expect("client transfer");
         client
-            .wait_for_balance(dest_pubkey, Some(difs))
+            .wait_for_balance(dest_address, Some(difs))
             .expect("get balance")
     }
 
@@ -427,19 +427,19 @@ impl LocalNodeGroup {
         from_account: &Arc<Keypair>,
         amount: u64,
     ) -> Result<()> {
-        let vote_account_pubkey = vote_account.pubkey();
-        let node_pubkey = from_account.pubkey();
+        let vote_account_address = vote_account.address();
+        let node_address = from_account.address();
 
         // Create the vote account if necessary
-        if client.poll_get_balance(&vote_account_pubkey).unwrap_or(0) == 0 {
+        if client.poll_get_balance(&vote_account_address).unwrap_or(0) == 0 {
             // 1) Create vote account
 
             let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref()],
                 vote_opcode::create_account(
-                    &from_account.pubkey(),
-                    &vote_account_pubkey,
-                    &node_pubkey,
+                    &from_account.address(),
+                    &vote_account_address,
+                    &node_address,
                     0,
                     amount,
                 ),
@@ -449,16 +449,16 @@ impl LocalNodeGroup {
                 .retry_transfer(&from_account, &mut transaction, 5)
                 .expect("fund vote");
             client
-                .wait_for_balance(&vote_account_pubkey, Some(amount))
+                .wait_for_balance(&vote_account_address, Some(amount))
                 .expect("get balance");
 
             let stake_account_keypair = Keypair::new();
-            let stake_account_pubkey = stake_account_keypair.pubkey();
+            let stake_account_address = stake_account_keypair.address();
             let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref()],
                 stake_opcode::create_delegate_account(
-                    &from_account.pubkey(),
-                    &stake_account_pubkey,
+                    &from_account.address(),
+                    &stake_account_address,
                     amount,
                 ),
                 client.get_recent_transaction_seal().unwrap().0,
@@ -468,15 +468,15 @@ impl LocalNodeGroup {
                 .retry_transfer(&from_account, &mut transaction, 5)
                 .expect("fund stake");
             client
-                .wait_for_balance(&stake_account_pubkey, Some(amount))
+                .wait_for_balance(&stake_account_address, Some(amount))
                 .expect("get balance");
 
             let mut transaction = Transaction::new_s_opcodes(
                 &[from_account.as_ref(), &stake_account_keypair],
                 vec![stake_opcode::delegate_stake(
-                    &from_account.pubkey(),
-                    &stake_account_pubkey,
-                    &vote_account_pubkey,
+                    &from_account.address(),
+                    &stake_account_address,
+                    &vote_account_address,
                 )],
                 client.get_recent_transaction_seal().unwrap().0,
             );
@@ -496,10 +496,10 @@ impl LocalNodeGroup {
                 module_path!().to_string()
             )
         );
-        let vote_account_user_data = client.get_account_data(&vote_account_pubkey);
+        let vote_account_user_data = client.get_account_data(&vote_account_address);
         if let Ok(Some(vote_account_user_data)) = vote_account_user_data {
             if let Ok(vote_state) = VoteState::deserialize(&vote_account_user_data) {
-                if vote_state.node_pubkey == node_pubkey {
+                if vote_state.node_address == node_address {
                     // info!("{}", Info(format!("vote account registered").to_string()));
                     println!("{}",
                         printLn(
@@ -521,63 +521,63 @@ impl LocalNodeGroup {
     fn setup_storage_account(
         client: &SlimAccountHost,
         storage_keypair: &Keypair,
-        from_keypair: &Arc<Keypair>,
+        from_acct: &Arc<Keypair>,
         storage_miner: bool,
     ) -> Result<()> {
         let context = Context::new_with_payer(
             if storage_miner {
                 storage_opcode::create_miner_storage_account(
-                    &from_keypair.pubkey(),
-                    &storage_keypair.pubkey(),
+                    &from_acct.address(),
+                    &storage_keypair.address(),
                     1,
                 )
             } else {
                 storage_opcode::create_validator_storage_account(
-                    &from_keypair.pubkey(),
-                    &storage_keypair.pubkey(),
+                    &from_acct.address(),
+                    &storage_keypair.address(),
                     1,
                 )
             },
-            Some(&from_keypair.pubkey()),
+            Some(&from_acct.address()),
         );
-        let signer_keys = vec![from_keypair.as_ref()];
+        let signer_keys = vec![from_acct.as_ref()];
         let transaction_seal = client.get_recent_transaction_seal().unwrap().0;
         let mut transaction = Transaction::new(&signer_keys, context, transaction_seal);
         client
-            .retry_transfer(&from_keypair, &mut transaction, 5)
+            .retry_transfer(&from_acct, &mut transaction, 5)
             .map(|_signature| ())
     }
 }
 
 impl NodeGroup for LocalNodeGroup {
-    fn get_node_pubkeys(&self) -> Vec<BvmAddr> {
+    fn get_node_addresss(&self) -> Vec<BvmAddr> {
         self.fullnodes.keys().cloned().collect()
     }
 
-    fn restart_node(&mut self, pubkey: BvmAddr) {
+    fn restart_node(&mut self, address: BvmAddr) {
         // Shut down the fullnode
-        let node = self.fullnodes.remove(&pubkey).unwrap();
+        let node = self.fullnodes.remove(&address).unwrap();
         node.exit();
         node.join().unwrap();
 
         // Restart the node
-        let fullnode_info = &self.fullnode_infos[&pubkey];
-        let node = Node::new_localhost_with_pubkey(&fullnode_info.keypair.pubkey());
-        if pubkey == self.connection_url_inf.id {
+        let fullnode_info = &self.fullnode_infos[&address];
+        let node = Node::new_localhost_with_address(&fullnode_info.keypair.address());
+        if address == self.connection_url_inf.id {
             self.connection_url_inf = node.info.clone();
         }
         let restarted_node = Validator::new(
             node,
             &fullnode_info.keypair,
             &fullnode_info.ledger_path,
-            &fullnode_info.voting_keypair.pubkey(),
+            &fullnode_info.voting_keypair.address(),
             &fullnode_info.voting_keypair,
             &fullnode_info.storage_keypair,
             None,
             &self.validator_config,
         );
 
-        self.fullnodes.insert(pubkey, restarted_node);
+        self.fullnodes.insert(address, restarted_node);
     }
 }
 

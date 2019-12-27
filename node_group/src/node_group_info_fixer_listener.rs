@@ -9,7 +9,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use bitconch_metricbot::datapoint;
 use bitconch_runtime::epoch_schedule::RoundPlan;
-use bitconch_interface::pubkey::BvmAddr;
+use bitconch_interface::address::BvmAddr;
 use std::cmp;
 use std::collections::HashMap;
 use std::mem;
@@ -115,7 +115,7 @@ impl NodeGroupInfoFixListener {
         epoch_schedule: &RoundPlan,
     ) -> Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let my_pubkey = node_group_info.read().unwrap().id();
+        let my_address = node_group_info.read().unwrap().id();
         let mut my_gossiped_root = 0;
 
         loop {
@@ -130,7 +130,7 @@ impl NodeGroupInfoFixListener {
             // need repairs
             for peer in peers {
                 if let Some(repairee_epoch_slots) = Self::process_potential_repairee(
-                    &my_pubkey,
+                    &my_address,
                     &peer.id,
                     node_group_info,
                     peer_roots,
@@ -142,7 +142,7 @@ impl NodeGroupInfoFixListener {
 
             // After updating all the peers, send out repairs to those that need it
             let _ = Self::serve_repairs(
-                &my_pubkey,
+                &my_address,
                 block_buffer_pool,
                 peer_roots,
                 &peers_needing_repairs,
@@ -157,22 +157,22 @@ impl NodeGroupInfoFixListener {
     }
 
     fn process_potential_repairee(
-        my_pubkey: &BvmAddr,
-        peer_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
+        peer_address: &BvmAddr,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         peer_roots: &mut HashMap<BvmAddr, (u64, u64)>,
         my_gossiped_root: &mut u64,
     ) -> Option<EpochSlots> {
-        let last_cached_repair_ts = Self::get_last_ts(peer_pubkey, peer_roots);
-        let my_root = Self::read_my_gossiped_root(&my_pubkey, node_group_info, my_gossiped_root);
+        let last_cached_repair_ts = Self::get_last_ts(peer_address, peer_roots);
+        let my_root = Self::read_my_gossiped_root(&my_address, node_group_info, my_gossiped_root);
         {
             let r_node_group_info = node_group_info.read().unwrap();
 
             // Update our local map with the updated peers' information
             if let Some((peer_epoch_slots, updated_ts)) =
-                r_node_group_info.get_epoch_state_for_node(&peer_pubkey, last_cached_repair_ts)
+                r_node_group_info.get_epoch_state_for_node(&peer_address, last_cached_repair_ts)
             {
-                let peer_entry = peer_roots.entry(*peer_pubkey).or_default();
+                let peer_entry = peer_roots.entry(*peer_address).or_default();
                 let peer_root = cmp::max(peer_epoch_slots.root, peer_entry.1);
                 let mut result = None;
                 let last_repair_ts = {
@@ -197,7 +197,7 @@ impl NodeGroupInfoFixListener {
     }
 
     fn serve_repairs(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         block_buffer_pool: &BlockBufferPool,
         peer_roots: &HashMap<BvmAddr, (u64, u64)>,
         repairees: &HashMap<BvmAddr, EpochSlots>,
@@ -206,19 +206,19 @@ impl NodeGroupInfoFixListener {
         my_gossiped_root: &mut u64,
         epoch_schedule: &RoundPlan,
     ) -> Result<()> {
-        for (repairee_pubkey, repairee_epoch_slots) in repairees {
+        for (repairee_address, repairee_epoch_slots) in repairees {
             let repairee_root = repairee_epoch_slots.root;
 
             let fix_target_blaze_unit = {
                 let r_node_group_info = node_group_info.read().unwrap();
-                let contact_info = r_node_group_info.get_contact_info_for_node(repairee_pubkey);
+                let contact_info = r_node_group_info.get_contact_info_for_node(repairee_address);
                 contact_info.map(|c| c.blaze_unit)
             };
 
             if let Some(fix_target_blaze_unit) = fix_target_blaze_unit {
                 // For every repairee, get the set of repairmen who are responsible for
                 let mut eligible_repairmen = Self::find_eligible_repairmen(
-                    my_pubkey,
+                    my_address,
                     repairee_root,
                     peer_roots,
                     BUFFER_SLOTS,
@@ -226,15 +226,15 @@ impl NodeGroupInfoFixListener {
 
                 Self::shuffle_repairmen(
                     &mut eligible_repairmen,
-                    repairee_pubkey,
+                    repairee_address,
                     repairee_epoch_slots.root,
                 );
 
                 let my_root =
-                    Self::read_my_gossiped_root(my_pubkey, node_group_info, my_gossiped_root);
+                    Self::read_my_gossiped_root(my_address, node_group_info, my_gossiped_root);
 
                 let _ = Self::serve_repairs_to_repairee(
-                    my_pubkey,
+                    my_address,
                     my_root,
                     block_buffer_pool,
                     &repairee_epoch_slots,
@@ -251,7 +251,7 @@ impl NodeGroupInfoFixListener {
     }
 
     fn serve_repairs_to_repairee(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         my_root: u64,
         block_buffer_pool: &BlockBufferPool,
         repairee_epoch_slots: &EpochSlots,
@@ -301,7 +301,7 @@ impl NodeGroupInfoFixListener {
                 // the cluster
                 let num_blobs_in_slot = slot_meta.received as usize;
                 if let Some(my_repair_indexes) = Self::calculate_my_repairman_index_for_slot(
-                    my_pubkey,
+                    my_address,
                     &eligible_repairmen,
                     num_blobs_in_slot,
                     FIX_REDUNDANCY,
@@ -351,13 +351,13 @@ impl NodeGroupInfoFixListener {
 
     fn shuffle_repairmen(
         eligible_repairmen: &mut Vec<&BvmAddr>,
-        repairee_pubkey: &BvmAddr,
+        repairee_address: &BvmAddr,
         repairee_root: u64,
     ) {
-        // Make a seed from pubkey + repairee root
+        // Make a seed from address + repairee root
         let mut seed = [0u8; mem::size_of::<BvmAddr>()];
-        let repairee_pubkey_bytes = repairee_pubkey.as_ref();
-        seed[..repairee_pubkey_bytes.len()].copy_from_slice(repairee_pubkey_bytes);
+        let repairee_address_bytes = repairee_address.as_ref();
+        seed[..repairee_address_bytes.len()].copy_from_slice(repairee_address_bytes);
         LittleEndian::write_u64(&mut seed[0..], repairee_root);
 
         // Deterministically shuffle the eligible repairmen based on the seed
@@ -369,7 +369,7 @@ impl NodeGroupInfoFixListener {
     // such that each blob in the slot is the responsibility of `repair_redundancy` or
     // `repair_redundancy + 1` number of repairmen in the cluster.
     fn calculate_my_repairman_index_for_slot(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         eligible_repairmen: &[&BvmAddr],
         num_blobs_in_slot: usize,
         repair_redundancy: usize,
@@ -385,7 +385,7 @@ impl NodeGroupInfoFixListener {
         // Calculate the indexes this node is responsible for
         if let Some(my_position) = eligible_repairmen[..total_repairmen_for_slot]
             .iter()
-            .position(|id| *id == my_pubkey)
+            .position(|id| *id == my_address)
         {
             let start_index = my_position % num_blobs_in_slot;
             Some(BlobIndexesNeededToBeFixed::new(
@@ -402,41 +402,41 @@ impl NodeGroupInfoFixListener {
     }
 
     fn find_eligible_repairmen<'a>(
-        my_pubkey: &'a BvmAddr,
+        my_address: &'a BvmAddr,
         repairee_root: u64,
         repairman_roots: &'a HashMap<BvmAddr, (u64, u64)>,
         num_buffer_slots: usize,
     ) -> Vec<&'a BvmAddr> {
         let mut repairmen: Vec<_> = repairman_roots
             .iter()
-            .filter_map(|(repairman_pubkey, (_, repairman_root))| {
+            .filter_map(|(repairman_address, (_, repairman_root))| {
                 if Self::should_repair_peer(
                     *repairman_root,
                     repairee_root,
                     num_buffer_slots - DELAY_SLOTS,
                 ) {
-                    Some(repairman_pubkey)
+                    Some(repairman_address)
                 } else {
                     None
                 }
             })
             .collect();
 
-        repairmen.push(my_pubkey);
+        repairmen.push(my_address);
         repairmen.sort();
         repairmen
     }
 
     // Read my root out of gossip, and update the cached `old_root`
     fn read_my_gossiped_root(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
         old_root: &mut u64,
     ) -> u64 {
         let new_root = node_group_info
             .read()
             .unwrap()
-            .get_gossiped_root_for_node(&my_pubkey, None);
+            .get_gossiped_root_for_node(&my_address, None);
 
         if let Some(new_root) = new_root {
             *old_root = new_root;
@@ -458,8 +458,8 @@ impl NodeGroupInfoFixListener {
         repairman_root > repairee_root + num_buffer_slots as u64
     }
 
-    fn get_last_ts(pubkey: &BvmAddr, peer_roots: &mut HashMap<BvmAddr, (u64, u64)>) -> Option<u64> {
-        peer_roots.get(pubkey).map(|(last_ts, _)| *last_ts)
+    fn get_last_ts(address: &BvmAddr, peer_roots: &mut HashMap<BvmAddr, (u64, u64)>) -> Option<u64> {
+        peer_roots.get(address).map(|(last_ts, _)| *last_ts)
     }
 }
 
@@ -543,8 +543,8 @@ mod tests {
     #[test]
     fn test_process_potential_repairee() {
         // Set up node ids
-        let my_pubkey = BvmAddr::new_rand();
-        let peer_pubkey = BvmAddr::new_rand();
+        let my_address = BvmAddr::new_rand();
+        let peer_address = BvmAddr::new_rand();
 
         // Set up node_group_info
         let node_group_info = Arc::new(RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
@@ -555,7 +555,7 @@ mod tests {
         let repairee_root = 0;
         let repairee_slots = BTreeSet::new();
         node_group_info.write().unwrap().push_epoch_slots(
-            peer_pubkey,
+            peer_address,
             repairee_root,
             repairee_slots.clone(),
         );
@@ -566,8 +566,8 @@ mod tests {
 
         // Root is not sufficiently far ahead, we shouldn't repair
         assert!(NodeGroupInfoFixListener::process_potential_repairee(
-            &my_pubkey,
-            &peer_pubkey,
+            &my_address,
+            &peer_address,
             &node_group_info,
             &mut peer_roots,
             &mut my_gossiped_root,
@@ -578,8 +578,8 @@ mod tests {
         // object in gossip is not updated
         my_gossiped_root = repairee_root + BUFFER_SLOTS as u64 + 1;
         assert!(NodeGroupInfoFixListener::process_potential_repairee(
-            &my_pubkey,
-            &peer_pubkey,
+            &my_address,
+            &peer_address,
             &node_group_info,
             &mut peer_roots,
             &mut my_gossiped_root,
@@ -590,8 +590,8 @@ mod tests {
         // even if our root moves forward
         my_gossiped_root += 4;
         assert!(NodeGroupInfoFixListener::process_potential_repairee(
-            &my_pubkey,
-            &peer_pubkey,
+            &my_address,
+            &peer_address,
             &node_group_info,
             &mut peer_roots,
             &mut my_gossiped_root,
@@ -604,10 +604,10 @@ mod tests {
         node_group_info
             .write()
             .unwrap()
-            .push_epoch_slots(peer_pubkey, repairee_root, repairee_slots);
+            .push_epoch_slots(peer_address, repairee_root, repairee_slots);
         assert!(NodeGroupInfoFixListener::process_potential_repairee(
-            &my_pubkey,
-            &peer_pubkey,
+            &my_address,
+            &peer_address,
             &node_group_info,
             &mut peer_roots,
             &mut my_gossiped_root,
@@ -632,7 +632,7 @@ mod tests {
         block_buffer_pool.set_genesis(num_slots - 1, 0).unwrap();
 
         // Set up my information
-        let my_pubkey = BvmAddr::new_rand();
+        let my_address = BvmAddr::new_rand();
         let my_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
         // Set up a mock repairee with a socket listening for incoming repairs
@@ -649,15 +649,15 @@ mod tests {
         let num_repairmen = blobs_per_slot - 1;
         let mut eligible_repairmen: Vec<_> =
             (0..num_repairmen).map(|_| BvmAddr::new_rand()).collect();
-        eligible_repairmen.push(my_pubkey);
+        eligible_repairmen.push(my_address);
         let eligible_repairmen_refs: Vec<_> = eligible_repairmen.iter().collect();
 
         // Have all the repairman send the repairs
         let epoch_schedule = RoundPlan::new(32, 16, false);
         let num_missing_slots = num_slots / 2;
-        for repairman_pubkey in &eligible_repairmen {
+        for repairman_address in &eligible_repairmen {
             NodeGroupInfoFixListener::serve_repairs_to_repairee(
-                &repairman_pubkey,
+                &repairman_address,
                 num_slots - 1,
                 &block_buffer_pool,
                 &repairee_epoch_slots,
@@ -708,7 +708,7 @@ mod tests {
         block_buffer_pool.set_genesis(candidate_each_round * 2 - 1, 0).unwrap();
 
         // Set up my information
-        let my_pubkey = BvmAddr::new_rand();
+        let my_address = BvmAddr::new_rand();
         let my_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
         // Set up a mock repairee with a socket listening for incoming repairs
@@ -726,11 +726,11 @@ mod tests {
             EpochSlots::new(mock_repairee.id, repairee_root, repairee_slots.clone(), 1);
 
         NodeGroupInfoFixListener::serve_repairs_to_repairee(
-            &my_pubkey,
+            &my_address,
             total_slots - 1,
             &block_buffer_pool,
             &repairee_epoch_slots,
-            &vec![&my_pubkey],
+            &vec![&my_address],
             &my_socket,
             &mock_repairee.blaze_node_url,
             1 as usize,
@@ -747,11 +747,11 @@ mod tests {
         let repairee_epoch_slots =
             EpochSlots::new(mock_repairee.id, stake_place_holder, repairee_slots, 1);
         NodeGroupInfoFixListener::serve_repairs_to_repairee(
-            &my_pubkey,
+            &my_address,
             total_slots - 1,
             &block_buffer_pool,
             &repairee_epoch_slots,
-            &vec![&my_pubkey],
+            &vec![&my_address],
             &my_socket,
             &mock_repairee.blaze_node_url,
             1 as usize,

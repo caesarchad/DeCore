@@ -20,7 +20,7 @@ pub struct EpochStakes {
     stakes: HashMap<BvmAddr, u64>,
     self_staked: u64,
     total_staked: u64,
-    delegate_pubkey: BvmAddr,
+    delegate_address: BvmAddr,
 }
 
 #[derive(Default, Debug)]
@@ -39,15 +39,15 @@ pub struct LockStack {
 }
 
 impl EpochStakes {
-    pub fn new(epoch: u64, stakes: HashMap<BvmAddr, u64>, delegate_pubkey: &BvmAddr) -> Self {
+    pub fn new(epoch: u64, stakes: HashMap<BvmAddr, u64>, delegate_address: &BvmAddr) -> Self {
         let total_staked = stakes.values().sum();
-        let self_staked = *stakes.get(&delegate_pubkey).unwrap_or(&0);
+        let self_staked = *stakes.get(&delegate_address).unwrap_or(&0);
         Self {
             epoch,
             stakes,
             total_staked,
             self_staked,
-            delegate_pubkey: *delegate_pubkey,
+            delegate_address: *delegate_address,
         }
     }
     pub fn new_for_tests(difs: u64) -> Self {
@@ -61,21 +61,21 @@ impl EpochStakes {
         let stakes = accounts.iter().map(|(k, (v, _))| (*k, *v)).collect();
         Self::new(epoch, stakes, &accounts[0].0)
     }
-    pub fn new_from_treasury(treasury: &Treasury, my_pubkey: &BvmAddr) -> Self {
+    pub fn new_from_treasury(treasury: &Treasury, my_address: &BvmAddr) -> Self {
         let treasury_round = treasury.get_epoch_and_slot_index(treasury.slot()).0;
         let stakes = staking_utils::vote_account_stakes_at_epoch(treasury, treasury_round)
             .expect("voting require a treasury with stakes");
-        Self::new(treasury_round, stakes, my_pubkey)
+        Self::new(treasury_round, stakes, my_address)
     }
 }
 
 impl LockStack {
-    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_pubkey: &BvmAddr) -> Self {
+    pub fn new_from_forks(treasury_forks: &TreasuryForks, my_address: &BvmAddr) -> Self {
         let mut frozen_treasuries: Vec<_> = treasury_forks.frozen_treasuries().values().cloned().collect();
         frozen_treasuries.sort_by_key(|b| (b.parents().len(), b.slot()));
         let epoch_stakes = {
             if let Some(treasury) = frozen_treasuries.last() {
-                EpochStakes::new_from_treasury(treasury, my_pubkey)
+                EpochStakes::new_from_treasury(treasury, my_address)
             } else {
                 return Self::default();
             }
@@ -132,8 +132,8 @@ impl LockStack {
             }
             let mut vote_state = vote_state.unwrap();
 
-            if key == self.epoch_stakes.delegate_pubkey
-                || vote_state.node_pubkey == self.epoch_stakes.delegate_pubkey
+            if key == self.epoch_stakes.delegate_address
+                || vote_state.node_address == self.epoch_stakes.delegate_address
             {
                 debug!("vote state {:?}", vote_state);
                 debug!(
@@ -239,7 +239,7 @@ impl LockStack {
                 )
             );
             self.epoch_stakes =
-                EpochStakes::new_from_treasury(treasury, &self.epoch_stakes.delegate_pubkey);
+                EpochStakes::new_from_treasury(treasury, &self.epoch_stakes.delegate_address);
             datapoint_info!(
                 "lock_stack-epoch",
                 ("epoch", self.epoch_stakes.epoch, i64),
@@ -401,8 +401,8 @@ impl LockStack {
     fn initialize_lockouts_from_treasury(treasury: &Treasury, current_epoch: u64) -> VoteState {
         let mut lockouts = VoteState::default();
         if let Some(iter) = treasury.epoch_vote_accounts(current_epoch) {
-            for (delegate_pubkey, (_, account)) in iter {
-                if *delegate_pubkey == treasury.collector_id() {
+            for (delegate_address, (_, account)) in iter {
+                if *delegate_address == treasury.collector_id() {
                     let state = VoteState::deserialize(&account.data).expect("votes");
                     if lockouts.votes.len() < state.votes.len() {
                         lockouts = state;

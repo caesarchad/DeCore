@@ -81,21 +81,21 @@ setup_validator_accounts() {
   declare storage_keypair_path=$5
   declare stake=$6
 
-  declare node_pubkey
-  node_pubkey=$($morgan_keybot pubkey "$node_keypair_path")
-  # node_pubkey=$(morgan-keybot pubkey "$node_keypair_path")
+  declare node_address
+  node_address=$($morgan_keybot address "$node_keypair_path")
+  # node_address=$(morgan-keybot address "$node_keypair_path")
 
-  declare vote_pubkey
-  vote_pubkey=$($morgan_keybot pubkey "$vote_keypair_path")
-  # # vote_pubkey=$(morgan-keybot pubkey "$vote_keypair_path")
+  declare vote_address
+  vote_address=$($morgan_keybot address "$vote_keypair_path")
+  # # vote_address=$(morgan-keybot address "$vote_keypair_path")
 
-  declare stake_pubkey
-  stake_pubkey=$($morgan_keybot pubkey "$stake_keypair_path")
-  # stake_pubkey=$(morgan-keybot pubkey "$stake_keypair_path")
+  declare stake_address
+  stake_address=$($morgan_keybot address "$stake_keypair_path")
+  # stake_address=$(morgan-keybot address "$stake_keypair_path")
 
-  declare storage_pubkey
-  storage_pubkey=$($morgan_keybot pubkey "$storage_keypair_path")
-  # storage_pubkey=$(morgan-keybot pubkey "$storage_keypair_path")
+  declare storage_address
+  storage_address=$($morgan_keybot address "$storage_keypair_path")
+  # storage_address=$(morgan-keybot address "$storage_keypair_path")
 
   if [[ -f $configured_flag ]]; then
     echo "Vote and stake accounts have already been configured"
@@ -103,32 +103,32 @@ setup_validator_accounts() {
     # Fund the node with enough tokens to fund its Vote, Staking, and Storage accounts
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" airdrop $((stake*2+2)) || return $?
 
-    # Fund the vote account from the node, with the node as the node_pubkey
+    # Fund the vote account from the node, with the node as the node_address
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-      create-vote-account "$vote_pubkey" "$node_pubkey" "$stake" || return $?
+      create-vote-account "$vote_address" "$node_address" "$stake" || return $?
 
-    # Fund the stake account from the node, with the node as the node_pubkey
+    # Fund the stake account from the node, with the node as the node_address
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-      create-stake-account "$stake_pubkey" "$stake" || return $?
+      create-stake-account "$stake_address" "$stake" || return $?
 
     # Delegate the stake.  The transaction fee is paid by the node but the
     #  transaction must be signed by the stake_keypair
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-      delegate-stake "$stake_keypair_path" "$vote_pubkey" || return $?
+      delegate-stake "$stake_keypair_path" "$vote_address" || return $?
 
     # Setup validator storage account
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-      create-validator-storage-account "$storage_pubkey" || return $?
+      create-validator-storage-account "$storage_address" || return $?
 
     touch "$configured_flag"
   fi
 
   $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-    show-vote-account "$vote_pubkey"
+    show-vote-account "$vote_address"
   $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-    show-stake-account "$stake_pubkey"
+    show-stake-account "$stake_address"
   $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-    show-storage-account "$storage_pubkey"
+    show-storage-account "$storage_address"
 
   return 0
 }
@@ -139,8 +139,8 @@ setup_miner_account() {
   declare storage_keypair_path=$3
   declare stake=$4
 
-  declare storage_pubkey
-  storage_pubkey=$($morgan_keybot pubkey "$storage_keypair_path")
+  declare storage_address
+  storage_address=$($morgan_keybot address "$storage_keypair_path")
 
   if [[ -f $configured_flag ]]; then
     echo "There is an already configured StorageMiner account existing"
@@ -149,13 +149,13 @@ setup_miner_account() {
 
     # Setup storage-miner storage account
     $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-      create-storage-miner-storage-account "$storage_pubkey" || return $?
+      create-storage-miner-storage-account "$storage_address" || return $?
 
     touch "$configured_flag"
   fi
 
   $morgan_wallet --keypair "$node_keypair_path" --url "http://$entrypoint_ip:10099" \
-    show-storage-account "$storage_pubkey"
+    show-storage-account "$storage_address"
 
   return 0
 }
@@ -258,13 +258,13 @@ if [[ $node_type = storage-miner ]]; then
   [[ -r "$identity_keypair_path" ]] || $morgan_keybot -o "$identity_keypair_path"
   [[ -r "$storage_keypair_path" ]] || $morgan_keybot -o "$storage_keypair_path"
 
-  identity_pubkey=$($morgan_keybot pubkey "$identity_keypair_path")
-  storage_pubkey=$($morgan_keybot pubkey "$storage_keypair_path")
+  identity_address=$($morgan_keybot address "$identity_keypair_path")
+  storage_address=$($morgan_keybot address "$storage_keypair_path")
 
   cat <<EOF
 ======================[ $node_type configuration ]======================
-storage-miner pubkey: $identity_pubkey
-storage pubkey: $storage_pubkey
+storage-miner address: $identity_address
+storage address: $storage_address
 ledger path: $ledger_config_dir
 ======================================================================
 EOF
@@ -337,15 +337,15 @@ fi
 
 
 if [[ $node_type != storage-miner ]]; then
-  identity_pubkey=$($morgan_keybot pubkey "$identity_keypair_path")
-  vote_pubkey=$($morgan_keybot pubkey "$vote_keypair_path")
-  storage_pubkey=$($morgan_keybot pubkey "$storage_keypair_path")
+  identity_address=$($morgan_keybot address "$identity_keypair_path")
+  vote_address=$($morgan_keybot address "$vote_keypair_path")
+  storage_address=$($morgan_keybot address "$storage_keypair_path")
 
   cat <<EOF
 ======================[ $node_type configuration ]======================
-identity pubkey: $identity_pubkey
-vote pubkey: $vote_pubkey
-storage pubkey: $storage_pubkey
+identity address: $identity_address
+vote address: $vote_address
+storage address: $storage_address
 ledger path: $ledger_config_dir
 accounts path: $accounts_config_dir
 ========================================================================
@@ -353,7 +353,7 @@ EOF
 
   default_arg --identity "$identity_keypair_path"
   default_arg --voting-keypair "$vote_keypair_path"
-  default_arg --vote-account "$vote_pubkey"
+  default_arg --vote-account "$vote_address"
   default_arg --storage-keypair "$storage_keypair_path"
   default_arg --ledger "$ledger_config_dir"
   default_arg --accounts "$accounts_config_dir"

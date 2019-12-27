@@ -82,15 +82,15 @@ mod tests {
 
     fn create_config_account(treasury: Treasury, mint_keypair: &Keypair) -> (TreasuryClient, Keypair) {
         let config_keypair = Keypair::new();
-        let config_pubkey = config_keypair.pubkey();
+        let config_address = config_keypair.address();
 
         let treasury_client = TreasuryClient::new(treasury);
         treasury_client
             .snd_online_instruction(
                 mint_keypair,
                 config_instruction::create_account::<MyConfig>(
-                    &mint_keypair.pubkey(),
-                    &config_pubkey,
+                    &mint_keypair.address(),
+                    &config_address,
                     1,
                 ),
             )
@@ -105,7 +105,7 @@ mod tests {
         let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
         let config_account_data = treasury_client
-            .get_account_data(&config_keypair.pubkey())
+            .get_account_data(&config_keypair.address())
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -119,18 +119,18 @@ mod tests {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
-        let config_pubkey = config_keypair.pubkey();
+        let config_address = config_keypair.address();
 
         let my_config = MyConfig::new(42);
 
-        let instruction = config_instruction::store(&config_pubkey, &my_config);
-        let context = Context::new_with_payer(vec![instruction], Some(&mint_keypair.pubkey()));
+        let instruction = config_instruction::store(&config_address, &my_config);
+        let context = Context::new_with_payer(vec![instruction], Some(&mint_keypair.address()));
         treasury_client
             .snd_online_context(&[&mint_keypair, &config_keypair], context)
             .unwrap();
 
         let config_account_data = treasury_client
-            .get_account_data(&config_pubkey)
+            .get_account_data(&config_address)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -144,11 +144,11 @@ mod tests {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_treasury(10_000);
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
-        let config_pubkey = config_keypair.pubkey();
+        let config_address = config_keypair.address();
 
         let my_config = MyConfig::new(42);
 
-        let mut instruction = config_instruction::store(&config_pubkey, &my_config);
+        let mut instruction = config_instruction::store(&config_address, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let context = Context::new(vec![instruction]);
         treasury_client
@@ -161,16 +161,16 @@ mod tests {
         morgan_logger::setup();
         let (treasury, mint_keypair) = create_treasury(10_000);
         let system_keypair = Keypair::new();
-        let system_pubkey = system_keypair.pubkey();
+        let system_address = system_keypair.address();
 
-        treasury.transfer(42, &mint_keypair, &system_pubkey).unwrap();
+        treasury.transfer(42, &mint_keypair, &system_address).unwrap();
         let (treasury_client, config_keypair) = create_config_account(treasury, &mint_keypair);
-        let config_pubkey = config_keypair.pubkey();
+        let config_address = config_keypair.address();
 
         let transfer_instruction =
-            sys_opcode::transfer(&system_pubkey, &BvmAddr::new_rand(), 42);
+            sys_opcode::transfer(&system_address, &BvmAddr::new_rand(), 42);
         let my_config = MyConfig::new(42);
-        let mut store_instruction = config_instruction::store(&config_pubkey, &my_config);
+        let mut store_instruction = config_instruction::store(&config_address, &my_config);
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
         let context = Context::new(vec![transfer_instruction, store_instruction]);

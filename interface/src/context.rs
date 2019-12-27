@@ -14,7 +14,7 @@ fn encode_opcode(ix:OpCode,keys: &[BvmAddr]) -> EncodedOpCodes {
     let accounts: Vec<_> = ix
         .accounts
         .iter()
-        .map(|account_meta| position(keys, &account_meta.pubkey))
+        .map(|account_meta| position(keys, &account_meta.address))
         .collect();
 
     EncodedOpCodes {
@@ -30,7 +30,7 @@ fn encode_multiple_opcodes(ixs: Vec<OpCode>, keys: &[BvmAddr]) -> Vec<EncodedOpC
         .collect()
 }
 
-/// A helper struct to collect pubkeys referenced by a set of instructions and credit-only counts
+/// A helper struct to collect addresss referenced by a set of instructions and credit-only counts
 #[derive(Debug, PartialEq, Eq)]
 struct OpCodeKeys {
     pub signed_keys: Vec<BvmAddr>,
@@ -55,7 +55,7 @@ impl OpCodeKeys {
     }
 }
 
-/// Return pubkeys referenced by all instructions, with the ones needing signatures first. If the
+/// Return addresss referenced by all instructions, with the ones needing signatures first. If the
 /// payer key is provided, it is always placed first in the list of signed keys. Credit-only signed
 /// accounts are placed last in the set of signed accounts. Credit-only unsigned accounts,
 /// including program ids, are placed last in the set. No duplicates and order is preserved.
@@ -63,7 +63,7 @@ fn get_keys(instructions: &[OpCode], payer: Option<&BvmAddr>) -> OpCodeKeys {
     let programs: Vec<_> = get_program_ids(instructions)
         .iter()
         .map(|program_id| AccountMeta {
-            pubkey: *program_id,
+            address: *program_id,
             is_signer: false,
             is_debitable: false,
         })
@@ -82,7 +82,7 @@ fn get_keys(instructions: &[OpCode], payer: Option<&BvmAddr>) -> OpCodeKeys {
     let payer_account_meta;
     if let Some(payer) = payer {
         payer_account_meta = AccountMeta {
-            pubkey: *payer,
+            address: *payer,
             is_signer: true,
             is_debitable: true,
         };
@@ -93,14 +93,14 @@ fn get_keys(instructions: &[OpCode], payer: Option<&BvmAddr>) -> OpCodeKeys {
     let mut unsigned_keys = vec![];
     let mut num_credit_only_signed_accounts = 0;
     let mut num_credit_only_unsigned_accounts = 0;
-    for account_meta in keys_and_signed.into_iter().unique_by(|x| x.pubkey) {
+    for account_meta in keys_and_signed.into_iter().unique_by(|x| x.address) {
         if account_meta.is_signer {
-            signed_keys.push(account_meta.pubkey);
+            signed_keys.push(account_meta.address);
             if !account_meta.is_debitable {
                 num_credit_only_signed_accounts += 1;
             }
         } else {
-            unsigned_keys.push(account_meta.pubkey);
+            unsigned_keys.push(account_meta.address);
             if !account_meta.is_debitable {
                 num_credit_only_unsigned_accounts += 1;
             }
@@ -213,7 +213,7 @@ impl Context {
         let program_ids = self.program_ids();
         program_ids
             .iter()
-            .position(|&&pubkey| pubkey == self.account_keys[index])
+            .position(|&&address| address == self.account_keys[index])
     }
 
     fn is_credit_debit(&self, i: usize) -> bool {
@@ -432,7 +432,7 @@ mod tests {
         let program_id1 = BvmAddr::new_rand();
         let id0 = BvmAddr::default();
         let keypair1 = Keypair::new();
-        let id1 = keypair1.pubkey();
+        let id1 = keypair1.address();
         let context = Context::new(vec![
             OpCode::new(program_id0, &0, vec![AccountMeta::new(id0, false)]),
             OpCode::new(program_id1, &0, vec![AccountMeta::new(id1, true)]),

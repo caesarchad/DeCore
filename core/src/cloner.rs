@@ -187,11 +187,11 @@ impl StorageMiner {
     ) -> Result<Self> {
         let exit = Arc::new(AtomicBool::new(false));
 
-        // info!("{}", Info(format!("StorageMiner: id: {}", keypair.pubkey()).to_string()));
+        // info!("{}", Info(format!("StorageMiner: id: {}", keypair.address()).to_string()));
         // info!("{}", Info(format!("Creating cluster info....").to_string()));
         println!("{}",
             printLn(
-                format!("StorageMiner: id: {}", keypair.pubkey()).to_string(),
+                format!("StorageMiner: id: {}", keypair.address()).to_string(),
                 module_path!().to_string()
             )
         );
@@ -490,7 +490,7 @@ impl StorageMiner {
         storage_keypair: &Keypair,
     ) -> Result<()> {
         // make sure storage-miner has some balance
-        if client.poll_get_balance(&keypair.pubkey())? == 0 {
+        if client.poll_get_balance(&keypair.address())? == 0 {
             Err(io::Error::new(
                 io::ErrorKind::Other,
                 "keypair account has no balance",
@@ -498,13 +498,13 @@ impl StorageMiner {
         }
 
         // check if the storage account exists
-        let balance = client.poll_get_balance(&storage_keypair.pubkey());
+        let balance = client.poll_get_balance(&storage_keypair.address());
         if balance.is_err() || balance.unwrap() == 0 {
             let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().expect("transaction_seal");
 
             let ix = storage_opcode::create_miner_storage_account(
-                &keypair.pubkey(),
-                &storage_keypair.pubkey(),
+                &keypair.address(),
+                &storage_keypair.address(),
                 1,
             );
             let tx = Transaction::new_s_opcodes(&[keypair], ix, transaction_seal);
@@ -528,21 +528,21 @@ impl StorageMiner {
         let client = crate::gossip_service::get_client(&nodes);
         assert!(
             client
-                .poll_get_balance(&self.storage_keypair.pubkey())
+                .poll_get_balance(&self.storage_keypair.address())
                 .unwrap()
                 > 0
         );
         // ...or no difs for fees
-        assert!(client.poll_get_balance(&self.keypair.pubkey()).unwrap() > 0);
+        assert!(client.poll_get_balance(&self.keypair.address()).unwrap() > 0);
 
         let (transaction_seal, _) = client.get_recent_transaction_seal().expect("No recent transaction_seal");
         let instruction = storage_opcode::mining_proof(
-            &self.storage_keypair.pubkey(),
+            &self.storage_keypair.address(),
             self.hash,
             self.slot,
             Signature::new(&self.signature.to_bytes()),
         );
-        let context = Context::new_with_payer(vec![instruction], Some(&self.keypair.pubkey()));
+        let context = Context::new_with_payer(vec![instruction], Some(&self.keypair.address()));
         let mut transaction = Transaction::new(
             &[self.keypair.as_ref(), self.storage_keypair.as_ref()],
             context,
@@ -634,7 +634,7 @@ mod tests {
         path.push("tmp");
         create_dir_all(&path).unwrap();
 
-        path.push(format!("{}-{}", name, keypair.pubkey()));
+        path.push(format!("{}-{}", name, keypair.address()));
         path
     }
 

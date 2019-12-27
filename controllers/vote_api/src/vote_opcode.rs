@@ -16,7 +16,7 @@ use morgan_interface::sys_opcode;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum VoteOpCode {
     /// Initialize the VoteState for this `vote account`
-    /// takes a node_pubkey and commission
+    /// takes a node_address and commission
     InitializeAccount(BvmAddr, u32),
 
     /// Authorize a voter to send signed votes.
@@ -27,79 +27,79 @@ pub enum VoteOpCode {
 }
 
 fn initialize_account(
-    from_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
-    node_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    vote_address: &BvmAddr,
+    node_address: &BvmAddr,
     commission: u32,
 ) -> OpCode {
     let account_metas = vec![
-        AccountMeta::new(*from_pubkey, true),
-        AccountMeta::new(*vote_pubkey, false),
+        AccountMeta::new(*from_address, true),
+        AccountMeta::new(*vote_address, false),
     ];
     OpCode::new(
         id(),
-        &VoteOpCode::InitializeAccount(*node_pubkey, commission),
+        &VoteOpCode::InitializeAccount(*node_address, commission),
         account_metas,
     )
 }
 
 pub fn create_account(
-    from_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
-    node_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    vote_address: &BvmAddr,
+    node_address: &BvmAddr,
     commission: u32,
     difs: u64,
 ) -> Vec<OpCode> {
     let space = VoteState::size_of() as u64;
     let create_ix =
-        sys_opcode::create_account(from_pubkey, vote_pubkey, difs, space, &id());
-    let init_ix = initialize_account(from_pubkey, vote_pubkey, node_pubkey, commission);
+        sys_opcode::create_account(from_address, vote_address, difs, space, &id());
+    let init_ix = initialize_account(from_address, vote_address, node_address, commission);
     vec![create_ix, init_ix]
 }
 
 fn metas_for_authorized_signer(
-    from_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
-    authorized_voter_pubkey: &BvmAddr, // currently authorized
+    from_address: &BvmAddr,
+    vote_address: &BvmAddr,
+    authorized_voter_address: &BvmAddr, // currently authorized
 ) -> Vec<AccountMeta> {
-    let mut account_metas = vec![AccountMeta::new(*from_pubkey, true)]; // sender
+    let mut account_metas = vec![AccountMeta::new(*from_address, true)]; // sender
 
-    let is_own_signer = authorized_voter_pubkey == vote_pubkey;
+    let is_own_signer = authorized_voter_address == vote_address;
 
-    account_metas.push(AccountMeta::new(*vote_pubkey, is_own_signer)); // vote account
+    account_metas.push(AccountMeta::new(*vote_address, is_own_signer)); // vote account
 
     if !is_own_signer {
-        account_metas.push(AccountMeta::new(*authorized_voter_pubkey, true)) // signer
+        account_metas.push(AccountMeta::new(*authorized_voter_address, true)) // signer
     }
     account_metas
 }
 
 pub fn authorize_voter(
-    from_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
-    authorized_voter_pubkey: &BvmAddr, // currently authorized
-    new_authorized_voter_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    vote_address: &BvmAddr,
+    authorized_voter_address: &BvmAddr, // currently authorized
+    new_authorized_voter_address: &BvmAddr,
 ) -> OpCode {
     let account_metas =
-        metas_for_authorized_signer(from_pubkey, vote_pubkey, authorized_voter_pubkey);
+        metas_for_authorized_signer(from_address, vote_address, authorized_voter_address);
 
     OpCode::new(
         id(),
-        &VoteOpCode::AuthorizeVoter(*new_authorized_voter_pubkey),
+        &VoteOpCode::AuthorizeVoter(*new_authorized_voter_address),
         account_metas,
     )
 }
 
 pub fn vote(
-    from_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
-    authorized_voter_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    vote_address: &BvmAddr,
+    authorized_voter_address: &BvmAddr,
     recent_votes: Vec<Vote>,
 ) -> OpCode {
     let mut account_metas =
-        metas_for_authorized_signer(from_pubkey, vote_pubkey, authorized_voter_pubkey);
+        metas_for_authorized_signer(from_address, vote_address, authorized_voter_address);
 
-    // request slot_hashes syscall account after vote_pubkey
+    // request slot_hashes syscall account after vote_address
     account_metas.insert(2, AccountMeta::new(slot_hashes::id(), false));
 
     OpCode::new(id(), &VoteOpCode::Vote(recent_votes), account_metas)
@@ -126,11 +126,11 @@ pub fn handle_opcode(
 
     // TODO: data-driven unpack and dispatch of KeyedAccounts
     match deserialize(data).map_err(|_| OpCodeErr::BadOpCodeContext)? {
-        VoteOpCode::InitializeAccount(node_pubkey, commission) => {
-            vote_state::initialize_account(me, &node_pubkey, commission)
+        VoteOpCode::InitializeAccount(node_address, commission) => {
+            vote_state::initialize_account(me, &node_address, commission)
         }
-        VoteOpCode::AuthorizeVoter(voter_pubkey) => {
-            vote_state::authorize_voter(me, rest, &voter_pubkey)
+        VoteOpCode::AuthorizeVoter(voter_address) => {
+            vote_state::authorize_voter(me, rest, &voter_address)
         }
         VoteOpCode::Vote(votes) => {
             datapoint_warn!("vote-native", ("count", 1, i64));
@@ -165,7 +165,7 @@ mod tests {
                 .accounts
                 .iter()
                 .zip(accounts.iter_mut())
-                .map(|(meta, account)| KeyedAccount::new(&meta.pubkey, meta.is_signer, account))
+                .map(|(meta, account)| KeyedAccount::new(&meta.address, meta.is_signer, account))
                 .collect();
             super::handle_opcode(
                 &BvmAddr::default(),

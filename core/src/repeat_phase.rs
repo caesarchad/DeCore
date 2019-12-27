@@ -76,7 +76,7 @@ impl ForkProgress {
 impl RepeatPhase {
     #[allow(clippy::new_ret_no_self, clippy::too_many_arguments)]
     pub fn new<T>(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         vote_account: &BvmAddr,
         voting_keypair: Option<&Arc<T>>,
         block_buffer_pool: Arc<BlockBufferPool>,
@@ -98,9 +98,9 @@ impl RepeatPhase {
         let subscriptions = subscriptions.clone();
         let treasury_forks = treasury_forks.clone();
         let waterclock_recorder = waterclock_recorder.clone();
-        let my_pubkey = *my_pubkey;
+        let my_address = *my_address;
         let mut drops_per_slot = 0;
-        let mut lock_stack = LockStack::new_from_forks(&treasury_forks.read().unwrap(), &my_pubkey);
+        let mut lock_stack = LockStack::new_from_forks(&treasury_forks.read().unwrap(), &my_address);
         // Start the replay phase loop
         let leader_schedule_cache = leader_schedule_cache.clone();
         let vote_account = *vote_account;
@@ -128,7 +128,7 @@ impl RepeatPhase {
                     Self::replay_active_treasuries(
                         &block_buffer_pool,
                         &treasury_forks,
-                        &my_pubkey,
+                        &my_address,
                         &mut drops_per_slot,
                         &mut progress,
                         &slot_full_sender,
@@ -160,7 +160,7 @@ impl RepeatPhase {
                         )?;
 
                         Self::reset_waterclock_recorder(
-                            &my_pubkey,
+                            &my_address,
                             &block_buffer_pool,
                             &treasury,
                             &waterclock_recorder,
@@ -186,7 +186,7 @@ impl RepeatPhase {
                             waterclock_drop_height + 1,
                         );
                         Self::start_leader(
-                            &my_pubkey,
+                            &my_address,
                             &treasury_forks,
                             &waterclock_recorder,
                             &node_group_info,
@@ -215,7 +215,7 @@ impl RepeatPhase {
         (Self { t_replay }, slot_full_receiver, root_slot_receiver)
     }
     pub fn start_leader(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
         node_group_info: &Arc<RwLock<NodeGroupInfo>>,
@@ -224,7 +224,7 @@ impl RepeatPhase {
         grace_drops: u64,
         leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) {
-        trace!("{} checking waterclock slot {}", my_pubkey, waterclock_slot);
+        trace!("{} checking waterclock slot {}", my_address, waterclock_slot);
         if treasury_forks.read().unwrap().get(waterclock_slot).is_none() {
             let parent_slot = waterclock_recorder.lock().unwrap().start_slot();
             let parent = {
@@ -239,16 +239,16 @@ impl RepeatPhase {
                 .map(|next_leader| {
                     debug!(
                         "me: {} leader {} at waterclock slot {}",
-                        my_pubkey, next_leader, waterclock_slot
+                        my_address, next_leader, waterclock_slot
                     );
                     node_group_info.write().unwrap().set_leader(&next_leader);
-                    if next_leader == *my_pubkey && reached_leader_drop {
-                        debug!("{} starting transaction_digesting_module for slot {}", my_pubkey, waterclock_slot);
+                    if next_leader == *my_address && reached_leader_drop {
+                        debug!("{} starting transaction_digesting_module for slot {}", my_address, waterclock_slot);
                         datapoint_warn!(
                             "replay_phase-new_leader",
                             ("count", waterclock_slot, i64),
                             ("grace", grace_drops, i64));
-                        let transaction_digesting_module_treasury = Treasury::new_from_parent(&parent, my_pubkey, waterclock_slot);
+                        let transaction_digesting_module_treasury = Treasury::new_from_parent(&parent, my_address, waterclock_slot);
                         treasury_forks.write().unwrap().insert(transaction_digesting_module_treasury);
                         if let Some(transaction_digesting_module_treasury) = treasury_forks.read().unwrap().get(waterclock_slot).cloned() {
                             assert_eq!(
@@ -257,7 +257,7 @@ impl RepeatPhase {
                             );
                             debug!(
                                 "waterclock_recorder new working treasury: me: {} next_slot: {} next_leader: {}",
-                                my_pubkey,
+                                my_address,
                                 transaction_digesting_module_treasury.slot(),
                                 next_leader
                             );
@@ -266,11 +266,11 @@ impl RepeatPhase {
                     }
                 })
                 .or_else(|| {
-                    // warn!("{} No next leader found", my_pubkey);
+                    // warn!("{} No next leader found", my_address);
                     println!(
                         "{}",
                         Warn(
-                            format!("{} No next leader found", my_pubkey).to_string(),
+                            format!("{} No next leader found", my_address).to_string(),
                             module_path!().to_string()
                         )
                     );
@@ -351,9 +351,9 @@ impl RepeatPhase {
 
             // Send our last few votes along with the new one
             let vote_ix = vote_opcode::vote(
-                &node_keypair.pubkey(),
+                &node_keypair.address(),
                 &vote_account,
-                &voting_keypair.pubkey(),
+                &voting_keypair.address(),
                 lock_stack.recent_votes(),
             );
 
@@ -367,7 +367,7 @@ impl RepeatPhase {
     }
 
     fn reset_waterclock_recorder(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         block_buffer_pool: &BlockBufferPool,
         treasury: &Arc<Treasury>,
         waterclock_recorder: &Arc<Mutex<WaterClockRecorder>>,
@@ -375,7 +375,7 @@ impl RepeatPhase {
         leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
     ) {
         let next_leader_slot =
-            leader_schedule_cache.next_leader_slot(&my_pubkey, treasury.slot(), &treasury, Some(block_buffer_pool));
+            leader_schedule_cache.next_leader_slot(&my_address, treasury.slot(), &treasury, Some(block_buffer_pool));
         waterclock_recorder.lock().unwrap().reset(
             treasury.drop_height(),
             treasury.last_transaction_seal(),
@@ -385,7 +385,7 @@ impl RepeatPhase {
         );
         debug!(
             "{:?} voted and reset waterclock at {}. next leader slot {:?}",
-            my_pubkey,
+            my_address,
             treasury.drop_height(),
             next_leader_slot
         );
@@ -394,7 +394,7 @@ impl RepeatPhase {
     fn replay_active_treasuries(
         block_buffer_pool: &Arc<BlockBufferPool>,
         treasury_forks: &Arc<RwLock<TreasuryForks>>,
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         drops_per_slot: &mut u64,
         progress: &mut HashMap<u64, ForkProgress>,
         slot_full_sender: &Sender<(u64, BvmAddr)>,
@@ -405,12 +405,12 @@ impl RepeatPhase {
         for treasury_slot in &active_treasuries {
             let treasury = treasury_forks.read().unwrap().get(*treasury_slot).unwrap().clone();
             *drops_per_slot = treasury.drops_per_slot();
-            if treasury.collector_id() != *my_pubkey {
+            if treasury.collector_id() != *my_address {
                 Self::replay_block_buffer_into_treasury(&treasury, &block_buffer_pool, progress)?;
             }
             let max_drop_height = (*treasury_slot + 1) * treasury.drops_per_slot() - 1;
             if treasury.drop_height() == max_drop_height {
-                Self::process_completed_treasury(my_pubkey, treasury, slot_full_sender);
+                Self::process_completed_treasury(my_address, treasury, slot_full_sender);
             }
         }
         Ok(())
@@ -604,7 +604,7 @@ impl RepeatPhase {
     }
 
     fn process_completed_treasury(
-        my_pubkey: &BvmAddr,
+        my_address: &BvmAddr,
         treasury: Arc<Treasury>,
         slot_full_sender: &Sender<(u64, BvmAddr)>,
     ) {
@@ -617,7 +617,7 @@ impl RepeatPhase {
         println!("{}", printLn(info, module_path!().to_string()));
 
         if let Err(e) = slot_full_sender.send((treasury.slot(), treasury.collector_id())) {
-            trace!("{} slot_full alert failed: {:?}", my_pubkey, e);
+            trace!("{} slot_full alert failed: {:?}", my_address, e);
         }
     }
 

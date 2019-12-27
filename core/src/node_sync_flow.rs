@@ -69,14 +69,14 @@ pub trait NodeSyncEvents {
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &BvmAddr,
+        leader_addr: &BvmAddr,
         statements: &FsclStmt,
     ) -> Result<()>;
     fn emit_block_event(
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &BvmAddr,
+        leader_addr: &BvmAddr,
         transaction_seal: Hash,
     ) -> Result<()>;
 }
@@ -126,7 +126,7 @@ where
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &BvmAddr,
+        leader_addr: &BvmAddr,
         stmt: &FsclStmt,
     ) -> Result<()> {
         let transactions: Vec<Vec<u8>> = serialize_transactions(stmt);
@@ -154,7 +154,7 @@ where
                     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
                     slot,
                     drop_height,
-                    leader_pubkey,
+                    leader_addr,
                     json_entry,
                 );
                 // error!("{}", Error(format!("fscl stmt event: {:?}", entry).to_string()));
@@ -176,7 +176,7 @@ where
         &self,
         slot: u64,
         drop_height: u64,
-        leader_pubkey: &BvmAddr,
+        leader_addr: &BvmAddr,
         transaction_seal: Hash,
     ) -> Result<()> {
         let payload = format!(
@@ -184,7 +184,7 @@ where
             Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true),
             slot,
             drop_height,
-            leader_pubkey,
+            leader_addr,
             transaction_seal,
         );
         // error!("{}", Error(format!("block_event: {:?}", payload).to_string()));
@@ -251,8 +251,8 @@ mod test {
 
         let keypair0 = Keypair::new();
         let keypair1 = Keypair::new();
-        let tx0 = sys_controller::transfer(&keypair0, &keypair1.pubkey(), 1, Hash::default());
-        let tx1 = sys_controller::transfer(&keypair1, &keypair0.pubkey(), 2, Hash::default());
+        let tx0 = sys_controller::transfer(&keypair0, &keypair1.address(), 1, Hash::default());
+        let tx1 = sys_controller::transfer(&keypair1, &keypair0.address(), 2, Hash::default());
         let serialized_tx0 = serialize(&tx0).unwrap();
         let serialized_tx1 = serialize(&tx1).unwrap();
         let entry = FsclStmt::new(&Hash::default(), 1, vec![tx0, tx1]);
@@ -274,19 +274,19 @@ mod test {
         let drop_height_initial = 0;
         let drop_height_final = drop_height_initial + drops_per_slot + 2;
         let mut curr_slot = 0;
-        let leader_pubkey = BvmAddr::new_rand();
+        let leader_addr = BvmAddr::new_rand();
 
         for drop_height in drop_height_initial..=drop_height_final {
             if drop_height == 5 {
                 nodesyncflow
-                    .emit_block_event(curr_slot, drop_height - 1, &leader_pubkey, transaction_seal)
+                    .emit_block_event(curr_slot, drop_height - 1, &leader_addr, transaction_seal)
                     .unwrap();
                 curr_slot += 1;
             }
             let entry = FsclStmt::new(&mut transaction_seal, 1, vec![]); // just drops
             transaction_seal = entry.hash;
             nodesyncflow
-                .emit_fscl_stmt_event(curr_slot, drop_height, &leader_pubkey, &entry)
+                .emit_fscl_stmt_event(curr_slot, drop_height, &leader_addr, &entry)
                 .unwrap();
             expected_entries.push(entry.clone());
             statements.push(entry);

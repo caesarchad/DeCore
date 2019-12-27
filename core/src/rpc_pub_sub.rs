@@ -17,7 +17,7 @@ pub trait RpcSolPubSub {
     type Metadata;
 
     // Get notification every time account data is changed
-    // Accepts pubkey parameter as base-58 encoded string
+    // Accepts address parameter as base-58 encoded string
     #[pubsub(
         subscription = "accountNotification",
         subscribe,
@@ -40,7 +40,7 @@ pub trait RpcSolPubSub {
     fn account_unsubscribe(&self, _: Option<Self::Metadata>, _: SubscriptionId) -> Result<bool>;
 
     // Get notification every time account data owned by a particular program is changed
-    // Accepts pubkey parameter as base-58 encoded string
+    // Accepts address parameter as base-58 encoded string
     #[pubsub(
         subscription = "programNotification",
         subscribe,
@@ -116,24 +116,24 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
         &self,
         _meta: Self::Metadata,
         subscriber: Subscriber<Account>,
-        pubkey_str: String,
+        address_str: String,
         confirmations: Option<Confirmations>,
     ) {
-        match param::<BvmAddr>(&pubkey_str, "pubkey") {
-            Ok(pubkey) => {
+        match param::<BvmAddr>(&address_str, "address") {
+            Ok(address) => {
                 let id = self.uid.fetch_add(1, atomic::Ordering::SeqCst);
                 let sub_id = SubscriptionId::Number(id as u64);
-                // info!("{}", Info(format!("account_subscribe: account={:?} id={:?}", pubkey, sub_id).to_string()));
+                // info!("{}", Info(format!("account_subscribe: account={:?} id={:?}", address, sub_id).to_string()));
                 println!("{}",
                     printLn(
-                        format!("account_subscribe: account={:?} id={:?}", pubkey, sub_id).to_string(),
+                        format!("account_subscribe: account={:?} id={:?}", address, sub_id).to_string(),
                         module_path!().to_string()
                     )
                 );
                 let sink = subscriber.assign_id(sub_id.clone()).unwrap();
 
                 self.subscriptions
-                    .add_account_subscription(&pubkey, confirmations, &sub_id, &sink)
+                    .add_account_subscription(&address, confirmations, &sub_id, &sink)
             }
             Err(e) => subscriber.reject(e).unwrap(),
         }
@@ -166,24 +166,24 @@ impl RpcSolPubSub for RpcSolPubSubImpl {
         &self,
         _meta: Self::Metadata,
         subscriber: Subscriber<(String, Account)>,
-        pubkey_str: String,
+        address_str: String,
         confirmations: Option<Confirmations>,
     ) {
-        match param::<BvmAddr>(&pubkey_str, "pubkey") {
-            Ok(pubkey) => {
+        match param::<BvmAddr>(&address_str, "address") {
+            Ok(address) => {
                 let id = self.uid.fetch_add(1, atomic::Ordering::SeqCst);
                 let sub_id = SubscriptionId::Number(id as u64);
-                // info!("{}", Info(format!("program_subscribe: account={:?} id={:?}", pubkey, sub_id).to_string()));
+                // info!("{}", Info(format!("program_subscribe: account={:?} id={:?}", address, sub_id).to_string()));
                 println!("{}",
                     printLn(
-                        format!("program_subscribe: account={:?} id={:?}", pubkey, sub_id).to_string(),
+                        format!("program_subscribe: account={:?} id={:?}", address, sub_id).to_string(),
                         module_path!().to_string()
                     )
                 );
                 let sink = subscriber.assign_id(sub_id.clone()).unwrap();
 
                 self.subscriptions
-                    .add_program_subscription(&pubkey, confirmations, &sub_id, &sink)
+                    .add_program_subscription(&address, confirmations, &sub_id, &sink)
             }
             Err(e) => subscriber.reject(e).unwrap(),
         }
@@ -327,7 +327,7 @@ mod tests {
             ..
         } = create_genesis_block(10_000);
         let bob = Keypair::new();
-        let bob_pubkey = bob.pubkey();
+        let bob_address = bob.address();
         let treasury = Treasury::new(&genesis_block);
         let transaction_seal = treasury.last_transaction_seal();
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new(0, treasury)));
@@ -335,7 +335,7 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
 
         // Test signature subscriptions
-        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
 
         let session = create_session();
         let (subscriber, _id_receiver, mut receiver) =
@@ -363,7 +363,7 @@ mod tests {
             mint_keypair: alice,
             ..
         } = create_genesis_block(10_000);
-        let bob_pubkey = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let arc_treasury = Arc::new(treasury);
         let transaction_seal = arc_treasury.last_transaction_seal();
@@ -374,7 +374,7 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
         io.extend_with(rpc.to_delegate());
 
-        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"signatureSubscribe","params":["{}"]}}"#,
             tx.signatures[0].to_string()
@@ -415,7 +415,7 @@ mod tests {
             .builtin_opcode_handlers
             .push(morgan_budget_controller!());
 
-        let bob_pubkey = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let witness = Keypair::new();
         let contract_funds = Keypair::new();
         let contract_state = Keypair::new();
@@ -431,23 +431,23 @@ mod tests {
         rpc.account_subscribe(
             session,
             subscriber,
-            contract_state.pubkey().to_string(),
+            contract_state.address().to_string(),
             None,
         );
 
         let tx = sys_controller::create_user_account(
             &alice,
-            &contract_funds.pubkey(),
+            &contract_funds.address(),
             51,
             transaction_seal,
         );
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
 
         let ixs = sc_opcode::when_signed(
-            &contract_funds.pubkey(),
-            &bob_pubkey,
-            &contract_state.pubkey(),
-            &witness.pubkey(),
+            &contract_funds.address(),
+            &bob_address,
+            &contract_state.address(),
+            &witness.address(),
             None,
             51,
         );
@@ -462,7 +462,7 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap()
-            .get_account(&contract_state.pubkey())
+            .get_account(&contract_state.address())
             .unwrap()
             .data;
         let expected = json!({
@@ -484,13 +484,13 @@ mod tests {
             assert_eq!(serde_json::to_string(&expected).unwrap(), response);
         }
 
-        let tx = sys_controller::create_user_account(&alice, &witness.pubkey(), 1, transaction_seal);
+        let tx = sys_controller::create_user_account(&alice, &witness.address(), 1, transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
         sleep(Duration::from_millis(200));
         let ix = sc_opcode::apply_signature(
-            &witness.pubkey(),
-            &contract_state.pubkey(),
-            &bob_pubkey,
+            &witness.address(),
+            &contract_state.address(),
+            &bob_address,
         );
         let tx = Transaction::new_s_opcodes(&[&witness], vec![ix], transaction_seal);
         process_transaction_and_notify(&treasury_forks, &tx, &rpc.subscriptions).unwrap();
@@ -502,14 +502,14 @@ mod tests {
                 .unwrap()
                 .get(0)
                 .unwrap()
-                .get_account(&contract_state.pubkey()),
+                .get_account(&contract_state.address()),
             None
         );
     }
 
     #[test]
     fn test_account_unsubscribe() {
-        let bob_pubkey = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let session = create_session();
 
         let mut io = PubSubHandler::default();
@@ -519,7 +519,7 @@ mod tests {
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"accountSubscribe","params":["{}"]}}"#,
-            bob_pubkey.to_string()
+            bob_address.to_string()
         );
         let _res = io.handle_request_sync(&req, session.clone());
 
@@ -560,9 +560,9 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
         let session = create_session();
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
-        rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
+        rpc.account_subscribe(session, subscriber, bob.address().to_string(), Some(2));
 
-        let tx = sys_controller::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob.address(), 100, transaction_seal);
         treasury_forks
             .write()
             .unwrap()
@@ -589,9 +589,9 @@ mod tests {
         let rpc = RpcSolPubSubImpl::default();
         let session = create_session();
         let (subscriber, _id_receiver, mut receiver) = Subscriber::new_test("accountNotification");
-        rpc.account_subscribe(session, subscriber, bob.pubkey().to_string(), Some(2));
+        rpc.account_subscribe(session, subscriber, bob.address().to_string(), Some(2));
 
-        let tx = sys_controller::transfer(&alice, &bob.pubkey(), 100, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob.address(), 100, transaction_seal);
         treasury_forks
             .write()
             .unwrap()

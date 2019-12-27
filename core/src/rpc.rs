@@ -66,18 +66,18 @@ impl JsonRpcRequestProcessor {
         }
     }
 
-    pub fn get_account_info(&self, pubkey: &BvmAddr) -> Result<Account> {
+    pub fn get_account_info(&self, address: &BvmAddr) -> Result<Account> {
         self.treasury()
-            .get_account(&pubkey)
+            .get_account(&address)
             .ok_or_else(Error::invalid_request)
     }
 
-    pub fn get_balance(&self, pubkey: &BvmAddr) -> u64 {
-        self.treasury().get_balance(&pubkey)
+    pub fn get_balance(&self, address: &BvmAddr) -> u64 {
+        self.treasury().get_balance(&address)
     }
 
-    pub fn get_reputation(&self, pubkey: &BvmAddr) -> u64 {
-        self.treasury().get_reputation(&pubkey)
+    pub fn get_reputation(&self, address: &BvmAddr) -> u64 {
+        self.treasury().get_reputation(&address)
     }
 
     fn get_recent_transaction_seal(&self) -> (String, GasCost) {
@@ -126,8 +126,8 @@ impl JsonRpcRequestProcessor {
         Ok(self.storage_state.get_slot())
     }
 
-    fn get_storage_pubkeys_for_slot(&self, slot: u64) -> Result<Vec<BvmAddr>> {
-        Ok(self.storage_state.get_pubkeys_for_slot(slot))
+    fn get_storage_addresss_for_slot(&self, slot: u64) -> Result<Vec<BvmAddr>> {
+        Ok(self.storage_state.get_addresss_for_slot(slot))
     }
 
     pub fn fullnode_exit(&self) -> Result<bool> {
@@ -154,7 +154,7 @@ fn get_transaction_digesting_module_addr(node_group_info: &Arc<RwLock<NodeGroupI
     Ok(contact_info.transaction_digesting_module)
 }
 
-fn verify_pubkey(input: String) -> Result<BvmAddr> {
+fn verify_address(input: String) -> Result<BvmAddr> {
     input.parse().map_err(|_e| Error::invalid_request())
 }
 
@@ -235,7 +235,7 @@ pub trait RpcSol {
     fn get_storage_slot(&self, _: Self::Metadata) -> Result<u64>;
 
     #[rpc(meta, name = "getStoragePubkeysForSlot")]
-    fn get_storage_pubkeys_for_slot(&self, _: Self::Metadata, _: u64) -> Result<Vec<BvmAddr>>;
+    fn get_storage_addresss_for_slot(&self, _: Self::Metadata, _: u64) -> Result<Vec<BvmAddr>>;
 
     #[rpc(meta, name = "fullnodeQuit")]
     fn fullnode_exit(&self, _: Self::Metadata) -> Result<bool>;
@@ -271,23 +271,23 @@ impl RpcSol for RpcSolImpl {
 
     fn get_account_info(&self, meta: Self::Metadata, id: String) -> Result<Account> {
         debug!("get_account_info rpc request received: {:?}", id);
-        let pubkey = verify_pubkey(id)?;
+        let address = verify_address(id)?;
         meta.request_processor
             .read()
             .unwrap()
-            .get_account_info(&pubkey)
+            .get_account_info(&address)
     }
 
     fn get_balance(&self, meta: Self::Metadata, id: String) -> Result<u64> {
         debug!("get_balance rpc request received: {:?}", id);
-        let pubkey = verify_pubkey(id)?;
-        Ok(meta.request_processor.read().unwrap().get_balance(&pubkey))
+        let address = verify_address(id)?;
+        Ok(meta.request_processor.read().unwrap().get_balance(&address))
     }
 
     fn get_reputation(&self, meta: Self::Metadata, id: String) -> Result<u64> {
         debug!("get_reputation rpc request received: {:?}", id);
-        let pubkey = verify_pubkey(id)?;
-        Ok(meta.request_processor.read().unwrap().get_reputation(&pubkey))
+        let address = verify_address(id)?;
+        Ok(meta.request_processor.read().unwrap().get_reputation(&address))
     }
 
     fn get_cluster_nodes(&self, meta: Self::Metadata) -> Result<Vec<RpcContactInfo>> {
@@ -376,7 +376,7 @@ impl RpcSol for RpcSolImpl {
             .config
             .drone_addr
             .ok_or_else(Error::invalid_request)?;
-        let pubkey = verify_pubkey(id)?;
+        let address = verify_address(id)?;
 
         let transaction_seal = meta
             .request_processor
@@ -384,7 +384,7 @@ impl RpcSol for RpcSolImpl {
             .unwrap()
             .treasury()
             .confirmed_last_transaction_seal();
-        let transaction = request_airdrop_transaction(&drone_addr, &pubkey, difs, transaction_seal)
+        let transaction = request_airdrop_transaction(&drone_addr, &address, difs, transaction_seal)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_airdrop_transaction failed: {:?}", err).to_string()));
                 println!("{}",
@@ -465,7 +465,7 @@ impl RpcSol for RpcSolImpl {
             .config
             .drone_addr
             .ok_or_else(Error::invalid_request)?;
-        let pubkey = verify_pubkey(id)?;
+        let address = verify_address(id)?;
 
         let transaction_seal = meta
             .request_processor
@@ -473,7 +473,7 @@ impl RpcSol for RpcSolImpl {
             .unwrap()
             .treasury()
             .confirmed_last_transaction_seal();
-        let transaction = request_reputation_airdrop_transaction(&drone_addr, &pubkey, reputations, transaction_seal)
+        let transaction = request_reputation_airdrop_transaction(&drone_addr, &address, reputations, transaction_seal)
             .map_err(|err| {
                 // info!("{}", Info(format!("request_reputation_airdrop_transaction failed: {:?}", err).to_string()));
                 println!("{}",
@@ -619,11 +619,11 @@ impl RpcSol for RpcSolImpl {
         meta.request_processor.read().unwrap().get_storage_slot()
     }
 
-    fn get_storage_pubkeys_for_slot(&self, meta: Self::Metadata, slot: u64) -> Result<Vec<BvmAddr>> {
+    fn get_storage_addresss_for_slot(&self, meta: Self::Metadata, slot: u64) -> Result<Vec<BvmAddr>> {
         meta.request_processor
             .read()
             .unwrap()
-            .get_storage_pubkeys_for_slot(slot)
+            .get_storage_addresss_for_slot(slot)
     }
 
     fn fullnode_exit(&self, meta: Self::Metadata) -> Result<bool> {
@@ -645,17 +645,17 @@ mod tests {
     use std::thread;
 
     fn start_rpc_handler_with_tx(
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
     ) -> (MetaIoHandler<Meta>, Meta, Hash, Keypair, BvmAddr) {
         let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
         let exit = Arc::new(AtomicBool::new(false));
 
         let transaction_seal = treasury.confirmed_last_transaction_seal();
-        let tx = sys_controller::transfer(&alice, pubkey, 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, address, 20, transaction_seal);
         treasury.process_transaction(&tx).expect("process transaction");
 
-        let tx = sys_controller::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &alice.address(), 20, transaction_seal);
         let _ = treasury.process_transaction(&tx);
 
         let request_processor = Arc::new(RwLock::new(JsonRpcRequestProcessor::new(
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_rpc_request_processor_new() {
-        let bob_pubkey = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
         let exit = Arc::new(AtomicBool::new(false));
         let (treasury_forks, alice) = new_treasury_forks();
         let treasury = treasury_forks.read().unwrap().working_treasury();
@@ -695,7 +695,7 @@ mod tests {
         );
         thread::spawn(move || {
             let transaction_seal = treasury.confirmed_last_transaction_seal();
-            let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+            let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
             treasury.process_transaction(&tx).expect("process transaction");
         })
         .join()
@@ -705,12 +705,12 @@ mod tests {
 
     #[test]
     fn test_rpc_get_balance() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getDif","params":["{}"]}}"#,
-            bob_pubkey
+            bob_address
         );
         let res = io.handle_request_sync(&req, meta);
         let expected = format!(r#"{{"jsonrpc":"2.0","result":20,"id":1}}"#);
@@ -723,12 +723,12 @@ mod tests {
 
     #[test]
     fn test_rpc_get_reputation() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getReputation","params":["{}"]}}"#,
-            bob_pubkey
+            bob_address
         );
         let res = io.handle_request_sync(&req, meta);
         let expected = format!(r#"{{"jsonrpc":"2.0","result":0,"id":1}}"#);
@@ -741,8 +741,8 @@ mod tests {
 
     #[test]
     fn test_rpc_get_cluster_nodes() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, leader_addr) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getClusterNodes"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -751,7 +751,7 @@ mod tests {
 
         let expected = format!(
             r#"{{"jsonrpc":"2.0","result":[{{"id": "{}", "gossip": "127.0.0.1:1235", "transaction_digesting_module": "127.0.0.1:1234", "rpc": "127.0.0.1:10099"}}],"id":1}}"#,
-            leader_pubkey,
+            leader_addr,
         );
 
         let expected: Response =
@@ -761,8 +761,8 @@ mod tests {
 
     #[test]
     fn test_rpc_get_slot_leader() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getRoundLeader"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -777,8 +777,8 @@ mod tests {
 
     #[test]
     fn test_rpc_get_tx_count() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getTxnCnt"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -792,12 +792,12 @@ mod tests {
 
     #[test]
     fn test_rpc_get_account_info() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["{}"]}}"#,
-            bob_pubkey
+            bob_address
         );
         let res = io.handle_request_sync(&req, meta);
         let expected = r#"{
@@ -820,9 +820,9 @@ mod tests {
 
     #[test]
     fn test_rpc_confirm_tx() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, transaction_seal, alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
+        let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"confirmTxn","params":["{}"]}}"#,
@@ -839,9 +839,9 @@ mod tests {
 
     #[test]
     fn test_rpc_get_signature_status() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, transaction_seal, alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
-        let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, transaction_seal, alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
+        let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
 
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
@@ -861,7 +861,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on unprocessed tx
-        let tx = sys_controller::transfer(&alice, &bob_pubkey, 10, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &bob_address, 10, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -880,7 +880,7 @@ mod tests {
         assert_eq!(expected, result);
 
         // Test getSignatureStatus request on a TransactionError
-        let tx = sys_controller::transfer(&alice, &alice.pubkey(), 20, transaction_seal);
+        let tx = sys_controller::transfer(&alice, &alice.address(), 20, transaction_seal);
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"getSignatureState","params":["{}"]}}"#,
             tx.signatures[0]
@@ -903,8 +903,8 @@ mod tests {
 
     #[test]
     fn test_rpc_get_recent_transaction_seal() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         let req = format!(r#"{{"jsonrpc":"2.0","id":1,"method":"getLatestTransactionSeal"}}"#);
         let res = io.handle_request_sync(&req, meta);
@@ -921,13 +921,13 @@ mod tests {
 
     #[test]
     fn test_rpc_fail_request_airdrop() {
-        let bob_pubkey = BvmAddr::new_rand();
-        let (io, meta, _transaction_seal, _alice, _leader_pubkey) = start_rpc_handler_with_tx(&bob_pubkey);
+        let bob_address = BvmAddr::new_rand();
+        let (io, meta, _transaction_seal, _alice, _leader_address) = start_rpc_handler_with_tx(&bob_address);
 
         // Expect internal error because no drone is available
         let req = format!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"requestDif","params":["{}", 50]}}"#,
-            bob_pubkey
+            bob_address
         );
         let res = io.handle_request_sync(&req, meta);
         let expected =
@@ -985,12 +985,12 @@ mod tests {
     }
 
     #[test]
-    fn test_rpc_verify_pubkey() {
-        let pubkey = BvmAddr::new_rand();
-        assert_eq!(verify_pubkey(pubkey.to_string()).unwrap(), pubkey);
-        let bad_pubkey = "a1b2c3d4";
+    fn test_rpc_verify_address() {
+        let address = BvmAddr::new_rand();
+        assert_eq!(verify_address(address.to_string()).unwrap(), address);
+        let bad_address = "a1b2c3d4";
         assert_eq!(
-            verify_pubkey(bad_pubkey.to_string()),
+            verify_address(bad_address.to_string()),
             Err(Error::invalid_request())
         );
     }

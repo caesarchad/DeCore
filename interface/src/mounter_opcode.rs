@@ -21,12 +21,12 @@ pub enum MounterOpCode {
 }
 
 pub fn write(
-    account_pubkey: &BvmAddr,
+    account_address: &BvmAddr,
     program_id: &BvmAddr,
     offset: u32,
     bytes: Vec<u8>,
 ) -> OpCode {
-    let account_metas = vec![AccountMeta::new(*account_pubkey, true)];
+    let account_metas = vec![AccountMeta::new(*account_address, true)];
     OpCode::new(
         *program_id,
         &MounterOpCode::Write { offset, bytes },
@@ -34,7 +34,7 @@ pub fn write(
     )
 }
 
-pub fn finalize(account_pubkey: &BvmAddr, program_id: &BvmAddr) -> OpCode {
-    let account_metas = vec![AccountMeta::new(*account_pubkey, true)];
+pub fn finalize(account_address: &BvmAddr, program_id: &BvmAddr) -> OpCode {
+    let account_metas = vec![AccountMeta::new(*account_address, true)];
     OpCode::new(*program_id, &MounterOpCode::Finalize, account_metas)
 }

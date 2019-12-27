@@ -291,7 +291,7 @@ fn deserialize_parameters(keyed_accounts: &mut [KeyedAccount], buffer: &[u8]) {
     let mut start = mem::size_of::<u64>();
     for info in keyed_accounts.iter_mut() {
         start += mem::size_of::<u64>(); // skip signer_key boolean
-        start += mem::size_of::<BvmAddr>(); // skip pubkey
+        start += mem::size_of::<BvmAddr>(); // skip address
         info.account.difs = LittleEndian::read_u64(&buffer[start..]);
 
         start += mem::size_of::<u64>() // skip difs

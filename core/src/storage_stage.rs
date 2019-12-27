@@ -114,7 +114,7 @@ impl StorageState {
         self.state.read().unwrap().slot
     }
 
-    pub fn get_pubkeys_for_slot(&self, slot: u64) -> Vec<BvmAddr> {
+    pub fn get_addresss_for_slot(&self, slot: u64) -> Vec<BvmAddr> {
         const MAX_PUBKEYS_TO_RETURN: usize = 5;
         let index = get_segment_from_slot(slot) as usize;
         let storage_miner_map = &self.state.read().unwrap().storage_miner_map;
@@ -206,13 +206,13 @@ impl StoragePhase {
 
                     {
                         let working_treasury = treasury_forks.read().unwrap().working_treasury();
-                        let storage_account = working_treasury.get_account(&storage_keypair.pubkey());
+                        let storage_account = working_treasury.get_account(&storage_keypair.address());
                         if storage_account.is_none() {
-                            // warn!("Storage account not found: {}", storage_keypair.pubkey());
+                            // warn!("Storage account not found: {}", storage_keypair.address());
                             println!(
                                 "{}",
                                 Warn(
-                                    format!("Storage account not found: {}", storage_keypair.pubkey()).to_string(),
+                                    format!("Storage account not found: {}", storage_keypair.address()).to_string(),
                                     module_path!().to_string()
                                 )
                             );
@@ -271,44 +271,44 @@ impl StoragePhase {
     ) -> io::Result<()> {
         let working_treasury = treasury_forks.read().unwrap().working_treasury();
         let transaction_seal = working_treasury.confirmed_last_transaction_seal();
-        let keypair_balance = working_treasury.get_balance(&keypair.pubkey());
+        let keypair_balance = working_treasury.get_balance(&keypair.address());
 
         if keypair_balance == 0 {
-            // warn!("keypair account balance empty: {}", keypair.pubkey(),);
+            // warn!("keypair account balance empty: {}", keypair.address(),);
             println!(
                 "{}",
                 Warn(
-                    format!("keypair account balance empty: {}", keypair.pubkey()).to_string(),
+                    format!("keypair account balance empty: {}", keypair.address()).to_string(),
                     module_path!().to_string()
                 )
             );
         } else {
             debug!(
                 "keypair account balance: {}: {}",
-                keypair.pubkey(),
+                keypair.address(),
                 keypair_balance
             );
         }
         if working_treasury
-            .get_account(&storage_keypair.pubkey())
+            .get_account(&storage_keypair.address())
             .is_none()
         {
             // warn!(
             //     "storage account does not exist: {}",
-            //     storage_keypair.pubkey()
+            //     storage_keypair.address()
             // );
             println!(
                 "{}",
                 Warn(
                     format!("storage account does not exist: {}",
-                        storage_keypair.pubkey()).to_string(),
+                        storage_keypair.address()).to_string(),
                     module_path!().to_string()
                 )
             );
         }
 
         let signer_keys = vec![keypair.as_ref(), storage_keypair.as_ref()];
-        let context = Context::new_with_payer(vec![instruction], Some(&signer_keys[0].pubkey()));
+        let context = Context::new_with_payer(vec![instruction], Some(&signer_keys[0].address()));
         let transaction = Transaction::new(&signer_keys, context, transaction_seal);
 
         account_host_socket.send_to(
@@ -330,7 +330,7 @@ impl StoragePhase {
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
         let ix = storage_opcode::advertise_recent_transaction_seal(
-            &storage_keypair.pubkey(),
+            &storage_keypair.address(),
             entry_id,
             slot,
         );
@@ -545,7 +545,7 @@ impl StoragePhase {
                                     .collect::<HashMap<_, _>>();
                                 if !checked_proofs.is_empty() {
                                     let ix = proof_validation(
-                                        &storage_keypair.pubkey(),
+                                        &storage_keypair.address(),
                                         segment as u64,
                                         checked_proofs,
                                     );
@@ -607,7 +607,7 @@ mod tests {
         let storage_keypair = Arc::new(Keypair::new());
         let exit = Arc::new(AtomicBool::new(false));
 
-        let node_group_info = test_node_group_info(&keypair.pubkey());
+        let node_group_info = test_node_group_info(&keypair.address());
         let GenesisBlockInfo { genesis_block, .. } = create_genesis_block(1000);
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
@@ -654,7 +654,7 @@ mod tests {
             .update_fscl_stmts(slot, 0, 0, drops_per_slot, &entries)
             .unwrap();
 
-        let node_group_info = test_node_group_info(&keypair.pubkey());
+        let node_group_info = test_node_group_info(&keypair.address());
 
         let (slot_sender, slot_rcvr) = channel();
         let storage_state = StorageState::new();
@@ -745,7 +745,7 @@ mod tests {
             .unwrap();
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let treasury_forks = Arc::new(RwLock::new(TreasuryForks::new_from_treasuries(&[treasury], 0)));
-        let node_group_info = test_node_group_info(&keypair.pubkey());
+        let node_group_info = test_node_group_info(&keypair.address());
 
         let (slot_sender, slot_rcvr) = channel();
         let storage_state = StorageState::new();
@@ -771,7 +771,7 @@ mod tests {
 
         let keypair = Keypair::new();
         let mining_proof_ix = storage_opcode::mining_proof(
-            &keypair.pubkey(),
+            &keypair.address(),
             Hash::default(),
             0,
             keypair.sign_context(b"test"),

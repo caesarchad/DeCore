@@ -170,8 +170,8 @@ impl ContactInfoTable {
     }
 
     /// Update the timestamp's of all the labels that are assosciated with BvmAddr
-    pub fn update_record_timestamp(&mut self, pubkey: &BvmAddr, now: u64) {
-        for label in &ContInfTblValue::record_labels(pubkey) {
+    pub fn update_record_timestamp(&mut self, address: &BvmAddr, now: u64) {
+        for label in &ContInfTblValue::record_labels(address) {
             self.update_label_timestamp(label, now);
         }
     }
@@ -241,16 +241,16 @@ mod test {
         assert_eq!(contact_info_table.table[&val.label()].insert_timestamp, 0);
 
         let val2 = ContInfTblValue::ContactInfo(ContactInfo::default());
-        assert_eq!(val2.label().pubkey(), val.label().pubkey());
+        assert_eq!(val2.label().address(), val.label().address());
         assert_matches!(contact_info_table.insert(val2.clone(), 0), Ok(Some(_)));
 
-        contact_info_table.update_record_timestamp(&val.label().pubkey(), 2);
+        contact_info_table.update_record_timestamp(&val.label().address(), 2);
         assert_eq!(contact_info_table.table[&val.label()].local_timestamp, 2);
         assert_eq!(contact_info_table.table[&val.label()].insert_timestamp, 0);
         assert_eq!(contact_info_table.table[&val2.label()].local_timestamp, 2);
         assert_eq!(contact_info_table.table[&val2.label()].insert_timestamp, 0);
 
-        contact_info_table.update_record_timestamp(&val.label().pubkey(), 1);
+        contact_info_table.update_record_timestamp(&val.label().address(), 1);
         assert_eq!(contact_info_table.table[&val.label()].local_timestamp, 2);
         assert_eq!(contact_info_table.table[&val.label()].insert_timestamp, 0);
 

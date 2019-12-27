@@ -790,7 +790,7 @@ pub mod tests {
         let slot_entries = create_drops(genesis_block.drops_per_slot - 1, genesis_block.hash());
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair.pubkey(),
+            &keypair.address(),
             1,
             slot_entries.last().unwrap().hash,
         );
@@ -809,13 +809,13 @@ pub mod tests {
     #[test]
     fn test_process_ledger_simple() {
         morgan_logger::setup();
-        let leader_pubkey = BvmAddr::new_rand();
+        let leader_addr = BvmAddr::new_rand();
         let mint = 100;
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
             ..
-        } = create_genesis_block_with_leader(mint, &leader_pubkey, 50);
+        } = create_genesis_block_with_leader(mint, &leader_addr, 50);
         let (ledger_path, mut last_entry_hash) = create_new_tmp_ledger!(&genesis_block);
         debug!("ledger_path: {:?}", ledger_path);
 
@@ -827,7 +827,7 @@ pub mod tests {
             let keypair = Keypair::new();
             let tx = sys_controller::create_user_account(
                 &mint_keypair,
-                &keypair.pubkey(),
+                &keypair.address(),
                 1,
                 transaction_seal,
             );
@@ -840,7 +840,7 @@ pub mod tests {
             let keypair2 = Keypair::new();
             let tx = sys_controller::create_user_account(
                 &keypair,
-                &keypair2.pubkey(),
+                &keypair2.address(),
                 42,
                 transaction_seal,
             );
@@ -873,7 +873,7 @@ pub mod tests {
 
         let treasury = treasury_forks[1].clone();
         assert_eq!(
-            treasury.get_balance(&mint_keypair.pubkey()),
+            treasury.get_balance(&mint_keypair.address()),
             mint - deducted_from_mint
         );
         assert_eq!(treasury.drop_height(), 2 * genesis_block.drops_per_slot - 1);
@@ -932,21 +932,21 @@ pub mod tests {
         // ensure treasury can process 2 entries that have a common account and no _drop is registered
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair1.pubkey(),
+            &keypair1.address(),
             2,
             treasury.last_transaction_seal(),
         );
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair2.pubkey(),
+            &keypair2.address(),
             2,
             treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
         assert_eq!(handle_fiscal_stmts(&treasury, &[entry_1, entry_2]), Ok(()));
-        assert_eq!(treasury.get_balance(&keypair1.pubkey()), 2);
-        assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
+        assert_eq!(treasury.get_balance(&keypair1.address()), 2);
+        assert_eq!(treasury.get_balance(&keypair2.address()), 2);
         assert_eq!(treasury.last_transaction_seal(), transaction_seal);
     }
 
@@ -963,8 +963,8 @@ pub mod tests {
         let keypair3 = Keypair::new();
 
         // fund: put 4 in each of 1 and 2
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair1.pubkey()), Ok(_));
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.pubkey()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair1.address()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.address()), Ok(_));
 
         // construct an FsclStmt whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
@@ -972,7 +972,7 @@ pub mod tests {
             1,
             vec![sys_controller::create_user_account(
                 &keypair1,
-                &mint_keypair.pubkey(),
+                &mint_keypair.address(),
                 1,
                 treasury.last_transaction_seal(),
             )],
@@ -984,13 +984,13 @@ pub mod tests {
             vec![
                 sys_controller::create_user_account(
                     &keypair2,
-                    &keypair3.pubkey(),
+                    &keypair3.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
                 sys_controller::create_user_account(
                     &keypair1,
-                    &mint_keypair.pubkey(),
+                    &mint_keypair.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // will collide
@@ -1002,9 +1002,9 @@ pub mod tests {
             Ok(())
         );
 
-        assert_eq!(treasury.get_balance(&keypair1.pubkey()), 1);
-        assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
-        assert_eq!(treasury.get_balance(&keypair3.pubkey()), 2);
+        assert_eq!(treasury.get_balance(&keypair1.address()), 1);
+        assert_eq!(treasury.get_balance(&keypair2.address()), 2);
+        assert_eq!(treasury.get_balance(&keypair3.address()), 2);
     }
 
     #[test]
@@ -1021,9 +1021,9 @@ pub mod tests {
         let keypair4 = Keypair::new();
 
         // fund: put 4 in each of 1 and 2
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair1.pubkey()), Ok(_));
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.pubkey()), Ok(_));
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair4.pubkey()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair1.address()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.address()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair4.address()), Ok(_));
 
         // construct an FsclStmt whose 2nd transaction would cause a lock conflict with previous entry
         let entry_1_to_mint = next_entry(
@@ -1032,13 +1032,13 @@ pub mod tests {
             vec![
                 sys_controller::create_user_account(
                     &keypair1,
-                    &mint_keypair.pubkey(),
+                    &mint_keypair.address(),
                     1,
                     treasury.last_transaction_seal(),
                 ),
                 sys_controller::transfer(
                     &keypair4,
-                    &keypair4.pubkey(),
+                    &keypair4.address(),
                     1,
                     Hash::default(), // Should cause a transaction failure with TransactionSealNotFound
                 ),
@@ -1051,13 +1051,13 @@ pub mod tests {
             vec![
                 sys_controller::create_user_account(
                     &keypair2,
-                    &keypair3.pubkey(),
+                    &keypair3.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
                 sys_controller::create_user_account(
                     &keypair1,
-                    &mint_keypair.pubkey(),
+                    &mint_keypair.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // will collide
@@ -1071,8 +1071,8 @@ pub mod tests {
         .is_err());
 
         // First transaction in first entry succeeded, so keypair1 lost 1 dif
-        assert_eq!(treasury.get_balance(&keypair1.pubkey()), 3);
-        assert_eq!(treasury.get_balance(&keypair2.pubkey()), 4);
+        assert_eq!(treasury.get_balance(&keypair1.address()), 3);
+        assert_eq!(treasury.get_balance(&keypair2.address()), 4);
 
         // Check all accounts are unlocked
         let txs1 = &entry_1_to_mint.transactions[..];
@@ -1104,8 +1104,8 @@ pub mod tests {
         let keypair3 = Keypair::new();
 
         // fund: put some money in each of 1 and 2
-        assert_matches!(treasury.transfer(5, &mint_keypair, &keypair1.pubkey()), Ok(_));
-        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.pubkey()), Ok(_));
+        assert_matches!(treasury.transfer(5, &mint_keypair, &keypair1.address()), Ok(_));
+        assert_matches!(treasury.transfer(4, &mint_keypair, &keypair2.address()), Ok(_));
 
         // 3 entries: first has a transfer, 2nd has a conflict with 1st, 3rd has a conflict with itself
         let entry_1_to_mint = next_entry(
@@ -1113,7 +1113,7 @@ pub mod tests {
             1,
             vec![sys_controller::transfer(
                 &keypair1,
-                &mint_keypair.pubkey(),
+                &mint_keypair.address(),
                 1,
                 treasury.last_transaction_seal(),
             )],
@@ -1129,13 +1129,13 @@ pub mod tests {
             vec![
                 sys_controller::create_user_account(
                     &keypair2,
-                    &keypair3.pubkey(),
+                    &keypair3.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // should be fine
                 sys_controller::transfer(
                     &keypair1,
-                    &mint_keypair.pubkey(),
+                    &mint_keypair.address(),
                     2,
                     treasury.last_transaction_seal(),
                 ), // will collide with predecessor
@@ -1152,13 +1152,13 @@ pub mod tests {
             vec![
                 sys_controller::transfer(
                     &keypair1,
-                    &keypair3.pubkey(),
+                    &keypair3.address(),
                     1,
                     treasury.last_transaction_seal(),
                 ),
                 sys_controller::transfer(
                     &keypair1,
-                    &keypair2.pubkey(),
+                    &keypair2.address(),
                     1,
                     treasury.last_transaction_seal(),
                 ), // should be fine
@@ -1180,9 +1180,9 @@ pub mod tests {
         .is_err());
 
         // last entry should have been aborted before commit_fiscal_stmts_pipe
-        assert_eq!(treasury.get_balance(&keypair1.pubkey()), 2);
-        assert_eq!(treasury.get_balance(&keypair2.pubkey()), 2);
-        assert_eq!(treasury.get_balance(&keypair3.pubkey()), 2);
+        assert_eq!(treasury.get_balance(&keypair1.address()), 2);
+        assert_eq!(treasury.get_balance(&keypair2.address()), 2);
+        assert_eq!(treasury.get_balance(&keypair3.address()), 2);
     }
 
     #[test]
@@ -1201,14 +1201,14 @@ pub mod tests {
         //load accounts
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair1.pubkey(),
+            &keypair1.address(),
             1,
             treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair2.pubkey(),
+            &keypair2.address(),
             1,
             treasury.last_transaction_seal(),
         );
@@ -1218,21 +1218,21 @@ pub mod tests {
         let transaction_seal = treasury.last_transaction_seal();
         let tx = sys_controller::create_user_account(
             &keypair1,
-            &keypair3.pubkey(),
+            &keypair3.address(),
             1,
             treasury.last_transaction_seal(),
         );
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let tx = sys_controller::create_user_account(
             &keypair2,
-            &keypair4.pubkey(),
+            &keypair4.address(),
             1,
             treasury.last_transaction_seal(),
         );
         let entry_2 = next_entry(&entry_1.hash, 1, vec![tx]);
         assert_eq!(handle_fiscal_stmts(&treasury, &[entry_1, entry_2]), Ok(()));
-        assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
-        assert_eq!(treasury.get_balance(&keypair4.pubkey()), 1);
+        assert_eq!(treasury.get_balance(&keypair3.address()), 1);
+        assert_eq!(treasury.get_balance(&keypair4.address()), 1);
         assert_eq!(treasury.last_transaction_seal(), transaction_seal);
     }
 
@@ -1252,14 +1252,14 @@ pub mod tests {
         //load accounts
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair1.pubkey(),
+            &keypair1.address(),
             1,
             treasury.last_transaction_seal(),
         );
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair2.pubkey(),
+            &keypair2.address(),
             1,
             treasury.last_transaction_seal(),
         );
@@ -1272,12 +1272,12 @@ pub mod tests {
 
         // ensure treasury can process 2 entries that do not have a common account and _drop is registered
         let tx =
-            sys_controller::create_user_account(&keypair2, &keypair3.pubkey(), 1, transaction_seal);
+            sys_controller::create_user_account(&keypair2, &keypair3.address(), 1, transaction_seal);
         let entry_1 = next_entry(&transaction_seal, 1, vec![tx]);
         let _drop = next_entry(&entry_1.hash, 1, vec![]);
         let tx = sys_controller::create_user_account(
             &keypair1,
-            &keypair4.pubkey(),
+            &keypair4.address(),
             1,
             treasury.last_transaction_seal(),
         );
@@ -1286,13 +1286,13 @@ pub mod tests {
             handle_fiscal_stmts(&treasury, &[entry_1.clone(), _drop.clone(), entry_2.clone()]),
             Ok(())
         );
-        assert_eq!(treasury.get_balance(&keypair3.pubkey()), 1);
-        assert_eq!(treasury.get_balance(&keypair4.pubkey()), 1);
+        assert_eq!(treasury.get_balance(&keypair3.address()), 1);
+        assert_eq!(treasury.get_balance(&keypair4.address()), 1);
 
         // ensure that an error is returned for an empty account (keypair2)
         let tx = sys_controller::create_user_account(
             &keypair2,
-            &keypair3.pubkey(),
+            &keypair3.address(),
             1,
             treasury.last_transaction_seal(),
         );
@@ -1312,25 +1312,25 @@ pub mod tests {
             ..
         } = create_genesis_block(11_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = BvmAddr::new_rand();
-        treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        let address = BvmAddr::new_rand();
+        treasury.transfer(1_000, &mint_keypair, &address).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
-        assert_eq!(treasury.get_balance(&pubkey), 1_000);
+        assert_eq!(treasury.get_balance(&address), 1_000);
         assert_eq!(
-            treasury.transfer(10_001, &mint_keypair, &pubkey),
+            treasury.transfer(10_001, &mint_keypair, &address),
             Err(TransactionError::OpCodeErr(
                 0,
                 OpCodeErr::new_result_with_negative_difs(),
             ))
         );
         assert_eq!(
-            treasury.transfer(10_001, &mint_keypair, &pubkey),
+            treasury.transfer(10_001, &mint_keypair, &address),
             Err(TransactionError::DuplicateSignature)
         );
 
         // Make sure other errors don't update the signature cache
         let tx =
-            sys_controller::create_user_account(&mint_keypair, &pubkey, 1000, Hash::default());
+            sys_controller::create_user_account(&mint_keypair, &address, 1000, Hash::default());
         let signature = tx.signatures[0];
 
         // Should fail with transaction_seal not found
@@ -1358,13 +1358,13 @@ pub mod tests {
         let keypair2 = Keypair::new();
         let success_tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair1.pubkey(),
+            &keypair1.address(),
             1,
             treasury.last_transaction_seal(),
         );
         let fail_tx = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair2.pubkey(),
+            &keypair2.address(),
             2,
             treasury.last_transaction_seal(),
         );
@@ -1405,7 +1405,7 @@ pub mod tests {
 
         // give everybody one dif
         for keypair in &keypairs {
-            treasury.transfer(1, &mint_keypair, &keypair.pubkey())
+            treasury.transfer(1, &mint_keypair, &keypair.address())
                 .expect("funding failed");
         }
 
@@ -1419,7 +1419,7 @@ pub mod tests {
                         0,
                         vec![sys_controller::transfer(
                             &keypairs[i],
-                            &keypairs[i + NUM_TRANSFERS].pubkey(),
+                            &keypairs[i + NUM_TRANSFERS].address(),
                             1,
                             treasury.last_transaction_seal(),
                         )],
@@ -1443,7 +1443,7 @@ pub mod tests {
                         0,
                         vec![sys_controller::transfer(
                             &keypairs[i + NUM_TRANSFERS],
-                            &keypairs[i].pubkey(),
+                            &keypairs[i].address(),
                             1,
                             treasury.last_transaction_seal(),
                         )],

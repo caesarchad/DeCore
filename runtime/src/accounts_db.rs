@@ -202,9 +202,9 @@ impl AccountsDB {
         storage: &AccountStorage,
         ancestors: &HashMap<Fork, usize>,
         accounts_index: &AccountsIndex<AccountInfo>,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
     ) -> Option<(Account, Fork)> {
-        let (info, fork) = accounts_index.get(pubkey, ancestors)?;
+        let (info, fork) = accounts_index.get(address, ancestors)?;
         storage
             .get(&info.id)
             .and_then(|store| Some(store.accounts.get_account(info.offset)?.0.clone_account()))
@@ -214,11 +214,11 @@ impl AccountsDB {
     pub fn load_slow(
         &self,
         ancestors: &HashMap<Fork, usize>,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
     ) -> Option<(Account, Fork)> {
         let accounts_index = self.accounts_index.read().unwrap();
         let storage = self.storage.read().unwrap();
-        Self::load(&storage, ancestors, &accounts_index, pubkey)
+        Self::load(&storage, ancestors, &accounts_index, address)
     }
 
     fn fork_storage(&self, fork_id: Fork) -> Arc<AccountStorageEntry> {
@@ -261,7 +261,7 @@ impl AccountsDB {
     fn store_accounts(&self, fork_id: Fork, accounts: &[(&BvmAddr, &Account)]) -> Vec<AccountInfo> {
         let with_meta: Vec<(StorageMeta, &Account)> = accounts
             .iter()
-            .map(|(pubkey, account)| {
+            .map(|(address, account)| {
                 let write_version = self.write_version.fetch_add(1, Ordering::Relaxed) as u64;
                 let data_len = if account.difs == 0 {
                     0
@@ -270,7 +270,7 @@ impl AccountsDB {
                 };
                 let meta = StorageMeta {
                     write_version,
-                    pubkey: **pubkey,
+                    address: **address,
                     data_len,
                 };
                 (meta, *account)
@@ -500,12 +500,12 @@ mod tests {
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
 
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&db, &mut pubkeys, 0, 100, 0, 0);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&db, &mut addresss, 0, 100, 0, 0);
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(0, 0)].into_iter().collect();
-            let account = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
+            let account = db.load_slow(&ancestors, &addresss[idx]).unwrap();
             let mut default_account = Account::default();
             default_account.difs = (idx + 1) as u64;
             assert_eq!((default_account, 0), account);
@@ -516,9 +516,9 @@ mod tests {
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(0, 0)].into_iter().collect();
-            let account0 = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
+            let account0 = db.load_slow(&ancestors, &addresss[idx]).unwrap();
             let ancestors = vec![(1, 1)].into_iter().collect();
-            let account1 = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
+            let account1 = db.load_slow(&ancestors, &addresss[idx]).unwrap();
             let mut default_account = Account::default();
             default_account.difs = (idx + 1) as u64;
             assert_eq!(&default_account, &account0.0);
@@ -531,10 +531,10 @@ mod tests {
         let paths = get_tmp_accounts_path!();
         let db = AccountsDB::new(&paths.paths);
 
-        let mut pubkeys: Vec<BvmAddr> = vec![];
+        let mut addresss: Vec<BvmAddr> = vec![];
         create_account(
             &db,
-            &mut pubkeys,
+            &mut addresss,
             0,
             2,
             ACCOUNT_DATA_FILE_SIZE as usize / 3,
@@ -542,10 +542,10 @@ mod tests {
         );
         assert!(check_storage(&db, 2));
 
-        let pubkey = BvmAddr::new_rand();
-        let account = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 3, &pubkey);
-        db.store(1, &[(&pubkey, &account)]);
-        db.store(1, &[(&pubkeys[0], &account)]);
+        let address = BvmAddr::new_rand();
+        let account = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 3, &address);
+        db.store(1, &[(&address, &account)]);
+        db.store(1, &[(&addresss[0], &account)]);
         {
             let stores = db.storage.read().unwrap();
             assert_eq!(stores.len(), 2);
@@ -581,40 +581,40 @@ mod tests {
 
     fn create_account(
         accounts: &AccountsDB,
-        pubkeys: &mut Vec<BvmAddr>,
+        addresss: &mut Vec<BvmAddr>,
         fork: Fork,
         num: usize,
         space: usize,
         num_vote: usize,
     ) {
         for t in 0..num {
-            let pubkey = BvmAddr::new_rand();
+            let address = BvmAddr::new_rand();
             let account = Account::new((t + 1) as u64, 0, space, &Account::default().owner);
-            pubkeys.push(pubkey.clone());
+            addresss.push(address.clone());
             let ancestors = vec![(fork, 0)].into_iter().collect();
-            assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
-            accounts.store(fork, &[(&pubkey, &account)]);
+            assert!(accounts.load_slow(&ancestors, &address).is_none());
+            accounts.store(fork, &[(&address, &account)]);
         }
         for t in 0..num_vote {
-            let pubkey = BvmAddr::new_rand();
+            let address = BvmAddr::new_rand();
             let account = Account::new((num + t + 1) as u64, 0, space, &morgan_vote_api::id());
-            pubkeys.push(pubkey.clone());
+            addresss.push(address.clone());
             let ancestors = vec![(fork, 0)].into_iter().collect();
-            assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
-            accounts.store(fork, &[(&pubkey, &account)]);
+            assert!(accounts.load_slow(&ancestors, &address).is_none());
+            accounts.store(fork, &[(&address, &account)]);
         }
     }
 
-    fn update_accounts(accounts: &AccountsDB, pubkeys: &Vec<BvmAddr>, fork: Fork, range: usize) {
+    fn update_accounts(accounts: &AccountsDB, addresss: &Vec<BvmAddr>, fork: Fork, range: usize) {
         for _ in 1..1000 {
             let idx = thread_rng().gen_range(0, range);
             let ancestors = vec![(fork, 0)].into_iter().collect();
-            if let Some((mut account, _)) = accounts.load_slow(&ancestors, &pubkeys[idx]) {
+            if let Some((mut account, _)) = accounts.load_slow(&ancestors, &addresss[idx]) {
                 account.difs = account.difs + 1;
-                accounts.store(fork, &[(&pubkeys[idx], &account)]);
+                accounts.store(fork, &[(&addresss[idx], &account)]);
                 if account.difs == 0 {
                     let ancestors = vec![(fork, 0)].into_iter().collect();
-                    assert!(accounts.load_slow(&ancestors, &pubkeys[idx]).is_none());
+                    assert!(accounts.load_slow(&ancestors, &addresss[idx]).is_none());
                 } else {
                     let mut default_account = Account::default();
                     default_account.difs = account.difs;
@@ -631,11 +631,11 @@ mod tests {
         stores[&0].count() == count
     }
 
-    fn check_accounts(accounts: &AccountsDB, pubkeys: &Vec<BvmAddr>, fork: Fork) {
+    fn check_accounts(accounts: &AccountsDB, addresss: &Vec<BvmAddr>, fork: Fork) {
         for _ in 1..100 {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(fork, 0)].into_iter().collect();
-            let account = accounts.load_slow(&ancestors, &pubkeys[idx]).unwrap();
+            let account = accounts.load_slow(&ancestors, &addresss[idx]).unwrap();
             let mut default_account = Account::default();
             default_account.difs = (idx + 1) as u64;
             assert_eq!((default_account, 0), account);
@@ -646,10 +646,10 @@ mod tests {
     fn test_account_one() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&accounts, &mut addresss, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
-        let account = accounts.load_slow(&ancestors, &pubkeys[0]).unwrap();
+        let account = accounts.load_slow(&ancestors, &addresss[0]).unwrap();
         let mut default_account = Account::default();
         default_account.difs = 1;
         assert_eq!((default_account, 0), account);
@@ -659,18 +659,18 @@ mod tests {
     fn test_account_many() {
         let paths = get_tmp_accounts_path("many0,many1");
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&accounts, &mut pubkeys, 0, 100, 0, 0);
-        check_accounts(&accounts, &pubkeys, 0);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&accounts, &mut addresss, 0, 100, 0, 0);
+        check_accounts(&accounts, &addresss, 0);
     }
 
     #[test]
     fn test_account_update() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&accounts, &mut pubkeys, 0, 100, 0, 0);
-        update_accounts(&accounts, &pubkeys, 0, 99);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&accounts, &mut addresss, 0, 100, 0, 0);
+        update_accounts(&accounts, &addresss, 0, 99);
         assert_eq!(check_storage(&accounts, 100), true);
     }
 
@@ -712,9 +712,9 @@ mod tests {
             AccountStorageStatus::StorageAvailable,
             AccountStorageStatus::StorageFull,
         ];
-        let pubkey1 = BvmAddr::new_rand();
-        let account1 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &pubkey1);
-        accounts.store(0, &[(&pubkey1, &account1)]);
+        let address1 = BvmAddr::new_rand();
+        let account1 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &address1);
+        accounts.store(0, &[(&address1, &account1)]);
         {
             let stores = accounts.storage.read().unwrap();
             assert_eq!(stores.len(), 1);
@@ -722,9 +722,9 @@ mod tests {
             assert_eq!(stores[&0].status(), AccountStorageStatus::StorageAvailable);
         }
 
-        let pubkey2 = BvmAddr::new_rand();
-        let account2 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &pubkey2);
-        accounts.store(0, &[(&pubkey2, &account2)]);
+        let address2 = BvmAddr::new_rand();
+        let account2 = Account::new(1, 0, ACCOUNT_DATA_FILE_SIZE as usize / 2, &address2);
+        accounts.store(0, &[(&address2, &account2)]);
         {
             let stores = accounts.storage.read().unwrap();
             assert_eq!(stores.len(), 2);
@@ -735,17 +735,17 @@ mod tests {
         }
         let ancestors = vec![(0, 0)].into_iter().collect();
         assert_eq!(
-            accounts.load_slow(&ancestors, &pubkey1).unwrap().0,
+            accounts.load_slow(&ancestors, &address1).unwrap().0,
             account1
         );
         assert_eq!(
-            accounts.load_slow(&ancestors, &pubkey2).unwrap().0,
+            accounts.load_slow(&ancestors, &address2).unwrap().0,
             account2
         );
 
         for i in 0..25 {
             let index = i % 2;
-            accounts.store(0, &[(&pubkey1, &account1)]);
+            accounts.store(0, &[(&address1, &account1)]);
             {
                 let stores = accounts.storage.read().unwrap();
                 assert_eq!(stores.len(), 3);
@@ -758,11 +758,11 @@ mod tests {
             }
             let ancestors = vec![(0, 0)].into_iter().collect();
             assert_eq!(
-                accounts.load_slow(&ancestors, &pubkey1).unwrap().0,
+                accounts.load_slow(&ancestors, &address1).unwrap().0,
                 account1
             );
             assert_eq!(
-                accounts.load_slow(&ancestors, &pubkey2).unwrap().0,
+                accounts.load_slow(&ancestors, &address2).unwrap().0,
                 account2
             );
         }
@@ -772,39 +772,39 @@ mod tests {
     fn test_purge_fork_not_root() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&accounts, &mut addresss, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
-        assert!(accounts.load_slow(&ancestors, &pubkeys[0]).is_some());;
+        assert!(accounts.load_slow(&ancestors, &addresss[0]).is_some());;
         accounts.purge_fork(0);
-        assert!(accounts.load_slow(&ancestors, &pubkeys[0]).is_none());;
+        assert!(accounts.load_slow(&ancestors, &addresss[0]).is_none());;
     }
 
     #[test]
     fn test_purge_fork_after_root() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let mut pubkeys: Vec<BvmAddr> = vec![];
-        create_account(&accounts, &mut pubkeys, 0, 1, 0, 0);
+        let mut addresss: Vec<BvmAddr> = vec![];
+        create_account(&accounts, &mut addresss, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
         accounts.add_root(0);
         accounts.purge_fork(0);
-        assert!(accounts.load_slow(&ancestors, &pubkeys[0]).is_some());
+        assert!(accounts.load_slow(&ancestors, &addresss[0]).is_some());
     }
 
     #[test]
     fn test_lazy_gc_fork() {
         let paths = get_tmp_accounts_path!();
         let accounts = AccountsDB::new(&paths.paths);
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let account = Account::new(1, 0, 0, &Account::default().owner);
-        accounts.store(0, &[(&pubkey, &account)]);
+        accounts.store(0, &[(&address, &account)]);
         let ancestors = vec![(0, 0)].into_iter().collect();
         let info = accounts
             .accounts_index
             .read()
             .unwrap()
-            .get(&pubkey, &ancestors)
+            .get(&address, &ancestors)
             .unwrap()
             .0
             .clone();
@@ -813,12 +813,12 @@ mod tests {
 
         assert!(accounts.storage.read().unwrap().get(&info.id).is_some());
 
-        accounts.store(1, &[(&pubkey, &account)]);
+        accounts.store(1, &[(&address, &account)]);
 
         assert!(accounts.storage.read().unwrap().get(&info.id).is_none());
 
         let ancestors = vec![(1, 1)].into_iter().collect();
-        assert_eq!(accounts.load_slow(&ancestors, &pubkey), Some((account, 1)));
+        assert_eq!(accounts.load_slow(&ancestors, &address), Some((account, 1)));
     }
 
 }

@@ -730,7 +730,7 @@ mod test {
                 .unwrap();
 
             let mut completed_slots = BTreeSet::new();
-            let node_info = Node::new_localhost_with_pubkey(&BvmAddr::default());
+            let node_info = Node::new_localhost_with_address(&BvmAddr::default());
             let node_group_info = RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
                 node_info.info.clone(),
             ));
@@ -774,11 +774,11 @@ mod test {
         let mut current_root = 0;
 
         let mut completed_slots = BTreeSet::new();
-        let node_info = Node::new_localhost_with_pubkey(&BvmAddr::default());
+        let node_info = Node::new_localhost_with_address(&BvmAddr::default());
         let node_group_info = RwLock::new(NodeGroupInfo::new_with_invalid_keypair(
             node_info.info.clone(),
         ));
-        let my_pubkey = BvmAddr::new_rand();
+        let my_address = BvmAddr::new_rand();
         let (completed_slots_sender, completed_slots_receiver) = channel();
 
         // Send a new slot before the root is updated
@@ -787,7 +787,7 @@ mod test {
             .send(vec![newly_completed_slot])
             .unwrap();
         FixService::update_epoch_slots(
-            my_pubkey.clone(),
+            my_address.clone(),
             current_root,
             &mut current_root.clone(),
             &mut completed_slots,
@@ -800,7 +800,7 @@ mod test {
             let r_node_group_info = node_group_info.read().unwrap();
 
             let (my_epoch_slots_in_gossip, updated_ts) = r_node_group_info
-                .get_epoch_state_for_node(&my_pubkey, None)
+                .get_epoch_state_for_node(&my_address, None)
                 .clone()
                 .unwrap();
 
@@ -817,7 +817,7 @@ mod test {
         // Calling update again with no updates to either the roots or set of completed slots
         // should not update gossip
         FixService::update_epoch_slots(
-            my_pubkey.clone(),
+            my_address.clone(),
             current_root,
             &mut current_root,
             &mut completed_slots,
@@ -828,14 +828,14 @@ mod test {
         assert!(node_group_info
             .read()
             .unwrap()
-            .get_epoch_state_for_node(&my_pubkey, Some(updated_ts))
+            .get_epoch_state_for_node(&my_address, Some(updated_ts))
             .is_none());
 
         sleep(Duration::from_millis(10));
         // Updating just the root again should update gossip (simulates replay phase updating root
         // after a slot has been signaled as completed)
         FixService::update_epoch_slots(
-            my_pubkey.clone(),
+            my_address.clone(),
             current_root + 1,
             &mut current_root,
             &mut completed_slots,
@@ -846,7 +846,7 @@ mod test {
         let r_node_group_info = node_group_info.read().unwrap();
 
         let (my_epoch_slots_in_gossip, _) = r_node_group_info
-            .get_epoch_state_for_node(&my_pubkey, Some(updated_ts))
+            .get_epoch_state_for_node(&my_address, Some(updated_ts))
             .clone()
             .unwrap();
 

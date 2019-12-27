@@ -180,32 +180,32 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     //  is fully implemented
     //  https://github.com/morgan-labs/morgan/issues/4213
     let (vote_account, vote_state) = vote_state::create_bootstrap_leader_account(
-        &bootstrap_vote_keypair.pubkey(),
-        &bootstrap_leader_keypair.pubkey(),
+        &bootstrap_vote_keypair.address(),
+        &bootstrap_leader_keypair.address(),
         0,
         bootstrap_leader_stake_difs,
     );
 
     let mut genesis_block = GenesisBlock::new(
-        &bootstrap_leader_keypair.pubkey(),
+        &bootstrap_leader_keypair.address(),
         &[
             // the mint
             (
-                mint_keypair.pubkey(),
+                mint_keypair.address(),
                 Account::new(difs, 0, 0, &sys_controller::id()),
             ),
             // node needs an account to issue votes from
             (
-                bootstrap_leader_keypair.pubkey(),
+                bootstrap_leader_keypair.address(),
                 Account::new(1, 0, 0, &sys_controller::id()),
             ),
             // where votes go to
-            (bootstrap_vote_keypair.pubkey(), vote_account),
+            (bootstrap_vote_keypair.address(), vote_account),
             // passive bootstrap leader stake, duplicates above temporarily
             (
-                bootstrap_stake_keypair.pubkey(),
+                bootstrap_stake_keypair.address(),
                 stake_state::create_delegate_stake_account(
-                    &bootstrap_vote_keypair.pubkey(),
+                    &bootstrap_vote_keypair.address(),
                     &vote_state,
                     bootstrap_leader_stake_difs,
                 ),
@@ -219,7 +219,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             morgan_config_controller!(),
         ],
     );
-    genesis_block.add_storage_controller(&bootstrap_storage_keypair.pubkey());
+    genesis_block.add_storage_controller(&bootstrap_storage_keypair.address());
 
     genesis_block.fee_calculator.difs_per_signature =
         value_t_or_exit!(matches, "difs_per_signature", u64);

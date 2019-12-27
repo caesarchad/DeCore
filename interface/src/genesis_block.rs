@@ -15,7 +15,7 @@ use std::path::Path;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GenesisBlock {
     pub accounts: Vec<(BvmAddr, Account)>,
-    pub bootstrap_leader_pubkey: BvmAddr,
+    pub bootstrap_leader_address: BvmAddr,
     pub epoch_warmup: bool,
     pub fee_calculator: GasCost,
     pub builtin_opcode_handlers: Vec<(String, BvmAddr)>,
@@ -32,7 +32,7 @@ pub fn create_genesis_block(difs: u64) -> (GenesisBlock, Keypair) {
         GenesisBlock::new(
             &BvmAddr::default(),
             &[(
-                mint_keypair.pubkey(),
+                mint_keypair.address(),
                 Account::new(difs, 0, 0, &sys_controller::id()),
             )],
             &[],
@@ -43,13 +43,13 @@ pub fn create_genesis_block(difs: u64) -> (GenesisBlock, Keypair) {
 
 impl GenesisBlock {
     pub fn new(
-        bootstrap_leader_pubkey: &BvmAddr,
+        bootstrap_leader_address: &BvmAddr,
         accounts: &[(BvmAddr, Account)],
         builtin_opcode_handlers: &[(String, BvmAddr)],
     ) -> Self {
         Self {
             accounts: accounts.to_vec(),
-            bootstrap_leader_pubkey: *bootstrap_leader_pubkey, // TODO: leader_schedule to derive from actual stakes, instead ;)
+            bootstrap_leader_address: *bootstrap_leader_address, // TODO: leader_schedule to derive from actual stakes, instead ;)
             epoch_warmup: true,
             fee_calculator: GasCost::default(),
             builtin_opcode_handlers: builtin_opcode_handlers.to_vec(),
@@ -91,7 +91,7 @@ mod tests {
         let out_dir = std::env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string());
         let keypair = Keypair::new();
 
-        let path = format!("{}/tmp/{}-{}", out_dir, name, keypair.pubkey());
+        let path = format!("{}/tmp/{}-{}", out_dir, name, keypair.address());
 
         // whack any possible collision
         let _ignored = std::fs::remove_dir_all(&path);
@@ -108,7 +108,7 @@ mod tests {
             &BvmAddr::default(),
             &[
                 (
-                    mint_keypair.pubkey(),
+                    mint_keypair.address(),
                     Account::new(10_000, 0, 0, &BvmAddr::default()),
                 ),
                 (BvmAddr::new_rand(), Account::new(1, 0, 0, &BvmAddr::default())),
@@ -117,7 +117,7 @@ mod tests {
         );
         assert_eq!(block.accounts.len(), 2);
         assert!(block.accounts.iter().any(
-            |(pubkey, account)| *pubkey == mint_keypair.pubkey() && account.difs == 10_000
+            |(address, account)| *address == mint_keypair.address() && account.difs == 10_000
         ));
 
         let path = &make_tmp_path("genesis_block");

@@ -81,12 +81,12 @@ impl ValueGenerator {
 }
 
 fn sort_stakes(stakes: &mut Vec<(BvmAddr, u64)>) {
-    // Sort first by stake. If stakes are the same, sort by pubkey to ensure a
+    // Sort first by stake. If stakes are the same, sort by address to ensure a
     // deterministic result.
     // Note: Use unstable sort, because we dedup right after to remove the equal elements.
-    stakes.sort_unstable_by(|(l_pubkey, l_stake), (r_pubkey, r_stake)| {
+    stakes.sort_unstable_by(|(l_address, l_stake), (r_address, r_stake)| {
         if r_stake == l_stake {
-            r_pubkey.cmp(&l_pubkey)
+            r_address.cmp(&l_address)
         } else {
             r_stake.cmp(&l_stake)
         }
@@ -106,62 +106,62 @@ mod tests {
 
     #[test]
     fn test_leader_schedule_via_treasury() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let genesis_block =
-            create_genesis_block_with_leader(0, &pubkey, BOOTSTRAP_LEADER_DIFS).genesis_block;
+            create_genesis_block_with_leader(0, &address, BOOTSTRAP_LEADER_DIFS).genesis_block;
         let treasury = Treasury::new(&genesis_block);
 
-        let pubkeys_and_stakes: Vec<_> = staking_utils::staked_nodes(&treasury).into_iter().collect();
+        let addresss_and_stakes: Vec<_> = staking_utils::staked_nodes(&treasury).into_iter().collect();
         let seed = [0u8; 32];
         let leader_schedule = LeaderSchedule::new(
-            &pubkeys_and_stakes,
+            &addresss_and_stakes,
             seed,
             genesis_block.candidate_each_round,
             NUM_CONSECUTIVE_LEADER_SLOTS,
         );
 
-        assert_eq!(leader_schedule[0], pubkey);
-        assert_eq!(leader_schedule[1], pubkey);
-        assert_eq!(leader_schedule[2], pubkey);
+        assert_eq!(leader_schedule[0], address);
+        assert_eq!(leader_schedule[1], address);
+        assert_eq!(leader_schedule[2], address);
     }
 
     #[test]
     fn test_leader_scheduler1_basic() {
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let genesis_block = create_genesis_block_with_leader(
             BOOTSTRAP_LEADER_DIFS,
-            &pubkey,
+            &address,
             BOOTSTRAP_LEADER_DIFS,
         )
         .genesis_block;
         let treasury = Treasury::new(&genesis_block);
-        assert_eq!(slot_leader_at(treasury.slot(), &treasury).unwrap(), pubkey);
+        assert_eq!(slot_leader_at(treasury.slot(), &treasury).unwrap(), address);
     }
 
     #[test]
     fn test_sort_stakes_basic() {
-        let pubkey0 = BvmAddr::new_rand();
-        let pubkey1 = BvmAddr::new_rand();
-        let mut stakes = vec![(pubkey0, 1), (pubkey1, 2)];
+        let address0 = BvmAddr::new_rand();
+        let address1 = BvmAddr::new_rand();
+        let mut stakes = vec![(address0, 1), (address1, 2)];
         sort_stakes(&mut stakes);
-        assert_eq!(stakes, vec![(pubkey1, 2), (pubkey0, 1)]);
+        assert_eq!(stakes, vec![(address1, 2), (address0, 1)]);
     }
 
     #[test]
     fn test_sort_stakes_with_dup() {
-        let pubkey0 = BvmAddr::new_rand();
-        let pubkey1 = BvmAddr::new_rand();
-        let mut stakes = vec![(pubkey0, 1), (pubkey1, 2), (pubkey0, 1)];
+        let address0 = BvmAddr::new_rand();
+        let address1 = BvmAddr::new_rand();
+        let mut stakes = vec![(address0, 1), (address1, 2), (address0, 1)];
         sort_stakes(&mut stakes);
-        assert_eq!(stakes, vec![(pubkey1, 2), (pubkey0, 1)]);
+        assert_eq!(stakes, vec![(address1, 2), (address0, 1)]);
     }
 
     #[test]
     fn test_sort_stakes_with_equal_stakes() {
-        let pubkey0 = BvmAddr::default();
-        let pubkey1 = BvmAddr::new_rand();
-        let mut stakes = vec![(pubkey0, 1), (pubkey1, 1)];
+        let address0 = BvmAddr::default();
+        let address1 = BvmAddr::new_rand();
+        let mut stakes = vec![(address0, 1), (address1, 1)];
         sort_stakes(&mut stakes);
-        assert_eq!(stakes, vec![(pubkey1, 1), (pubkey0, 1)]);
+        assert_eq!(stakes, vec![(address1, 1), (address0, 1)]);
     }
 }

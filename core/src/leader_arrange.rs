@@ -92,14 +92,14 @@ mod tests {
 
     #[test]
     fn test_leader_schedule_index() {
-        let pubkey0 = BvmAddr::new_rand();
-        let pubkey1 = BvmAddr::new_rand();
+        let address0 = BvmAddr::new_rand();
+        let address1 = BvmAddr::new_rand();
         let leader_schedule = LeaderSchedule {
-            slot_leaders: vec![pubkey0, pubkey1],
+            slot_leaders: vec![address0, address1],
         };
-        assert_eq!(leader_schedule[0], pubkey0);
-        assert_eq!(leader_schedule[1], pubkey1);
-        assert_eq!(leader_schedule[2], pubkey0);
+        assert_eq!(leader_schedule[0], address0);
+        assert_eq!(leader_schedule[1], address1);
+        assert_eq!(leader_schedule[2], address0);
     }
 
     #[test]
@@ -142,9 +142,9 @@ mod tests {
 
     #[test]
     fn test_repeated_leader_schedule_specific() {
-        let alice_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
-        let stakes = vec![(alice_pubkey, 2), (bob_pubkey, 1)];
+        let alice_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
+        let stakes = vec![(alice_address, 2), (bob_address, 1)];
 
         let seed = BvmAddr::default();
         let mut seed_bytes = [0u8; 32];
@@ -158,24 +158,24 @@ mod tests {
         assert_eq!(leaders1.len(), leaders2.len());
 
         let leaders1_expected = vec![
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            bob_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
+            alice_address,
+            alice_address,
+            alice_address,
+            bob_address,
+            alice_address,
+            alice_address,
+            alice_address,
+            alice_address,
         ];
         let leaders2_expected = vec![
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            alice_pubkey,
-            bob_pubkey,
-            bob_pubkey,
+            alice_address,
+            alice_address,
+            alice_address,
+            alice_address,
+            alice_address,
+            alice_address,
+            bob_address,
+            bob_address,
         ];
 
         assert_eq!(leaders1, leaders1_expected);

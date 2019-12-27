@@ -25,15 +25,15 @@ impl Signature {
         Self(GenericArray::clone_from_slice(&signature_slice))
     }
 
-    pub fn verify(&self, pubkey_bytes: &[u8], message_bytes: &[u8]) -> bool {
-        let pubkey = ed25519_dalek::PublicKey::from_bytes(pubkey_bytes);
+    pub fn verify(&self, addr_bytes: &[u8], context_bytes: &[u8]) -> bool {
+        let addr = ed25519_dalek::PublicKey::from_bytes(addr_bytes);
         let signature = ed25519_dalek::Signature::from_bytes(self.0.as_slice());
-        if pubkey.is_err() || signature.is_err() {
+        if addr.is_err() || signature.is_err() {
             return false;
         }
-        pubkey
+        addr
             .unwrap()
-            .verify(message_bytes, &signature.unwrap())
+            .verify(context_bytes, &signature.unwrap())
             .is_ok()
     }
 }
@@ -45,10 +45,10 @@ pub trait Signable {
     }
     fn verify(&self) -> bool {
         self.get_signature()
-            .verify(&self.pubkey().as_ref(), &self.signable_data())
+            .verify(&self.address().as_ref(), &self.signable_data())
     }
 
-    fn pubkey(&self) -> BvmAddr;
+    fn address(&self) -> BvmAddr;
     fn signable_data(&self) -> Vec<u8>;
     fn get_signature(&self) -> Signature;
     fn set_signature(&mut self, signature: Signature);
@@ -95,7 +95,7 @@ impl FromStr for Signature {
 
 pub trait KeypairUtil {
     fn new() -> Self;
-    fn pubkey(&self) -> BvmAddr;
+    fn address(&self) -> BvmAddr;
     fn sign_context(&self, context: &[u8]) -> Signature;
 }
 
@@ -107,7 +107,7 @@ impl KeypairUtil for Keypair {
     }
 
     /// Return the public key for the given keypair
-    fn pubkey(&self) -> BvmAddr {
+    fn address(&self) -> BvmAddr {
         BvmAddr::new(&self.public.as_ref())
     }
 
@@ -148,7 +148,7 @@ mod tests {
         let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string());
         let keypair = Keypair::new();
 
-        format!("{}/tmp/{}-{}", out_dir, name, keypair.pubkey()).to_string()
+        format!("{}/tmp/{}-{}", out_dir, name, keypair.address()).to_string()
     }
 
     #[test]
@@ -162,7 +162,7 @@ mod tests {
             read_keypair(&outfile).unwrap().to_bytes().to_vec()
         );
         assert_eq!(
-            read_keypair(&outfile).unwrap().pubkey().as_ref().len(),
+            read_keypair(&outfile).unwrap().address().as_ref().len(),
             mem::size_of::<BvmAddr>()
         );
         fs::remove_file(&outfile).unwrap();

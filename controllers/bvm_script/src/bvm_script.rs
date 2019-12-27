@@ -42,9 +42,9 @@ impl Switch {
     /// Return true if the given Endorsement satisfies this Switch.
     pub fn is_satisfied(&self, witness: &Endorsement, from: &BvmAddr) -> bool {
         match (self, witness) {
-            (Switch::Signature(pubkey), Endorsement::Signature) => pubkey == from,
-            (Switch::Timestamp(dt, pubkey), Endorsement::Timestamp(last_time)) => {
-                pubkey == from && dt <= last_time
+            (Switch::Signature(address), Endorsement::Signature) => address == from,
+            (Switch::Timestamp(dt, address), Endorsement::Timestamp(last_time)) => {
+                address == from && dt <= last_time
             }
             _ => false,
         }
@@ -122,35 +122,35 @@ impl BvmScript {
     }
 
     /// Create a budget that pays `difs` to `to` after the given DateTime signed
-    /// by `dt_pubkey`.
+    /// by `dt_address`.
     pub fn new_future_payment(
         dt: DateTime<Utc>,
-        dt_pubkey: &BvmAddr,
+        dt_address: &BvmAddr,
         difs: u64,
         to: &BvmAddr,
     ) -> Self {
         BvmScript::After(
-            Switch::Timestamp(dt, *dt_pubkey),
+            Switch::Timestamp(dt, *dt_address),
             Box::new(Self::new_payment(difs, to)),
         )
     }
 
     /// Create a budget that pays `difs` to `to` after the given DateTime
-    /// signed by `dt_pubkey` unless canceled by `from`.
+    /// signed by `dt_address` unless canceled by `from`.
     pub fn new_cancelable_future_payment(
         dt: DateTime<Utc>,
-        dt_pubkey: &BvmAddr,
+        dt_address: &BvmAddr,
         difs: u64,
         to: &BvmAddr,
         from: Option<BvmAddr>,
     ) -> Self {
         if from.is_none() {
-            return Self::new_future_payment(dt, dt_pubkey, difs, to);
+            return Self::new_future_payment(dt, dt_address, difs, to);
         }
         let from = from.unwrap();
         BvmScript::Or(
             (
-                Switch::Timestamp(dt, *dt_pubkey),
+                Switch::Timestamp(dt, *dt_address),
                 Box::new(Self::new_payment(difs, to)),
             ),
             (

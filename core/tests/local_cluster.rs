@@ -137,8 +137,8 @@ fn test_two_unbalanced_stakes() {
         num_slots_per_epoch,
     );
     node_group.close_preserve_ledgers();
-    let leader_pubkey = node_group.connection_url_inf.id;
-    let leader_ledger = node_group.fullnode_infos[&leader_pubkey].ledger_path.clone();
+    let leader_addr = node_group.connection_url_inf.id;
+    let leader_ledger = node_group.fullnode_infos[&leader_addr].ledger_path.clone();
     node_group_tests::verify_ledger_drops(&leader_ledger, num_drops_per_slot as usize);
 }
 
@@ -157,11 +157,11 @@ fn test_forwarding() {
     let (node_group_hosts, _) = find_node_group_host(&node_group.connection_url_inf.gossip, 2).unwrap();
     assert!(node_group_hosts.len() >= 2);
 
-    let leader_pubkey = node_group.connection_url_inf.id;
+    let leader_addr = node_group.connection_url_inf.id;
 
     let validator_info = node_group_hosts
         .iter()
-        .find(|c| c.id != leader_pubkey)
+        .find(|c| c.id != leader_addr)
         .unwrap();
 
     // Confirm that transactions were forwarded to and processed by the leader.
@@ -181,7 +181,7 @@ fn test_restart_node() {
         candidate_each_round,
         ..NodeGroupConfig::default()
     });
-    let nodes = node_group.get_node_pubkeys();
+    let nodes = node_group.get_node_addresss();
     node_group_tests::sleep_n_epochs(
         1.0,
         &node_group.genesis_block.waterclock_config,
@@ -264,7 +264,7 @@ fn run_repairman_catchup(num_repairmen: u64) {
         ..NodeGroupConfig::default()
     });
 
-    let repairman_pubkeys: HashSet<_> = node_group.get_node_pubkeys().into_iter().collect();
+    let repairman_addresss: HashSet<_> = node_group.get_node_addresss().into_iter().collect();
     let epoch_schedule = RoundPlan::new(num_slots_per_epoch, stake_place_holder, true);
     let num_warmup_epochs = (epoch_schedule.get_stakers_epoch(0) + 1) as f64;
 
@@ -282,10 +282,10 @@ fn run_repairman_catchup(num_repairmen: u64) {
 
     node_group.add_validator(&validator_config, repairee_stake);
 
-    let all_pubkeys = node_group.get_node_pubkeys();
-    let repairee_id = all_pubkeys
+    let all_addresss = node_group.get_node_addresss();
+    let repairee_id = all_addresss
         .into_iter()
-        .find(|x| !repairman_pubkeys.contains(x))
+        .find(|x| !repairman_addresss.contains(x))
         .unwrap();
 
     // Wait for repairman protocol to catch this validator up

@@ -345,13 +345,13 @@ pub fn create_drops(num_drops: u64, mut hash: Hash) -> Vec<FsclStmt> {
 
 pub fn compose_s_fiscal_stmt(start: &Hash, num: usize) -> Vec<FsclStmt> {
     let keypair = Keypair::new();
-    let pubkey = keypair.pubkey();
+    let address = keypair.address();
 
     let mut hash = *start;
     let mut num_hashes = 0;
     (0..num)
         .map(|_| {
-            let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+            let ix = sc_opcode::apply_timestamp(&address, &address, &address, Utc::now());
             let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], *start);
             FsclStmt::new_mut(&mut hash, &mut num_hashes, vec![tx])
         })
@@ -368,9 +368,9 @@ pub fn compose_b_fiscal_stmt(fscl_stmt_cnt: usize) -> Vec<FsclStmt> {
     let zero = Hash::default();
     let one = morgan_interface::hash::hash(&zero.as_ref());
     let keypair = Keypair::new();
-    let pubkey = keypair.pubkey();
+    let address = keypair.address();
 
-    let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+    let ix = sc_opcode::apply_timestamp(&address, &address, &address, Utc::now());
     let tx = Transaction::new_s_opcodes(&[&keypair], vec![ix], one);
 
     let serialized_size = serialized_size(&tx).unwrap();
@@ -429,20 +429,20 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     fn create_sample_payment(keypair: &Keypair, hash: Hash) -> Transaction {
-        let pubkey = keypair.pubkey();
-        let ixs = sc_opcode::payment(&pubkey, &pubkey, 1);
+        let address = keypair.address();
+        let ixs = sc_opcode::payment(&address, &address, 1);
         Transaction::new_s_opcodes(&[keypair], ixs, hash)
     }
 
     fn create_sample_timestamp(keypair: &Keypair, hash: Hash) -> Transaction {
-        let pubkey = keypair.pubkey();
-        let ix = sc_opcode::apply_timestamp(&pubkey, &pubkey, &pubkey, Utc::now());
+        let address = keypair.address();
+        let ix = sc_opcode::apply_timestamp(&address, &address, &address, Utc::now());
         Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 
     fn create_sample_apply_signature(keypair: &Keypair, hash: Hash) -> Transaction {
-        let pubkey = keypair.pubkey();
-        let ix = sc_opcode::apply_signature(&pubkey, &pubkey, &pubkey);
+        let address = keypair.address();
+        let ix = sc_opcode::apply_signature(&address, &address, &address);
         Transaction::new_s_opcodes(&[keypair], vec![ix], hash)
     }
 
@@ -462,8 +462,8 @@ mod tests {
 
         // First, verify entries
         let keypair = Keypair::new();
-        let tx0 = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
-        let tx1 = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 1, zero);
+        let tx0 = sys_controller::create_user_account(&keypair, &keypair.address(), 0, zero);
+        let tx1 = sys_controller::create_user_account(&keypair, &keypair.address(), 1, zero);
         let mut e0 = FsclStmt::new(&zero, 0, vec![tx0.clone(), tx1.clone()]);
         assert!(e0.verify(&zero));
 
@@ -513,7 +513,7 @@ mod tests {
     fn test_next_entry_panic() {
         let zero = Hash::default();
         let keypair = Keypair::new();
-        let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
+        let tx = sys_controller::create_user_account(&keypair, &keypair.address(), 0, zero);
         next_entry(&zero, 0, vec![tx]);
     }
 
@@ -521,7 +521,7 @@ mod tests {
     fn test_serialized_to_blob_size() {
         let zero = Hash::default();
         let keypair = Keypair::new();
-        let tx = sys_controller::create_user_account(&keypair, &keypair.pubkey(), 0, zero);
+        let tx = sys_controller::create_user_account(&keypair, &keypair.address(), 0, zero);
         let entry = next_entry(&zero, 1, vec![tx.clone()]);
         assert_eq!(
             FsclStmt::serialized_to_blob_size(&[tx]),

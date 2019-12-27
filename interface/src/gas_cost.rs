@@ -34,15 +34,15 @@ mod tests {
         assert_eq!(GasCost::new(1).calculate_fee(&context), 0);
 
         // One signature, a fee.
-        let pubkey0 = BvmAddr::new(&[0; 32]);
-        let pubkey1 = BvmAddr::new(&[1; 32]);
-        let ix0 = sys_opcode::transfer(&pubkey0, &pubkey1, 1);
+        let address0 = BvmAddr::new(&[0; 32]);
+        let address1 = BvmAddr::new(&[1; 32]);
+        let ix0 = sys_opcode::transfer(&address0, &address1, 1);
         let context = Context::new(vec![ix0]);
         assert_eq!(GasCost::new(2).calculate_fee(&context), 2);
 
         // Two signatures, double the fee.
-        let ix0 = sys_opcode::transfer(&pubkey0, &pubkey1, 1);
-        let ix1 = sys_opcode::transfer(&pubkey1, &pubkey0, 1);
+        let ix0 = sys_opcode::transfer(&address0, &address1, 1);
+        let ix1 = sys_opcode::transfer(&address1, &address0, 1);
         let context = Context::new(vec![ix0, ix1]);
         assert_eq!(GasCost::new(2).calculate_fee(&context), 4);
     }

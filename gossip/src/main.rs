@@ -12,8 +12,8 @@ use std::error;
 use std::net::SocketAddr;
 use std::process::exit;
 
-fn pubkey_validator(pubkey: String) -> Result<(), String> {
-    match pubkey.parse::<BvmAddr>() {
+fn address_validator(address: String) -> Result<(), String> {
+    match address.parse::<BvmAddr>() {
         Ok(_) => Ok(()),
         Err(err) => Err(format!("{:?}", err)),
     }
@@ -65,12 +65,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                         .help("Wait for exactly NUM nodes to converge"),
                 )
                 .arg(
-                    Arg::with_name("node_pubkey")
+                    Arg::with_name("node_address")
                         .short("p")
-                        .long("pubkey")
+                        .long("address")
                         .value_name("PUBKEY")
                         .takes_value(true)
-                        .validator(pubkey_validator)
+                        .validator(address_validator)
                         .help("Public key of a specific node to wait for"),
                 )
                 .arg(
@@ -88,11 +88,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 .about("Send stop request to a node")
                 .setting(AppSettings::DisableVersion)
                 .arg(
-                    Arg::with_name("node_pubkey")
+                    Arg::with_name("node_address")
                         .index(1)
                         .required(true)
                         .value_name("PUBKEY")
-                        .validator(pubkey_validator)
+                        .validator(address_validator)
                         .help("Public key of a specific node to stop"),
                 ),
         )
@@ -116,9 +116,9 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             let timeout = matches
                 .value_of("timeout")
                 .map(|secs| secs.to_string().parse().unwrap());
-            let pubkey = matches
-                .value_of("node_pubkey")
-                .map(|pubkey_str| pubkey_str.parse::<BvmAddr>().unwrap());
+            let address = matches
+                .value_of("node_address")
+                .map(|address_str| address_str.parse::<BvmAddr>().unwrap());
 
             let gossip_addr = if matches.is_present("pull_only") {
                 None
@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 &connection_url_addr,
                 num_nodes,
                 timeout,
-                pubkey,
+                address,
                 gossip_addr.as_ref(),
             )?;
 
@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                         );
                     }
                 }
-                if let Some(node) = pubkey {
+                if let Some(node) = address {
                     if nodes.iter().find(|x| x.id == node).is_none() {
                         eprintln!("Error: Could not find node {:?}", node);
                     }
@@ -169,18 +169,18 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             }
         }
         ("stop", Some(matches)) => {
-            let pubkey = matches
-                .value_of("node_pubkey")
+            let address = matches
+                .value_of("node_address")
                 .unwrap()
                 .parse::<BvmAddr>()
                 .unwrap();
-            let (nodes, _storage_miners) = discover(&connection_url_addr, None, None, Some(pubkey), None)?;
-            let node = nodes.iter().find(|x| x.id == pubkey).unwrap();
+            let (nodes, _storage_miners) = discover(&connection_url_addr, None, None, Some(address), None)?;
+            let node = nodes.iter().find(|x| x.id == address).unwrap();
 
             if !ContactInfo::is_valid_address(&node.rpc) {
-                eprintln!("Error: RPC service is not enabled on node {:?}", pubkey);
+                eprintln!("Error: RPC service is not enabled on node {:?}", address);
             }
-            println!("\nSending stop request to node {:?}", pubkey);
+            println!("\nSending stop request to node {:?}", address);
 
             let result = RpcClient::new_socket(node.rpc).fullnode_exit()?;
             if result {

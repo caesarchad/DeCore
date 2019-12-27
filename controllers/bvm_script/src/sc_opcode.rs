@@ -68,11 +68,11 @@ pub fn on_date(
     to: &BvmAddr,
     contract: &BvmAddr,
     dt: DateTime<Utc>,
-    dt_pubkey: &BvmAddr,
+    dt_address: &BvmAddr,
     cancelable: Option<BvmAddr>,
     difs: u64,
 ) -> Vec<OpCode> {
-    let expr = BvmScript::new_cancelable_future_payment(dt, dt_pubkey, difs, to, cancelable);
+    let expr = BvmScript::new_cancelable_future_payment(dt, dt_address, difs, to, cancelable);
     create_account(from, contract, difs, expr)
 }
 
@@ -123,28 +123,28 @@ mod tests {
 
     #[test]
     fn test_budget_instruction_verify() {
-        let alice_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
-        payment(&alice_pubkey, &bob_pubkey, 1); // No panic! indicates success.
+        let alice_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
+        payment(&alice_address, &bob_address, 1); // No panic! indicates success.
     }
 
     #[test]
     #[should_panic]
     fn test_budget_instruction_overspend() {
-        let alice_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
-        let budget_pubkey = BvmAddr::new_rand();
-        let expr = BvmScript::new_payment(2, &bob_pubkey);
-        create_account(&alice_pubkey, &budget_pubkey, 1, expr);
+        let alice_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
+        let budget_address = BvmAddr::new_rand();
+        let expr = BvmScript::new_payment(2, &bob_address);
+        create_account(&alice_address, &budget_address, 1, expr);
     }
 
     #[test]
     #[should_panic]
     fn test_budget_instruction_underspend() {
-        let alice_pubkey = BvmAddr::new_rand();
-        let bob_pubkey = BvmAddr::new_rand();
-        let budget_pubkey = BvmAddr::new_rand();
-        let expr = BvmScript::new_payment(1, &bob_pubkey);
-        create_account(&alice_pubkey, &budget_pubkey, 2, expr);
+        let alice_address = BvmAddr::new_rand();
+        let bob_address = BvmAddr::new_rand();
+        let budget_address = BvmAddr::new_rand();
+        let expr = BvmScript::new_payment(1, &bob_address);
+        create_account(&alice_address, &budget_address, 2, expr);
     }
 }

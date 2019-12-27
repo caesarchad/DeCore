@@ -74,20 +74,20 @@ pub fn check_replay_blob(
     blob: &Blob,
     treasury: Option<Arc<Treasury>>,
     leader_schedule_cache: &Arc<LdrSchBufferPoolList>,
-    my_pubkey: &BvmAddr,
+    my_address: &BvmAddr,
 ) -> bool {
-    let slot_leader_pubkey = match treasury {
+    let slot_leader_address = match treasury {
         None => leader_schedule_cache.slot_leader_at(blob.slot(), None),
         Some(treasury) => leader_schedule_cache.slot_leader_at(blob.slot(), Some(&treasury)),
     };
 
-    if blob.id() == *my_pubkey {
+    if blob.id() == *my_address {
         inc_new_counter_debug!("data_filter-accept_epoch-circular_transmission", 1);
         false
-    } else if slot_leader_pubkey == None {
+    } else if slot_leader_address == None {
         inc_new_counter_debug!("data_filter-accept_epoch-unknown_leader", 1);
         false
-    } else if slot_leader_pubkey != Some(blob.id()) {
+    } else if slot_leader_address != Some(blob.id()) {
         inc_new_counter_debug!("data_filter-accept_epoch-wrong_leader", 1);
         false
     } else {
@@ -97,7 +97,7 @@ pub fn check_replay_blob(
 
 fn accept_epoch<F>(
     block_buffer_pool: &Arc<BlockBufferPool>,
-    my_pubkey: &BvmAddr,
+    my_address: &BvmAddr,
     r: &BlobAcptr,
     retransmit: &BlobSndr,
     genesis_transaction_seal: &Hash,
@@ -120,9 +120,9 @@ where
             && blob.read().unwrap().genesis_transaction_seal() == *genesis_transaction_seal
     });
 
-    replay_blobs(&blobs, retransmit, my_pubkey)?;
+    replay_blobs(&blobs, retransmit, my_address)?;
 
-    trace!("{} num blobs received: {}", my_pubkey, blobs.len());
+    trace!("{} num blobs received: {}", my_address, blobs.len());
 
     handle_data_blob(&blobs, block_buffer_pool)?;
 
@@ -293,14 +293,14 @@ mod test {
     #[test]
     fn test_should_retransmit_and_persist() {
         let me_id = BvmAddr::new_rand();
-        let leader_pubkey = BvmAddr::new_rand();
+        let leader_addr = BvmAddr::new_rand();
         let treasury = Arc::new(Treasury::new(
-            &create_genesis_block_with_leader(100, &leader_pubkey, 10).genesis_block,
+            &create_genesis_block_with_leader(100, &leader_addr, 10).genesis_block,
         ));
         let cache = Arc::new(LdrSchBufferPoolList::new_from_treasury(&treasury));
 
         let mut blob = Blob::default();
-        blob.set_id(&leader_pubkey);
+        blob.set_id(&leader_addr);
 
         // without a Treasury and blobs not from me, blob gets thrown out
         assert_eq!(

@@ -11,7 +11,7 @@ use bincode::serialized_size;
 use std::ops::Deref;
 
 /// "Sysca11SlotHashes11111111111111111111111111"
-///  slot hashes account pubkey
+///  slot hashes account address
 const ID: [u8; 32] = [
     6, 167, 211, 138, 69, 219, 186, 157, 48, 170, 46, 66, 2, 146, 193, 59, 39, 59, 245, 188, 30,
     60, 130, 78, 86, 27, 113, 191, 208, 0, 0, 0,
@@ -21,8 +21,8 @@ pub fn id() -> BvmAddr {
     BvmAddr::new(&ID)
 }
 
-pub fn check_id(pubkey: &BvmAddr) -> bool {
-    pubkey.as_ref() == ID
+pub fn check_id(address: &BvmAddr) -> bool {
+    address.as_ref() == ID
 }
 
 pub const MAX_SLOT_HASHES: usize = 512; // 512 slots to get your vote in

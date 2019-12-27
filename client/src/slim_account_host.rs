@@ -127,20 +127,20 @@ impl SlimAccountHost {
 
     pub fn poll_balance_with_timeout(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         polling_frequency: &Duration,
         timeout: &Duration,
     ) -> io::Result<u64> {
         self.rpc_client
-            .poll_balance_with_timeout(pubkey, polling_frequency, timeout)
+            .poll_balance_with_timeout(address, polling_frequency, timeout)
     }
 
-    pub fn poll_get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
-        self.rpc_client.poll_get_balance(pubkey)
+    pub fn poll_get_balance(&self, address: &BvmAddr) -> io::Result<u64> {
+        self.rpc_client.poll_get_balance(address)
     }
 
-    pub fn wait_for_balance(&self, pubkey: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
-        self.rpc_client.wait_for_balance(pubkey, expected_balance)
+    pub fn wait_for_balance(&self, address: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
+        self.rpc_client.wait_for_balance(address, expected_balance)
     }
 
     /// Check a signature in the treasury. This method blocks
@@ -188,19 +188,19 @@ impl OnlineAccount for SlimAccountHost {
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
     ) -> TransportResult<Signature> {
         let transfer_instruction =
-            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.address(), address, difs);
         self.snd_online_instruction(keypair, transfer_instruction)
     }
 
-    fn get_account_data(&self, pubkey: &BvmAddr) -> TransportResult<Option<Vec<u8>>> {
-        Ok(self.rpc_client.get_account_data(pubkey).ok())
+    fn get_account_data(&self, address: &BvmAddr) -> TransportResult<Option<Vec<u8>>> {
+        Ok(self.rpc_client.get_account_data(address).ok())
     }
 
-    fn get_balance(&self, pubkey: &BvmAddr) -> TransportResult<u64> {
-        let balance = self.rpc_client.get_balance(pubkey)?;
+    fn get_balance(&self, address: &BvmAddr) -> TransportResult<u64> {
+        let balance = self.rpc_client.get_balance(address)?;
         Ok(balance)
     }
 
@@ -282,11 +282,11 @@ impl OfflineAccount for SlimAccountHost {
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
-            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.address(), address, difs);
         self.send_offline_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }

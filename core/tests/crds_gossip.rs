@@ -20,16 +20,16 @@ fn star_network_create(num: usize) -> Network {
     let mut network: HashMap<_, _> = (1..num)
         .map(|_| {
             let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-            let id = new.label().pubkey();
+            let id = new.label().address();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
             node.contact_info_table.insert(entry.clone(), 0).unwrap();
             node.set_self(&id);
-            (new.label().pubkey(), Arc::new(Mutex::new(node)))
+            (new.label().address(), Arc::new(Mutex::new(node)))
         })
         .collect();
     let mut node = NodeTbleGossip::default();
-    let id = entry.label().pubkey();
+    let id = entry.label().address();
     node.contact_info_table.insert(entry.clone(), 0).unwrap();
     node.set_self(&id);
     network.insert(id, Arc::new(Mutex::new(node)));
@@ -39,18 +39,18 @@ fn star_network_create(num: usize) -> Network {
 fn rstar_network_create(num: usize) -> Network {
     let entry = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
     let mut origin = NodeTbleGossip::default();
-    let id = entry.label().pubkey();
+    let id = entry.label().address();
     origin.contact_info_table.insert(entry.clone(), 0).unwrap();
     origin.set_self(&id);
     let mut network: HashMap<_, _> = (1..num)
         .map(|_| {
             let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-            let id = new.label().pubkey();
+            let id = new.label().address();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
             origin.contact_info_table.insert(new.clone(), 0).unwrap();
             node.set_self(&id);
-            (new.label().pubkey(), Arc::new(Mutex::new(node)))
+            (new.label().address(), Arc::new(Mutex::new(node)))
         })
         .collect();
     network.insert(id, Arc::new(Mutex::new(origin)));
@@ -61,11 +61,11 @@ fn ring_network_create(num: usize) -> Network {
     let mut network: HashMap<_, _> = (0..num)
         .map(|_| {
             let new = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-            let id = new.label().pubkey();
+            let id = new.label().address();
             let mut node = NodeTbleGossip::default();
             node.contact_info_table.insert(new.clone(), 0).unwrap();
             node.set_self(&id);
-            (new.label().pubkey(), Arc::new(Mutex::new(node)))
+            (new.label().address(), Arc::new(Mutex::new(node)))
         })
         .collect();
     let keys: Vec<BvmAddr> = network.keys().cloned().collect();
@@ -262,7 +262,7 @@ fn network_run_pull(
                 let mut bytes: usize = 0;
                 let mut msgs: usize = 0;
                 let mut overhead: usize = 0;
-                let from = caller_info.label().pubkey();
+                let from = caller_info.label().address();
                 bytes += request.keys.len();
                 bytes += (request.bits.len() / 8) as usize;
                 bytes += serialized_size(&caller_info).unwrap() as usize;
@@ -371,7 +371,7 @@ fn test_prune_errors() {
     node_table_gossip.id = BvmAddr::new(&[0; 32]);
     let id = node_table_gossip.id;
     let ci = ContactInfo::new_localhost(&BvmAddr::new(&[1; 32]), 0);
-    let prune_pubkey = BvmAddr::new(&[2; 32]);
+    let prune_address = BvmAddr::new(&[2; 32]);
     node_table_gossip
         .contact_info_table
         .insert(ContInfTblValue::ContactInfo(ci.clone()), 0)
@@ -382,16 +382,16 @@ fn test_prune_errors() {
     let mut res = node_table_gossip.process_prune_msg(
         &ci.id,
         &BvmAddr::new(hash(&[1; 32]).as_ref()),
-        &[prune_pubkey],
+        &[prune_address],
         now,
         now,
     );
     assert_eq!(res.err(), Some(NodeTbleErr::BadPruneDestination));
     //correct dest
-    res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, now);
+    res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_address], now, now);
     res.unwrap();
     //test timeout
     let timeout = now + node_table_gossip.push.prune_timeout * 2;
-    res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_pubkey], now, timeout);
+    res = node_table_gossip.process_prune_msg(&ci.id, &id, &[prune_address], now, timeout);
     assert_eq!(res.err(), Some(NodeTbleErr::PruneMessageTimeout));
 }

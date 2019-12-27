@@ -90,7 +90,7 @@ impl Validator {
                 module_path!().to_string()
             )
         );
-        let id = keypair.pubkey();
+        let id = keypair.address();
         assert_eq!(id, node.info.id);
         let genesis_block =
             GenesisBlock::load(ledger_path).expect("Expected to successfully open genesis block");
@@ -390,7 +390,7 @@ pub fn new_validator_for_tests() -> (Validator, ContactInfo, Keypair, String) {
     use crate::genesis_utils::{create_genesis_block_with_leader, GenesisBlockInfo};
 
     let node_keypair = Arc::new(Keypair::new());
-    let node = Node::new_localhost_with_pubkey(&node_keypair.pubkey());
+    let node = Node::new_localhost_with_address(&node_keypair.address());
     let contact_info = node.info.clone();
 
     let GenesisBlockInfo {
@@ -410,7 +410,7 @@ pub fn new_validator_for_tests() -> (Validator, ContactInfo, Keypair, String) {
         node,
         &node_keypair,
         &ledger_path,
-        &voting_keypair.pubkey(),
+        &voting_keypair.address(),
         &voting_keypair,
         &storage_keypair,
         None,
@@ -431,12 +431,12 @@ mod tests {
     fn validator_exit() {
         morgan_logger::setup();
         let leader_keypair = Keypair::new();
-        let leader_node = Node::new_localhost_with_pubkey(&leader_keypair.pubkey());
+        let leader_node = Node::new_localhost_with_address(&leader_keypair.address());
 
         let validator_keypair = Keypair::new();
-        let validator_node = Node::new_localhost_with_pubkey(&validator_keypair.pubkey());
+        let validator_node = Node::new_localhost_with_address(&validator_keypair.address());
         let genesis_block =
-            create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000).genesis_block;
+            create_genesis_block_with_leader(10_000, &leader_keypair.address(), 1000).genesis_block;
         let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
 
         let voting_keypair = Arc::new(Keypair::new());
@@ -445,7 +445,7 @@ mod tests {
             validator_node,
             &Arc::new(validator_keypair),
             &validator_ledger_path,
-            &voting_keypair.pubkey(),
+            &voting_keypair.address(),
             &voting_keypair,
             &storage_keypair,
             Some(&leader_node.info),
@@ -458,15 +458,15 @@ mod tests {
     #[test]
     fn validator_parallel_exit() {
         let leader_keypair = Keypair::new();
-        let leader_node = Node::new_localhost_with_pubkey(&leader_keypair.pubkey());
+        let leader_node = Node::new_localhost_with_address(&leader_keypair.address());
 
         let mut ledger_paths = vec![];
         let validators: Vec<Validator> = (0..2)
             .map(|_| {
                 let validator_keypair = Keypair::new();
-                let validator_node = Node::new_localhost_with_pubkey(&validator_keypair.pubkey());
+                let validator_node = Node::new_localhost_with_address(&validator_keypair.address());
                 let genesis_block =
-                    create_genesis_block_with_leader(10_000, &leader_keypair.pubkey(), 1000)
+                    create_genesis_block_with_leader(10_000, &leader_keypair.address(), 1000)
                         .genesis_block;
                 let (validator_ledger_path, _transaction_seal) = create_new_tmp_ledger!(&genesis_block);
                 ledger_paths.push(validator_ledger_path.clone());
@@ -476,7 +476,7 @@ mod tests {
                     validator_node,
                     &Arc::new(validator_keypair),
                     &validator_ledger_path,
-                    &voting_keypair.pubkey(),
+                    &voting_keypair.address(),
                     &voting_keypair,
                     &storage_keypair,
                     Some(&leader_node.info),

@@ -56,16 +56,16 @@ impl OfflineAccount for TreasuryClient {
         self.snd_offline_context(&[keypair], context, recent_transaction_seal)
     }
 
-    /// Transfer `difs` from `keypair` to `pubkey`
+    /// Transfer `difs` from `keypair` to `address`
     fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature> {
         let transfer_instruction =
-            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.address(), address, difs);
         self.send_offline_instruction(keypair, transfer_instruction, recent_transaction_seal)
     }
 }
@@ -84,19 +84,19 @@ impl OnlineAccount for TreasuryClient {
         self.snd_online_context(&[keypair], context)
     }
 
-    /// Transfer `difs` from `keypair` to `pubkey`
-    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &BvmAddr) -> Result<Signature> {
+    /// Transfer `difs` from `keypair` to `address`
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, address: &BvmAddr) -> Result<Signature> {
         let transfer_instruction =
-            sys_opcode::transfer(&keypair.pubkey(), pubkey, difs);
+            sys_opcode::transfer(&keypair.address(), address, difs);
         self.snd_online_instruction(keypair, transfer_instruction)
     }
 
-    fn get_account_data(&self, pubkey: &BvmAddr) -> Result<Option<Vec<u8>>> {
-        Ok(self.treasury.get_account(pubkey).map(|account| account.data))
+    fn get_account_data(&self, address: &BvmAddr) -> Result<Option<Vec<u8>>> {
+        Ok(self.treasury.get_account(address).map(|account| account.data))
     }
 
-    fn get_balance(&self, pubkey: &BvmAddr) -> Result<u64> {
-        Ok(self.treasury.get_balance(pubkey))
+    fn get_balance(&self, address: &BvmAddr) -> Result<u64> {
+        Ok(self.treasury.get_balance(address))
     }
 
     fn get_signature_status(
@@ -222,22 +222,22 @@ mod tests {
     #[test]
     fn test_treasury_client_new_with_keypairs() {
         let (genesis_block, john_doe_keypair) = create_genesis_block(10_000);
-        let john_pubkey = john_doe_keypair.pubkey();
+        let john_address = john_doe_keypair.address();
         let jane_doe_keypair = Keypair::new();
-        let jane_pubkey = jane_doe_keypair.pubkey();
+        let jane_address = jane_doe_keypair.address();
         let doe_keypairs = vec![&john_doe_keypair, &jane_doe_keypair];
         let treasury = Treasury::new(&genesis_block);
         let treasury_client = TreasuryClient::new(treasury);
 
         // Create 2-2 Multisig Transfer instruction.
-        let bob_pubkey = BvmAddr::new_rand();
-        let mut transfer_instruction = sys_opcode::transfer(&john_pubkey, &bob_pubkey, 42);
+        let bob_address = BvmAddr::new_rand();
+        let mut transfer_instruction = sys_opcode::transfer(&john_address, &bob_address, 42);
         transfer_instruction
             .accounts
-            .push(AccountMeta::new(jane_pubkey, true));
+            .push(AccountMeta::new(jane_address, true));
 
         let context = Context::new(vec![transfer_instruction]);
         treasury_client.snd_online_context(&doe_keypairs, context).unwrap();
-        assert_eq!(treasury_client.get_balance(&bob_pubkey).unwrap(), 42);
+        assert_eq!(treasury_client.get_balance(&bob_address).unwrap(), 42);
     }
 }

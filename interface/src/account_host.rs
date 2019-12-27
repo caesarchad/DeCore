@@ -30,15 +30,15 @@ pub trait OnlineAccount {
     /// a single signer. Then send it to the server, retrying as-needed.
     fn snd_online_instruction(&self, keypair: &Keypair, instruction: OpCode) -> Result<Signature>;
 
-    /// Transfer difs from `keypair` to `pubkey`, retrying until the
+    /// Transfer difs from `keypair` to `address`, retrying until the
     /// transfer completes or produces and error.
-    fn online_transfer(&self, difs: u64, keypair: &Keypair, pubkey: &BvmAddr) -> Result<Signature>;
+    fn online_transfer(&self, difs: u64, keypair: &Keypair, address: &BvmAddr) -> Result<Signature>;
 
     /// Get an account or None if not found.
-    fn get_account_data(&self, pubkey: &BvmAddr) -> Result<Option<Vec<u8>>>;
+    fn get_account_data(&self, address: &BvmAddr) -> Result<Option<Vec<u8>>>;
 
     /// Get account balance or 0 if not found.
-    fn get_balance(&self, pubkey: &BvmAddr) -> Result<u64>;
+    fn get_balance(&self, address: &BvmAddr) -> Result<u64>;
 
     /// Get signature status.
     fn get_signature_status(
@@ -90,12 +90,12 @@ pub trait OfflineAccount {
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 
-    /// Attempt to transfer difs from `keypair` to `pubkey`, but don't wait to confirm.
+    /// Attempt to transfer difs from `keypair` to `address`, but don't wait to confirm.
     fn offline_transfer(
         &self,
         difs: u64,
         keypair: &Keypair,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         recent_transaction_seal: Hash,
     ) -> io::Result<Signature>;
 }

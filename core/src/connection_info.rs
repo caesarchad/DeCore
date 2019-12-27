@@ -165,7 +165,7 @@ impl ContactInfo {
     }
 
     #[cfg(test)]
-    fn new_with_pubkey_socketaddr(pubkey: &BvmAddr, bind_addr: &SocketAddr) -> Self {
+    fn new_with_address_socketaddr(address: &BvmAddr, bind_addr: &SocketAddr) -> Self {
         fn next_port(addr: &SocketAddr, nxt: u16) -> SocketAddr {
             let mut nxt_addr = *addr;
             nxt_addr.set_port(addr.port() + nxt);
@@ -179,7 +179,7 @@ impl ContactInfo {
         let rpc_addr = SocketAddr::new(bind_addr.ip(), DEFAULT_RPC_PORT);
         let rpc_pubsub_addr = SocketAddr::new(bind_addr.ip(), DEFAULT_RPC_PUBSUB_PORT);
         Self::new(
-            pubkey,
+            address,
             gossip_addr,
             blz_nd_url,
             transaction_digesting_module_addr,
@@ -194,7 +194,7 @@ impl ContactInfo {
     #[cfg(test)]
     pub(crate) fn new_with_socketaddr(bind_addr: &SocketAddr) -> Self {
         let keypair = Keypair::new();
-        Self::new_with_pubkey_socketaddr(&keypair.pubkey(), bind_addr)
+        Self::new_with_address_socketaddr(&keypair.address(), bind_addr)
     }
 
     // Construct a ContactInfo that's only usable for gossip
@@ -240,7 +240,7 @@ impl ContactInfo {
 }
 
 impl Signable for ContactInfo {
-    fn pubkey(&self) -> BvmAddr {
+    fn address(&self) -> BvmAddr {
         self.id
     }
 
@@ -347,13 +347,13 @@ mod tests {
         assert!(ci.storage_addr.ip().is_unspecified());
     }
     #[test]
-    fn replayed_data_new_with_socketaddr_with_pubkey() {
+    fn replayed_data_new_with_socketaddr_with_address() {
         let keypair = Keypair::new();
-        let d1 = ContactInfo::new_with_pubkey_socketaddr(
-            &keypair.pubkey(),
+        let d1 = ContactInfo::new_with_address_socketaddr(
+            &keypair.address(),
             &socketaddr!("127.0.0.1:1234"),
         );
-        assert_eq!(d1.id, keypair.pubkey());
+        assert_eq!(d1.id, keypair.address());
         assert_eq!(d1.gossip, socketaddr!("127.0.0.1:1235"));
         assert_eq!(d1.blaze_unit, socketaddr!("127.0.0.1:1236"));
         assert_eq!(d1.transaction_digesting_module_via_blobs, socketaddr!("127.0.0.1:1237"));

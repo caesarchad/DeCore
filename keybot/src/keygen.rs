@@ -1,5 +1,5 @@
 use clap::{crate_description, crate_name, crate_version, App, Arg, SubCommand};
-use morgan_interface::bvm_address::write_pubkey;
+use morgan_interface::bvm_address::write_address;
 use morgan_interface::signature::{gen_keypair_file, read_keypair, KeypairUtil};
 use std::error;
 
@@ -28,8 +28,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("pubkey")
-                .about("Display the pubkey from a keypair file")
+            SubCommand::with_name("address")
+                .about("Display the address from a keypair file")
                 .arg(
                     Arg::with_name("infile")
                         .index(1)
@@ -49,21 +49,21 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .get_matches();
 
     match matches.subcommand() {
-        ("pubkey", Some(pubkey_matches)) => {
+        ("address", Some(address_matches)) => {
             let mut path = dirs::home_dir().expect("home directory");
-            let infile = if pubkey_matches.is_present("infile") {
-                pubkey_matches.value_of("infile").unwrap()
+            let infile = if address_matches.is_present("infile") {
+                address_matches.value_of("infile").unwrap()
             } else {
                 path.extend(&[".config", "morgan", "id.json"]);
                 path.to_str().unwrap()
             };
             let keypair = read_keypair(infile)?;
 
-            if pubkey_matches.is_present("outfile") {
-                let outfile = pubkey_matches.value_of("outfile").unwrap();
-                write_pubkey(outfile, keypair.pubkey())?;
+            if address_matches.is_present("outfile") {
+                let outfile = address_matches.value_of("outfile").unwrap();
+                write_address(outfile, keypair.address())?;
             } else {
-                println!("{}", keypair.pubkey());
+                println!("{}", keypair.address());
             }
         }
         match_tuple => {

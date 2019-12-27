@@ -15,7 +15,7 @@ use morgan_vote_api::vote_state::VoteState;
 pub enum StakeState {
     Uninitialized,
     Delegate {
-        voter_pubkey: BvmAddr,
+        voter_address: BvmAddr,
         credits_observed: u64,
     },
     MiningPool,
@@ -46,13 +46,13 @@ impl StakeState {
     }
 
     // utility function, used by Stakes, tests
-    pub fn voter_pubkey_from(account: &Account) -> Option<BvmAddr> {
-        Self::from(account).and_then(|state: Self| state.voter_pubkey())
+    pub fn voter_address_from(account: &Account) -> Option<BvmAddr> {
+        Self::from(account).and_then(|state: Self| state.voter_address())
     }
 
-    pub fn voter_pubkey(&self) -> Option<BvmAddr> {
+    pub fn voter_address(&self) -> Option<BvmAddr> {
         match self {
-            StakeState::Delegate { voter_pubkey, .. } => Some(*voter_pubkey),
+            StakeState::Delegate { voter_address, .. } => Some(*voter_address),
             _ => None,
         }
     }
@@ -109,7 +109,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
     fn initialize_delegate(&mut self) -> Result<(), OpCodeErr> {
         if let StakeState::Uninitialized = self.state()? {
             self.set_state(&StakeState::Delegate {
-                voter_pubkey: BvmAddr::default(),
+                voter_address: BvmAddr::default(),
                 credits_observed: 0,
             })
         } else {
@@ -124,7 +124,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
         if let StakeState::Delegate { .. } = self.state()? {
             let vote_state: VoteState = vote_account.state()?;
             self.set_state(&StakeState::Delegate {
-                voter_pubkey: *vote_account.unsigned_key(),
+                voter_address: *vote_account.unsigned_key(),
                 credits_observed: vote_state.credits(),
             })
         } else {
@@ -140,14 +140,14 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
         if let (
             StakeState::MiningPool,
             StakeState::Delegate {
-                voter_pubkey,
+                voter_address,
                 credits_observed,
             },
         ) = (self.state()?, stake_account.state()?)
         {
             let vote_state: VoteState = vote_account.state()?;
 
-            if voter_pubkey != *vote_account.unsigned_key() {
+            if voter_address != *vote_account.unsigned_key() {
                 return Err(OpCodeErr::InvalidArgument);
             }
 
@@ -168,7 +168,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
                 vote_account.account.difs += voters_reward;
 
                 stake_account.set_state(&StakeState::Delegate {
-                    voter_pubkey,
+                    voter_address,
                     credits_observed: vote_state.credits(),
                 })
             } else {
@@ -183,7 +183,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
 
 // utility function, used by Treasury, tests, genesis
 pub fn create_delegate_stake_account(
-    voter_pubkey: &BvmAddr,
+    voter_address: &BvmAddr,
     vote_state: &VoteState,
     difs: u64,
 ) -> Account {
@@ -191,7 +191,7 @@ pub fn create_delegate_stake_account(
 
     stake_account
         .set_state(&StakeState::Delegate {
-            voter_pubkey: *voter_pubkey,
+            voter_address: *voter_address,
             credits_observed: vote_state.credits(),
         })
         .expect("set_state");
@@ -216,16 +216,16 @@ mod tests {
             vote_state.process_slot_vote_unchecked(i);
         }
 
-        let vote_pubkey = vote_keypair.pubkey();
+        let vote_address = vote_keypair.address();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
-        let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
+            vote_state::create_account(&vote_address, &BvmAddr::new_rand(), 0, 100);
+        let mut vote_keyed_account = KeyedAccount::new(&vote_address, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let stake_pubkey = BvmAddr::default();
+        let stake_address = BvmAddr::default();
         let mut stake_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
 
-        let mut stake_keyed_account = KeyedAccount::new(&stake_pubkey, false, &mut stake_account);
+        let mut stake_keyed_account = KeyedAccount::new(&stake_address, false, &mut stake_account);
 
         {
             let stake_state: StakeState = stake_keyed_account.state().unwrap();
@@ -238,7 +238,7 @@ mod tests {
             Err(OpCodeErr::MissingRequiredSignature)
         );
 
-        let mut stake_keyed_account = KeyedAccount::new(&stake_pubkey, true, &mut stake_account);
+        let mut stake_keyed_account = KeyedAccount::new(&stake_address, true, &mut stake_account);
         assert!(stake_keyed_account
             .delegate_stake(&vote_keyed_account)
             .is_ok());
@@ -246,7 +246,7 @@ mod tests {
         // verify that create_delegate_stake_account() matches the
         //   resulting account from delegate_stake()
         assert_eq!(
-            create_delegate_stake_account(&vote_pubkey, &vote_state, 0),
+            create_delegate_stake_account(&vote_address, &vote_state, 0),
             *stake_keyed_account.account,
         );
 
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(
             stake_state,
             StakeState::Delegate {
-                voter_pubkey: vote_keypair.pubkey(),
+                voter_address: vote_keypair.address(),
                 credits_observed: vote_state.credits()
             }
         );
@@ -321,20 +321,20 @@ mod tests {
             vote_state.process_slot_vote_unchecked(i);
         }
 
-        let vote_pubkey = vote_keypair.pubkey();
+        let vote_address = vote_keypair.address();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
-        let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
+            vote_state::create_account(&vote_address, &BvmAddr::new_rand(), 0, 100);
+        let mut vote_keyed_account = KeyedAccount::new(&vote_address, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let pubkey = BvmAddr::default();
+        let address = BvmAddr::default();
         let mut stake_account = Account::new(
             STAKE_GETS_PAID_EVERY_VOTE,
             0,
             std::mem::size_of::<StakeState>(),
             &id(),
         );
-        let mut stake_keyed_account = KeyedAccount::new(&pubkey, true, &mut stake_account);
+        let mut stake_keyed_account = KeyedAccount::new(&address, true, &mut stake_account);
         stake_keyed_account.initialize_delegate().unwrap();
 
         // delegate the stake
@@ -344,7 +344,7 @@ mod tests {
 
         let mut mining_pool_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
         let mut mining_pool_keyed_account =
-            KeyedAccount::new(&pubkey, true, &mut mining_pool_account);
+            KeyedAccount::new(&address, true, &mut mining_pool_account);
 
         // not a mining pool yet...
         assert_eq!(
@@ -396,15 +396,15 @@ mod tests {
             vote_state.process_slot_vote_unchecked(i);
         }
 
-        let vote_pubkey = vote_keypair.pubkey();
+        let vote_address = vote_keypair.address();
         let mut vote_account =
-            vote_state::create_account(&vote_pubkey, &BvmAddr::new_rand(), 0, 100);
-        let mut vote_keyed_account = KeyedAccount::new(&vote_pubkey, false, &mut vote_account);
+            vote_state::create_account(&vote_address, &BvmAddr::new_rand(), 0, 100);
+        let mut vote_keyed_account = KeyedAccount::new(&vote_address, false, &mut vote_account);
         vote_keyed_account.set_state(&vote_state).unwrap();
 
-        let pubkey = BvmAddr::default();
+        let address = BvmAddr::default();
         let mut stake_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
-        let mut stake_keyed_account = KeyedAccount::new(&pubkey, true, &mut stake_account);
+        let mut stake_keyed_account = KeyedAccount::new(&address, true, &mut stake_account);
         stake_keyed_account.initialize_delegate().unwrap();
 
         // delegate the stake
@@ -414,7 +414,7 @@ mod tests {
 
         let mut mining_pool_account = Account::new(0, 0, std::mem::size_of::<StakeState>(), &id());
         let mut mining_pool_keyed_account =
-            KeyedAccount::new(&pubkey, true, &mut mining_pool_account);
+            KeyedAccount::new(&address, true, &mut mining_pool_account);
         mining_pool_keyed_account
             .set_state(&StakeState::MiningPool)
             .unwrap();
@@ -433,13 +433,13 @@ mod tests {
         );
 
         let vote1_keypair = Keypair::new();
-        let vote1_pubkey = vote1_keypair.pubkey();
+        let vote1_address = vote1_keypair.address();
         let mut vote1_account =
-            vote_state::create_account(&vote1_pubkey, &BvmAddr::new_rand(), 0, 100);
-        let mut vote1_keyed_account = KeyedAccount::new(&vote1_pubkey, false, &mut vote1_account);
+            vote_state::create_account(&vote1_address, &BvmAddr::new_rand(), 0, 100);
+        let mut vote1_keyed_account = KeyedAccount::new(&vote1_address, false, &mut vote1_account);
         vote1_keyed_account.set_state(&vote_state).unwrap();
 
-        // wrong voter_pubkey...
+        // wrong voter_address...
         assert_eq!(
             mining_pool_keyed_account
                 .redeem_vote_credits(&mut stake_keyed_account, &mut vote1_keyed_account),

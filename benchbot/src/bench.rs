@@ -153,7 +153,7 @@ where
             continue;
         }
         transaction_seal_time = Instant::now();
-        let balance = client.get_balance(&id.pubkey()).unwrap_or(0);
+        let balance = client.get_balance(&id.address()).unwrap_or(0);
         metrics_submit_lamport_balance(balance);
         generate_txs(
             &shared_txs,
@@ -196,7 +196,7 @@ where
         }
     }
 
-    let balance = client.get_balance(&id.pubkey()).unwrap_or(0);
+    let balance = client.get_balance(&id.address()).unwrap_or(0);
     metrics_submit_lamport_balance(balance);
 
     compute_and_report_stats(
@@ -239,7 +239,7 @@ fn generate_txs(
         .par_iter()
         .map(|(id, keypair)| {
             (
-                sys_controller::create_user_account(id, &keypair.pubkey(), 1, *transaction_seal),
+                sys_controller::create_user_account(id, &keypair.address(), 1, *transaction_seal),
                 timestamp(),
             )
         })
@@ -357,7 +357,7 @@ pub fn fund_keys<T: AccountHost>(client: &T, genesis: &Keypair, dests: &[Keypair
             let per_unit = f.1 / (max_units as u64);
             let moves: Vec<_> = notfunded[start..]
                 .iter()
-                .map(|k| (k.pubkey(), per_unit))
+                .map(|k| (k.address(), per_unit))
                 .collect();
             notfunded[start..]
                 .iter()
@@ -383,7 +383,7 @@ pub fn fund_keys<T: AccountHost>(client: &T, genesis: &Keypair, dests: &[Keypair
                     (
                         k.clone(),
                         Transaction::new_u_opcodes(sys_opcode::transfer_many(
-                            &k.pubkey(),
+                            &k.address(),
                             &m,
                         )),
                     )
@@ -446,7 +446,7 @@ pub fn airdrop_difs<T: AccountHost>(
     id: &Keypair,
     tx_count: u64,
 ) {
-    let starting_balance = client.get_balance(&id.pubkey()).unwrap_or(0);
+    let starting_balance = client.get_balance(&id.address()).unwrap_or(0);
     metrics_submit_lamport_balance(starting_balance);
     println!("starting balance {}", starting_balance);
 
@@ -456,11 +456,11 @@ pub fn airdrop_difs<T: AccountHost>(
             "Airdropping {:?} difs from {} for {}",
             airdrop_amount,
             drone_addr,
-            id.pubkey(),
+            id.address(),
         );
 
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
-        match request_airdrop_transaction(&drone_addr, &id.pubkey(), airdrop_amount, transaction_seal) {
+        match request_airdrop_transaction(&drone_addr, &id.address(), airdrop_amount, transaction_seal) {
             Ok(transaction) => {
                 let signature = client.send_offline_transaction(transaction).unwrap();
                 client
@@ -480,7 +480,7 @@ pub fn airdrop_difs<T: AccountHost>(
             }
         };
 
-        let current_balance = client.get_balance(&id.pubkey()).unwrap_or_else(|e| {
+        let current_balance = client.get_balance(&id.address()).unwrap_or_else(|e| {
             println!("airdrop error {}", e);
             starting_balance
         });
@@ -490,7 +490,7 @@ pub fn airdrop_difs<T: AccountHost>(
         if current_balance - starting_balance != airdrop_amount {
             println!(
                 "Airdrop failed! {} {} {}",
-                id.pubkey(),
+                id.address(),
                 current_balance,
                 starting_balance
             );
@@ -591,7 +591,7 @@ pub fn generate_keypairs(seed_keypair: &Keypair, count: usize) -> Vec<Keypair> {
 pub fn generate_and_fund_keypairs<T: AccountHost>(
     client: &T,
     drone_addr: Option<SocketAddr>,
-    funding_pubkey: &Keypair,
+    fund_addr: &Keypair,
     tx_count: usize,
     difs_per_account: u64,
 ) -> (Vec<Keypair>, u64) {
@@ -607,7 +607,7 @@ pub fn generate_and_fund_keypairs<T: AccountHost>(
         )
     );
 
-    let mut keypairs = generate_keypairs(funding_pubkey, tx_count * 2);
+    let mut keypairs = generate_keypairs(fund_addr, tx_count * 2);
 
     // info!("Get difs...");
     // info!(target: "bench", "{}",
@@ -624,14 +624,14 @@ pub fn generate_and_fund_keypairs<T: AccountHost>(
     // Sample the first keypair, see if it has difs, if so then resume.
     // This logic is to prevent dif loss on repeated morgan-bench-tps executions
     let last_keypair_balance = client
-        .get_balance(&keypairs[tx_count * 2 - 1].pubkey())
+        .get_balance(&keypairs[tx_count * 2 - 1].address())
         .unwrap_or(0);
 
     if difs_per_account > last_keypair_balance {
         let extra = difs_per_account - last_keypair_balance;
         let total = extra * (keypairs.len() as u64);
-        if client.get_balance(&funding_pubkey.pubkey()).unwrap_or(0) < total {
-            airdrop_difs(client, &drone_addr.unwrap(), funding_pubkey, total);
+        if client.get_balance(&fund_addr.address()).unwrap_or(0) < total {
+            airdrop_difs(client, &drone_addr.unwrap(), fund_addr, total);
         }
         // info!("adding more difs {}", extra);
         // info!(target: "bench", "{}",
@@ -645,7 +645,7 @@ pub fn generate_and_fund_keypairs<T: AccountHost>(
             )
         );
 
-        fund_keys(client, funding_pubkey, &keypairs, extra);
+        fund_keys(client, fund_addr, &keypairs, extra);
     }
 
     // 'generate_keypairs' generates extra keys to be able to have size-aligned funding batches for fund_keys.
@@ -696,7 +696,7 @@ mod tests {
         });
 
         let drone_keypair = Keypair::new();
-        node_group.transfer(&node_group.funding_keypair, &drone_keypair.pubkey(), 1_000_000);
+        node_group.transfer(&node_group.funding_keypair, &drone_keypair.address(), 1_000_000);
 
         let (addr_sender, addr_receiver) = channel();
         run_local_drone(drone_keypair, addr_sender, None);
@@ -754,7 +754,7 @@ mod tests {
 
         for kp in &keypairs {
             // TODO: This should be >= difs, but fails at the moment
-            assert_ne!(client.get_balance(&kp.pubkey()).unwrap(), 0);
+            assert_ne!(client.get_balance(&kp.address()).unwrap(), 0);
         }
     }
 }

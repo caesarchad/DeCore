@@ -187,8 +187,8 @@ fn main() {
 
     let staking_account = matches
         .value_of("staking_account")
-        .map_or(voting_keypair.pubkey(), |pubkey| {
-            pubkey.parse().expect("failed to parse staking_account")
+        .map_or(voting_keypair.address(), |address| {
+            address.parse().expect("failed to parse staking_account")
         });
 
     let ledger_path = matches.value_of("ledger").unwrap();
@@ -242,7 +242,7 @@ fn main() {
     validator_config.nodesyncflow = matches.value_of("nodesyncflow").map(ToString::to_string);
 
     let keypair = Arc::new(keypair);
-    let mut node = Node::new_with_external_ip(&keypair.pubkey(), &gossip_addr, dynamic_port_range);
+    let mut node = Node::new_with_external_ip(&keypair.address(), &gossip_addr, dynamic_port_range);
     if let Some(port) = matches.value_of("rpc_port") {
         let port_number = port.to_string().parse().expect("integer");
         if port_number == 0 {

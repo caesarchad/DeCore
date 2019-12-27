@@ -94,7 +94,7 @@ impl Transaction {
     ) -> Self {
         let mut account_keys: Vec<_> = from_keypairs
             .iter()
-            .map(|keypair| (*keypair).pubkey())
+            .map(|keypair| (*keypair).address())
             .collect();
         account_keys.extend_from_slice(keys);
         account_keys.extend(&program_ids);
@@ -161,7 +161,7 @@ impl Transaction {
         let signed_keys =
             &self.context.account_keys[0..self.context.header.num_required_signatures as usize];
         for (i, keypair) in keypairs.iter().enumerate() {
-            assert_eq!(keypair.pubkey(), signed_keys[i], "keypair-pubkey mismatch");
+            assert_eq!(keypair.address(), signed_keys[i], "keypair-address mismatch");
         }
         assert_eq!(keypairs.len(), signed_keys.len(), "not enough keypairs");
         self.sign_unchecked(keypairs, recent_transaction_seal);
@@ -185,8 +185,8 @@ impl Transaction {
         for keypair in keypairs {
             let i = signed_keys
                 .iter()
-                .position(|pubkey| pubkey == &keypair.pubkey())
-                .expect("keypair-pubkey mismatch");
+                .position(|address| address == &keypair.address())
+                .expect("keypair-address mismatch");
 
             self.signatures[i] = keypair.sign_context(&self.context_data())
         }
@@ -251,11 +251,11 @@ mod tests {
         );
         assert!(tx.verify_refs());
 
-        assert_eq!(tx.key(0, 0), Some(&key.pubkey()));
-        assert_eq!(tx.signer_key(0, 0), Some(&key.pubkey()));
+        assert_eq!(tx.key(0, 0), Some(&key.address()));
+        assert_eq!(tx.signer_key(0, 0), Some(&key.address()));
 
-        assert_eq!(tx.key(1, 0), Some(&key.pubkey()));
-        assert_eq!(tx.signer_key(1, 0), Some(&key.pubkey()));
+        assert_eq!(tx.key(1, 0), Some(&key.address()));
+        assert_eq!(tx.signer_key(1, 0), Some(&key.address()));
 
         assert_eq!(tx.key(0, 1), Some(&key1));
         assert_eq!(tx.signer_key(0, 1), None);
@@ -318,7 +318,7 @@ mod tests {
             2, 2, 2,
         ]);
         let account_metas = vec![
-            AccountMeta::new(keypair.pubkey(), true),
+            AccountMeta::new(keypair.address(), true),
             AccountMeta::new(to, false),
         ];
         let instruction = OpCode::new(program_id, &(1u8, 2u8, 3u8), account_metas);
@@ -338,9 +338,9 @@ mod tests {
     #[test]
     fn test_transaction_minimum_serialized_size() {
         let alice_keypair = Keypair::new();
-        let alice_pubkey = alice_keypair.pubkey();
-        let bob_pubkey = BvmAddr::new_rand();
-        let ix = sys_opcode::transfer(&alice_pubkey, &bob_pubkey, 42);
+        let alice_address = alice_keypair.address();
+        let bob_address = BvmAddr::new_rand();
+        let ix = sys_opcode::transfer(&alice_address, &bob_address, 42);
 
         let expected_data_size = size_of::<u32>() + size_of::<u64>();
         assert_eq!(expected_data_size, 12);
@@ -433,9 +433,9 @@ mod tests {
             BvmAddr::default(),
             &0,
             vec![
-                AccountMeta::new(keypair0.pubkey(), true),
-                AccountMeta::new(keypair1.pubkey(), true),
-                AccountMeta::new(keypair2.pubkey(), true),
+                AccountMeta::new(keypair0.address(), true),
+                AccountMeta::new(keypair1.address(), true),
+                AccountMeta::new(keypair2.address(), true),
             ],
         )]);
 
@@ -456,7 +456,7 @@ mod tests {
     fn test_transaction_missing_keypair() {
         let program_id = BvmAddr::default();
         let keypair0 = Keypair::new();
-        let id0 = keypair0.pubkey();
+        let id0 = keypair0.address();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
         Transaction::new_u_opcodes(vec![ix])
             .sign(&Vec::<&Keypair>::new(), Hash::default());
@@ -476,7 +476,7 @@ mod tests {
     fn test_transaction_correct_key() {
         let program_id = BvmAddr::default();
         let keypair0 = Keypair::new();
-        let id0 = keypair0.pubkey();
+        let id0 = keypair0.address();
         let ix = OpCode::new(program_id, &0, vec![AccountMeta::new(id0, true)]);
         let mut tx = Transaction::new_u_opcodes(vec![ix]);
         tx.sign(&[&keypair0], Hash::default());

@@ -214,10 +214,10 @@ impl RpcClient {
 
     pub fn retry_get_balance(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         retries: usize,
     ) -> Result<Option<u64>, Box<dyn error::Error>> {
-        let params = json!([format!("{}", pubkey)]);
+        let params = json!([format!("{}", address)]);
         let res = self
             .client
             .send(&RpcRequest::GetBalance, Some(params), retries)?
@@ -225,8 +225,8 @@ impl RpcClient {
         Ok(res)
     }
 
-    pub fn get_account(&self, pubkey: &BvmAddr) -> io::Result<Account> {
-        let params = json!([format!("{}", pubkey)]);
+    pub fn get_account(&self, address: &BvmAddr) -> io::Result<Account> {
+        let params = json!([format!("{}", address)]);
         let response = self
             .client
             .send(&RpcRequest::GetAccountInfo, Some(params), 0);
@@ -235,26 +235,26 @@ impl RpcClient {
             .and_then(|account_json| {
                 let account: Account =
                     serde_json::from_value(account_json).expect("deserialize account");
-                trace!("Response account {:?} {:?}", pubkey, account);
+                trace!("Response account {:?} {:?}", address, account);
                 Ok(account)
             })
             .map_err(|err| {
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("AccountNotFound: pubkey={}: {}", pubkey, err),
+                    format!("AccountNotFound: address={}: {}", address, err),
                 )
             })
     }
 
-    pub fn get_account_data(&self, pubkey: &BvmAddr) -> io::Result<Vec<u8>> {
-        self.get_account(pubkey).map(|account| account.data)
+    pub fn get_account_data(&self, address: &BvmAddr) -> io::Result<Vec<u8>> {
+        self.get_account(address).map(|account| account.data)
     }
 
-    /// Request the balance of the user holding `pubkey`. This method blocks
+    /// Request the balance of the user holding `address`. This method blocks
     /// until the server sends a response. If the response packet is dropped
     /// by the network, this method will hang indefinitely.
-    pub fn get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
-        self.get_account(pubkey).map(|account| account.difs)
+    pub fn get_balance(&self, address: &BvmAddr) -> io::Result<u64> {
+        self.get_account(address).map(|account| account.difs)
     }
 
     /// Request the transaction count.  If the response packet is dropped by the network,
@@ -330,13 +330,13 @@ impl RpcClient {
 
     pub fn poll_balance_with_timeout(
         &self,
-        pubkey: &BvmAddr,
+        address: &BvmAddr,
         polling_frequency: &Duration,
         timeout: &Duration,
     ) -> io::Result<u64> {
         let now = Instant::now();
         loop {
-            match self.get_balance(&pubkey) {
+            match self.get_balance(&address) {
                 Ok(bal) => {
                     return Ok(bal);
                 }
@@ -350,14 +350,14 @@ impl RpcClient {
         }
     }
 
-    pub fn poll_get_balance(&self, pubkey: &BvmAddr) -> io::Result<u64> {
-        self.poll_balance_with_timeout(pubkey, &Duration::from_millis(100), &Duration::from_secs(1))
+    pub fn poll_get_balance(&self, address: &BvmAddr) -> io::Result<u64> {
+        self.poll_balance_with_timeout(address, &Duration::from_millis(100), &Duration::from_secs(1))
     }
 
-    pub fn wait_for_balance(&self, pubkey: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
+    pub fn wait_for_balance(&self, address: &BvmAddr, expected_balance: Option<u64>) -> Option<u64> {
         const LAST: usize = 30;
         for run in 0..LAST {
-            let balance_result = self.poll_get_balance(pubkey);
+            let balance_result = self.poll_get_balance(address);
             if expected_balance.is_none() {
                 return balance_result.ok();
             }

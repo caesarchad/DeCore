@@ -37,7 +37,7 @@ extern "C" {
         total_packets: u32,
         total_signatures: u32,
         message_lens: *const u32,
-        pubkey_offsets: *const u32,
+        address_offsets: *const u32,
         signature_offsets: *const u32,
         signed_message_offsets: *const u32,
         out: *mut u8, //combined length of all the items in vecs
@@ -67,9 +67,9 @@ pub fn init() {
 }
 
 fn verify_packet(packet: &Pkt) -> u8 {
-    let (sig_len, sig_start, msg_start, pubkey_start) = get_packet_offsets(packet, 0);
+    let (sig_len, sig_start, msg_start, address_start) = get_packet_offsets(packet, 0);
     let mut sig_start = sig_start as usize;
-    let mut pubkey_start = pubkey_start as usize;
+    let mut address_start = address_start as usize;
     let msg_start = msg_start as usize;
 
     if packet.meta.size <= msg_start {
@@ -78,21 +78,21 @@ fn verify_packet(packet: &Pkt) -> u8 {
 
     let msg_end = packet.meta.size;
     for _ in 0..sig_len {
-        let pubkey_end = pubkey_start as usize + size_of::<BvmAddr>();
+        let address_end = address_start as usize + size_of::<BvmAddr>();
         let sig_end = sig_start as usize + size_of::<Signature>();
 
-        if pubkey_end >= packet.meta.size || sig_end >= packet.meta.size {
+        if address_end >= packet.meta.size || sig_end >= packet.meta.size {
             return 0;
         }
 
         let signature = Signature::new(&packet.data[sig_start..sig_end]);
         if !signature.verify(
-            &packet.data[pubkey_start..pubkey_end],
+            &packet.data[address_start..address_end],
             &packet.data[msg_start..msg_end],
         ) {
             return 0;
         }
-        pubkey_start += size_of::<BvmAddr>();
+        address_start += size_of::<BvmAddr>();
         sig_start += size_of::<Signature>();
     }
     1
@@ -111,24 +111,24 @@ pub fn get_packet_offsets(packet: &Pkt, current_offset: u32) -> (u32, u32, u32, 
     let (sig_len, sig_size) = des_lenth(&packet.data);
     let msg_start_offset = sig_size + sig_len * size_of::<Signature>();
 
-    let (_pubkey_len, pubkey_size) = des_lenth(&packet.data[msg_start_offset..]);
+    let (_address_len, address_size) = des_lenth(&packet.data[msg_start_offset..]);
 
     let sig_start = current_offset as usize + sig_size;
     let msg_start = current_offset as usize + msg_start_offset;
-    let pubkey_start =
-        msg_start + serialized_size(&MessageHeader::default()).unwrap() as usize + pubkey_size;
+    let address_start =
+        msg_start + serialized_size(&MessageHeader::default()).unwrap() as usize + address_size;
 
     (
         sig_len as u32,
         sig_start as u32,
         msg_start as u32,
-        pubkey_start as u32,
+        address_start as u32,
     )
 }
 
 pub fn generate_offsets(batches: &[BndlPkt]) -> Result<TxOffsets> {
     let mut signature_offsets: Vec<_> = Vec::new();
-    let mut pubkey_offsets: Vec<_> = Vec::new();
+    let mut address_offsets: Vec<_> = Vec::new();
     let mut msg_start_offsets: Vec<_> = Vec::new();
     let mut msg_sizes: Vec<_> = Vec::new();
     let mut current_packet = 0;
@@ -138,20 +138,20 @@ pub fn generate_offsets(batches: &[BndlPkt]) -> Result<TxOffsets> {
         p.packets.iter().for_each(|packet| {
             let current_offset = current_packet as u32 * size_of::<Pkt>() as u32;
 
-            let (sig_len, sig_start, msg_start_offset, pubkey_offset) =
+            let (sig_len, sig_start, msg_start_offset, address_offset) =
                 get_packet_offsets(packet, current_offset);
-            let mut pubkey_offset = pubkey_offset;
+            let mut address_offset = address_offset;
 
             sig_lens.push(sig_len);
 
-            trace!("pubkey_offset: {}", pubkey_offset);
+            trace!("address_offset: {}", address_offset);
             let mut sig_offset = sig_start;
             for _ in 0..sig_len {
                 signature_offsets.push(sig_offset);
                 sig_offset += size_of::<Signature>() as u32;
 
-                pubkey_offsets.push(pubkey_offset);
-                pubkey_offset += size_of::<BvmAddr>() as u32;
+                address_offsets.push(address_offset);
+                address_offset += size_of::<BvmAddr>() as u32;
 
                 msg_start_offsets.push(msg_start_offset);
 
@@ -163,7 +163,7 @@ pub fn generate_offsets(batches: &[BndlPkt]) -> Result<TxOffsets> {
     });
     Ok((
         signature_offsets,
-        pubkey_offsets,
+        address_offsets,
         msg_start_offsets,
         msg_sizes,
         v_sig_lens,
@@ -214,7 +214,7 @@ pub fn ed25519_verify(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
         return ed25519_verify_cpu(batches);
     }
 
-    let (signature_offsets, pubkey_offsets, msg_start_offsets, msg_sizes, sig_lens) =
+    let (signature_offsets, address_offsets, msg_start_offsets, msg_sizes, sig_lens) =
         generate_offsets(batches).unwrap();
 
     debug!("CUDA ECDSA for {}", batch_size(batches));
@@ -247,7 +247,7 @@ pub fn ed25519_verify(batches: &[BndlPkt]) -> Vec<Vec<u8>> {
             num_packets as u32,
             signature_offsets.len() as u32,
             msg_sizes.as_ptr(),
-            pubkey_offsets.as_ptr(),
+            address_offsets.as_ptr(),
             signature_offsets.as_ptr(),
             msg_start_offsets.as_ptr(),
             out.as_mut_ptr(),
@@ -326,7 +326,7 @@ mod tests {
         let context_data = tx.context_data();
         let packet = signature_verify::make_packet_from_transaction(tx.clone());
 
-        let (sig_len, sig_start, msg_start_offset, pubkey_offset) =
+        let (sig_len, sig_start, msg_start_offset, address_offset) =
             signature_verify::get_packet_offsets(&packet, 0);
 
         assert_eq!(
@@ -335,7 +335,7 @@ mod tests {
         );
         assert_eq!(
             memfind(&tx_bytes, &tx.self_context().account_keys[0].as_ref()),
-            Some(pubkey_offset as usize)
+            Some(address_offset as usize)
         );
         assert_eq!(
             memfind(&tx_bytes, &context_data),
@@ -372,13 +372,13 @@ mod tests {
     // Just like get_packet_offsets, but not returning redundant information.
     fn get_packet_offsets_from_tx(tx: Transaction, current_offset: u32) -> (u32, u32, u32, u32) {
         let packet = signature_verify::make_packet_from_transaction(tx);
-        let (sig_len, sig_start, msg_start_offset, pubkey_offset) =
+        let (sig_len, sig_start, msg_start_offset, address_offset) =
             signature_verify::get_packet_offsets(&packet, current_offset);
         (
             sig_len,
             sig_start - current_offset,
             msg_start_offset - sig_start,
-            pubkey_offset - msg_start_offset,
+            address_offset - msg_start_offset,
         )
     }
 

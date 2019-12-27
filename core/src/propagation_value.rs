@@ -45,7 +45,7 @@ impl EpochSlots {
 }
 
 impl Signable for EpochSlots {
-    fn pubkey(&self) -> BvmAddr {
+    fn address(&self) -> BvmAddr {
         self.from
     }
 
@@ -93,7 +93,7 @@ impl Vote {
 }
 
 impl Signable for Vote {
-    fn pubkey(&self) -> BvmAddr {
+    fn address(&self) -> BvmAddr {
         self.from
     }
 
@@ -291,15 +291,15 @@ pub enum ContInfTblValueTag {
 impl fmt::Display for ContInfTblValueTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ContInfTblValueTag::ContactInfo(_) => write!(f, "ContactInfo({})", self.pubkey()),
-            ContInfTblValueTag::Vote(_) => write!(f, "Vote({})", self.pubkey()),
-            ContInfTblValueTag::EpochSlots(_) => write!(f, "EpochSlots({})", self.pubkey()),
+            ContInfTblValueTag::ContactInfo(_) => write!(f, "ContactInfo({})", self.address()),
+            ContInfTblValueTag::Vote(_) => write!(f, "Vote({})", self.address()),
+            ContInfTblValueTag::EpochSlots(_) => write!(f, "EpochSlots({})", self.address()),
         }
     }
 }
 
 impl ContInfTblValueTag {
-    pub fn pubkey(&self) -> BvmAddr {
+    pub fn address(&self) -> BvmAddr {
         match self {
             ContInfTblValueTag::ContactInfo(p) => *p,
             ContInfTblValueTag::Vote(p) => *p,
@@ -322,10 +322,10 @@ impl ContInfTblValue {
     pub fn label(&self) -> ContInfTblValueTag {
         match self {
             ContInfTblValue::ContactInfo(contact_info) => {
-                ContInfTblValueTag::ContactInfo(contact_info.pubkey())
+                ContInfTblValueTag::ContactInfo(contact_info.address())
             }
-            ContInfTblValue::Vote(vote) => ContInfTblValueTag::Vote(vote.pubkey()),
-            ContInfTblValue::EpochSlots(slots) => ContInfTblValueTag::EpochSlots(slots.pubkey()),
+            ContInfTblValue::Vote(vote) => ContInfTblValueTag::Vote(vote.address()),
+            ContInfTblValue::EpochSlots(slots) => ContInfTblValueTag::EpochSlots(slots.address()),
         }
     }
     pub fn contact_info(&self) -> Option<&ContactInfo> {
@@ -373,11 +373,11 @@ impl Signable for ContInfTblValue {
         }
     }
 
-    fn pubkey(&self) -> BvmAddr {
+    fn address(&self) -> BvmAddr {
         match self {
-            ContInfTblValue::ContactInfo(contact_info) => contact_info.pubkey(),
-            ContInfTblValue::Vote(vote) => vote.pubkey(),
-            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.pubkey(),
+            ContInfTblValue::ContactInfo(contact_info) => contact_info.address(),
+            ContInfTblValue::Vote(vote) => vote.address(),
+            ContInfTblValue::EpochSlots(epoch_slots) => epoch_slots.address(),
         }
     }
 
@@ -442,12 +442,12 @@ mod test {
         let keypair = Keypair::new();
         let wrong_keypair = Keypair::new();
         let mut v =
-            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&keypair.pubkey(), timestamp()));
+            ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&keypair.address(), timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
-        v = ContInfTblValue::Vote(Vote::new(&keypair.pubkey(), test_tx(), timestamp()));
+        v = ContInfTblValue::Vote(Vote::new(&keypair.address(), test_tx(), timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
         let btreeset: BTreeSet<u64> = vec![1, 2, 3, 6, 8].into_iter().collect();
-        v = ContInfTblValue::EpochSlots(EpochSlots::new(keypair.pubkey(), 0, btreeset, timestamp()));
+        v = ContInfTblValue::EpochSlots(EpochSlots::new(keypair.address(), 0, btreeset, timestamp()));
         verify_signatures(&mut v, &keypair, &wrong_keypair);
     }
 

@@ -204,7 +204,7 @@ mod tests {
                     &mut num_hashes,
                     vec![sys_controller::create_user_account(
                         &keypair,
-                        &keypair.pubkey(),
+                        &keypair.address(),
                         1,
                         one,
                     )],

@@ -111,7 +111,7 @@ impl NodeTbleGspPush {
             let mut failed = false;
             for p in &peers {
                 let filter = self.active_set.get_mut(p);
-                failed |= filter.is_none() || filter.unwrap().contains(&label.pubkey());
+                failed |= filter.is_none() || filter.unwrap().contains(&label.address());
             }
             if failed {
                 continue;
@@ -367,17 +367,17 @@ mod test {
         assert_eq!(contact_info_table.insert(value1.clone(), 0), Ok(None));
         push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
 
-        assert!(push.active_set.get(&value1.label().pubkey()).is_some());
+        assert!(push.active_set.get(&value1.label().address()).is_some());
         let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
-        assert!(push.active_set.get(&value2.label().pubkey()).is_none());
+        assert!(push.active_set.get(&value2.label().address()).is_none());
         assert_eq!(contact_info_table.insert(value2.clone(), 0), Ok(None));
         for _ in 0..30 {
             push.refresh_push_active_set(&contact_info_table, &HashMap::new(), &BvmAddr::default(), 1, 1);
-            if push.active_set.get(&value2.label().pubkey()).is_some() {
+            if push.active_set.get(&value2.label().address()).is_some() {
                 break;
             }
         }
-        assert!(push.active_set.get(&value2.label().pubkey()).is_some());
+        assert!(push.active_set.get(&value2.label().address()).is_some());
 
         for _ in 0..push.num_active {
             let value2 = ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), 0));
@@ -395,7 +395,7 @@ mod test {
         for i in 1..=100 {
             let peer =
                 ContInfTblValue::ContactInfo(ContactInfo::new_localhost(&BvmAddr::new_rand(), time));
-            let id = peer.label().pubkey();
+            let id = peer.label().address();
             contact_info_table.insert(peer.clone(), time).unwrap();
             stakes.insert(id, i * 100);
         }
@@ -424,7 +424,7 @@ mod test {
         assert_eq!(push.active_set.len(), 1);
         assert_eq!(
             push.new_push_messages(&contact_info_table, 0),
-            (vec![peer.label().pubkey()], vec![new_msg])
+            (vec![peer.label().address()], vec![new_msg])
         );
     }
     #[test]
@@ -440,10 +440,10 @@ mod test {
             push.process_push_message(&mut contact_info_table, new_msg.clone(), 0),
             Ok(None)
         );
-        push.process_prune_msg(&peer.label().pubkey(), &[new_msg.label().pubkey()]);
+        push.process_prune_msg(&peer.label().address(), &[new_msg.label().address()]);
         assert_eq!(
             push.new_push_messages(&contact_info_table, 0),
-            (vec![peer.label().pubkey()], vec![])
+            (vec![peer.label().address()], vec![])
         );
     }
     #[test]
@@ -464,7 +464,7 @@ mod test {
         push.purge_old_pending_push_messages(&contact_info_table, 0);
         assert_eq!(
             push.new_push_messages(&contact_info_table, 0),
-            (vec![peer.label().pubkey()], vec![])
+            (vec![peer.label().address()], vec![])
         );
     }
 

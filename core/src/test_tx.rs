@@ -7,9 +7,9 @@ use morgan_interface::transaction::Transaction;
 
 pub fn test_tx() -> Transaction {
     let keypair1 = Keypair::new();
-    let pubkey1 = keypair1.pubkey();
+    let address1 = keypair1.address();
     let zero = Hash::default();
-    sys_controller::create_user_account(&keypair1, &pubkey1, 42, zero)
+    sys_controller::create_user_account(&keypair1, &address1, 42, zero)
 }
 
 pub fn test_multisig_tx() -> Transaction {

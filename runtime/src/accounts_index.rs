@@ -12,8 +12,8 @@ pub struct AccountsIndex<T> {
 }
 
 impl<T: Clone> AccountsIndex<T> {
-    pub fn get(&self, pubkey: &BvmAddr, ancestors: &HashMap<Fork, usize>) -> Option<(&T, Fork)> {
-        let list = self.account_maps.get(pubkey)?;
+    pub fn get(&self, address: &BvmAddr, ancestors: &HashMap<Fork, usize>) -> Option<(&T, Fork)> {
+        let list = self.account_maps.get(address)?;
         let mut max = 0;
         let mut rv = None;
         for e in list.iter().rev() {
@@ -26,11 +26,11 @@ impl<T: Clone> AccountsIndex<T> {
         rv
     }
 
-    pub fn insert(&mut self, fork: Fork, pubkey: &BvmAddr, account_info: T) -> Vec<(Fork, T)> {
+    pub fn insert(&mut self, fork: Fork, address: &BvmAddr, account_info: T) -> Vec<(Fork, T)> {
         let mut rv = vec![];
         let mut fork_vec: Vec<(Fork, T)> = vec![];
         {
-            let entry = self.account_maps.entry(*pubkey).or_insert(vec![]);
+            let entry = self.account_maps.entry(*address).or_insert(vec![]);
             std::mem::swap(entry, &mut fork_vec);
         };
 
@@ -48,7 +48,7 @@ impl<T: Clone> AccountsIndex<T> {
         );
         fork_vec.retain(|(fork, _)| !self.is_purged(*fork));
         {
-            let entry = self.account_maps.entry(*pubkey).or_insert(vec![]);
+            let entry = self.account_maps.entry(*address).or_insert(vec![]);
             std::mem::swap(entry, &mut fork_vec);
         };
         rv
@@ -83,40 +83,40 @@ mod tests {
         let key = Keypair::new();
         let index = AccountsIndex::<bool>::default();
         let ancestors = HashMap::new();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), None);
+        assert_eq!(index.get(&key.address(), &ancestors), None);
     }
 
     #[test]
     fn test_insert_no_ancestors() {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
 
         let ancestors = HashMap::new();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), None);
+        assert_eq!(index.get(&key.address(), &ancestors), None);
     }
 
     #[test]
     fn test_insert_wrong_ancestors() {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
 
         let ancestors = vec![(1, 1)].into_iter().collect();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), None);
+        assert_eq!(index.get(&key.address(), &ancestors), None);
     }
 
     #[test]
     fn test_insert_with_ancestors() {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
 
         let ancestors = vec![(0, 0)].into_iter().collect();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&true, 0)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&true, 0)));
     }
 
     #[test]
@@ -131,12 +131,12 @@ mod tests {
     fn test_insert_with_root() {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
 
         let ancestors = vec![].into_iter().collect();
         index.add_root(0);
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&true, 0)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&true, 0)));
     }
 
     #[test]
@@ -189,13 +189,13 @@ mod tests {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
         let ancestors = vec![(0, 0)].into_iter().collect();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&true, 0)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&true, 0)));
 
-        let gc = index.insert(0, &key.pubkey(), false);
+        let gc = index.insert(0, &key.address(), false);
         assert_eq!(gc, vec![(0, true)]);
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&false, 0)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&false, 0)));
     }
 
     #[test]
@@ -203,25 +203,25 @@ mod tests {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
         let ancestors = vec![(0, 0)].into_iter().collect();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
-        let gc = index.insert(1, &key.pubkey(), false);
+        let gc = index.insert(1, &key.address(), false);
         assert!(gc.is_empty());
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&true, 0)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&true, 0)));
         let ancestors = vec![(1, 0)].into_iter().collect();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&false, 1)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&false, 1)));
     }
 
     #[test]
     fn test_update_gc_purged_fork() {
         let key = Keypair::new();
         let mut index = AccountsIndex::<bool>::default();
-        let gc = index.insert(0, &key.pubkey(), true);
+        let gc = index.insert(0, &key.address(), true);
         assert!(gc.is_empty());
         index.add_root(1);
-        let gc = index.insert(1, &key.pubkey(), false);
+        let gc = index.insert(1, &key.address(), false);
         assert_eq!(gc, vec![(0, true)]);
         let ancestors = vec![].into_iter().collect();
-        assert_eq!(index.get(&key.pubkey(), &ancestors), Some((&false, 1)));
+        assert_eq!(index.get(&key.address(), &ancestors), Some((&false, 1)));
     }
 }

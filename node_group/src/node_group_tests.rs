@@ -44,12 +44,12 @@ pub fn spend_and_verify_all_nodes(
         let random_keypair = Keypair::new();
         let client = create_client(ingress_node.client_facing_addr(), FULLNODE_PORT_RANGE);
         let bal = client
-            .poll_get_balance(&funding_keypair.pubkey())
+            .poll_get_balance(&funding_keypair.address())
             .expect("balance in genesis");
         assert!(bal > 0);
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut transaction =
-            sys_controller::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
+            sys_controller::transfer(&funding_keypair, &random_keypair.address(), 1, transaction_seal);
         let confs = VOTE_THRESHOLD_DEPTH + 1;
         let sig = client
             .retry_transfer_until_confirmed(&funding_keypair, &mut transaction, 5, confs)
@@ -66,12 +66,12 @@ pub fn send_many_transactions(node: &ContactInfo, funding_keypair: &Keypair, num
     for _ in 0..num_txs {
         let random_keypair = Keypair::new();
         let bal = client
-            .poll_get_balance(&funding_keypair.pubkey())
+            .poll_get_balance(&funding_keypair.address())
             .expect("balance in genesis");
         assert!(bal > 0);
         let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
         let mut transaction =
-            sys_controller::transfer(&funding_keypair, &random_keypair.pubkey(), 1, transaction_seal);
+            sys_controller::transfer(&funding_keypair, &random_keypair.address(), 1, transaction_seal);
         client
             .retry_transfer(&funding_keypair, &mut transaction, 5)
             .unwrap();
@@ -251,7 +251,7 @@ pub fn kill_entry_and_spend_and_verify_rest(
 
         let client = create_client(ingress_node.client_facing_addr(), FULLNODE_PORT_RANGE);
         let balance = client
-            .poll_get_balance(&funding_keypair.pubkey())
+            .poll_get_balance(&funding_keypair.address())
             .expect("balance in genesis");
         assert_ne!(balance, 0);
 
@@ -267,7 +267,7 @@ pub fn kill_entry_and_spend_and_verify_rest(
             let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().unwrap();
             let mut transaction = sys_controller::transfer(
                 &funding_keypair,
-                &random_keypair.pubkey(),
+                &random_keypair.address(),
                 1,
                 transaction_seal,
             );

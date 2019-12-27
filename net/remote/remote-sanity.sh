@@ -177,13 +177,13 @@ if $installCheck && [[ -r update_manifest_keypair.json ]]; then
 
   (
     set -x
-    update_manifest_pubkey=$($morgan_keybot pubkey update_manifest_keypair.json)
+    update_manifest_address=$($morgan_keybot address update_manifest_keypair.json)
     rm -rf install-data-dir
     $morgan_install init \
       --no-modify-path \
       --data-dir install-data-dir \
       --url http://"$sanityTargetIp":10099 \
-      --pubkey "$update_manifest_pubkey"
+      --address "$update_manifest_address"
 
     $morgan_install info
   )

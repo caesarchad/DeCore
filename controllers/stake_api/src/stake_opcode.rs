@@ -21,14 +21,14 @@ pub enum StakeOpCode {
 }
 
 pub fn create_delegate_account(
-    from_pubkey: &BvmAddr,
-    staker_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    staker_address: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
         sys_opcode::create_account(
-            from_pubkey,
-            staker_pubkey,
+            from_address,
+            staker_address,
             difs,
             std::mem::size_of::<StakeState>() as u64,
             &id(),
@@ -37,22 +37,22 @@ pub fn create_delegate_account(
             id(),
             &StakeOpCode::InitializeDelegate,
             vec![
-                AccountMeta::new(*from_pubkey, true),
-                AccountMeta::new(*staker_pubkey, false),
+                AccountMeta::new(*from_address, true),
+                AccountMeta::new(*staker_address, false),
             ],
         ),
     ]
 }
 
 pub fn create_mining_pool_account(
-    from_pubkey: &BvmAddr,
-    staker_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    staker_address: &BvmAddr,
     difs: u64,
 ) -> Vec<OpCode> {
     vec![
         sys_opcode::create_account(
-            from_pubkey,
-            staker_pubkey,
+            from_address,
+            staker_address,
             difs,
             std::mem::size_of::<StakeState>() as u64,
             &id(),
@@ -61,37 +61,37 @@ pub fn create_mining_pool_account(
             id(),
             &StakeOpCode::InitializeMiningPool,
             vec![
-                AccountMeta::new(*from_pubkey, true),
-                AccountMeta::new(*staker_pubkey, false),
+                AccountMeta::new(*from_address, true),
+                AccountMeta::new(*staker_address, false),
             ],
         ),
     ]
 }
 
 pub fn redeem_vote_credits(
-    from_pubkey: &BvmAddr,
-    mining_pool_pubkey: &BvmAddr,
-    stake_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    mining_pool_address: &BvmAddr,
+    stake_address: &BvmAddr,
+    vote_address: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
-        AccountMeta::new(*from_pubkey, true),
-        AccountMeta::new(*mining_pool_pubkey, false),
-        AccountMeta::new(*stake_pubkey, false),
-        AccountMeta::new(*vote_pubkey, false),
+        AccountMeta::new(*from_address, true),
+        AccountMeta::new(*mining_pool_address, false),
+        AccountMeta::new(*stake_address, false),
+        AccountMeta::new(*vote_address, false),
     ];
     OpCode::new(id(), &StakeOpCode::RedeemVoteCredits, account_metas)
 }
 
 pub fn delegate_stake(
-    from_pubkey: &BvmAddr,
-    stake_pubkey: &BvmAddr,
-    vote_pubkey: &BvmAddr,
+    from_address: &BvmAddr,
+    stake_address: &BvmAddr,
+    vote_address: &BvmAddr,
 ) -> OpCode {
     let account_metas = vec![
-        AccountMeta::new(*from_pubkey, true),
-        AccountMeta::new(*stake_pubkey, true),
-        AccountMeta::new(*vote_pubkey, false),
+        AccountMeta::new(*from_address, true),
+        AccountMeta::new(*stake_address, true),
+        AccountMeta::new(*vote_address, false),
     ];
     OpCode::new(id(), &StakeOpCode::DelegateStake, account_metas)
 }
@@ -166,7 +166,7 @@ mod tests {
                 .accounts
                 .iter()
                 .zip(accounts.iter_mut())
-                .map(|(meta, account)| KeyedAccount::new(&meta.pubkey, meta.is_signer, account))
+                .map(|(meta, account)| KeyedAccount::new(&meta.address, meta.is_signer, account))
                 .collect();
             super::handle_opcode(
                 &BvmAddr::default(),

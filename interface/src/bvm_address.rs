@@ -13,37 +13,37 @@ use std::str::FromStr;
 pub struct BvmAddr(GenericArray<u8, U32>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParsePubkeyError {
+pub enum PrseAddrErr {
     WrongSize,
     Invalid,
 }
 
-impl fmt::Display for ParsePubkeyError {
+impl fmt::Display for PrseAddrErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ParsePubkeyError: {:?}", self)
+        write!(f, "PrseAddrErr: {:?}", self)
     }
 }
 
-impl error::Error for ParsePubkeyError {}
+impl error::Error for PrseAddrErr {}
 
 impl FromStr for BvmAddr {
-    type Err = ParsePubkeyError;
+    type Err = PrseAddrErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pubkey_vec = bs58::decode(s)
+        let address_vec = bs58::decode(s)
             .into_vec()
-            .map_err(|_| ParsePubkeyError::Invalid)?;
-        if pubkey_vec.len() != mem::size_of::<BvmAddr>() {
-            Err(ParsePubkeyError::WrongSize)
+            .map_err(|_| PrseAddrErr::Invalid)?;
+        if address_vec.len() != mem::size_of::<BvmAddr>() {
+            Err(PrseAddrErr::WrongSize)
         } else {
-            Ok(BvmAddr::new(&pubkey_vec))
+            Ok(BvmAddr::new(&address_vec))
         }
     }
 }
 
 impl BvmAddr {
-    pub fn new(pubkey_vec: &[u8]) -> Self {
-        BvmAddr(GenericArray::clone_from_slice(&pubkey_vec))
+    pub fn new(address_vec: &[u8]) -> Self {
+        BvmAddr(GenericArray::clone_from_slice(&address_vec))
     }
 
     pub fn new_rand() -> Self {
@@ -69,8 +69,8 @@ impl fmt::Display for BvmAddr {
     }
 }
 
-pub fn write_pubkey(outfile: &str, pubkey: BvmAddr) -> Result<(), Box<error::Error>> {
-    let printable = format!("{}", pubkey);
+pub fn write_address(outfile: &str, address: BvmAddr) -> Result<(), Box<error::Error>> {
+    let printable = format!("{}", address);
     let serialized = serde_json::to_string(&printable)?;
 
     if let Some(outdir) = Path::new(&outfile).parent() {
@@ -82,7 +82,7 @@ pub fn write_pubkey(outfile: &str, pubkey: BvmAddr) -> Result<(), Box<error::Err
     Ok(())
 }
 
-pub fn read_pubkey(infile: &str) -> Result<BvmAddr, Box<error::Error>> {
+pub fn read_address(infile: &str) -> Result<BvmAddr, Box<error::Error>> {
     let f = File::open(infile.to_string())?;
     let printable: String = serde_json::from_reader(f)?;
     Ok(BvmAddr::from_str(&printable)?)
@@ -94,45 +94,45 @@ mod tests {
     use std::fs::remove_file;
 
     #[test]
-    fn pubkey_fromstr() {
-        let pubkey = BvmAddr::new_rand();
-        let mut pubkey_base58_str = bs58::encode(pubkey.0).into_string();
+    fn address_fromstr() {
+        let address = BvmAddr::new_rand();
+        let mut address_base58_str = bs58::encode(address.0).into_string();
 
-        assert_eq!(pubkey_base58_str.parse::<BvmAddr>(), Ok(pubkey));
+        assert_eq!(address_base58_str.parse::<BvmAddr>(), Ok(address));
 
-        pubkey_base58_str.push_str(&bs58::encode(pubkey.0).into_string());
+        address_base58_str.push_str(&bs58::encode(address.0).into_string());
         assert_eq!(
-            pubkey_base58_str.parse::<BvmAddr>(),
-            Err(ParsePubkeyError::WrongSize)
+            address_base58_str.parse::<BvmAddr>(),
+            Err(PrseAddrErr::WrongSize)
         );
 
-        pubkey_base58_str.truncate(pubkey_base58_str.len() / 2);
-        assert_eq!(pubkey_base58_str.parse::<BvmAddr>(), Ok(pubkey));
+        address_base58_str.truncate(address_base58_str.len() / 2);
+        assert_eq!(address_base58_str.parse::<BvmAddr>(), Ok(address));
 
-        pubkey_base58_str.truncate(pubkey_base58_str.len() / 2);
+        address_base58_str.truncate(address_base58_str.len() / 2);
         assert_eq!(
-            pubkey_base58_str.parse::<BvmAddr>(),
-            Err(ParsePubkeyError::WrongSize)
+            address_base58_str.parse::<BvmAddr>(),
+            Err(PrseAddrErr::WrongSize)
         );
 
-        let mut pubkey_base58_str = bs58::encode(pubkey.0).into_string();
-        assert_eq!(pubkey_base58_str.parse::<BvmAddr>(), Ok(pubkey));
+        let mut address_base58_str = bs58::encode(address.0).into_string();
+        assert_eq!(address_base58_str.parse::<BvmAddr>(), Ok(address));
 
         // throw some non-base58 stuff in there
-        pubkey_base58_str.replace_range(..1, "I");
+        address_base58_str.replace_range(..1, "I");
         assert_eq!(
-            pubkey_base58_str.parse::<BvmAddr>(),
-            Err(ParsePubkeyError::Invalid)
+            address_base58_str.parse::<BvmAddr>(),
+            Err(PrseAddrErr::Invalid)
         );
     }
 
     #[test]
-    fn test_read_write_pubkey() -> Result<(), Box<error::Error>> {
-        let filename = "test_pubkey.json";
-        let pubkey = BvmAddr::new_rand();
-        write_pubkey(filename, pubkey)?;
-        let read = read_pubkey(filename)?;
-        assert_eq!(read, pubkey);
+    fn test_read_write_address() -> Result<(), Box<error::Error>> {
+        let filename = "test_address.json";
+        let address = BvmAddr::new_rand();
+        write_address(filename, address)?;
+        let read = read_address(filename)?;
+        assert_eq!(read, address);
         remove_file(filename)?;
         Ok(())
     }

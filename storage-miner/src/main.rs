@@ -83,11 +83,11 @@ fn main() {
         addr
     };
     let node =
-        Node::new_miner_with_external_ip(&keypair.pubkey(), &gossip_addr, FULLNODE_PORT_RANGE);
+        Node::new_miner_with_external_ip(&keypair.address(), &gossip_addr, FULLNODE_PORT_RANGE);
 
     println!(
         "replicating the data with keypair={:?} gossip_addr={:?}",
-        keypair.pubkey(),
+        keypair.address(),
         gossip_addr
     );
 

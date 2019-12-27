@@ -133,9 +133,9 @@ mod tests {
             .map(|i| Vote::new(i as u64, Hash::default()))
             .collect::<Vec<_>>();
         let vote_ix = vote_opcode::vote(
-            &node_keypair.pubkey(),
-            &vote_keypair.pubkey(),
-            &vote_keypair.pubkey(),
+            &node_keypair.address(),
+            &vote_keypair.address(),
+            &vote_keypair.address(),
             votes,
         );
 

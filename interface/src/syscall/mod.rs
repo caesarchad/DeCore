@@ -5,7 +5,7 @@ use crate::bvm_address::BvmAddr;
 pub mod slot_hashes;
 
 /// "Sysca11111111111111111111111111111111111111"
-///   owner pubkey for syscall accounts
+///   owner address for syscall accounts
 const ID: [u8; 32] = [
     6, 167, 211, 138, 69, 216, 137, 185, 198, 189, 33, 204, 111, 12, 217, 220, 229, 201, 34, 52,
     253, 202, 87, 144, 232, 16, 195, 192, 0, 0, 0, 0,

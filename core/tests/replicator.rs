@@ -200,7 +200,7 @@ fn test_storage_miner_startup_leader_hang() {
                 module_path!().to_string()
             )
         );
-        let storage_miner_node = Node::new_localhost_with_pubkey(&storage_miner_keypair.pubkey());
+        let storage_miner_node = Node::new_localhost_with_address(&storage_miner_keypair.address());
 
         let fake_gossip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
         let leader_info = ContactInfo::new_gossip_connection_url(&fake_gossip);
@@ -248,7 +248,7 @@ fn test_storage_miner_startup_ledger_hang() {
     );
     let bad_keys = Arc::new(Keypair::new());
     let storage_keypair = Arc::new(Keypair::new());
-    let mut storage_miner_node = Node::new_localhost_with_pubkey(&bad_keys.pubkey());
+    let mut storage_miner_node = Node::new_localhost_with_address(&bad_keys.address());
 
     // Pass bad TVU sockets to prevent successful ledger download
     storage_miner_node.sockets.blaze_unit = vec![std::net::UdpSocket::bind("0.0.0.0:0").unwrap()];
@@ -293,7 +293,7 @@ fn test_account_setup() {
     node_group.storage_miner_infos.iter().for_each(|(_, value)| {
         assert_eq!(
             client
-                .poll_get_balance(&value.miner_storage_pubkey)
+                .poll_get_balance(&value.miner_storage_address)
                 .unwrap(),
             1
         );

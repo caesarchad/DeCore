@@ -14,7 +14,7 @@ fn test_local_drone() {
     let difs = 50;
     let transaction_seal = Hash::new(&to.as_ref());
     let create_instruction =
-        sys_opcode::create_user_account(&keypair.pubkey(), &to, difs);
+        sys_opcode::create_user_account(&keypair.address(), &to, difs);
     let context = Context::new(vec![create_instruction]);
     let expected_tx = Transaction::new(&[&keypair], context, transaction_seal);
 

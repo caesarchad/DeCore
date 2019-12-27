@@ -117,7 +117,7 @@ pub fn pop_last_entries() -> Vec<JsonLogEntry> {
     queue.drain(..).collect()
 }
 
-// input (vote_pubkey, (stake, vote_account)) => (stake, vote_state)
+// input (vote_address, (stake, vote_account)) => (stake, vote_state)
 fn to_vote_states(
     node_staked_accounts: impl Iterator<Item = (impl Borrow<BvmAddr>, impl Borrow<(u64, Account)>)>,
 ) -> impl Iterator<Item = (u64, VoteState)> {
@@ -134,7 +134,7 @@ fn to_staked_nodes(
 ) -> HashMap<BvmAddr, u64> {
     let mut map: HashMap<BvmAddr, u64> = HashMap::new();
     node_staked_accounts.for_each(|(stake, state)| {
-        map.entry(state.node_pubkey)
+        map.entry(state.node_address)
             .and_modify(|s| *s += stake)
             .or_insert(stake);
     });
@@ -212,7 +212,7 @@ pub(crate) mod tests {
         assert_eq!(vote_account_stakes_at_epoch(&treasury, 10), None);
 
         // First epoch has the bootstrap leader
-        expected.insert(voting_keypair.pubkey(), BOOTSTRAP_LEADER_DIFS);
+        expected.insert(voting_keypair.address(), BOOTSTRAP_LEADER_DIFS);
         let expected = Some(expected);
         assert_eq!(vote_account_stakes_at_epoch(&treasury, 0), expected);
 
@@ -225,8 +225,8 @@ pub(crate) mod tests {
     pub(crate) fn setup_vote_and_stake_accounts(
         treasury: &Treasury,
         from_account: &Keypair,
-        vote_pubkey: &BvmAddr,
-        node_pubkey: &BvmAddr,
+        vote_address: &BvmAddr,
+        node_address: &BvmAddr,
         amount: u64,
     ) {
         fn process_instructions<T: KeypairUtil>(
@@ -246,23 +246,23 @@ pub(crate) mod tests {
             treasury,
             &[from_account],
             vote_opcode::create_account(
-                &from_account.pubkey(),
-                vote_pubkey,
-                node_pubkey,
+                &from_account.address(),
+                vote_address,
+                node_address,
                 0,
                 amount,
             ),
         );
 
         let stake_account_keypair = Keypair::new();
-        let stake_account_pubkey = stake_account_keypair.pubkey();
+        let stake_account_address = stake_account_keypair.address();
 
         process_instructions(
             treasury,
             &[from_account],
             stake_opcode::create_delegate_account(
-                &from_account.pubkey(),
-                &stake_account_pubkey,
+                &from_account.address(),
+                &stake_account_address,
                 amount,
             ),
         );
@@ -271,9 +271,9 @@ pub(crate) mod tests {
             treasury,
             &[from_account, &stake_account_keypair],
             vec![stake_opcode::delegate_stake(
-                &from_account.pubkey(),
-                &stake_account_pubkey,
-                vote_pubkey,
+                &from_account.address(),
+                &stake_account_address,
+                vote_address,
             )],
         );
     }
@@ -290,12 +290,12 @@ pub(crate) mod tests {
         } = create_genesis_block(10_000);
 
         let treasury = Treasury::new(&genesis_block);
-        let vote_pubkey = BvmAddr::new_rand();
+        let vote_address = BvmAddr::new_rand();
 
         // Give the validator some stake but don't setup a staking account
         // Validator has no difs staked, so they get filtered out. Only the bootstrap leader
         // created by the genesis block will get included
-        treasury.transfer(1, &mint_keypair, &validator.pubkey())
+        treasury.transfer(1, &mint_keypair, &validator.address())
             .unwrap();
 
         // Make a mint vote account. Because the mint has nonzero stake, this
@@ -303,8 +303,8 @@ pub(crate) mod tests {
         setup_vote_and_stake_accounts(
             &treasury,
             &mint_keypair,
-            &vote_pubkey,
-            &mint_keypair.pubkey(),
+            &vote_address,
+            &mint_keypair.address(),
             stake,
         );
 

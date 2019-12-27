@@ -107,21 +107,21 @@ mod tests {
     }
 
     fn setup() -> (Treasury, Vec<Transaction>) {
-        let dummy_leader_pubkey = BvmAddr::new_rand();
+        let dummy_leader_address = BvmAddr::new_rand();
         let GenesisBlockInfo {
             genesis_block,
             mint_keypair,
             ..
-        } = create_genesis_block_with_leader(500, &dummy_leader_pubkey, 100);
+        } = create_genesis_block_with_leader(500, &dummy_leader_address, 100);
         let treasury = Treasury::new(&genesis_block);
 
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let keypair2 = Keypair::new();
-        let pubkey2 = BvmAddr::new_rand();
+        let address2 = BvmAddr::new_rand();
 
         let txs = vec![
-            sys_controller::transfer(&mint_keypair, &pubkey, 1, genesis_block.hash()),
-            sys_controller::transfer(&keypair2, &pubkey2, 1, genesis_block.hash()),
+            sys_controller::transfer(&mint_keypair, &address, 1, genesis_block.hash()),
+            sys_controller::transfer(&keypair2, &address2, 1, genesis_block.hash()),
         ];
 
         (treasury, txs)

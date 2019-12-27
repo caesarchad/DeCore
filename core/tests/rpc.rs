@@ -18,7 +18,7 @@ fn test_rpc_send_tx() {
     morgan_logger::setup();
 
     let (server, leader_data, alice, ledger_path) = new_validator_for_tests();
-    let bob_pubkey = BvmAddr::new_rand();
+    let bob_address = BvmAddr::new_rand();
 
     let client = reqwest::Client::new();
     let request = json!({
@@ -45,7 +45,7 @@ fn test_rpc_send_tx() {
             module_path!().to_string()
         )
     );
-    let tx = sys_controller::transfer(&alice, &bob_pubkey, 20, transaction_seal);
+    let tx = sys_controller::transfer(&alice, &bob_address, 20, transaction_seal);
     let serial_tx = serialize(&tx).unwrap();
 
     let client = reqwest::Client::new();

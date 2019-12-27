@@ -80,7 +80,7 @@ pub struct Treasury {
     /// Treasury height in term of treasuries
     treasury_height: u64,
 
-    /// The pubkey to send transactions fees to.
+    /// The address to send transactions fees to.
     collector_id: BvmAddr,
 
     /// An object to calculate transaction fees.
@@ -274,11 +274,11 @@ impl Treasury {
 
     fn process_genesis_block(&mut self, genesis_block: &GenesisBlock) {
         // Bootstrap leader collects fees until `new_from_parent` is called.
-        self.collector_id = genesis_block.bootstrap_leader_pubkey;
+        self.collector_id = genesis_block.bootstrap_leader_address;
         self.fee_calculator = genesis_block.fee_calculator.clone();
 
-        for (pubkey, account) in genesis_block.accounts.iter() {
-            self.store(pubkey, account);
+        for (address, account) in genesis_block.accounts.iter() {
+            self.store(address, account);
         }
 
         self.transaction_seal_queue
@@ -812,8 +812,8 @@ impl Treasury {
     }
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
-    pub fn get_balance(&self, pubkey: &BvmAddr) -> u64 {
-        self.get_account(pubkey)
+    pub fn get_balance(&self, address: &BvmAddr) -> u64 {
+        self.get_account(address)
             .map(|x| Self::read_balance(&x))
             .unwrap_or(0)
     }
@@ -823,8 +823,8 @@ impl Treasury {
     }
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
-    pub fn get_reputation(&self, pubkey: &BvmAddr) -> u64 {
-        self.get_account(pubkey)
+    pub fn get_reputation(&self, address: &BvmAddr) -> u64 {
+        self.get_account(address)
             .map(|x| Self::read_reputation(&x))
             .unwrap_or(0)
     }
@@ -840,23 +840,23 @@ impl Treasury {
         parents
     }
 
-    fn store(&self, pubkey: &BvmAddr, account: &Account) {
-        self.accounts.store_slow(self.slot(), pubkey, account);
+    fn store(&self, address: &BvmAddr, account: &Account) {
+        self.accounts.store_slow(self.slot(), address, account);
 
         if Stakes::is_stake(account) {
-            self.stakes.write().unwrap().store(pubkey, account);
+            self.stakes.write().unwrap().store(address, account);
         }
     }
 
-    pub fn withdraw(&self, pubkey: &BvmAddr, difs: u64) -> Result<()> {
-        match self.get_account(pubkey) {
+    pub fn withdraw(&self, address: &BvmAddr, difs: u64) -> Result<()> {
+        match self.get_account(address) {
             Some(mut account) => {
                 if difs > account.difs {
                     return Err(TransactionError::InsufficientFundsForFee);
                 }
 
                 account.difs -= difs;
-                self.store(pubkey, &account);
+                self.store(address, &account);
 
                 Ok(())
             }
@@ -864,15 +864,15 @@ impl Treasury {
         }
     }
 
-    pub fn deposit(&self, pubkey: &BvmAddr, difs: u64) {
-        let mut account = self.get_account(pubkey).unwrap_or_default();
+    pub fn deposit(&self, address: &BvmAddr, difs: u64) {
+        let mut account = self.get_account(address).unwrap_or_default();
         account.difs += difs;
-        self.store(pubkey, &account);
+        self.store(address, &account);
     }
 
-    pub fn get_account(&self, pubkey: &BvmAddr) -> Option<Account> {
+    pub fn get_account(&self, address: &BvmAddr) -> Option<Account> {
         self.accounts
-            .load_slow(&self.ancestors, pubkey)
+            .load_slow(&self.ancestors, address)
             .map(|(account, _)| account)
     }
 
@@ -883,9 +883,9 @@ impl Treasury {
         self.accounts.load_by_program(self.slot(), program_id)
     }
 
-    pub fn get_account_modified_since_parent(&self, pubkey: &BvmAddr) -> Option<(Account, Fork)> {
+    pub fn get_account_modified_since_parent(&self, address: &BvmAddr) -> Option<(Account, Fork)> {
         let just_self: HashMap<u64, usize> = vec![(self.slot(), 0)].into_iter().collect();
-        self.accounts.load_slow(&just_self, pubkey)
+        self.accounts.load_slow(&just_self, address)
     }
 
     pub fn transaction_count(&self) -> u64 {
@@ -970,13 +970,13 @@ impl Treasury {
             let context = &txs[i].self_context();
             let acc = raccs.as_ref().unwrap();
 
-            for (pubkey, account) in context
+            for (address, account) in context
                 .account_keys
                 .iter()
                 .zip(acc.0.iter())
                 .filter(|(_, account)| Stakes::is_stake(account))
             {
-                self.stakes.write().unwrap().store(pubkey, account);
+                self.stakes.write().unwrap().store(address, account);
             }
         }
     }
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn test_treasury_new() {
-        let dummy_leader_pubkey = BvmAddr::new_rand();
+        let dummy_leader_address = BvmAddr::new_rand();
         let dummy_leader_difs = BOOTSTRAP_LEADER_DIFS;
         let mint_difs = 10_000;
         let GenesisBlockInfo {
@@ -1056,13 +1056,13 @@ mod tests {
             ..
         } = create_genesis_block_with_leader(
             mint_difs,
-            &dummy_leader_pubkey,
+            &dummy_leader_address,
             dummy_leader_difs,
         );
         let treasury = Treasury::new(&genesis_block);
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), mint_difs);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), mint_difs);
         assert_eq!(
-            treasury.get_balance(&voting_keypair.pubkey()),
+            treasury.get_balance(&voting_keypair.address()),
             dummy_leader_difs /* 1 token goes to the vote account associated with dummy_leader_difs */
         );
     }
@@ -1070,15 +1070,15 @@ mod tests {
     #[test]
     fn test_two_payments_to_one_party() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
-        let pubkey = BvmAddr::new_rand();
+        let address = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         assert_eq!(treasury.last_transaction_seal(), genesis_block.hash());
 
-        treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
-        assert_eq!(treasury.get_balance(&pubkey), 1_000);
+        treasury.transfer(1_000, &mint_keypair, &address).unwrap();
+        assert_eq!(treasury.get_balance(&address), 1_000);
 
-        treasury.transfer(500, &mint_keypair, &pubkey).unwrap();
-        assert_eq!(treasury.get_balance(&pubkey), 1_500);
+        treasury.transfer(500, &mint_keypair, &address).unwrap();
+        assert_eq!(treasury.get_balance(&address), 1_500);
         assert_eq!(treasury.transaction_count(), 2);
     }
 
@@ -1096,7 +1096,7 @@ mod tests {
         assert_eq!(res.len(), 2);
         assert_eq!(res[0], Ok(()));
         assert_eq!(res[1], Err(TransactionError::AccountInUse));
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 0);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 0);
         assert_eq!(treasury.get_balance(&key1), 1);
         assert_eq!(treasury.get_balance(&key2), 0);
         assert_eq!(treasury.get_signature_status(&t1.signatures[0]), Some(Ok(())));
@@ -1112,7 +1112,7 @@ mod tests {
         let key2 = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
-            sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
+            sys_opcode::transfer_many(&mint_keypair.address(), &[(key1, 1), (key2, 1)]);
         let tx = Transaction::new_s_opcodes(
             &[&mint_keypair],
             instructions,
@@ -1125,7 +1125,7 @@ mod tests {
                 OpCodeErr::new_result_with_negative_difs(),
             )
         );
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 1);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 1);
         assert_eq!(treasury.get_balance(&key1), 0);
         assert_eq!(treasury.get_balance(&key2), 0);
     }
@@ -1137,14 +1137,14 @@ mod tests {
         let key2 = BvmAddr::new_rand();
         let treasury = Treasury::new(&genesis_block);
         let instructions =
-            sys_opcode::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
+            sys_opcode::transfer_many(&mint_keypair.address(), &[(key1, 1), (key2, 1)]);
         let tx = Transaction::new_s_opcodes(
             &[&mint_keypair],
             instructions,
             genesis_block.hash(),
         );
         treasury.process_transaction(&tx).unwrap();
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 0);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 0);
         assert_eq!(treasury.get_balance(&key1), 1);
         assert_eq!(treasury.get_balance(&key2), 1);
     }
@@ -1161,7 +1161,7 @@ mod tests {
         // genesis with 0 program context
         let tx = sys_controller::create_user_account(
             &mint_keypair,
-            &dest.pubkey(),
+            &dest.address(),
             2,
             genesis_block.hash(),
         );
@@ -1177,10 +1177,10 @@ mod tests {
         );
 
         // The difs didn't move, but the from address paid the transaction fee.
-        assert_eq!(treasury.get_balance(&dest.pubkey()), 0);
+        assert_eq!(treasury.get_balance(&dest.address()), 0);
 
         // This should be the original balance minus the transaction fee.
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 1);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 1);
     }
 
     #[test]
@@ -1189,7 +1189,7 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
         let keypair = Keypair::new();
         assert_eq!(
-            treasury.transfer(1, &keypair, &mint_keypair.pubkey()),
+            treasury.transfer(1, &keypair, &mint_keypair.address()),
             Err(TransactionError::AccountNotFound)
         );
         assert_eq!(treasury.transaction_count(), 0);
@@ -1199,12 +1199,12 @@ mod tests {
     fn test_insufficient_funds() {
         let (genesis_block, mint_keypair) = create_genesis_block(11_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = BvmAddr::new_rand();
-        treasury.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        let address = BvmAddr::new_rand();
+        treasury.transfer(1_000, &mint_keypair, &address).unwrap();
         assert_eq!(treasury.transaction_count(), 1);
-        assert_eq!(treasury.get_balance(&pubkey), 1_000);
+        assert_eq!(treasury.get_balance(&address), 1_000);
         assert_eq!(
-            treasury.transfer(10_001, &mint_keypair, &pubkey),
+            treasury.transfer(10_001, &mint_keypair, &address),
             Err(TransactionError::OpCodeErr(
                 0,
                 OpCodeErr::new_result_with_negative_difs(),
@@ -1212,18 +1212,18 @@ mod tests {
         );
         assert_eq!(treasury.transaction_count(), 1);
 
-        let mint_pubkey = mint_keypair.pubkey();
-        assert_eq!(treasury.get_balance(&mint_pubkey), 10_000);
-        assert_eq!(treasury.get_balance(&pubkey), 1_000);
+        let mint_address = mint_keypair.address();
+        assert_eq!(treasury.get_balance(&mint_address), 10_000);
+        assert_eq!(treasury.get_balance(&address), 1_000);
     }
 
     #[test]
     fn test_transfer_to_newb() {
         let (genesis_block, mint_keypair) = create_genesis_block(10_000);
         let treasury = Treasury::new(&genesis_block);
-        let pubkey = BvmAddr::new_rand();
-        treasury.transfer(500, &mint_keypair, &pubkey).unwrap();
-        assert_eq!(treasury.get_balance(&pubkey), 500);
+        let address = BvmAddr::new_rand();
+        treasury.transfer(500, &mint_keypair, &address).unwrap();
+        assert_eq!(treasury.get_balance(&address), 500);
     }
 
     #[test]
@@ -1233,12 +1233,12 @@ mod tests {
 
         // Test new account
         let key = Keypair::new();
-        treasury.deposit(&key.pubkey(), 10);
-        assert_eq!(treasury.get_balance(&key.pubkey()), 10);
+        treasury.deposit(&key.address(), 10);
+        assert_eq!(treasury.get_balance(&key.address()), 10);
 
         // Existing account
-        treasury.deposit(&key.pubkey(), 3);
-        assert_eq!(treasury.get_balance(&key.pubkey()), 13);
+        treasury.deposit(&key.address(), 3);
+        assert_eq!(treasury.get_balance(&key.address()), 13);
     }
 
     #[test]
@@ -1249,22 +1249,22 @@ mod tests {
         // Test no account
         let key = Keypair::new();
         assert_eq!(
-            treasury.withdraw(&key.pubkey(), 10),
+            treasury.withdraw(&key.address(), 10),
             Err(TransactionError::AccountNotFound)
         );
 
-        treasury.deposit(&key.pubkey(), 3);
-        assert_eq!(treasury.get_balance(&key.pubkey()), 3);
+        treasury.deposit(&key.address(), 3);
+        assert_eq!(treasury.get_balance(&key.address()), 3);
 
         // Low balance
         assert_eq!(
-            treasury.withdraw(&key.pubkey(), 10),
+            treasury.withdraw(&key.address(), 10),
             Err(TransactionError::InsufficientFundsForFee)
         );
 
         // Enough balance
-        assert_eq!(treasury.withdraw(&key.pubkey(), 2), Ok(()));
-        assert_eq!(treasury.get_balance(&key.pubkey()), 1);
+        assert_eq!(treasury.withdraw(&key.address(), 2), Ok(()));
+        assert_eq!(treasury.get_balance(&key.address()), 1);
     }
 
     #[test]
@@ -1282,33 +1282,33 @@ mod tests {
         let key2 = Keypair::new();
 
         let tx =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 2, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 2, genesis_block.hash());
         let initial_balance = treasury.get_balance(&leader);
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(treasury.get_balance(&leader), initial_balance + 3);
-        assert_eq!(treasury.get_balance(&key1.pubkey()), 2);
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 100 - 5);
+        assert_eq!(treasury.get_balance(&key1.address()), 2);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 100 - 5);
 
         treasury.fee_calculator.difs_per_signature = 1;
-        let tx = sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+        let tx = sys_controller::transfer(&key1, &key2.address(), 1, genesis_block.hash());
 
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(treasury.get_balance(&leader), initial_balance + 4);
-        assert_eq!(treasury.get_balance(&key1.pubkey()), 0);
-        assert_eq!(treasury.get_balance(&key2.pubkey()), 1);
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 100 - 5);
+        assert_eq!(treasury.get_balance(&key1.address()), 0);
+        assert_eq!(treasury.get_balance(&key2.address()), 1);
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 100 - 5);
 
         // verify that an OpCodeErr collects fees, too
         let mut tx =
-            sys_controller::transfer(&mint_keypair, &key2.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key2.address(), 1, genesis_block.hash());
         // send a bogus instruction to sys_controller, cause an instruction error
         tx.context.instructions[0].data[0] = 40;
 
         treasury.process_transaction(&tx)
             .expect_err("instruction error"); // fails with an instruction error
         assert_eq!(treasury.get_balance(&leader), initial_balance + 5); // gots our bucks
-        assert_eq!(treasury.get_balance(&key2.pubkey()), 1); //  our fee --V
-        assert_eq!(treasury.get_balance(&mint_keypair.pubkey()), 100 - 5 - 1);
+        assert_eq!(treasury.get_balance(&key2.address()), 1); //  our fee --V
+        assert_eq!(treasury.get_balance(&mint_keypair.address()), 100 - 5 - 1);
     }
 
     #[test]
@@ -1323,9 +1323,9 @@ mod tests {
 
         let key = Keypair::new();
         let tx1 =
-            sys_controller::transfer(&mint_keypair, &key.pubkey(), 2, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key.address(), 2, genesis_block.hash());
         let tx2 =
-            sys_controller::transfer(&mint_keypair, &key.pubkey(), 5, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key.address(), 5, genesis_block.hash());
 
         let results = vec![
             Ok(()),
@@ -1350,13 +1350,13 @@ mod tests {
         let keypair = Keypair::new();
         let tx0 = sys_controller::create_user_account(
             &mint_keypair,
-            &keypair.pubkey(),
+            &keypair.address(),
             2,
             genesis_block.hash(),
         );
         let tx1 = sys_controller::create_user_account(
             &keypair,
-            &mint_keypair.pubkey(),
+            &mint_keypair.address(),
             1,
             genesis_block.hash(),
         );
@@ -1376,8 +1376,8 @@ mod tests {
         let payer1 = Keypair::new();
         let recipient = BvmAddr::new_rand();
         // Fund additional payers
-        treasury.transfer(3, &mint_keypair, &payer0.pubkey()).unwrap();
-        treasury.transfer(3, &mint_keypair, &payer1.pubkey()).unwrap();
+        treasury.transfer(3, &mint_keypair, &payer0.address()).unwrap();
+        treasury.transfer(3, &mint_keypair, &payer1.address()).unwrap();
         let tx0 = sys_controller::transfer(&mint_keypair, &recipient, 1, genesis_block.hash());
         let tx1 = sys_controller::transfer(&payer0, &recipient, 1, genesis_block.hash());
         let tx2 = sys_controller::transfer(&payer1, &recipient, 1, genesis_block.hash());
@@ -1407,7 +1407,7 @@ mod tests {
 
         let tx1 = sys_controller::create_user_account(
             &mint_keypair,
-            &alice.pubkey(),
+            &alice.address(),
             1,
             genesis_block.hash(),
         );
@@ -1423,19 +1423,19 @@ mod tests {
 
         // try executing an interleaved transfer twice
         assert_eq!(
-            treasury.transfer(1, &mint_keypair, &bob.pubkey()),
+            treasury.transfer(1, &mint_keypair, &bob.address()),
             Err(TransactionError::AccountInUse)
         );
         // the second time should fail as well
         // this verifies that `unlock_accounts` doesn't unlock `AccountInUse` accounts
         assert_eq!(
-            treasury.transfer(1, &mint_keypair, &bob.pubkey()),
+            treasury.transfer(1, &mint_keypair, &bob.address()),
             Err(TransactionError::AccountInUse)
         );
 
         drop(lock_result);
 
-        assert!(treasury.transfer(2, &mint_keypair, &bob.pubkey()).is_ok());
+        assert!(treasury.transfer(2, &mint_keypair, &bob.address()).is_ok());
     }
 
     #[test]
@@ -1445,7 +1445,7 @@ mod tests {
         let treasury = Treasury::new(&genesis_block);
 
         let tx =
-            sys_controller::transfer(&mint_keypair, &keypair.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &keypair.address(), 1, genesis_block.hash());
 
         let mut tx_invalid_program_index = tx.clone();
         tx_invalid_program_index.context.instructions[0].program_ids_index = 42;
@@ -1468,12 +1468,12 @@ mod tests {
         let key1 = Keypair::new();
         let treasury = Treasury::new(&genesis_block);
 
-        treasury.transfer(1, &mint_keypair, &key1.pubkey()).unwrap();
-        assert_eq!(treasury.get_balance(&key1.pubkey()), 1);
-        let tx = sys_controller::transfer(&key1, &key1.pubkey(), 1, genesis_block.hash());
+        treasury.transfer(1, &mint_keypair, &key1.address()).unwrap();
+        assert_eq!(treasury.get_balance(&key1.address()), 1);
+        let tx = sys_controller::transfer(&key1, &key1.address(), 1, genesis_block.hash());
         let res = treasury.process_transactions(&vec![tx.clone()]);
         assert_eq!(res.len(), 1);
-        assert_eq!(treasury.get_balance(&key1.pubkey()), 1);
+        assert_eq!(treasury.get_balance(&key1.address()), 1);
 
         // TODO: Why do we convert errors to Oks?
         //res[0].clone().unwrap_err();
@@ -1505,7 +1505,7 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 1, genesis_block.hash());
         assert_eq!(parent.process_transaction(&tx), Ok(()));
         let treasury = new_from_parent(&parent);
         assert_eq!(
@@ -1523,10 +1523,10 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 1, genesis_block.hash());
         assert_eq!(parent.process_transaction(&tx), Ok(()));
         let treasury = new_from_parent(&parent);
-        let tx = sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+        let tx = sys_controller::transfer(&key1, &key2.address(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
         assert_eq!(parent.get_signature_status(&tx.signatures[0]), None);
     }
@@ -1539,10 +1539,10 @@ mod tests {
         let initial_state = treasury0.hash_internal_state();
         assert_eq!(treasury1.hash_internal_state(), initial_state);
 
-        let pubkey = BvmAddr::new_rand();
-        treasury0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        let address = BvmAddr::new_rand();
+        treasury0.transfer(1_000, &mint_keypair, &address).unwrap();
         assert_ne!(treasury0.hash_internal_state(), initial_state);
-        treasury1.transfer(1_000, &mint_keypair, &pubkey).unwrap();
+        treasury1.transfer(1_000, &mint_keypair, &address).unwrap();
         assert_eq!(treasury0.hash_internal_state(), treasury1.hash_internal_state());
 
         // Checkpointing should not change its state
@@ -1589,7 +1589,7 @@ mod tests {
         let parent = Arc::new(Treasury::new(&genesis_block));
 
         let tx_transfer_mint_to_1 =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 1, genesis_block.hash());
         trace!("parent process tx ");
         assert_eq!(parent.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         trace!("done parent process tx ");
@@ -1609,7 +1609,7 @@ mod tests {
 
         assert_eq!(treasury.transaction_count(), parent.transaction_count());
         let tx_transfer_1_to_2 =
-            sys_controller::transfer(&key1, &key2.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&key1, &key2.address(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_1_to_2), Ok(()));
         assert_eq!(treasury.transaction_count(), 2);
         assert_eq!(parent.transaction_count(), 1);
@@ -1620,9 +1620,9 @@ mod tests {
 
         for _ in 0..3 {
             // first time these should match what happened above, assert that parents are ok
-            assert_eq!(treasury.get_balance(&key1.pubkey()), 0);
-            assert_eq!(treasury.get_account(&key1.pubkey()), None);
-            assert_eq!(treasury.get_balance(&key2.pubkey()), 1);
+            assert_eq!(treasury.get_balance(&key1.address()), 0);
+            assert_eq!(treasury.get_account(&key1.address()), None);
+            assert_eq!(treasury.get_balance(&key2.address()), 1);
             trace!("start");
             assert_eq!(
                 treasury.get_signature_status(&tx_transfer_mint_to_1.signatures[0]),
@@ -1649,19 +1649,19 @@ mod tests {
 
         let key1 = Keypair::new();
 
-        parent.transfer(1, &mint_keypair, &key1.pubkey()).unwrap();
-        assert_eq!(parent.get_balance(&key1.pubkey()), 1);
+        parent.transfer(1, &mint_keypair, &key1.address()).unwrap();
+        assert_eq!(parent.get_balance(&key1.address()), 1);
         let treasury = new_from_parent(&parent);
         treasury.squash();
-        assert_eq!(parent.get_balance(&key1.pubkey()), 1);
+        assert_eq!(parent.get_balance(&key1.address()), 1);
     }
 
     #[test]
     fn test_treasury_epoch_vote_accounts() {
-        let leader_pubkey = BvmAddr::new_rand();
+        let leader_addr = BvmAddr::new_rand();
         let leader_difs = 3;
         let mut genesis_block =
-            create_genesis_block_with_leader(5, &leader_pubkey, leader_difs).genesis_block;
+            create_genesis_block_with_leader(5, &leader_addr, leader_difs).genesis_block;
 
         // set this up weird, forces future generation, odd mod(), etc.
         //  this says: "vote_accounts for epoch X should be generated at slot index 3 in epoch X-2...
@@ -1676,10 +1676,10 @@ mod tests {
         let vote_accounts0: Option<HashMap<_, _>> = parent.epoch_vote_accounts(0).map(|accounts| {
             accounts
                 .iter()
-                .filter_map(|(pubkey, (_, account))| {
+                .filter_map(|(address, (_, account))| {
                     if let Ok(vote_state) = VoteState::deserialize(&account.data) {
-                        if vote_state.node_pubkey == leader_pubkey {
-                            Some((*pubkey, true))
+                        if vote_state.node_address == leader_addr {
+                            Some((*address, true))
                         } else {
                             None
                         }
@@ -1704,7 +1704,7 @@ mod tests {
         // child crosses epoch boundary and is the first slot in the epoch
         let child = Treasury::new_from_parent(
             &parent,
-            &leader_pubkey,
+            &leader_addr,
             SLOTS_PER_EPOCH - (STAKERS_SLOT_OFFSET % SLOTS_PER_EPOCH),
         );
 
@@ -1713,7 +1713,7 @@ mod tests {
         // child crosses epoch boundary but isn't the first slot in the epoch
         let child = Treasury::new_from_parent(
             &parent,
-            &leader_pubkey,
+            &leader_addr,
             SLOTS_PER_EPOCH - (STAKERS_SLOT_OFFSET % SLOTS_PER_EPOCH) + 1,
         );
         assert!(child.epoch_vote_accounts(i).is_some());
@@ -1728,7 +1728,7 @@ mod tests {
         let key = Keypair::new();
 
         let mut transfer_instruction =
-            sys_opcode::transfer(&mint_keypair.pubkey(), &key.pubkey(), 0);
+            sys_opcode::transfer(&mint_keypair.address(), &key.address(), 0);
         transfer_instruction.accounts[0].is_signer = false;
 
         let tx = Transaction::new_s_opcodes(
@@ -1738,7 +1738,7 @@ mod tests {
         );
 
         assert_eq!(treasury.process_transaction(&tx), Ok(()));
-        assert_eq!(treasury.get_balance(&key.pubkey()), 0);
+        assert_eq!(treasury.get_balance(&key.address()), 0);
     }
 
     #[test]
@@ -1818,7 +1818,7 @@ mod tests {
         let treasury = Arc::new(Treasury::new(&genesis_block));
         let key1 = Keypair::new();
         let tx_transfer_mint_to_1 =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         assert_eq!(treasury.is_delta.load(Ordering::Relaxed), true);
     }
@@ -1832,7 +1832,7 @@ mod tests {
 
         // Set is_delta to true
         let tx_transfer_mint_to_1 =
-            sys_controller::transfer(&mint_keypair, &key1.pubkey(), 1, genesis_block.hash());
+            sys_controller::transfer(&mint_keypair, &key1.address(), 1, genesis_block.hash());
         assert_eq!(treasury.process_transaction(&tx_transfer_mint_to_1), Ok(()));
         assert_eq!(treasury.is_votable(), false);
 
@@ -1858,7 +1858,7 @@ mod tests {
         assert_eq!(
             treasury1.process_transaction(&sys_controller::transfer(
                 &mint_keypair,
-                &Keypair::new().pubkey(),
+                &Keypair::new().address(),
                 1,
                 genesis_block.hash(),
             )),
@@ -1910,9 +1910,9 @@ mod tests {
 
         let vote_keypair = Keypair::new();
         let instructions = vote_opcode::create_account(
-            &mint_keypair.pubkey(),
-            &vote_keypair.pubkey(),
-            &mint_keypair.pubkey(),
+            &mint_keypair.address(),
+            &vote_keypair.address(),
+            &mint_keypair.address(),
             0,
             10,
         );
@@ -1929,9 +1929,9 @@ mod tests {
 
         assert_eq!(vote_accounts.len(), 2);
 
-        assert!(vote_accounts.get(&vote_keypair.pubkey()).is_some());
+        assert!(vote_accounts.get(&vote_keypair.address()).is_some());
 
-        assert!(treasury.withdraw(&vote_keypair.pubkey(), 10).is_ok());
+        assert!(treasury.withdraw(&vote_keypair.address(), 10).is_ok());
 
         let vote_accounts = treasury.vote_accounts();
 
@@ -1958,7 +1958,7 @@ mod tests {
         let keypair2 = Keypair::new();
         let fail_tx = sys_controller::create_user_account(
             &keypair1,
-            &keypair2.pubkey(),
+            &keypair2.address(),
             1,
             treasury.last_transaction_seal(),
         );

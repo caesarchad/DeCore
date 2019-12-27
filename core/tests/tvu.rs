@@ -42,7 +42,7 @@ fn test_replay() {
     morgan_logger::setup();
     let leader = Node::new_localhost();
     let target1_keypair = Keypair::new();
-    let target1 = Node::new_localhost_with_pubkey(&target1_keypair.pubkey());
+    let target1 = Node::new_localhost_with_address(&target1_keypair.address());
     let target2 = Node::new_localhost();
     let exit = Arc::new(AtomicBool::new(false));
 
@@ -98,7 +98,7 @@ fn test_replay() {
     ) = verifier::new_treasuries_from_block_buffer(&block_buffer_pool_path, None);
     let working_treasury = treasury_forks.working_treasury();
     assert_eq!(
-        working_treasury.get_balance(&mint_keypair.pubkey()),
+        working_treasury.get_balance(&mint_keypair.address()),
         mint_balance
     );
 
@@ -117,7 +117,7 @@ fn test_replay() {
         let (waterclock_service_exit, waterclock_recorder, waterclock_service, _entry_receiver) =
             create_test_recorder(&working_treasury, &block_buffer_pool);
         let blaze_unit = BlazeUnit::new(
-            &voting_keypair.pubkey(),
+            &voting_keypair.address(),
             Some(&Arc::new(voting_keypair)),
             &storage_keypair,
             &treasury_forks,
@@ -155,7 +155,7 @@ fn test_replay() {
 
             let tx0 = sys_controller::create_user_account(
                 &mint_keypair,
-                &bob_keypair.pubkey(),
+                &bob_keypair.address(),
                 transfer_amount,
                 transaction_seal,
             );
@@ -193,10 +193,10 @@ fn test_replay() {
         }
 
         let working_treasury = treasury_forks.read().unwrap().working_treasury();
-        let final_mint_balance = working_treasury.get_balance(&mint_keypair.pubkey());
+        let final_mint_balance = working_treasury.get_balance(&mint_keypair.address());
         assert_eq!(final_mint_balance, mint_ref_balance);
 
-        let bob_balance = working_treasury.get_balance(&bob_keypair.pubkey());
+        let bob_balance = working_treasury.get_balance(&bob_keypair.address());
         assert_eq!(bob_balance, mint_balance - mint_ref_balance);
 
         exit.store(true, Ordering::Relaxed);

@@ -13,7 +13,7 @@ fn bench_block_to_blobs_to_block(bencher: &mut Bencher) {
     let zero = Hash::default();
     let one = hash(&zero.as_ref());
     let keypair = Keypair::new();
-    let tx0 = sys_controller::transfer(&keypair, &keypair.pubkey(), 1, one);
+    let tx0 = sys_controller::transfer(&keypair, &keypair.address(), 1, one);
     let transactions = vec![tx0; 10];
     let entries = next_fiscal_statment(&zero, 1, transactions);
 

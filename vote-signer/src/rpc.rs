@@ -136,8 +136,8 @@ impl VoteSignerRpc for VoteSignerRpcImpl {
     }
 }
 
-fn verify_signature(sig: &Signature, pubkey: &BvmAddr, msg: &[u8]) -> Result<()> {
-    if sig.verify(pubkey.as_ref(), msg) {
+fn verify_signature(sig: &Signature, address: &BvmAddr, msg: &[u8]) -> Result<()> {
+    if sig.verify(address.as_ref(), msg) {
         Ok(())
     } else {
         Err(Error::invalid_request())
@@ -145,9 +145,9 @@ fn verify_signature(sig: &Signature, pubkey: &BvmAddr, msg: &[u8]) -> Result<()>
 }
 
 pub trait VoteSigner {
-    fn register(&self, pubkey: &BvmAddr, sig: &Signature, signed_msg: &[u8]) -> Result<BvmAddr>;
-    fn sign(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature>;
-    fn deregister(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()>;
+    fn register(&self, address: &BvmAddr, sig: &Signature, signed_msg: &[u8]) -> Result<BvmAddr>;
+    fn sign(&self, address: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature>;
+    fn deregister(&self, address: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()>;
 }
 
 #[derive(Clone)]
@@ -156,28 +156,28 @@ pub struct LocalVoteSigner {
 }
 impl VoteSigner for LocalVoteSigner {
     /// Process JSON-RPC request items sent via JSON-RPC.
-    fn register(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<BvmAddr> {
-        verify_signature(&sig, &pubkey, &msg)?;
+    fn register(&self, address: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<BvmAddr> {
+        verify_signature(&sig, &address, &msg)?;
         {
-            if let Some(voting_keypair) = self.nodes.read().unwrap().get(&pubkey) {
-                return Ok(voting_keypair.pubkey());
+            if let Some(voting_keypair) = self.nodes.read().unwrap().get(&address) {
+                return Ok(voting_keypair.address());
             }
         }
         let voting_keypair = Keypair::new();
-        let voting_pubkey = voting_keypair.pubkey();
-        self.nodes.write().unwrap().insert(*pubkey, voting_keypair);
-        Ok(voting_pubkey)
+        let voting_address = voting_keypair.address();
+        self.nodes.write().unwrap().insert(*address, voting_keypair);
+        Ok(voting_address)
     }
-    fn sign(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature> {
-        verify_signature(&sig, &pubkey, &msg)?;
-        match self.nodes.read().unwrap().get(&pubkey) {
+    fn sign(&self, address: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<Signature> {
+        verify_signature(&sig, &address, &msg)?;
+        match self.nodes.read().unwrap().get(&address) {
             Some(voting_keypair) => Ok(voting_keypair.sign_context(&msg)),
             None => Err(Error::invalid_request()),
         }
     }
-    fn deregister(&self, pubkey: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()> {
-        verify_signature(&sig, &pubkey, &msg)?;
-        self.nodes.write().unwrap().remove(&pubkey);
+    fn deregister(&self, address: &BvmAddr, sig: &Signature, msg: &[u8]) -> Result<()> {
+        verify_signature(&sig, &address, &msg)?;
+        self.nodes.write().unwrap().remove(&address);
         Ok(())
     }
 }
@@ -211,14 +211,14 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let sig = node_keypair.sign_context(msg.as_bytes());
         let req = json!({
            "jsonrpc": "2.0",
            "id": 1,
            "method": "registerNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -247,7 +247,7 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let msg1 = "This is a Test1";
         let sig = node_keypair.sign_context(msg.as_bytes());
@@ -255,7 +255,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "registerNode",
-           "params": [node_pubkey, sig, msg1.as_bytes()],
+           "params": [node_address, sig, msg1.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -279,14 +279,14 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let sig = node_keypair.sign_context(msg.as_bytes());
         let req = json!({
            "jsonrpc": "2.0",
            "id": 1,
            "method": "deregisterNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -310,7 +310,7 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let msg1 = "This is a Test1";
         let sig = node_keypair.sign_context(msg.as_bytes());
@@ -318,7 +318,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "deregisterNode",
-           "params": [node_pubkey, sig, msg1.as_bytes()],
+           "params": [node_address, sig, msg1.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -342,7 +342,7 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let sig = node_keypair.sign_context(msg.as_bytes());
 
@@ -350,12 +350,12 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "registerNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta.clone());
         let result: Response = serde_json::from_str(&res.expect("actual response"))
             .expect("actual response deserialization");
-        let mut vote_pubkey = BvmAddr::new_rand();
+        let mut vote_address = BvmAddr::new_rand();
         if let Response::Single(out) = result {
             if let Output::Success(succ) = out {
                 assert_eq!(succ.jsonrpc.unwrap(), Version::V2);
@@ -364,7 +364,7 @@ mod tests {
                     succ.result.as_array().unwrap().len(),
                     mem::size_of::<BvmAddr>()
                 );
-                vote_pubkey = serde_json::from_value(succ.result).unwrap();
+                vote_address = serde_json::from_value(succ.result).unwrap();
             } else {
                 assert!(false);
             }
@@ -376,7 +376,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "signVote",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -392,7 +392,7 @@ mod tests {
                     mem::size_of::<Signature>()
                 );
                 let sig: Signature = serde_json::from_value(succ.result).unwrap();
-                assert_eq!(verify_signature(&sig, &vote_pubkey, msg.as_bytes()), Ok(()));
+                assert_eq!(verify_signature(&sig, &vote_address, msg.as_bytes()), Ok(()));
             } else {
                 assert!(false);
             }
@@ -406,14 +406,14 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let sig = node_keypair.sign_context(msg.as_bytes());
         let req = json!({
            "jsonrpc": "2.0",
            "id": 1,
            "method": "signVote",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -437,7 +437,7 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let sig = node_keypair.sign_context(msg.as_bytes());
 
@@ -445,7 +445,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "registerNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let _res = io.handle_request_sync(&req.to_string(), meta.clone());
 
@@ -453,7 +453,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "deregisterNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let _res = io.handle_request_sync(&req.to_string(), meta.clone());
 
@@ -461,7 +461,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "signVote",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
@@ -485,7 +485,7 @@ mod tests {
         let (io, meta) = start_rpc_handler();
 
         let node_keypair = Keypair::new();
-        let node_pubkey = node_keypair.pubkey();
+        let node_address = node_keypair.address();
         let msg = "This is a test";
         let msg1 = "This is a Test";
         let sig = node_keypair.sign_context(msg.as_bytes());
@@ -494,7 +494,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "registerNode",
-           "params": [node_pubkey, sig, msg.as_bytes()],
+           "params": [node_address, sig, msg.as_bytes()],
         });
         let _res = io.handle_request_sync(&req.to_string(), meta.clone());
 
@@ -502,7 +502,7 @@ mod tests {
            "jsonrpc": "2.0",
            "id": 1,
            "method": "signVote",
-           "params": [node_pubkey, sig, msg1.as_bytes()],
+           "params": [node_address, sig, msg1.as_bytes()],
         });
         let res = io.handle_request_sync(&req.to_string(), meta);
 
