@@ -10,7 +10,8 @@ use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use morgan::block_buffer_pool::{fetch_interim_ledger_location, BlockBufferPool};
 use morgan::fiscal_statement_info::{compose_b_fiscal_stmt, compose_s_fiscal_stmt_nohash, FsclStmtSlc};
-use morgan::packet::{Blob, BLOB_HEADER_SIZE};
+use morgan::packet::Blob;
+use morgan::bvm_types::BLOB_HEADER_SIZE;
 use test::Bencher;
 
 // Given some blobs and a ledger at ledger_path, benchmark writing the blobs to the ledger

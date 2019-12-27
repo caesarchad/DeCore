@@ -657,7 +657,7 @@ pub fn generate_and_fund_keypairs<T: AccountHost>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use morgan::node_group_info::FULLNODE_PORT_RANGE;
+    use morgan::bvm_types::FULLNODE_PORT_RANGE;
     use morgan::local_node_group::{NodeGroupConfig, LocalNodeGroup};
     use morgan::verifier::ValidatorConfig;
     use morgan_client::slim_account_host::create_client;

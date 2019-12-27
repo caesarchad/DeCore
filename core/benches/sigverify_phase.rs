@@ -5,7 +5,7 @@ extern crate test;
 
 use log::*;
 use rand::{thread_rng, Rng};
-use morgan::packet::to_packets_chunked;
+use morgan::packet::pkt_chunk;
 use morgan::service::Service;
 use morgan::signature_verify_phase ::SigVerifyPhase;
 use morgan::test_tx::test_tx;
@@ -31,7 +31,7 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
     let chunk_size = 1024;
     let mut batches = if use_same_tx {
         let tx = test_tx();
-        to_packets_chunked(&vec![tx; len], chunk_size)
+        pkt_chunk(&vec![tx; len], chunk_size)
     } else {
         let from_keypair = Keypair::new();
         let to_keypair = Keypair::new();
@@ -48,7 +48,7 @@ fn bench_sigverify_phase(bencher: &mut Bencher) {
                 tx
             })
             .collect();
-        to_packets_chunked(&txs, chunk_size)
+        pkt_chunk(&txs, chunk_size)
     };
 
     trace!(

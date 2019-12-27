@@ -267,7 +267,7 @@ fn bench_treasury_phase_multi_programs(bencher: &mut Bencher) {
         assert!(r.is_ok(), "sanity parallel execution");
     }
     treasury.clear_signatures();
-    let verified: Vec<_> = to_packets_chunked(&transactions.clone(), 96)
+    let verified: Vec<_> = pkt_bndl(&transactions.clone(), 96)
         .into_iter()
         .map(|x| {
             let len = x.packets.len();

@@ -97,10 +97,10 @@ name = "treasury_phase"
 name = "block_buffer_pool"
 
 [[bench]]
-name = "ledger"
+name = "fscl_stmts"
 
 [[bench]]
-name = "gen_keys"
+name = "keymaker"
 
 [[bench]]
 name = "sigverify"
@@ -111,6 +111,4 @@ name = "sigverify_phase"
 [[bench]]
 name = "water_clock"
 
-[[bench]]
-required-features = ["chacha"]
-name = "chacha"
+
