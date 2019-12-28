@@ -1,4 +1,4 @@
-use crate::token_state::TokenState;
+use crate::ico_context::IcoContext;
 use log::*;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
@@ -13,7 +13,7 @@ pub fn handle_opcode(
 ) -> Result<(), OpCodeErr> {
     morgan_logger::setup();
 
-    TokenState::process(program_id, info, input).map_err(|e| {
+    IcoContext::process(program_id, info, input).map_err(|e| {
         // error!("{}", Error(format!("error: {:?}", e).to_string()));
         println!(
             "{}",

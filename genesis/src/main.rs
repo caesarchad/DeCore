@@ -292,7 +292,7 @@ mod tests {
             ),
             (
                 "Token11111111111111111111111111111111111111",
-                morgan_token_api::id(),
+                morgan_token_api::pgm_id::id(),
             ),
             (
                 "Vote111111111111111111111111111111111111111",
@@ -319,7 +319,7 @@ mod tests {
             morgan_interface::bvm_loader::id(),
             morgan_bvm_script::id(),
             morgan_storage_api::id(),
-            morgan_token_api::id(),
+            morgan_token_api::pgm_id::id(),
             morgan_vote_api::id(),
             morgan_stake_api::id(),
             morgan_profiler::pgm_id::id(),

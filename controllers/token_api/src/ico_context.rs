@@ -7,29 +7,29 @@ use morgan_interface::bvm_address::BvmAddr;
 use morgan_helper::logHelper::*;
 
 #[derive(Serialize, Debug, PartialEq, FromPrimitive)]
-pub enum TokenError {
+pub enum IcoErr {
     InvalidArgument,
     InsufficentFunds,
     NotOwner,
 }
 
-impl<T> DecodeError<T> for TokenError {
+impl<T> DecodeError<T> for IcoErr {
     fn type_of(&self) -> &'static str {
-        "TokenError"
+        "IcoErr"
     }
 }
 
-impl std::fmt::Display for TokenError {
+impl std::fmt::Display for IcoErr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "error")
     }
 }
-impl std::error::Error for TokenError {}
+impl std::error::Error for IcoErr {}
 
-pub type Result<T> = std::result::Result<T, TokenError>;
+pub type Result<T> = std::result::Result<T, IcoErr>;
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
-pub struct TokenInfo {
+pub struct IcoInfo {
     supply: u64,
 
     decimals: u8,
@@ -40,48 +40,48 @@ pub struct TokenInfo {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TokenAccountDelegateInfo {
+pub struct IcoAgent {
     genesis: BvmAddr,
 
     original_amount: u64,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TokenAccountInfo {
+pub struct TkActInfo {
     token: BvmAddr,
 
     owner: BvmAddr,
 
     amount: u64,
 
-    delegate: Option<TokenAccountDelegateInfo>,
+    agent_acct: Option<IcoAgent>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-enum TokenOpCode {
-    NewToken(TokenInfo),
-    NewTokenAccount,
-    Transfer(u64),
-    Approve(u64),
+enum IcoOpCode {
+    NewICO(IcoInfo),
+    NewIcoAcct,
+    MoveToken(u64),
+    SetALW(u64),
     SetOwner,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub enum TokenState {
+pub enum IcoContext {
     Unallocated,
-    Token(TokenInfo),
-    Account(TokenAccountInfo),
+    Token(IcoInfo),
+    Account(TkActInfo),
     Invalid,
 }
-impl Default for TokenState {
-    fn default() -> TokenState {
-        TokenState::Unallocated
+impl Default for IcoContext {
+    fn default() -> IcoContext {
+        IcoContext::Unallocated
     }
 }
 
-impl TokenState {
+impl IcoContext {
     #[allow(clippy::needless_pass_by_value)]
-    fn map_to_invalid_args(err: std::boxed::Box<bincode::ErrorKind>) -> TokenError {
+    fn map_to_invalid_args(err: std::boxed::Box<bincode::ErrorKind>) -> IcoErr {
         
         println!(
             "{}",
@@ -90,27 +90,27 @@ impl TokenState {
                 module_path!().to_string()
             )
         );
-        TokenError::InvalidArgument
+        IcoErr::InvalidArgument
     }
 
-    pub fn deserialize(input: &[u8]) -> Result<TokenState> {
+    pub fn deserialize(input: &[u8]) -> Result<IcoContext> {
         if input.is_empty() {
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
         match input[0] {
-            0 => Ok(TokenState::Unallocated),
-            1 => Ok(TokenState::Token(
+            0 => Ok(IcoContext::Unallocated),
+            1 => Ok(IcoContext::Token(
                 bincode::deserialize(&input[1..]).map_err(Self::map_to_invalid_args)?,
             )),
-            2 => Ok(TokenState::Account(
+            2 => Ok(IcoContext::Account(
                 bincode::deserialize(&input[1..]).map_err(Self::map_to_invalid_args)?,
             )),
-            _ => Err(TokenError::InvalidArgument),
+            _ => Err(IcoErr::InvalidArgument),
         }
     }
 
-    fn serialize(self: &TokenState, output: &mut [u8]) -> Result<()> {
+    fn serialize(self: &IcoContext, output: &mut [u8]) -> Result<()> {
         if output.is_empty() {
             
             println!(
@@ -120,16 +120,16 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
         match self {
-            TokenState::Unallocated | TokenState::Invalid => Err(TokenError::InvalidArgument),
-            TokenState::Token(token_info) => {
+            IcoContext::Unallocated | IcoContext::Invalid => Err(IcoErr::InvalidArgument),
+            IcoContext::Token(ico_info) => {
                 output[0] = 1;
                 let writer = std::io::BufWriter::new(&mut output[1..]);
-                bincode::serialize_into(writer, &token_info).map_err(Self::map_to_invalid_args)
+                bincode::serialize_into(writer, &ico_info).map_err(Self::map_to_invalid_args)
             }
-            TokenState::Account(account_info) => {
+            IcoContext::Account(account_info) => {
                 output[0] = 2;
                 let writer = std::io::BufWriter::new(&mut output[1..]);
                 bincode::serialize_into(writer, &account_info).map_err(Self::map_to_invalid_args)
@@ -139,17 +139,17 @@ impl TokenState {
 
     #[allow(dead_code)]
     pub fn amount(&self) -> Result<u64> {
-        if let TokenState::Account(account_info) = self {
+        if let IcoContext::Account(account_info) = self {
             Ok(account_info.amount)
         } else {
-            Err(TokenError::InvalidArgument)
+            Err(IcoErr::InvalidArgument)
         }
     }
 
     #[allow(dead_code)]
     pub fn only_owner(&self, key: &BvmAddr) -> Result<()> {
         if *key != BvmAddr::default() {
-            if let TokenState::Account(account_info) = self {
+            if let IcoContext::Account(account_info) = self {
                 if account_info.owner == *key {
                     return Ok(());
                 }
@@ -159,20 +159,20 @@ impl TokenState {
         println!(
             "{}",
             Warn(
-                format!("TokenState: non-owner rejected").to_string(),
+                format!("IcoContext: non-owner rejected").to_string(),
                 module_path!().to_string()
             )
         );
-        Err(TokenError::NotOwner)
+        Err(IcoErr::NotOwner)
     }
 
-    pub fn process_newtoken(
+    pub fn issue_ico_cmd(
         info: &mut [KeyedAccount],
-        token_info: TokenInfo,
-        input_accounts: &[TokenState],
-        output_accounts: &mut Vec<(usize, TokenState)>,
+        ico_info: IcoInfo,
+        in_accts: &[IcoContext],
+        out_accts: &mut Vec<(usize, IcoContext)>,
     ) -> Result<()> {
-        if input_accounts.len() != 2 {
+        if in_accts.len() != 2 {
             
             println!(
                 "{}",
@@ -181,10 +181,10 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
-        if let TokenState::Account(dest_account) = &input_accounts[1] {
+        if let IcoContext::Account(dest_account) = &in_accts[1] {
             if info[0].signer_key().unwrap() != &dest_account.token {
                 
                 println!(
@@ -194,24 +194,24 @@ impl TokenState {
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if dest_account.delegate.is_some() {
+            if dest_account.agent_acct.is_some() {
                 
                 println!(
                     "{}",
                     Error(
-                        format!("account 1 is a delegate and cannot accept tokens").to_string(),
+                        format!("account 1 is a agent_acct and cannot accept tokens").to_string(),
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
             let mut output_dest_account = dest_account.clone();
-            output_dest_account.amount = token_info.supply;
-            output_accounts.push((1, TokenState::Account(output_dest_account)));
+            output_dest_account.amount = ico_info.supply;
+            out_accts.push((1, IcoContext::Account(output_dest_account)));
         } else {
             
             println!(
@@ -221,10 +221,10 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
-        if input_accounts[0] != TokenState::Unallocated {
+        if in_accts[0] != IcoContext::Unallocated {
             
             println!(
                 "{}",
@@ -233,22 +233,22 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
-        output_accounts.push((0, TokenState::Token(token_info)));
+        out_accts.push((0, IcoContext::Token(ico_info)));
         Ok(())
     }
 
-    pub fn process_newaccount(
+    pub fn crate_ico_acct(
         info: &mut [KeyedAccount],
-        input_accounts: &[TokenState],
-        output_accounts: &mut Vec<(usize, TokenState)>,
+        in_accts: &[IcoContext],
+        out_accts: &mut Vec<(usize, IcoContext)>,
     ) -> Result<()> {
         // key 0 - Destination new token account
         // key 1 - Owner of the account
         // key 2 - Token this account is associated with
-        // key 3 - Source account that this account is a delegate for (optional)
-        if input_accounts.len() < 3 {
+        // key 3 - Source account that this account is a agent_acct for (optional)
+        if in_accts.len() < 3 {
             // error!("{}", Error(format!("Expected 3 accounts").to_string()));
             println!(
                 "{}",
@@ -257,9 +257,9 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
-        if input_accounts[0] != TokenState::Unallocated {
+        if in_accts[0] != IcoContext::Unallocated {
             
             println!(
                 "{}",
@@ -268,31 +268,31 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
-        let mut token_account_info = TokenAccountInfo {
+        let mut token_account_info = TkActInfo {
             token: *info[2].unsigned_key(),
             owner: *info[1].unsigned_key(),
             amount: 0,
-            delegate: None,
+            agent_acct: None,
         };
-        if input_accounts.len() >= 4 {
-            token_account_info.delegate = Some(TokenAccountDelegateInfo {
+        if in_accts.len() >= 4 {
+            token_account_info.agent_acct = Some(IcoAgent {
                 genesis: *info[3].unsigned_key(),
                 original_amount: 0,
             });
         }
-        output_accounts.push((0, TokenState::Account(token_account_info)));
+        out_accts.push((0, IcoContext::Account(token_account_info)));
         Ok(())
     }
 
-    pub fn process_transfer(
+    pub fn transfer_token(
         info: &mut [KeyedAccount],
         amount: u64,
-        input_accounts: &[TokenState],
-        output_accounts: &mut Vec<(usize, TokenState)>,
+        in_accts: &[IcoContext],
+        out_accts: &mut Vec<(usize, IcoContext)>,
     ) -> Result<()> {
-        if input_accounts.len() < 3 {
+        if in_accts.len() < 3 {
             
             println!(
                 "{}",
@@ -301,13 +301,13 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
-        if let (TokenState::Account(source_account), TokenState::Account(dest_account)) =
-            (&input_accounts[1], &input_accounts[2])
+        if let (IcoContext::Account(src_acct), IcoContext::Account(dest_account)) =
+            (&in_accts[1], &in_accts[2])
         {
-            if source_account.token != dest_account.token {
+            if src_acct.token != dest_account.token {
                 
                 println!(
                     "{}",
@@ -316,22 +316,22 @@ impl TokenState {
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if dest_account.delegate.is_some() {
+            if dest_account.agent_acct.is_some() {
                 
                 println!(
                     "{}",
                     Error(
-                        format!("account 2 is a delegate and cannot accept tokens").to_string(),
+                        format!("account 2 is a agent_acct and cannot accept tokens").to_string(),
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if info[0].signer_key().unwrap() != &source_account.owner {
+            if info[0].signer_key().unwrap() != &src_acct.owner {
                 
                 println!(
                     "{}",
@@ -340,19 +340,19 @@ impl TokenState {
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if source_account.amount < amount {
-                Err(TokenError::InsufficentFunds)?;
+            if src_acct.amount < amount {
+                Err(IcoErr::InsufficentFunds)?;
             }
 
-            let mut output_source_account = source_account.clone();
-            output_source_account.amount -= amount;
-            output_accounts.push((1, TokenState::Account(output_source_account)));
+            let mut out_src_acct = src_acct.clone();
+            out_src_acct.amount -= amount;
+            out_accts.push((1, IcoContext::Account(out_src_acct)));
 
-            if let Some(ref delegate_info) = source_account.delegate {
-                if input_accounts.len() != 4 {
+            if let Some(ref agent_acct_info) = src_acct.agent_acct {
+                if in_accts.len() != 4 {
                     
                     println!(
                         "{}",
@@ -361,12 +361,12 @@ impl TokenState {
                             module_path!().to_string()
                         )
                     );
-                    Err(TokenError::InvalidArgument)?;
+                    Err(IcoErr::InvalidArgument)?;
                 }
 
-                let delegate_account = source_account;
-                if let TokenState::Account(source_account) = &input_accounts[3] {
-                    if source_account.token != delegate_account.token {
+                let agent_account = src_acct;
+                if let IcoContext::Account(src_acct) = &in_accts[3] {
+                    if src_acct.token != agent_account.token {
                         
                         println!(
                             "{}",
@@ -375,27 +375,27 @@ impl TokenState {
                                 module_path!().to_string()
                             )
                         );
-                        Err(TokenError::InvalidArgument)?;
+                        Err(IcoErr::InvalidArgument)?;
                     }
-                    if info[3].unsigned_key() != &delegate_info.genesis {
+                    if info[3].unsigned_key() != &agent_acct_info.genesis {
                         
                         println!(
                             "{}",
                             Error(
-                                format!("Account 1 is not a delegate of account 3").to_string(),
+                                format!("Account 1 is not a agent_acct of account 3").to_string(),
                                 module_path!().to_string()
                             )
                         );
-                        Err(TokenError::InvalidArgument)?;
+                        Err(IcoErr::InvalidArgument)?;
                     }
 
-                    if source_account.amount < amount {
-                        Err(TokenError::InsufficentFunds)?;
+                    if src_acct.amount < amount {
+                        Err(IcoErr::InsufficentFunds)?;
                     }
 
-                    let mut output_source_account = source_account.clone();
-                    output_source_account.amount -= amount;
-                    output_accounts.push((3, TokenState::Account(output_source_account)));
+                    let mut out_src_acct = src_acct.clone();
+                    out_src_acct.amount -= amount;
+                    out_accts.push((3, IcoContext::Account(out_src_acct)));
                 } else {
                     
                     println!(
@@ -405,13 +405,13 @@ impl TokenState {
                             module_path!().to_string()
                         )
                     );
-                    Err(TokenError::InvalidArgument)?;
+                    Err(IcoErr::InvalidArgument)?;
                 }
             }
 
             let mut output_dest_account = dest_account.clone();
             output_dest_account.amount += amount;
-            output_accounts.push((2, TokenState::Account(output_dest_account)));
+            out_accts.push((2, IcoContext::Account(output_dest_account)));
         } else {
             
             println!(
@@ -421,18 +421,18 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
         Ok(())
     }
 
-    pub fn process_approve(
+    pub fn set_allowance(
         info: &mut [KeyedAccount],
         amount: u64,
-        input_accounts: &[TokenState],
-        output_accounts: &mut Vec<(usize, TokenState)>,
+        in_accts: &[IcoContext],
+        out_accts: &mut Vec<(usize, IcoContext)>,
     ) -> Result<()> {
-        if input_accounts.len() != 3 {
+        if in_accts.len() != 3 {
             
             println!(
                 "{}",
@@ -441,13 +441,13 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
-        if let (TokenState::Account(source_account), TokenState::Account(delegate_account)) =
-            (&input_accounts[1], &input_accounts[2])
+        if let (IcoContext::Account(src_acct), IcoContext::Account(agent_account)) =
+            (&in_accts[1], &in_accts[2])
         {
-            if source_account.token != delegate_account.token {
+            if src_acct.token != agent_account.token {
                 
                 println!(
                     "{}",
@@ -456,10 +456,10 @@ impl TokenState {
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if info[0].signer_key().unwrap() != &source_account.owner {
+            if info[0].signer_key().unwrap() != &src_acct.owner {
                 
                 println!(
                     "{}",
@@ -468,53 +468,53 @@ impl TokenState {
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            if source_account.delegate.is_some() {
+            if src_acct.agent_acct.is_some() {
                 
                 println!(
                     "{}",
                     Error(
-                        format!("account 1 is a delegate").to_string(),
+                        format!("account 1 is a agent_acct").to_string(),
                         module_path!().to_string()
                     )
                 );
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            match &delegate_account.delegate {
+            match &agent_account.agent_acct {
                 None => {
                     
                     println!(
                         "{}",
                         Error(
-                            format!("account 2 is not a delegate").to_string(),
+                            format!("account 2 is not a agent_acct").to_string(),
                             module_path!().to_string()
                         )
                     );
-                    Err(TokenError::InvalidArgument)?;
+                    Err(IcoErr::InvalidArgument)?;
                 }
-                Some(delegate_info) => {
-                    if info[1].unsigned_key() != &delegate_info.genesis {
+                Some(agent_acct_info) => {
+                    if info[1].unsigned_key() != &agent_acct_info.genesis {
                         
                         println!(
                             "{}",
                             Error(
-                                format!("account 2 is not a delegate of account 1").to_string(),
+                                format!("account 2 is not a agent_acct of account 1").to_string(),
                                 module_path!().to_string()
                             )
                         );
-                        Err(TokenError::InvalidArgument)?;
+                        Err(IcoErr::InvalidArgument)?;
                     }
 
-                    let mut output_delegate_account = delegate_account.clone();
+                    let mut output_delegate_account = agent_account.clone();
                     output_delegate_account.amount = amount;
-                    output_delegate_account.delegate = Some(TokenAccountDelegateInfo {
-                        genesis: delegate_info.genesis,
+                    output_delegate_account.agent_acct = Some(IcoAgent {
+                        genesis: agent_acct_info.genesis,
                         original_amount: amount,
                     });
-                    output_accounts.push((2, TokenState::Account(output_delegate_account)));
+                    out_accts.push((2, IcoContext::Account(output_delegate_account)));
                 }
             }
         } else {
@@ -526,17 +526,17 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
         Ok(())
     }
 
-    pub fn process_setowner(
+    pub fn set_ico_owner(
         info: &mut [KeyedAccount],
-        input_accounts: &[TokenState],
-        output_accounts: &mut Vec<(usize, TokenState)>,
+        in_accts: &[IcoContext],
+        out_accts: &mut Vec<(usize, IcoContext)>,
     ) -> Result<()> {
-        if input_accounts.len() < 3 {
+        if in_accts.len() < 3 {
             
             println!(
                 "{}",
@@ -545,11 +545,11 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
 
-        if let TokenState::Account(source_account) = &input_accounts[1] {
-            if info[0].signer_key().unwrap() != &source_account.owner {
+        if let IcoContext::Account(src_acct) = &in_accts[1] {
+            if info[0].signer_key().unwrap() != &src_acct.owner {
                 
                 let info:String = format!("owner of account 1 not present").to_string();
                 println!("{}",
@@ -559,12 +559,12 @@ impl TokenState {
                     )
                 );
 
-                Err(TokenError::InvalidArgument)?;
+                Err(IcoErr::InvalidArgument)?;
             }
 
-            let mut output_source_account = source_account.clone();
-            output_source_account.owner = *info[2].unsigned_key();
-            output_accounts.push((1, TokenState::Account(output_source_account)));
+            let mut out_src_acct = src_acct.clone();
+            out_src_acct.owner = *info[2].unsigned_key();
+            out_accts.push((1, IcoContext::Account(out_src_acct)));
         } else {
             
             let info:String = format!("account 1 is invalid").to_string();
@@ -574,14 +574,14 @@ impl TokenState {
                     module_path!().to_string()
                 )
             );
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
         Ok(())
     }
 
     pub fn process(program_id: &BvmAddr, info: &mut [KeyedAccount], input: &[u8]) -> Result<()> {
         let command =
-            bincode::deserialize::<TokenOpCode>(input).map_err(Self::map_to_invalid_args)?;
+            bincode::deserialize::<IcoOpCode>(input).map_err(Self::map_to_invalid_args)?;
         
         let loginfo:String = format!("process_transaction: command={:?}", command).to_string();
         println!("{}",
@@ -591,9 +591,9 @@ impl TokenState {
             )
         );
         if info[0].signer_key().is_none() {
-            Err(TokenError::InvalidArgument)?;
+            Err(IcoErr::InvalidArgument)?;
         }
-        let input_accounts: Vec<TokenState> = info
+        let in_accts: Vec<IcoContext> = info
             .iter()
             .map(|keyed_account| {
                 let account = &keyed_account.account;
@@ -609,16 +609,16 @@ impl TokenState {
                                     module_path!().to_string()
                                 )
                             );
-                            TokenState::Invalid
+                            IcoContext::Invalid
                         }
                     }
                 } else {
-                    TokenState::Invalid
+                    IcoContext::Invalid
                 }
             })
             .collect();
 
-        for account in &input_accounts {
+        for account in &in_accts {
             
             let loginfo:String = format!("input_account: data={:?}", account).to_string();
             println!("{}",
@@ -629,29 +629,29 @@ impl TokenState {
             );
         }
 
-        let mut output_accounts: Vec<(_, _)> = vec![];
+        let mut out_accts: Vec<(_, _)> = vec![];
 
         match command {
-            TokenOpCode::NewToken(token_info) => {
-                Self::process_newtoken(info, token_info, &input_accounts, &mut output_accounts)?
+            IcoOpCode::NewICO(ico_info) => {
+                Self::issue_ico_cmd(info, ico_info, &in_accts, &mut out_accts)?
             }
-            TokenOpCode::NewTokenAccount => {
-                Self::process_newaccount(info, &input_accounts, &mut output_accounts)?
-            }
-
-            TokenOpCode::Transfer(amount) => {
-                Self::process_transfer(info, amount, &input_accounts, &mut output_accounts)?
+            IcoOpCode::NewIcoAcct => {
+                Self::crate_ico_acct(info, &in_accts, &mut out_accts)?
             }
 
-            TokenOpCode::Approve(amount) => {
-                Self::process_approve(info, amount, &input_accounts, &mut output_accounts)?
+            IcoOpCode::MoveToken(amount) => {
+                Self::transfer_token(info, amount, &in_accts, &mut out_accts)?
             }
 
-            TokenOpCode::SetOwner => {
-                Self::process_setowner(info, &input_accounts, &mut output_accounts)?
+            IcoOpCode::SetALW(amount) => {
+                Self::set_allowance(info, amount, &in_accts, &mut out_accts)?
+            }
+
+            IcoOpCode::SetOwner => {
+                Self::set_ico_owner(info, &in_accts, &mut out_accts)?
             }
         }
-        for (index, account) in &output_accounts {
+        for (index, account) in &out_accts {
             
             let loginfo:String = format!("output_account: index={} data={:?}", index, account).to_string();
             println!("{}",
@@ -671,27 +671,27 @@ mod test {
     use super::*;
     #[test]
     pub fn serde() {
-        assert_eq!(TokenState::deserialize(&[0]), Ok(TokenState::default()));
+        assert_eq!(IcoContext::deserialize(&[0]), Ok(IcoContext::default()));
 
         let mut data = vec![0; 256];
 
-        let account = TokenState::Account(TokenAccountInfo {
+        let account = IcoContext::Account(TkActInfo {
             token: BvmAddr::new(&[1; 32]),
             owner: BvmAddr::new(&[2; 32]),
             amount: 123,
-            delegate: None,
+            agent_acct: None,
         });
         account.serialize(&mut data).unwrap();
-        assert_eq!(TokenState::deserialize(&data), Ok(account));
+        assert_eq!(IcoContext::deserialize(&data), Ok(account));
 
-        let account = TokenState::Token(TokenInfo {
+        let account = IcoContext::Token(IcoInfo {
             supply: 12345,
             decimals: 2,
             name: "A test token".to_string(),
             symbol: "TEST".to_string(),
         });
         account.serialize(&mut data).unwrap();
-        assert_eq!(TokenState::deserialize(&data), Ok(account));
+        assert_eq!(IcoContext::deserialize(&data), Ok(account));
     }
 
     #[test]
@@ -699,19 +699,19 @@ mod test {
         let mut data = vec![0; 256];
 
         
-        let account = TokenState::default();
-        assert_eq!(account, TokenState::Unallocated);
+        let account = IcoContext::default();
+        assert_eq!(account, IcoContext::Unallocated);
         assert!(account.serialize(&mut data).is_err());
         assert!(account.serialize(&mut data).is_err());
-        let account = TokenState::Invalid;
+        let account = IcoContext::Invalid;
         assert!(account.serialize(&mut data).is_err());
 
         
-        assert!(TokenState::deserialize(&[]).is_err());
-        assert!(TokenState::deserialize(&[1]).is_err());
-        assert!(TokenState::deserialize(&[1, 2]).is_err());
-        assert!(TokenState::deserialize(&[2, 2]).is_err());
-        assert!(TokenState::deserialize(&[3]).is_err());
+        assert!(IcoContext::deserialize(&[]).is_err());
+        assert!(IcoContext::deserialize(&[1]).is_err());
+        assert!(IcoContext::deserialize(&[1, 2]).is_err());
+        assert!(IcoContext::deserialize(&[2, 2]).is_err());
+        assert!(IcoContext::deserialize(&[3]).is_err());
     }
 
     
