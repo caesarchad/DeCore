@@ -23,7 +23,7 @@ morgan-storage-api = { path = "../controllers/storage_api", version = "0.15.3"  
 morgan-storage-controller = { path = "../controllers/storage_controller", version = "0.15.3"     }
 morgan-token-api = { path = "../controllers/token_api", version = "0.15.3"     }
 morgan-token-controller = { path = "../controllers/token_controller", version = "0.15.3"     }
-morgan-config-api = { path = "../controllers/config_api", version = "0.15.3"     }
+morgan-profiler = { path = "../controllers/profiler", version = "0.15.3"     }
 morgan-config-controller = { path = "../controllers/config_controller", version = "0.15.3"     }
 
 [dev-dependencies]

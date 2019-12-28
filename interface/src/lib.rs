@@ -1,6 +1,6 @@
 pub mod account;
 pub mod account_utils;
-pub mod bvm_controller;
+pub mod bvm_loader;
 pub mod keymaker;
 pub mod constants;
 pub mod account_host;

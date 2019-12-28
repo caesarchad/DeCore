@@ -15,7 +15,7 @@ use morgan_tokenbot::drone::DRONE_PORT;
 #[cfg(test)]
 use morgan_tokenbot::drone_mock::request_airdrop_transaction;
 use morgan_interface::account_utils::State;
-use morgan_interface::bvm_controller;
+use morgan_interface::bvm_loader;
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::opcodes_utils::DecodeError;
@@ -756,7 +756,7 @@ fn process_deploy(
         transaction_seal,
         1,
         program_data.len() as u64,
-        &bvm_controller::id(),
+        &bvm_loader::id(),
     );
     trace!("Creating program account");
     let result = rpc_client.send_and_confirm_transaction(&mut tx, &[&config.keypair]);
@@ -772,7 +772,7 @@ fn process_deploy(
         .map(|(chunk, i)| {
             let instruction = morgan_interface::mounter_opcode::write(
                 &program_id.address(),
-                &bvm_controller::id(),
+                &bvm_loader::id(),
                 (i * USERDATA_CHUNK_SIZE) as u32,
                 chunk.to_vec(),
             );
@@ -783,7 +783,7 @@ fn process_deploy(
     rpc_client.send_and_confirm_transactions(write_transactions, &signers)?;
 
     trace!("Finalizing program account");
-    let instruction = morgan_interface::mounter_opcode::finalize(&program_id.address(), &bvm_controller::id());
+    let instruction = morgan_interface::mounter_opcode::finalize(&program_id.address(), &bvm_loader::id());
     let context = Context::new_with_payer(vec![instruction], Some(&signers[0].address()));
     let mut tx = Transaction::new(&signers, context, transaction_seal);
     rpc_client
@@ -1575,7 +1575,7 @@ pub fn app<'ab, 'v>(name: &str, about: &'ab str, version: &'v str) -> App<'ab, '
                         .takes_value(true)
                         .required(true)
                         .help("/path/to/program.o"),
-                ), // TODO: Add "loader" argument; current default is bvm_controller
+                ), // TODO: Add "loader" argument; current default is bvm_loader
         )
         .subcommand(
             SubCommand::with_name("get-transaction-count")

@@ -28,7 +28,7 @@ mod bpf {
     mod bpf_c {
         use super::*;
         use morgan_runtime::loader_utils::compose_call_opcode;
-        use morgan_interface::bvm_controller;
+        use morgan_interface::bvm_loader;
         use morgan_interface::account_host::OnlineAccount;
         use morgan_interface::signature::KeypairUtil;
         use std::io::Read;
@@ -46,7 +46,7 @@ mod bpf {
             let treasury_client = TreasuryClient::new(treasury);
 
             // Call user program
-            let program_id = load_program(&treasury_client, &alice_keypair, &bvm_controller::id(), elf);
+            let program_id = load_program(&treasury_client, &alice_keypair, &bvm_loader::id(), elf);
             let instruction = compose_call_opcode(alice_keypair.address(), program_id, &1u8);
             treasury_client
                 .snd_online_instruction(&alice_keypair, instruction)

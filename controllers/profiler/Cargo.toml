@@ -1,5 +1,5 @@
 [package]
-name = "morgan-config-api"
+name = "morgan-profiler"
 version = "0.15.3"
 description = "config program API"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]
@@ -21,6 +21,6 @@ morgan-helper = { path = "../../helper", version = "0.1.0"     }
 morgan-runtime = { path = "../../runtime", version = "0.15.3"     }
 
 [lib]
-name = "morgan_config_api"
+name = "morgan_profiler"
 crate-type = ["lib"]
 

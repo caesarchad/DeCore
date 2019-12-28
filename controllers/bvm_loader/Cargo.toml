@@ -1,5 +1,5 @@
 [package]
-name = "morgan-bvmcontroller"
+name = "morgan-bvm-loader"
 version = "0.15.3"
 description = "Morgan BPF Loader"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]

@@ -40,10 +40,13 @@ pub fn handle_opcode(
     Ok(())
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config_instruction, id, ConfigState};
+    use crate::pub_func::*;
+    use crate::pgm_id::{id, ConfigState,};
     use bincode::{deserialize, serialized_size};
     use serde_derive::{Deserialize, Serialize};
     use morgan_runtime::treasury::Treasury;
@@ -88,7 +91,7 @@ mod tests {
         treasury_client
             .snd_online_instruction(
                 mint_keypair,
-                config_instruction::create_account::<MyConfig>(
+                profile_account::<MyConfig>(
                     &mint_keypair.address(),
                     &config_address,
                     1,
@@ -123,7 +126,7 @@ mod tests {
 
         let my_config = MyConfig::new(42);
 
-        let instruction = config_instruction::store(&config_address, &my_config);
+        let instruction = populate_with(&config_address, &my_config);
         let context = Context::new_with_payer(vec![instruction], Some(&mint_keypair.address()));
         treasury_client
             .snd_online_context(&[&mint_keypair, &config_keypair], context)
@@ -148,7 +151,7 @@ mod tests {
 
         let my_config = MyConfig::new(42);
 
-        let mut instruction = config_instruction::store(&config_address, &my_config);
+        let mut instruction = populate_with(&config_address, &my_config);
         instruction.data = vec![0; 123]; // <-- Replace data with a vector that's too large
         let context = Context::new(vec![instruction]);
         treasury_client
@@ -170,7 +173,7 @@ mod tests {
         let transfer_instruction =
             sys_opcode::transfer(&system_address, &BvmAddr::new_rand(), 42);
         let my_config = MyConfig::new(42);
-        let mut store_instruction = config_instruction::store(&config_address, &my_config);
+        let mut store_instruction = populate_with(&config_address, &my_config);
         store_instruction.accounts[0].is_signer = false; // <----- not a signer
 
         let context = Context::new(vec![transfer_instruction, store_instruction]);

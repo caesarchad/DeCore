@@ -275,7 +275,7 @@ mod tests {
             ),
             (
                 "BPFLoader1111111111111111111111111111111111",
-                morgan_interface::bvm_controller::id(),
+                morgan_interface::bvm_loader::id(),
             ),
             (
                 "Budget1111111111111111111111111111111111111",
@@ -303,7 +303,7 @@ mod tests {
             ),
             (
                 "Config1111111111111111111111111111111111111",
-                morgan_config_api::id(),
+                morgan_profiler::pgm_id::id(),
             ),
         ];
         assert!(ids.iter().all(|(name, id)| *name == id.to_string()));
@@ -315,13 +315,13 @@ mod tests {
         let ids = vec![
             morgan_interface::sys_controller::id(),
             morgan_interface::bultin_mounter::id(),
-            morgan_interface::bvm_controller::id(),
+            morgan_interface::bvm_loader::id(),
             morgan_bvm_script::id(),
             morgan_storage_api::id(),
             morgan_token_api::id(),
             morgan_vote_api::id(),
             morgan_stake_api::id(),
-            morgan_config_api::id(),
+            morgan_profiler::pgm_id::id(),
         ];
         assert!(ids.into_iter().all(move |id| unique.insert(id)));
     }
