@@ -25,3 +25,12 @@ pub fn handle_opcode(
         OpCodeErr::CustomError(e as u32)
     })
 }
+
+#[macro_export]
+macro_rules! bvm_ico_entrypoint {
+    () => {
+        ("bvm_ico_entrypoint".to_string(), morgan_ico_issuer::pgm_id::id())
+    };
+}
+
+morgan_interface::morgan_entrypoint!(handle_opcode);

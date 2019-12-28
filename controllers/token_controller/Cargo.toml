@@ -15,5 +15,5 @@ morgan-interface = { path = "../../interface", version = "0.15.3"     }
 morgan-ico-issuer = { path = "../ico_issuer", version = "0.15.3"     }
 
 [lib]
-name = "morgan_token_controller"
+name = "bvm_ico_entrypoint"
 crate-type = ["lib","cdylib"]

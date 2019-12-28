@@ -21,7 +21,6 @@ members = [
     "controllers/storage_api",
     "controllers/storage_controller",
     "controllers/ico_issuer",
-    "controllers/token_controller",
     "controllers/vote_api",
     "controllers/vote_controller",
     "storage-miner",

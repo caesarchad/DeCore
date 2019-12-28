@@ -6,7 +6,7 @@ extern crate morgan_stake_controller;
 #[macro_use]
 extern crate morgan_budget_controller;
 #[macro_use]
-extern crate morgan_token_controller;
+extern crate bvm_ico_entrypoint;
 #[macro_use]
 extern crate morgan_profiler;
 
@@ -25,6 +25,7 @@ use morgan_stake_api::stake_state;
 use morgan_storage_controller::genesis_block_util::GenesisBlockUtil;
 use morgan_vote_api::vote_state;
 use morgan_profiler::bvm_profiler_entrypoint;
+use morgan_ico_issuer::bvm_ico_entrypoint;
 use std::error;
 use std::time::{Duration, Instant};
 
@@ -216,7 +217,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             morgan_vote_controller!(),
             morgan_stake_controller!(),
             morgan_budget_controller!(),
-            morgan_token_controller!(),
+            bvm_ico_entrypoint!(),
             bvm_profiler_entrypoint!(),
         ],
     );
