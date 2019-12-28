@@ -1,8 +1,8 @@
 //! storage program
 //!  Receive mining proofs from miners, validate the answers
 //!  and give reward for good proofs.
-use crate::storage_contract::StorageAccount;
-use crate::storage_opcode::StorageOpCode;
+use crate::storage_contract::PocAcct;
+use crate::storage_opcode::PocOpCode;
 use morgan_interface::account::KeyedAccount;
 use morgan_interface::opcodes::OpCodeErr;
 use morgan_interface::bvm_address::BvmAddr;
@@ -19,28 +19,28 @@ pub fn handle_opcode(
 
     let (me, rest) = keyed_accounts.split_at_mut(1);
     let me_unsigned = me[0].signer_key().is_none();
-    let mut storage_account = StorageAccount::new(&mut me[0].account);
+    let mut storage_account = PocAcct::new(&mut me[0].account);
 
     match bincode::deserialize(data).map_err(|_| OpCodeErr::BadOpCodeContext)? {
-        StorageOpCode::InitializeMiningPool => {
+        PocOpCode::SetPocPool => {
             if !rest.is_empty() {
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.initialize_mining_pool()
+            storage_account.set_poc_pool()
         }
-        StorageOpCode::InitializeMinerStorage => {
+        PocOpCode::SetPocStorage => {
             if !rest.is_empty() {
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.initialize_storage_miner_storage()
+            storage_account.set_poc_miner_strj()
         }
-        StorageOpCode::InitializeValidatorStorage => {
+        PocOpCode::SetLocalStorage => {
             if !rest.is_empty() {
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.initialize_validator_storage()
+            storage_account.set_local_strj()
         }
-        StorageOpCode::SubmitMiningProof {
+        PocOpCode::SetPocSig {
             sha_state,
             slot,
             signature,
@@ -49,44 +49,44 @@ pub fn handle_opcode(
                 // This instruction must be signed by `me`
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.submit_mining_proof(
+            storage_account.issue_poc_sig(
                 sha_state,
                 slot,
                 signature,
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageOpCode::AdvertiseStorageRecentTransactionSeal { hash, slot } => {
+        PocOpCode::BrdcstPocLastTxSeal { hash, slot } => {
             if me_unsigned || !rest.is_empty() {
                 // This instruction must be signed by `me`
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.advertise_storage_recent_transaction_seal(
+            storage_account.brdcst_strj_rcnt_tx_seal(
                 hash,
                 slot,
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageOpCode::ClaimStorageReward { slot } => {
+        PocOpCode::ClaimStorageReward { slot } => {
             if rest.len() != 1 {
                 Err(OpCodeErr::InvalidArgument)?;
             }
-            storage_account.claim_storage_reward(
+            storage_account.collect_poc_incentive(
                 &mut rest[0],
                 slot,
                 drop_height / DEFAULT_DROPS_PER_SLOT,
             )
         }
-        StorageOpCode::ProofValidation { segment, proofs } => {
+        PocOpCode::CheckPocSig { segment, poc_sigs } => {
             if me_unsigned || rest.is_empty() {
                 // This instruction must be signed by `me` and `rest` cannot be empty
                 Err(OpCodeErr::InvalidArgument)?;
             }
             let mut rest: Vec<_> = rest
                 .iter_mut()
-                .map(|keyed_account| StorageAccount::new(&mut keyed_account.account))
+                .map(|keyed_account| PocAcct::new(&mut keyed_account.account))
                 .collect();
-            storage_account.proof_validation(segment, proofs, &mut rest)
+            storage_account.verify_poc_sig(segment, poc_sigs, &mut rest)
         }
     }
 }
@@ -95,7 +95,7 @@ pub fn handle_opcode(
 mod tests {
     use super::*;
     use crate::storage_contract::{
-        CheckedProof, Proof, ProofStatus, StorageContract, STORAGE_ACCOUNT_SPACE,
+        VeriPocSig, PocSig, PocSeal, PocType, POC_ACCT_ROM,
         TOTAL_STORAGE_MINER_REWARDS, TOTAL_VALIDATOR_REWARDS,
     };
     use crate::storage_opcode;
@@ -149,15 +149,15 @@ mod tests {
     fn test_proof_bounds() {
         let address = BvmAddr::new_rand();
         let mut account = Account {
-            data: vec![0; STORAGE_ACCOUNT_SPACE as usize],
+            data: vec![0; POC_ACCT_ROM as usize],
             ..Account::default()
         };
         {
-            let mut storage_account = StorageAccount::new(&mut account);
-            storage_account.initialize_storage_miner_storage().unwrap();
+            let mut storage_account = PocAcct::new(&mut account);
+            storage_account.set_poc_miner_strj().unwrap();
         }
 
-        let ix = storage_opcode::mining_proof(
+        let ix = storage_opcode::poc_signature(
             &address,
             Hash::default(),
             SLOTS_PER_SEGMENT,
@@ -187,7 +187,7 @@ mod tests {
         let mut user_account = Account::default();
         keyed_accounts.push(KeyedAccount::new(&address, true, &mut user_account));
 
-        let ix = storage_opcode::advertise_recent_transaction_seal(
+        let ix = storage_opcode::brdcst_last_tx_seal(
             &address,
             Hash::default(),
             SLOTS_PER_SEGMENT,
@@ -205,7 +205,7 @@ mod tests {
         let mut accounts = [Account::default()];
 
         let ix =
-            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
+            storage_opcode::poc_signature(&address, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -221,11 +221,11 @@ mod tests {
         morgan_logger::setup();
         let address = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
-        accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
-        accounts[1].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
+        accounts[0].data.resize(POC_ACCT_ROM as usize, 0);
+        accounts[1].data.resize(POC_ACCT_ROM as usize, 0);
 
         let ix =
-            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
+            storage_opcode::poc_signature(&address, Hash::default(), 0, Signature::default());
 
         // submitting a proof for a slot in the past, so this should fail
         assert!(test_instruction(&ix, &mut accounts, 0).is_err());
@@ -236,14 +236,14 @@ mod tests {
         morgan_logger::setup();
         let address = BvmAddr::new_rand();
         let mut accounts = [Account::default(), Account::default()];
-        accounts[0].data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
+        accounts[0].data.resize(POC_ACCT_ROM as usize, 0);
         {
-            let mut storage_account = StorageAccount::new(&mut accounts[0]);
-            storage_account.initialize_storage_miner_storage().unwrap();
+            let mut storage_account = PocAcct::new(&mut accounts[0]);
+            storage_account.set_poc_miner_strj().unwrap();
         }
 
         let ix =
-            storage_opcode::mining_proof(&address, Hash::default(), 0, Signature::default());
+            storage_opcode::poc_signature(&address, Hash::default(), 0, Signature::default());
         // move _drop height into segment 1
         let drops_till_next_segment = DROPS_IN_SEGMENT + 1;
 
@@ -299,7 +299,7 @@ mod tests {
 
         // advertise for storage segment 1
         let context = Context::new_with_payer(
-            vec![storage_opcode::advertise_recent_transaction_seal(
+            vec![storage_opcode::brdcst_last_tx_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT,
@@ -334,7 +334,7 @@ mod tests {
                 ));
         }
         let context = Context::new_with_payer(
-            vec![storage_opcode::advertise_recent_transaction_seal(
+            vec![storage_opcode::brdcst_last_tx_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 2,
@@ -353,7 +353,7 @@ mod tests {
         );
 
         let context = Context::new_with_payer(
-            vec![storage_opcode::proof_validation(
+            vec![storage_opcode::verify_poc_sig(
                 &validator_storage_id,
                 get_segment_from_slot(slot) as u64,
                 checked_proofs,
@@ -367,7 +367,7 @@ mod tests {
         );
 
         let context = Context::new_with_payer(
-            vec![storage_opcode::advertise_recent_transaction_seal(
+            vec![storage_opcode::brdcst_last_tx_seal(
                 &validator_storage_id,
                 Hash::default(),
                 SLOTS_PER_SEGMENT * 3,
@@ -448,7 +448,7 @@ mod tests {
         let mut ixs: Vec<_> = validator_accounts_to_create
             .into_iter()
             .flat_map(|account| {
-                storage_opcode::create_validator_storage_account(
+                storage_opcode::crt_vldr_strj_acct(
                     &mint.address(),
                     account,
                     difs,
@@ -474,7 +474,7 @@ mod tests {
                 let contract = deserialize(&storage_system_account_data);
                 if let Ok(contract) = contract {
                     match contract {
-                        StorageContract::ValidatorStorage { slot, .. } => {
+                        PocType::LocalStrj { slot, .. } => {
                             return slot;
                         }
                         _ => {
@@ -509,10 +509,10 @@ mod tests {
         storage_keypair: &Keypair,
         slot: u64,
         treasury_client: &TreasuryClient,
-    ) -> CheckedProof {
+    ) -> VeriPocSig {
         let sha_state = Hash::new(BvmAddr::new_rand().as_ref());
         let context = Context::new_with_payer(
-            vec![storage_opcode::mining_proof(
+            vec![storage_opcode::poc_signature(
                 &storage_keypair.address(),
                 sha_state,
                 slot,
@@ -525,12 +525,12 @@ mod tests {
             treasury_client.snd_online_context(&[&mint_keypair, &storage_keypair], context),
             Ok(_)
         );
-        CheckedProof {
-            proof: Proof {
+        VeriPocSig {
+            poc_sig: PocSig {
                 signature: Signature::default(),
                 sha_state,
             },
-            status: ProofStatus::Valid,
+            status: PocSeal::Good,
         }
     }
 
@@ -539,7 +539,7 @@ mod tests {
             let contract = deserialize(&storage_system_account_data);
             if let Ok(contract) = contract {
                 match contract {
-                    StorageContract::ValidatorStorage { hash, .. } => {
+                    PocType::LocalStrj { hash, .. } => {
                         return hash;
                     }
                     _ => (),
@@ -582,7 +582,7 @@ mod tests {
         ));
         treasury_client.snd_online_context(&[&mint_keypair], context).unwrap();
 
-        let context = Context::new(storage_opcode::create_validator_storage_account(
+        let context = Context::new(storage_opcode::crt_vldr_strj_acct(
             &mint_address,
             &validator_address,
             1,
@@ -590,7 +590,7 @@ mod tests {
         treasury_client.snd_online_context(&[&mint_keypair], context).unwrap();
 
         let context = Context::new_with_payer(
-            vec![storage_opcode::advertise_recent_transaction_seal(
+            vec![storage_opcode::brdcst_last_tx_seal(
                 &validator_address,
                 storage_transaction_seal,
                 SLOTS_PER_SEGMENT,
@@ -605,7 +605,7 @@ mod tests {
 
         let slot = 0;
         let context = Context::new_with_payer(
-            vec![storage_opcode::mining_proof(
+            vec![storage_opcode::poc_signature(
                 &miner_address,
                 Hash::default(),
                 slot,

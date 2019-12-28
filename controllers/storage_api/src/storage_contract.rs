@@ -1,4 +1,4 @@
-use crate::get_segment_from_slot;
+use crate::pgm_id::get_segment_from_slot;
 use log::*;
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::account::Account;
@@ -14,132 +14,132 @@ use morgan_helper::logHelper::*;
 pub const TOTAL_VALIDATOR_REWARDS: u64 = 1;
 pub const TOTAL_STORAGE_MINER_REWARDS: u64 = 1;
 // Todo Tune this for actual use cases when storage miners are feature complete
-pub const STORAGE_ACCOUNT_SPACE: u64 = 1024 * 8;
+pub const POC_ACCT_ROM: u64 = 1024 * 8;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum ProofStatus {
-    Skipped,
-    Valid,
-    NotValid,
+pub enum PocSeal {
+    LeapSeal,
+    Good,
+    Bad,
 }
 
-impl Default for ProofStatus {
+impl Default for PocSeal {
     fn default() -> Self {
-        ProofStatus::Skipped
+        PocSeal::LeapSeal
     }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Proof {
+pub struct PocSig {
     pub signature: Signature,
     pub sha_state: Hash,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
-pub struct CheckedProof {
-    pub proof: Proof,
-    pub status: ProofStatus,
+pub struct VeriPocSig {
+    pub poc_sig: PocSig,
+    pub status: PocSeal,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum StorageContract {
+pub enum PocType {
     Uninitialized, // Must be first (aka, 0)
 
-    ValidatorStorage {
+    LocalStrj {
         // Most recently advertised slot
         slot: u64,
         // Most recently advertised transaction_seal
         hash: Hash,
-        lockout_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
-        reward_validations: HashMap<usize, HashMap<Hash, ProofStatus>>,
+        lck_check: HashMap<usize, HashMap<Hash, PocSeal>>,
+        coinbase_check: HashMap<usize, HashMap<Hash, PocSeal>>,
     },
-    MinerStorage {
+    PocMiner {
         /// Map of Proofs per segment, in a HashMap based on the sha_state
-        proofs: HashMap<usize, HashMap<Hash, Proof>>,
+        poc_sigs: HashMap<usize, HashMap<Hash, PocSig>>,
         /// Map of Rewards per segment, in a HashMap based on the sha_state
         /// Multiple validators can validate the same set of proofs so it needs a Vec
-        reward_validations: HashMap<usize, HashMap<Hash, Vec<ProofStatus>>>,
+        coinbase_check: HashMap<usize, HashMap<Hash, Vec<PocSeal>>>,
     },
 
-    MiningPool,
+    PocPool,
 }
 
 // utility function, used by Treasury, tests, genesis
-pub fn create_validator_storage_account(difs: u64) -> Account {
-    let mut storage_account = Account::new(difs, 0, STORAGE_ACCOUNT_SPACE as usize, &crate::id());
+pub fn crt_vldr_strj_acct(difs: u64) -> Account {
+    let mut strj_acct = Account::new(difs, 0, POC_ACCT_ROM as usize, &crate::pgm_id::id());
 
-    storage_account
-        .set_state(&StorageContract::ValidatorStorage {
+    strj_acct
+        .set_state(&PocType::LocalStrj {
             slot: 0,
             hash: Hash::default(),
-            lockout_validations: HashMap::new(),
-            reward_validations: HashMap::new(),
+            lck_check: HashMap::new(),
+            coinbase_check: HashMap::new(),
         })
         .expect("set_state");
 
-    storage_account
+        strj_acct
 }
 
-pub struct StorageAccount<'a> {
+pub struct PocAcct<'a> {
     account: &'a mut Account,
 }
 
-impl<'a> StorageAccount<'a> {
+impl<'a> PocAcct<'a> {
     pub fn new(account: &'a mut Account) -> Self {
         Self { account }
     }
 
-    pub fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr> {
-        let storage_contract = &mut self.account.state()?;
-        if let StorageContract::Uninitialized = storage_contract {
-            *storage_contract = StorageContract::MiningPool;
-            self.account.set_state(storage_contract)
+    pub fn set_poc_pool(&mut self) -> Result<(), OpCodeErr> {
+        let poc_pact = &mut self.account.state()?;
+        if let PocType::Uninitialized = poc_pact {
+            *poc_pact = PocType::PocPool;
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
-    pub fn initialize_storage_miner_storage(&mut self) -> Result<(), OpCodeErr> {
-        let storage_contract = &mut self.account.state()?;
-        if let StorageContract::Uninitialized = storage_contract {
-            *storage_contract = StorageContract::MinerStorage {
-                proofs: HashMap::new(),
-                reward_validations: HashMap::new(),
+    pub fn set_poc_miner_strj(&mut self) -> Result<(), OpCodeErr> {
+        let poc_pact = &mut self.account.state()?;
+        if let PocType::Uninitialized = poc_pact {
+            *poc_pact = PocType::PocMiner {
+                poc_sigs: HashMap::new(),
+                coinbase_check: HashMap::new(),
             };
-            self.account.set_state(storage_contract)
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
-    pub fn initialize_validator_storage(&mut self) -> Result<(), OpCodeErr> {
-        let storage_contract = &mut self.account.state()?;
-        if let StorageContract::Uninitialized = storage_contract {
-            *storage_contract = StorageContract::ValidatorStorage {
+    pub fn set_local_strj(&mut self) -> Result<(), OpCodeErr> {
+        let poc_pact = &mut self.account.state()?;
+        if let PocType::Uninitialized = poc_pact {
+            *poc_pact = PocType::LocalStrj {
                 slot: 0,
                 hash: Hash::default(),
-                lockout_validations: HashMap::new(),
-                reward_validations: HashMap::new(),
+                lck_check: HashMap::new(),
+                coinbase_check: HashMap::new(),
             };
-            self.account.set_state(storage_contract)
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::AccountAlreadyInitialized)?
         }
     }
 
-    pub fn submit_mining_proof(
+    pub fn issue_poc_sig(
         &mut self,
         sha_state: Hash,
         slot: u64,
         signature: Signature,
         current_slot: u64,
     ) -> Result<(), OpCodeErr> {
-        let mut storage_contract = &mut self.account.state()?;
-        if let StorageContract::MinerStorage { proofs, .. } = &mut storage_contract {
-            let segment_index = get_segment_from_slot(slot);
-            let current_segment = get_segment_from_slot(current_slot);
+        let mut poc_pact = &mut self.account.state()?;
+        if let PocType::PocMiner { poc_sigs, .. } = &mut poc_pact {
+            let sgmt_indx = get_segment_from_slot(slot);
+            let crnt_sgmt = get_segment_from_slot(current_slot);
 
-            if segment_index >= current_segment {
+            if sgmt_indx >= crnt_sgmt {
                 // attempt to submit proof for unconfirmed segment
                 return Err(OpCodeErr::InvalidArgument);
             }
@@ -149,78 +149,78 @@ impl<'a> StorageAccount<'a> {
                 sha_state, slot
             );
 
-            let segment_proofs = proofs.entry(segment_index).or_default();
-            if segment_proofs.contains_key(&sha_state) {
+            let sgmt_poc_sigs = poc_sigs.entry(sgmt_indx).or_default();
+            if sgmt_poc_sigs.contains_key(&sha_state) {
                 // do not accept duplicate proofs
                 return Err(OpCodeErr::InvalidArgument);
             }
-            segment_proofs.insert(
+            sgmt_poc_sigs.insert(
                 sha_state,
-                Proof {
+                PocSig {
                     sha_state,
                     signature,
                 },
             );
 
-            self.account.set_state(storage_contract)
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::InvalidArgument)?
         }
     }
 
-    pub fn advertise_storage_recent_transaction_seal(
+    pub fn brdcst_strj_rcnt_tx_seal(
         &mut self,
         hash: Hash,
         slot: u64,
         current_slot: u64,
     ) -> Result<(), OpCodeErr> {
-        let mut storage_contract = &mut self.account.state()?;
-        if let StorageContract::ValidatorStorage {
+        let mut poc_pact = &mut self.account.state()?;
+        if let PocType::LocalStrj {
             slot: state_slot,
             hash: state_hash,
-            reward_validations,
-            lockout_validations,
-        } = &mut storage_contract
+            coinbase_check,
+            lck_check,
+        } = &mut poc_pact
         {
-            let current_segment = get_segment_from_slot(current_slot);
-            let original_segment = get_segment_from_slot(*state_slot);
+            let crnt_sgmt = get_segment_from_slot(current_slot);
+            let orgi_sgmt = get_segment_from_slot(*state_slot);
             let segment = get_segment_from_slot(slot);
             debug!(
                 "advertise new segment: {} orig: {}",
-                segment, current_segment
+                segment, crnt_sgmt
             );
-            if segment < original_segment || segment >= current_segment {
+            if segment < orgi_sgmt || segment >= crnt_sgmt {
                 return Err(OpCodeErr::InvalidArgument);
             }
 
             *state_slot = slot;
             *state_hash = hash;
 
-            // move storage epoch updated, move the lockout_validations to reward_validations
-            reward_validations.extend(lockout_validations.drain());
-            self.account.set_state(storage_contract)
+            // move storage epoch updated, move the lck_check to coinbase_check
+            coinbase_check.extend(lck_check.drain());
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::InvalidArgument)?
         }
     }
 
-    pub fn proof_validation(
+    pub fn verify_poc_sig(
         &mut self,
         segment: u64,
-        proofs: Vec<(BvmAddr, Vec<CheckedProof>)>,
-        storage_miner_accounts: &mut [StorageAccount],
+        proofs: Vec<(BvmAddr, Vec<VeriPocSig>)>,
+        storage_miner_accounts: &mut [PocAcct],
     ) -> Result<(), OpCodeErr> {
-        let mut storage_contract = &mut self.account.state()?;
-        if let StorageContract::ValidatorStorage {
+        let mut poc_pact = &mut self.account.state()?;
+        if let PocType::LocalStrj {
             slot: state_slot,
-            lockout_validations,
+            lck_check,
             ..
-        } = &mut storage_contract
+        } = &mut poc_pact
         {
-            let segment_index = segment as usize;
-            let state_segment = get_segment_from_slot(*state_slot);
+            let sgmt_indx = segment as usize;
+            let s_sgmt = get_segment_from_slot(*state_slot);
 
-            if segment_index > state_segment {
+            if sgmt_indx > s_sgmt {
                 return Err(OpCodeErr::InvalidArgument);
             }
 
@@ -232,9 +232,9 @@ impl<'a> StorageAccount<'a> {
                         .state()
                         .ok()
                         .map(move |contract| match contract {
-                            StorageContract::MinerStorage { proofs, .. } => {
-                                if let Some(proofs) = proofs.get(&segment_index).cloned() {
-                                    Some((account, proofs))
+                            PocType::PocMiner { poc_sigs, .. } => {
+                                if let Some(poc_sigs) = poc_sigs.get(&sgmt_indx).cloned() {
+                                    Some((account, poc_sigs))
                                 } else {
                                     None
                                 }
@@ -253,11 +253,11 @@ impl<'a> StorageAccount<'a> {
             let valid_proofs: Vec<_> = proofs
                 .into_iter()
                 .zip(accounts_and_proofs.into_iter())
-                .flat_map(|((_id, checked_proofs), (account, proofs))| {
-                    checked_proofs.into_iter().filter_map(move |checked_proof| {
-                        proofs.get(&checked_proof.proof.sha_state).map(|proof| {
-                            process_validation(account, segment_index, &proof, &checked_proof)
-                                .map(|_| checked_proof)
+                .flat_map(|((_id, verf_poc_sigs), (account, poc_sigs))| {
+                    verf_poc_sigs.into_iter().filter_map(move |verified_poc_sig| {
+                        poc_sigs.get(&verified_poc_sig.poc_sig.sha_state).map(|proof| {
+                            save_verf_poc_sigs(account, sgmt_indx, &proof, &verified_poc_sig)
+                                .map(|_| verified_poc_sig)
                         })
                     })
                 })
@@ -266,77 +266,77 @@ impl<'a> StorageAccount<'a> {
 
             // allow validators to store successful validations
             valid_proofs.into_iter().for_each(|proof| {
-                lockout_validations
-                    .entry(segment_index)
+                lck_check
+                    .entry(sgmt_indx)
                     .or_default()
-                    .insert(proof.proof.sha_state, proof.status);
+                    .insert(proof.poc_sig.sha_state, proof.status);
             });
 
-            self.account.set_state(storage_contract)
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::InvalidArgument)?
         }
     }
 
-    pub fn claim_storage_reward(
+    pub fn collect_poc_incentive(
         &mut self,
         mining_pool: &mut KeyedAccount,
         slot: u64,
         current_slot: u64,
     ) -> Result<(), OpCodeErr> {
-        let mut storage_contract = &mut self.account.state()?;
+        let mut poc_pact = &mut self.account.state()?;
 
-        if let StorageContract::ValidatorStorage {
-            reward_validations,
+        if let PocType::LocalStrj {
+            coinbase_check,
             slot: state_slot,
             ..
-        } = &mut storage_contract
+        } = &mut poc_pact
         {
-            let state_segment = get_segment_from_slot(*state_slot);
-            let claim_segment = get_segment_from_slot(slot);
-            if state_segment <= claim_segment || !reward_validations.contains_key(&claim_segment) {
+            let s_sgmt = get_segment_from_slot(*state_slot);
+            let c_segment = get_segment_from_slot(slot);
+            if s_sgmt <= c_segment || !coinbase_check.contains_key(&c_segment) {
                 debug!(
                     "current {:?}, claim {:?}, have rewards for {:?} segments",
-                    state_segment,
-                    claim_segment,
-                    reward_validations.len()
+                    s_sgmt,
+                    c_segment,
+                    coinbase_check.len()
                 );
                 return Err(OpCodeErr::InvalidArgument);
             }
-            let num_validations = count_valid_proofs(
-                &reward_validations
-                    .remove(&claim_segment)
+            let num_validations = poc_sigs_num(
+                &coinbase_check
+                    .remove(&c_segment)
                     .map(|mut proofs| proofs.drain().map(|(_, proof)| proof).collect::<Vec<_>>())
                     .unwrap_or_default(),
             );
             let reward = TOTAL_VALIDATOR_REWARDS * num_validations;
             mining_pool.account.difs -= reward;
             self.account.difs += reward;
-            self.account.set_state(storage_contract)
-        } else if let StorageContract::MinerStorage {
-            proofs,
-            reward_validations,
-        } = &mut storage_contract
+            self.account.set_state(poc_pact)
+        } else if let PocType::PocMiner {
+            poc_sigs,
+            coinbase_check,
+        } = &mut poc_pact
         {
             // if current _drop height is a full segment away, allow reward collection
-            let claim_index = get_segment_from_slot(current_slot);
-            let claim_segment = get_segment_from_slot(slot);
+            let c_indx = get_segment_from_slot(current_slot);
+            let c_segment = get_segment_from_slot(slot);
             // Todo this might might always be true
-            if claim_index <= claim_segment
-                || !reward_validations.contains_key(&claim_segment)
-                || !proofs.contains_key(&claim_segment)
+            if c_indx <= c_segment
+                || !coinbase_check.contains_key(&c_segment)
+                || !poc_sigs.contains_key(&c_segment)
             {
                 // info!(
                 //     "{}",
                 //     Info(format!("current {:?}, claim {:?}, have rewards for {:?} segments",
-                //     claim_index,
-                //     claim_segment,
-                //     reward_validations.len()).to_string())
+                //     c_indx,
+                //     c_segment,
+                //     coinbase_check.len()).to_string())
                 // );
                 let info:String = format!("current {:?}, claim {:?}, have rewards for {:?} segments",
-                    claim_index,
-                    claim_segment,
-                    reward_validations.len()).to_string();
+                    c_indx,
+                    c_segment,
+                    coinbase_check.len()).to_string();
                 println!("{}",
                     printLn(
                         info,
@@ -346,17 +346,17 @@ impl<'a> StorageAccount<'a> {
                 return Err(OpCodeErr::InvalidArgument);
             }
             // remove proofs for which rewards have already been collected
-            let segment_proofs = proofs.get_mut(&claim_segment).unwrap();
-            let checked_proofs = reward_validations
-                .remove(&claim_segment)
-                .map(|mut proofs| {
-                    proofs
+            let sgmt_poc_sigs = poc_sigs.get_mut(&c_segment).unwrap();
+            let verf_poc_sigs = coinbase_check
+                .remove(&c_segment)
+                .map(|mut poc_sigs| {
+                    poc_sigs
                         .drain()
                         .map(|(sha_state, proof)| {
                             proof
                                 .into_iter()
                                 .map(|proof| {
-                                    segment_proofs.remove(&sha_state);
+                                    sgmt_poc_sigs.remove(&sha_state);
                                     proof
                                 })
                                 .collect::<Vec<_>>()
@@ -365,13 +365,13 @@ impl<'a> StorageAccount<'a> {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let total_proofs = checked_proofs.len() as u64;
-            let num_validations = count_valid_proofs(&checked_proofs);
+            let total_proofs = verf_poc_sigs.len() as u64;
+            let num_validations = poc_sigs_num(&verf_poc_sigs);
             let reward =
                 num_validations * TOTAL_STORAGE_MINER_REWARDS * (num_validations / total_proofs);
             mining_pool.account.difs -= reward;
             self.account.difs += reward;
-            self.account.set_state(storage_contract)
+            self.account.set_state(poc_pact)
         } else {
             Err(OpCodeErr::InvalidArgument)?
         }
@@ -379,61 +379,61 @@ impl<'a> StorageAccount<'a> {
 }
 
 /// Store the result of a proof validation into the storage-miner account
-fn store_validation_result(
-    storage_account: &mut StorageAccount,
+fn save_verf_result(
+    poc_acct: &mut PocAcct,
     segment: usize,
-    checked_proof: CheckedProof,
+    verified_poc_sig: VeriPocSig,
 ) -> Result<(), OpCodeErr> {
-    let mut storage_contract = storage_account.account.state()?;
-    match &mut storage_contract {
-        StorageContract::MinerStorage {
-            proofs,
-            reward_validations,
+    let mut poc_pact = poc_acct.account.state()?;
+    match &mut poc_pact {
+        PocType::PocMiner {
+            poc_sigs,
+            coinbase_check,
             ..
         } => {
-            if !proofs.contains_key(&segment) {
+            if !poc_sigs.contains_key(&segment) {
                 return Err(OpCodeErr::InvalidAccountData);
             }
 
-            if proofs
+            if poc_sigs
                 .get(&segment)
                 .unwrap()
-                .contains_key(&checked_proof.proof.sha_state)
+                .contains_key(&verified_poc_sig.poc_sig.sha_state)
             {
-                reward_validations
+                coinbase_check
                     .entry(segment)
                     .or_default()
-                    .entry(checked_proof.proof.sha_state)
+                    .entry(verified_poc_sig.poc_sig.sha_state)
                     .or_default()
-                    .push(checked_proof.status);
+                    .push(verified_poc_sig.status);
             } else {
                 return Err(OpCodeErr::InvalidAccountData);
             }
         }
         _ => return Err(OpCodeErr::InvalidAccountData),
     }
-    storage_account.account.set_state(&storage_contract)
+    poc_acct.account.set_state(&poc_pact)
 }
 
-fn count_valid_proofs(proofs: &[ProofStatus]) -> u64 {
+fn poc_sigs_num(poc_sigs: &[PocSeal]) -> u64 {
     let mut num = 0;
-    for proof in proofs {
-        if let ProofStatus::Valid = proof {
+    for poc_sig in poc_sigs {
+        if let PocSeal::Good = poc_sig {
             num += 1;
         }
     }
     num
 }
 
-fn process_validation(
-    account: &mut StorageAccount,
-    segment_index: usize,
-    proof: &Proof,
-    checked_proof: &CheckedProof,
+fn save_verf_poc_sigs(
+    account: &mut PocAcct,
+    sgmt_indx: usize,
+    poc_sig: &PocSig,
+    verified_poc_sig: &VeriPocSig,
 ) -> Result<(), OpCodeErr> {
-    store_validation_result(account, segment_index, checked_proof.clone())?;
-    if proof.signature != checked_proof.proof.signature
-        || checked_proof.status != ProofStatus::Valid
+    save_verf_result(account, sgmt_indx, verified_poc_sig.clone())?;
+    if poc_sig.signature != verified_poc_sig.poc_sig.signature
+        || verified_poc_sig.status != PocSeal::Good
     {
         return Err(OpCodeErr::GenericError);
     }
@@ -449,40 +449,40 @@ mod tests {
     fn test_account_data() {
         morgan_logger::setup();
         let mut account = Account::default();
-        account.data.resize(STORAGE_ACCOUNT_SPACE as usize, 0);
-        let storage_account = StorageAccount::new(&mut account);
+        account.data.resize(POC_ACCT_ROM as usize, 0);
+        let poc_acct = PocAcct::new(&mut account);
         // pretend it's a validator op code
-        let mut contract = storage_account.account.state().unwrap();
-        if let StorageContract::ValidatorStorage { .. } = contract {
+        let mut contract = poc_acct.account.state().unwrap();
+        if let PocType::LocalStrj { .. } = contract {
             assert!(true)
         }
-        if let StorageContract::MinerStorage { .. } = &mut contract {
+        if let PocType::PocMiner { .. } = &mut contract {
             panic!("Contract should not decode into two types");
         }
 
-        contract = StorageContract::ValidatorStorage {
+        contract = PocType::LocalStrj {
             slot: 0,
             hash: Hash::default(),
-            lockout_validations: HashMap::new(),
-            reward_validations: HashMap::new(),
+            lck_check: HashMap::new(),
+            coinbase_check: HashMap::new(),
         };
-        storage_account.account.set_state(&contract).unwrap();
-        if let StorageContract::MinerStorage { .. } = contract {
+        poc_acct.account.set_state(&contract).unwrap();
+        if let PocType::PocMiner { .. } = contract {
             panic!("Wrong contract type");
         }
-        contract = StorageContract::MinerStorage {
-            proofs: HashMap::new(),
-            reward_validations: HashMap::new(),
+        contract = PocType::PocMiner {
+            poc_sigs: HashMap::new(),
+            coinbase_check: HashMap::new(),
         };
-        storage_account.account.set_state(&contract).unwrap();
-        if let StorageContract::ValidatorStorage { .. } = contract {
+        poc_acct.account.set_state(&contract).unwrap();
+        if let PocType::LocalStrj { .. } = contract {
             panic!("Wrong contract type");
         }
     }
 
     #[test]
     fn test_process_validation() {
-        let mut account = StorageAccount {
+        let mut account = PocAcct {
             account: &mut Account {
                 difs: 0,
                 reputations: 0,
@@ -491,42 +491,45 @@ mod tests {
                 executable: false,
             },
         };
-        let segment_index = 0_usize;
-        let proof = Proof {
+        let sgmt_indx = 0_usize;
+        let poc_sig = PocSig {
             signature: Signature::default(),
             sha_state: Hash::default(),
         };
-        let mut checked_proof = CheckedProof {
-            proof: proof.clone(),
-            status: ProofStatus::Valid,
+        let mut verified_poc_sig = VeriPocSig {
+            poc_sig: poc_sig.clone(),
+            status: PocSeal::Good,
         };
 
         // account has no space
-        process_validation(&mut account, segment_index, &proof, &checked_proof).unwrap_err();
+        save_verf_poc_sigs(&mut account, sgmt_indx, &poc_sig, &verified_poc_sig).unwrap_err();
 
         account
             .account
             .data
-            .resize(STORAGE_ACCOUNT_SPACE as usize, 0);
-        let storage_contract = &mut account.account.state().unwrap();
-        if let StorageContract::Uninitialized = storage_contract {
-            let mut proof_map = HashMap::new();
-            proof_map.insert(proof.sha_state, proof.clone());
-            let mut proofs = HashMap::new();
-            proofs.insert(0, proof_map);
-            *storage_contract = StorageContract::MinerStorage {
-                proofs,
-                reward_validations: HashMap::new(),
+            .resize(POC_ACCT_ROM as usize, 0);
+        let poc_pact = &mut account.account.state().unwrap();
+        if let PocType::Uninitialized = poc_pact {
+            
+            let mut poc_sig_map = HashMap::new();
+            poc_sig_map.insert(poc_sig.sha_state, poc_sig.clone());
+
+
+            let mut poc_sig_vec = HashMap::new();
+            poc_sig_vec.insert(0, poc_sig_map);
+            *poc_pact = PocType::PocMiner {
+                poc_sigs:poc_sig_vec,
+                coinbase_check: HashMap::new(),
             };
         };
-        account.account.set_state(storage_contract).unwrap();
+        account.account.set_state(poc_pact).unwrap();
 
         // proof is valid
-        process_validation(&mut account, segment_index, &proof, &checked_proof).unwrap();
+        save_verf_poc_sigs(&mut account, sgmt_indx, &poc_sig, &verified_poc_sig).unwrap();
 
-        checked_proof.status = ProofStatus::NotValid;
+        verified_poc_sig.status = PocSeal::Bad;
 
         // proof failed verification
-        process_validation(&mut account, segment_index, &proof, &checked_proof).unwrap_err();
+        save_verf_poc_sigs(&mut account, sgmt_indx, &poc_sig, &verified_poc_sig).unwrap_err();
     }
 }

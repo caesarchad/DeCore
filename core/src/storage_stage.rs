@@ -20,9 +20,9 @@ use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;
-use morgan_storage_api::storage_contract::{CheckedProof, Proof, ProofStatus};
-use morgan_storage_api::storage_opcode::{proof_validation, StorageOpCode};
-use morgan_storage_api::{get_segment_from_slot, storage_opcode};
+use morgan_storage_api::storage_contract::{VeriPocSig, PocSig, PocSeal};
+use morgan_storage_api::storage_opcode::{self,verify_poc_sig, PocOpCode};
+use morgan_storage_api::pgm_id::get_segment_from_slot;
 use std::collections::HashMap;
 use std::io;
 use std::mem::size_of;
@@ -38,7 +38,7 @@ use morgan_helper::logHelper::*;
 // Vec of [ledger blocks] x [keys]
 type StorageResults = Vec<Hash>;
 type StorageKeys = Vec<u8>;
-type StorageMinerMap = Vec<HashMap<BvmAddr, Vec<Proof>>>;
+type StorageMinerMap = Vec<HashMap<BvmAddr, Vec<PocSig>>>;
 
 #[derive(Default)]
 pub struct StorageStateInner {
@@ -329,7 +329,7 @@ impl StoragePhase {
         let mut seed = [0u8; 32];
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
-        let ix = storage_opcode::advertise_recent_transaction_seal(
+        let ix = storage_opcode::brdcst_last_tx_seal(
             &storage_keypair.address(),
             entry_id,
             slot,
@@ -412,7 +412,7 @@ impl StoragePhase {
         storage_account_key: BvmAddr,
     ) {
         match deserialize(data) {
-            Ok(StorageOpCode::SubmitMiningProof {
+            Ok(PocOpCode::SetPocSig {
                 slot: proof_slot,
                 signature,
                 sha_state,
@@ -443,7 +443,7 @@ impl StoragePhase {
                         statew.storage_miner_map[proof_segment_index]
                             .entry(storage_account_key)
                             .or_default()
-                            .push(Proof {
+                            .push(PocSig {
                                 signature,
                                 sha_state,
                             });
@@ -491,7 +491,7 @@ impl StoragePhase {
                             for instruction in tx.context.instructions.iter() {
                                 let program_id =
                                     tx.context.account_keys[instruction.program_ids_index as usize];
-                                if morgan_storage_api::check_id(&program_id) {
+                                if morgan_storage_api::pgm_id::check_id(&program_id) {
                                     let storage_account_key =
                                         tx.context.account_keys[instruction.accounts[0] as usize];
                                     Self::process_storage_transaction(
@@ -535,16 +535,16 @@ impl StoragePhase {
                                             *id,
                                             proofs
                                                 .drain(..)
-                                                .map(|proof| CheckedProof {
-                                                    proof,
-                                                    status: ProofStatus::Valid,
+                                                .map(|poc_sig| VeriPocSig {
+                                                    poc_sig,
+                                                    status: PocSeal::Good,
                                                 })
                                                 .collect::<Vec<_>>(),
                                         )
                                     })
                                     .collect::<HashMap<_, _>>();
                                 if !checked_proofs.is_empty() {
-                                    let ix = proof_validation(
+                                    let ix = verify_poc_sig(
                                         &storage_keypair.address(),
                                         segment as u64,
                                         checked_proofs,
@@ -592,7 +592,7 @@ mod tests {
     use morgan_interface::hash::{Hash, Hasher};
     use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_storage_api::SLOTS_PER_SEGMENT;
+    use morgan_storage_api::pgm_id::SLOTS_PER_SEGMENT;
     use std::cmp::{max, min};
     use std::fs::remove_dir_all;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -770,7 +770,7 @@ mod tests {
         }
 
         let keypair = Keypair::new();
-        let mining_proof_ix = storage_opcode::mining_proof(
+        let mining_proof_ix = storage_opcode::poc_signature(
             &keypair.address(),
             Hash::default(),
             0,

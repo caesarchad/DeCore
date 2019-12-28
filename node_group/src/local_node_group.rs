@@ -531,7 +531,7 @@ impl LocalNodeGroup {
                     1,
                 )
             } else {
-                storage_opcode::create_validator_storage_account(
+                storage_opcode::crt_vldr_strj_acct(
                     &from_acct.address(),
                     &storage_keypair.address(),
                     1,

@@ -1,5 +1,5 @@
-use crate::id;
-use crate::storage_contract::{CheckedProof, STORAGE_ACCOUNT_SPACE};
+use crate::pgm_id::id;
+use crate::storage_contract::{VeriPocSig, POC_ACCT_ROM};
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::{AccountMeta, OpCode};
@@ -9,21 +9,21 @@ use morgan_interface::sys_opcode;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum StorageOpCode {
+pub enum PocOpCode {
     /// Initialize the account as a mining pool, validator or storage-miner
     ///
     /// Expects 1 Account:
     ///    0 - Account to be initialized
-    InitializeMiningPool,
-    InitializeValidatorStorage,
-    InitializeMinerStorage,
+    SetPocPool,
+    SetLocalStorage,
+    SetPocStorage,
 
-    SubmitMiningProof {
+    SetPocSig {
         sha_state: Hash,
         slot: u64,
         signature: Signature,
     },
-    AdvertiseStorageRecentTransactionSeal {
+    BrdcstPocLastTxSeal {
         hash: Hash,
         slot: u64,
     },
@@ -31,17 +31,17 @@ pub enum StorageOpCode {
     ///
     /// Expects 1 Account:
     ///    0 - Storage account with credits to redeem
-    ///    1 - MiningPool account to redeem credits from
+    ///    1 - PocPool account to redeem credits from
     ClaimStorageReward {
         slot: u64,
     },
-    ProofValidation {
+    CheckPocSig {
         segment: u64,
-        proofs: Vec<(BvmAddr, Vec<CheckedProof>)>,
+        poc_sigs: Vec<(BvmAddr, Vec<VeriPocSig>)>,
     },
 }
 
-pub fn create_validator_storage_account(
+pub fn crt_vldr_strj_acct(
     from_address: &BvmAddr,
     storage_address: &BvmAddr,
     difs: u64,
@@ -51,12 +51,12 @@ pub fn create_validator_storage_account(
             from_address,
             storage_address,
             difs,
-            STORAGE_ACCOUNT_SPACE,
+            POC_ACCT_ROM,
             &id(),
         ),
         OpCode::new(
             id(),
-            &StorageOpCode::InitializeValidatorStorage,
+            &PocOpCode::SetLocalStorage,
             vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
@@ -72,12 +72,12 @@ pub fn create_miner_storage_account(
             from_address,
             storage_address,
             difs,
-            STORAGE_ACCOUNT_SPACE,
+            POC_ACCT_ROM,
             &id(),
         ),
         OpCode::new(
             id(),
-            &StorageOpCode::InitializeMinerStorage,
+            &PocOpCode::SetPocStorage,
             vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
@@ -93,24 +93,24 @@ pub fn create_mining_pool_account(
             from_address,
             storage_address,
             difs,
-            STORAGE_ACCOUNT_SPACE,
+            POC_ACCT_ROM,
             &id(),
         ),
         OpCode::new(
             id(),
-            &StorageOpCode::InitializeMiningPool,
+            &PocOpCode::SetPocPool,
             vec![AccountMeta::new(*storage_address, false)],
         ),
     ]
 }
 
-pub fn mining_proof(
+pub fn poc_signature(
     storage_address: &BvmAddr,
     sha_state: Hash,
     slot: u64,
     signature: Signature,
 ) -> OpCode {
-    let storage_opcode = StorageOpCode::SubmitMiningProof {
+    let storage_opcode = PocOpCode::SetPocSig {
         sha_state,
         slot,
         signature,
@@ -119,12 +119,12 @@ pub fn mining_proof(
     OpCode::new(id(), &storage_opcode, account_metas)
 }
 
-pub fn advertise_recent_transaction_seal(
+pub fn brdcst_last_tx_seal(
     storage_address: &BvmAddr,
     storage_hash: Hash,
     slot: u64,
 ) -> OpCode {
-    let storage_opcode = StorageOpCode::AdvertiseStorageRecentTransactionSeal {
+    let storage_opcode = PocOpCode::BrdcstPocLastTxSeal {
         hash: storage_hash,
         slot,
     };
@@ -132,18 +132,18 @@ pub fn advertise_recent_transaction_seal(
     OpCode::new(id(), &storage_opcode, account_metas)
 }
 
-pub fn proof_validation<S: std::hash::BuildHasher>(
+pub fn verify_poc_sig<S: std::hash::BuildHasher>(
     storage_address: &BvmAddr,
     segment: u64,
-    checked_proofs: HashMap<BvmAddr, Vec<CheckedProof>, S>,
+    veri_poc_sigs: HashMap<BvmAddr, Vec<VeriPocSig>, S>,
 ) -> OpCode {
     let mut account_metas = vec![AccountMeta::new(*storage_address, true)];
     let mut proofs = vec![];
-    checked_proofs.into_iter().for_each(|(id, p)| {
+    veri_poc_sigs.into_iter().for_each(|(id, p)| {
         proofs.push((id, p));
         account_metas.push(AccountMeta::new(id, false))
     });
-    let storage_opcode = StorageOpCode::ProofValidation { segment, proofs };
+    let storage_opcode = PocOpCode::CheckPocSig { segment, poc_sigs:proofs };
     OpCode::new(id(), &storage_opcode, account_metas)
 }
 
@@ -152,7 +152,7 @@ pub fn claim_reward(
     mining_pool_address: &BvmAddr,
     slot: u64,
 ) -> OpCode {
-    let storage_opcode = StorageOpCode::ClaimStorageReward { slot };
+    let storage_opcode = PocOpCode::ClaimStorageReward { slot };
     let account_metas = vec![
         AccountMeta::new(*storage_address, false),
         AccountMeta::new(*mining_pool_address, false),

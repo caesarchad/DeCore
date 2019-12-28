@@ -27,7 +27,11 @@ use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;
 use morgan_interface::transport::TransportError;
-use morgan_storage_api::{get_segment_from_slot, storage_opcode, SLOTS_PER_SEGMENT};
+use morgan_storage_api::storage_opcode;
+use morgan_storage_api::pgm_id::{
+    get_segment_from_slot,
+    SLOTS_PER_SEGMENT,
+};
 use std::fs::File;
 use std::io::{self, BufReader, Error, ErrorKind, Read, Seek, SeekFrom};
 use std::mem::size_of;
@@ -111,13 +115,13 @@ pub(crate) fn sample_file(in_path: &Path, sample_offsets: &[u64]) -> io::Result<
 
 fn get_slot_from_transaction_seal(signature: &ed25519_dalek::Signature, storage_slot: u64) -> u64 {
     let signature_vec = signature.to_bytes();
-    let mut segment_index = u64::from(signature_vec[0])
+    let mut sgmt_indx = u64::from(signature_vec[0])
         | (u64::from(signature_vec[1]) << 8)
         | (u64::from(signature_vec[1]) << 16)
         | (u64::from(signature_vec[2]) << 24);
     let max_segment_index = get_segment_from_slot(storage_slot);
-    segment_index %= max_segment_index as u64;
-    segment_index * SLOTS_PER_SEGMENT
+    sgmt_indx %= max_segment_index as u64;
+    sgmt_indx * SLOTS_PER_SEGMENT
 }
 
 fn create_request_processor(
@@ -344,7 +348,7 @@ impl StorageMiner {
                 );
                 break;
             }
-            self.submit_mining_proof();
+            self.issue_poc_sig();
             // TODO: Miners should be submitting proofs as fast as possible
             sleep(Duration::from_secs(2));
         }
@@ -522,7 +526,7 @@ impl StorageMiner {
         Ok(())
     }
 
-    fn submit_mining_proof(&self) {
+    fn issue_poc_sig(&self) {
         // No point if we've got no storage account...
         let nodes = self.node_group_info.read().unwrap().fetch_blaze_node_list();
         let client = crate::gossip_service::get_client(&nodes);
@@ -536,7 +540,7 @@ impl StorageMiner {
         assert!(client.poll_get_balance(&self.keypair.address()).unwrap() > 0);
 
         let (transaction_seal, _) = client.get_recent_transaction_seal().expect("No recent transaction_seal");
-        let instruction = storage_opcode::mining_proof(
+        let instruction = storage_opcode::poc_signature(
             &self.storage_keypair.address(),
             self.hash,
             self.slot,

@@ -13,7 +13,7 @@ pub enum StakeOpCode {
     
     InitializeDelegate,
     
-    InitializeMiningPool,
+    SetPocPool,
     
     DelegateStake,
 
@@ -59,7 +59,7 @@ pub fn create_mining_pool_account(
         ),
         OpCode::new(
             id(),
-            &StakeOpCode::InitializeMiningPool,
+            &StakeOpCode::SetPocPool,
             vec![
                 AccountMeta::new(*from_address, true),
                 AccountMeta::new(*staker_address, false),
@@ -118,11 +118,11 @@ pub fn handle_opcode(
 
     // TODO: data-driven unpack and dispatch of KeyedAccounts
     match deserialize(data).map_err(|_| OpCodeErr::BadOpCodeContext)? {
-        StakeOpCode::InitializeMiningPool => {
+        StakeOpCode::SetPocPool => {
             if !rest.is_empty() {
                 Err(OpCodeErr::BadOpCodeContext)?;
             }
-            me.initialize_mining_pool()
+            me.set_poc_pool()
         }
         StakeOpCode::InitializeDelegate => {
             if !rest.is_empty() {

@@ -11,7 +11,7 @@ impl GenesisBlockUtil for GenesisBlock {
     fn add_storage_controller(&mut self, validator_storage_address: &BvmAddr) {
         self.accounts.push((
             *validator_storage_address,
-            storage_contract::create_validator_storage_account(1),
+            storage_contract::crt_vldr_strj_acct(1),
         ));
         self.builtin_opcode_handlers
             .push(morgan_storage_controller!());

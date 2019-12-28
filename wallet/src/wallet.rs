@@ -624,7 +624,7 @@ fn process_show_stake_account(
             println!("credits observed: {}", credits_observed);
             Ok("".to_string())
         }
-        Ok(StakeState::MiningPool) => {
+        Ok(StakeState::PocPool) => {
             println!("account difs: {}", stake_account.difs);
             Ok("".to_string())
         }
@@ -673,7 +673,7 @@ fn process_create_validator_storage_account(
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ixs = storage_opcode::create_validator_storage_account(
+    let ixs = storage_opcode::crt_vldr_strj_acct(
         &config.keypair.address(),
         storage_account_address,
         1,
@@ -710,9 +710,9 @@ fn process_show_storage_account(
     _config: &WalletConfig,
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
-    use morgan_storage_api::storage_contract::StorageContract;
+    use morgan_storage_api::storage_contract::PocType;
     let account = rpc_client.get_account(storage_account_address)?;
-    let storage_contract: StorageContract = account.state().map_err(|err| {
+    let storage_contract: PocType = account.state().map_err(|err| {
         WalletError::RpcRequestError(
             format!("Unable to deserialize storage account: {:?}", err).to_string(),
         )

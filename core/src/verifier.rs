@@ -25,7 +25,7 @@ use morgan_interface::waterclock_config::WaterClockConfig;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil};
 use morgan_interface::timing::timestamp;
-use morgan_storage_api::SLOTS_PER_SEGMENT;
+use morgan_storage_api::pgm_id::SLOTS_PER_SEGMENT;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;

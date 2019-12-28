@@ -18,7 +18,7 @@ pub enum StakeState {
         voter_address: BvmAddr,
         credits_observed: u64,
     },
-    MiningPool,
+    PocPool,
 }
 
 impl Default for StakeState {
@@ -33,7 +33,7 @@ const DROPS_PER_SLOT: f64 = 8f64;
 // credits/yr or slots/yr  is        seconds/year        *   drops/second   * slots/_drop
 const CREDITS_PER_YEAR: f64 = (365f64 * 24f64 * 3600f64) * DROPS_PER_SECOND / DROPS_PER_SLOT;
 
-// TODO: 20% is a niiice rate...  TODO: make this a member of MiningPool?
+// TODO: 20% is a niiice rate...  TODO: make this a member of PocPool?
 const STAKE_REWARD_TARGET_RATE: f64 = 0.20;
 
 #[cfg(test)]
@@ -88,7 +88,7 @@ impl StakeState {
 }
 
 pub trait StakeAccount {
-    fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr>;
+    fn set_poc_pool(&mut self) -> Result<(), OpCodeErr>;
     fn initialize_delegate(&mut self) -> Result<(), OpCodeErr>;
     fn delegate_stake(&mut self, vote_account: &KeyedAccount) -> Result<(), OpCodeErr>;
     fn redeem_vote_credits(
@@ -99,9 +99,9 @@ pub trait StakeAccount {
 }
 
 impl<'a> StakeAccount for KeyedAccount<'a> {
-    fn initialize_mining_pool(&mut self) -> Result<(), OpCodeErr> {
+    fn set_poc_pool(&mut self) -> Result<(), OpCodeErr> {
         if let StakeState::Uninitialized = self.state()? {
-            self.set_state(&StakeState::MiningPool)
+            self.set_state(&StakeState::PocPool)
         } else {
             Err(OpCodeErr::InvalidAccountData)
         }
@@ -138,7 +138,7 @@ impl<'a> StakeAccount for KeyedAccount<'a> {
         vote_account: &mut KeyedAccount,
     ) -> Result<(), OpCodeErr> {
         if let (
-            StakeState::MiningPool,
+            StakeState::PocPool,
             StakeState::Delegate {
                 voter_address,
                 credits_observed,
@@ -259,7 +259,7 @@ mod tests {
             }
         );
 
-        let stake_state = StakeState::MiningPool;
+        let stake_state = StakeState::PocPool;
         stake_keyed_account.set_state(&stake_state).unwrap();
         assert!(stake_keyed_account
             .delegate_stake(&vote_keyed_account)
@@ -354,7 +354,7 @@ mod tests {
         );
 
         mining_pool_keyed_account
-            .set_state(&StakeState::MiningPool)
+            .set_state(&StakeState::PocPool)
             .unwrap();
 
         // no movement in vote account, so no redemption needed
@@ -416,7 +416,7 @@ mod tests {
         let mut mining_pool_keyed_account =
             KeyedAccount::new(&address, true, &mut mining_pool_account);
         mining_pool_keyed_account
-            .set_state(&StakeState::MiningPool)
+            .set_state(&StakeState::PocPool)
             .unwrap();
 
         let mut vote_state = VoteState::default();

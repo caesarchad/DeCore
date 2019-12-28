@@ -5,7 +5,7 @@ macro_rules! morgan_storage_controller {
     () => {
         (
             "morgan_storage_controller".to_string(),
-            morgan_storage_api::id(),
+            morgan_storage_api::pgm_id::id(),
         )
     };
 }
