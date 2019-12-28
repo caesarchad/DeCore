@@ -40,7 +40,14 @@ pub fn handle_opcode(
     Ok(())
 }
 
+#[macro_export]
+macro_rules! bvm_profiler_entrypoint {
+    () => {
+        ("bvm_profiler_entrypoint".to_string(), morgan_profiler::pgm_id::id())
+    };
+}
 
+morgan_interface::morgan_entrypoint!(handle_opcode);
 
 #[cfg(test)]
 mod tests {

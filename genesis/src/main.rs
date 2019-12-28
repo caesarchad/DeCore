@@ -8,7 +8,7 @@ extern crate morgan_budget_controller;
 #[macro_use]
 extern crate morgan_token_controller;
 #[macro_use]
-extern crate morgan_config_controller;
+extern crate morgan_profiler;
 
 use clap::{crate_description, crate_name, crate_version, value_t_or_exit, App, Arg};
 use morgan::block_buffer_pool::make_new_ledger_file;
@@ -24,6 +24,7 @@ use morgan_interface::constants;
 use morgan_stake_api::stake_state;
 use morgan_storage_controller::genesis_block_util::GenesisBlockUtil;
 use morgan_vote_api::vote_state;
+use morgan_profiler::bvm_profiler_entrypoint;
 use std::error;
 use std::time::{Duration, Instant};
 
@@ -216,7 +217,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             morgan_stake_controller!(),
             morgan_budget_controller!(),
             morgan_token_controller!(),
-            morgan_config_controller!(),
+            bvm_profiler_entrypoint!(),
         ],
     );
     genesis_block.add_storage_controller(&bootstrap_storage_keypair.address());

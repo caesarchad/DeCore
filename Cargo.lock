@@ -1527,7 +1527,6 @@ dependencies = [
  "morgan-budget-controller 0.15.3",
  "morgan-bvm-script 0.15.3",
  "morgan-client 0.15.3",
- "morgan-config-controller 0.15.3",
  "morgan-helper 0.1.0",
  "morgan-interface 0.15.3",
  "morgan-logger 0.15.3",

@@ -14,5 +14,5 @@ morgan-profiler = { path = "../profiler", version = "0.15.3"     }
 morgan-logger = { path = "../../logger", version = "0.15.3"     }
 morgan-interface = { path = "../../interface", version = "0.15.3"     }
 [lib]
-name = "morgan_config_controller"
+name = "bvm_profiler_entrypoint"
 crate-type = ["lib","cdylib"]
