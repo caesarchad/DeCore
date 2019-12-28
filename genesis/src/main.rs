@@ -6,7 +6,7 @@ extern crate morgan_stake_controller;
 #[macro_use]
 extern crate morgan_budget_controller;
 #[macro_use]
-extern crate bvm_ico_entrypoint;
+extern crate morgan_ico_issuer;
 #[macro_use]
 extern crate morgan_profiler;
 
