@@ -1672,13 +1672,13 @@ dependencies = [
  "morgan 0.15.3",
  "morgan-budget-controller 0.15.3",
  "morgan-bvm-script 0.15.3",
+ "morgan-ico-issuer 0.15.3",
  "morgan-interface 0.15.3",
  "morgan-profiler 0.15.3",
  "morgan-stake-api 0.15.3",
  "morgan-stake-controller 0.15.3",
  "morgan-storage-api 0.15.3",
  "morgan-storage-controller 0.15.3",
- "morgan-token-api 0.15.3",
  "morgan-token-controller 0.15.3",
  "morgan-vote-api 0.15.3",
  "morgan-vote-controller 0.15.3",
@@ -1704,6 +1704,21 @@ dependencies = [
  "ansi_term 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "morgan-ico-issuer"
+version = "0.15.3"
+dependencies = [
+ "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "morgan-helper 0.1.0",
+ "morgan-interface 0.15.3",
+ "morgan-logger 0.15.3",
+ "num-derive 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1895,28 +1910,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "morgan-token-api"
-version = "0.15.3"
-dependencies = [
- "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-helper 0.1.0",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
- "num-derive 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-traits 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "morgan-token-controller"
 version = "0.15.3"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "morgan-ico-issuer 0.15.3",
  "morgan-interface 0.15.3",
  "morgan-logger 0.15.3",
- "morgan-token-api 0.15.3",
 ]
 
 [[package]]

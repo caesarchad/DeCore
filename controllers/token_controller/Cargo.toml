@@ -12,7 +12,7 @@ edition = "2018"
 log = "0.4.2"
 morgan-logger = { path = "../../logger", version = "0.15.3"     }
 morgan-interface = { path = "../../interface", version = "0.15.3"     }
-morgan-token-api = { path = "../token_api", version = "0.15.3"     }
+morgan-ico-issuer = { path = "../ico_issuer", version = "0.15.3"     }
 
 [lib]
 name = "morgan_token_controller"

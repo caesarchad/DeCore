@@ -1,5 +1,5 @@
 [package]
-name = "morgan-token-api"
+name = "morgan-ico-issuer"
 version = "0.15.3"
 description = "Morgan Token API"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]
@@ -20,5 +20,5 @@ morgan-interface = { path = "../../interface", version = "0.15.3"     }
 morgan-helper = { path = "../../helper", version = "0.1.0"     }
 
 [lib]
-name = "morgan_token_api"
+name = "morgan_ico_issuer"
 crate-type = ["lib"]

@@ -21,7 +21,7 @@ morgan-stake-api = { path = "../controllers/stake_api", version = "0.15.3"     }
 morgan-stake-controller = { path = "../controllers/stake_controller", version = "0.15.3"     }
 morgan-storage-api = { path = "../controllers/storage_api", version = "0.15.3"     }
 morgan-storage-controller = { path = "../controllers/storage_controller", version = "0.15.3"     }
-morgan-token-api = { path = "../controllers/token_api", version = "0.15.3"     }
+morgan-ico-issuer = { path = "../controllers/ico_issuer", version = "0.15.3"     }
 morgan-token-controller = { path = "../controllers/token_controller", version = "0.15.3"     }
 morgan-profiler = { path = "../controllers/profiler", version = "0.15.3"     }
 
