@@ -16,7 +16,6 @@ members = [
     "controllers/bvm_script",
     "controllers/budget_controller",
     "controllers/profiler",
-    "controllers/config_controller",
     "controllers/stake_api",
     "controllers/stake_controller",
     "controllers/storage_api",

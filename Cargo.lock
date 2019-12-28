@@ -1664,16 +1664,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "morgan-config-controller"
-version = "0.15.3"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "morgan-interface 0.15.3",
- "morgan-logger 0.15.3",
- "morgan-profiler 0.15.3",
-]
-
-[[package]]
 name = "morgan-genesis"
 version = "0.15.3"
 dependencies = [
@@ -1682,7 +1672,6 @@ dependencies = [
  "morgan 0.15.3",
  "morgan-budget-controller 0.15.3",
  "morgan-bvm-script 0.15.3",
- "morgan-config-controller 0.15.3",
  "morgan-interface 0.15.3",
  "morgan-profiler 0.15.3",
  "morgan-stake-api 0.15.3",
