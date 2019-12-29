@@ -20,8 +20,8 @@ use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;
-use morgan_storage_api::storage_contract::{VeriPocSig, PocSig, PocSeal};
-use morgan_storage_api::storage_opcode::{self,verify_poc_sig, PocOpCode};
+use morgan_storage_api::poc_pact::{VeriPocSig, PocSig, PocSeal};
+use morgan_storage_api::poc_opcode::{self,verify_poc_sig, PocOpCode};
 use morgan_storage_api::pgm_id::get_segment_from_slot;
 use std::collections::HashMap;
 use std::io;
@@ -329,7 +329,7 @@ impl StoragePhase {
         let mut seed = [0u8; 32];
         let signature = storage_keypair.sign(&entry_id.as_ref());
 
-        let ix = storage_opcode::brdcst_last_tx_seal(
+        let ix = poc_opcode::brdcst_last_tx_seal(
             &storage_keypair.address(),
             entry_id,
             slot,
@@ -770,7 +770,7 @@ mod tests {
         }
 
         let keypair = Keypair::new();
-        let mining_proof_ix = storage_opcode::poc_signature(
+        let mining_proof_ix = poc_opcode::poc_signature(
             &keypair.address(),
             Hash::default(),
             0,

@@ -1,5 +1,5 @@
 use crate::pgm_id::id;
-use crate::storage_contract::{VeriPocSig, POC_ACCT_ROM};
+use crate::poc_pact::{VeriPocSig, POC_ACCT_ROM};
 use serde_derive::{Deserialize, Serialize};
 use morgan_interface::hash::Hash;
 use morgan_interface::opcodes::{AccountMeta, OpCode};

@@ -10,5 +10,5 @@ macro_rules! morgan_storage_controller {
     };
 }
 
-use morgan_storage_api::storage_processor::handle_opcode;
+use morgan_storage_api::poc_handler::handle_opcode;
 morgan_interface::morgan_entrypoint!(handle_opcode);

@@ -443,7 +443,7 @@ fn save_verf_poc_sigs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id;
+    use crate::pgm_id::id;
 
     #[test]
     fn test_account_data() {

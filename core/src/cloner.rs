@@ -27,7 +27,7 @@ use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;
 use morgan_interface::transport::TransportError;
-use morgan_storage_api::storage_opcode;
+use morgan_storage_api::poc_opcode;
 use morgan_storage_api::pgm_id::{
     get_segment_from_slot,
     SLOTS_PER_SEGMENT,
@@ -506,7 +506,7 @@ impl StorageMiner {
         if balance.is_err() || balance.unwrap() == 0 {
             let (transaction_seal, _fee_calculator) = client.get_recent_transaction_seal().expect("transaction_seal");
 
-            let ix = storage_opcode::create_miner_storage_account(
+            let ix = poc_opcode::create_miner_storage_account(
                 &keypair.address(),
                 &storage_keypair.address(),
                 1,
@@ -540,13 +540,13 @@ impl StorageMiner {
         assert!(client.poll_get_balance(&self.keypair.address()).unwrap() > 0);
 
         let (transaction_seal, _) = client.get_recent_transaction_seal().expect("No recent transaction_seal");
-        let instruction = storage_opcode::poc_signature(
+        let op_code = poc_opcode::poc_signature(
             &self.storage_keypair.address(),
             self.hash,
             self.slot,
             Signature::new(&self.signature.to_bytes()),
         );
-        let context = Context::new_with_payer(vec![instruction], Some(&self.keypair.address()));
+        let context = Context::new_with_payer(vec![op_code], Some(&self.keypair.address()));
         let mut transaction = Transaction::new(
             &[self.keypair.as_ref(), self.storage_keypair.as_ref()],
             context,

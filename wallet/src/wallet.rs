@@ -27,7 +27,7 @@ use morgan_interface::sys_opcode::SystemError;
 use morgan_interface::sys_controller;
 use morgan_interface::transaction::{Transaction, TransactionError};
 use morgan_stake_api::stake_opcode;
-use morgan_storage_api::storage_opcode;
+use morgan_storage_api::poc_opcode;
 use morgan_vote_api::vote_opcode;
 use std::fs::File;
 use std::io::Read;
@@ -641,7 +641,7 @@ fn process_create_storage_mining_pool_account(
     difs: u64,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ixs = storage_opcode::create_mining_pool_account(
+    let ixs = poc_opcode::create_mining_pool_account(
         &config.keypair.address(),
         storage_account_address,
         difs,
@@ -657,7 +657,7 @@ fn process_create_miner_storage_account(
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ixs = storage_opcode::create_miner_storage_account(
+    let ixs = poc_opcode::create_miner_storage_account(
         &config.keypair.address(),
         storage_account_address,
         1,
@@ -673,7 +673,7 @@ fn process_create_validator_storage_account(
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
-    let ixs = storage_opcode::crt_vldr_strj_acct(
+    let ixs = poc_opcode::crt_vldr_strj_acct(
         &config.keypair.address(),
         storage_account_address,
         1,
@@ -692,7 +692,7 @@ fn process_claim_storage_reward(
 ) -> ProcessResult {
     let (recent_transaction_seal, _fee_calculator) = rpc_client.get_recent_transaction_seal()?;
 
-    let instruction = storage_opcode::claim_reward(
+    let instruction = poc_opcode::claim_reward(
         storage_account_address,
         storage_mining_pool_account_address,
         slot,
@@ -710,7 +710,7 @@ fn process_show_storage_account(
     _config: &WalletConfig,
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
-    use morgan_storage_api::storage_contract::PocType;
+    use morgan_storage_api::poc_pact::PocType;
     let account = rpc_client.get_account(storage_account_address)?;
     let storage_contract: PocType = account.state().map_err(|err| {
         WalletError::RpcRequestError(
