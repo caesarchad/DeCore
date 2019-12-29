@@ -289,7 +289,7 @@ mod tests {
             ),
             (
                 "Storage111111111111111111111111111111111111",
-                morgan_storage_api::pgm_id::id(),
+                morgan_poc_agnt::pgm_id::id(),
             ),
             (
                 "Token11111111111111111111111111111111111111",
@@ -319,7 +319,7 @@ mod tests {
             morgan_interface::bultin_mounter::id(),
             morgan_interface::bvm_loader::id(),
             morgan_bvm_script::id(),
-            morgan_storage_api::pgm_id::id(),
+            morgan_poc_agnt::pgm_id::id(),
             morgan_ico_issuer::pgm_id::id(),
             morgan_vote_api::id(),
             morgan_stake_api::id(),

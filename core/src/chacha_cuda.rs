@@ -7,7 +7,7 @@ use crate::signature_verify::{
     chacha_cbc_encrypt_many_sample, chacha_end_sha_state, chacha_init_sha_state,
 };
 use morgan_interface::hash::Hash;
-use morgan_storage_api::SLOTS_PER_SEGMENT;
+use morgan_poc_agnt::SLOTS_PER_SEGMENT;
 use std::io;
 use std::mem::size_of;
 use std::sync::Arc;

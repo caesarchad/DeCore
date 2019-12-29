@@ -1,7 +1,7 @@
 use crate::morgan_storage_controller;
 use morgan_interface::genesis_block::GenesisBlock;
 use morgan_interface::bvm_address::BvmAddr;
-use morgan_storage_api::poc_pact;
+use morgan_poc_agnt::poc_pact;
 
 pub trait GenesisBlockUtil {
     fn add_storage_controller(&mut self, validator_storage_address: &BvmAddr);

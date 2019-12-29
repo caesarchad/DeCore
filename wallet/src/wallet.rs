@@ -27,7 +27,7 @@ use morgan_interface::sys_opcode::SystemError;
 use morgan_interface::sys_controller;
 use morgan_interface::transaction::{Transaction, TransactionError};
 use morgan_stake_api::stake_opcode;
-use morgan_storage_api::poc_opcode;
+use morgan_poc_agnt::poc_opcode;
 use morgan_vote_api::vote_opcode;
 use std::fs::File;
 use std::io::Read;
@@ -710,7 +710,7 @@ fn process_show_storage_account(
     _config: &WalletConfig,
     storage_account_address: &BvmAddr,
 ) -> ProcessResult {
-    use morgan_storage_api::poc_pact::PocType;
+    use morgan_poc_agnt::poc_pact::PocType;
     let account = rpc_client.get_account(storage_account_address)?;
     let storage_contract: PocType = account.state().map_err(|err| {
         WalletError::RpcRequestError(

@@ -21,7 +21,7 @@ use morgan_interface::constants::DEFAULT_SLOTS_PER_EPOCH;
 use morgan_interface::constants::DEFAULT_DROPS_PER_SLOT;
 use morgan_interface::transaction::Transaction;
 use morgan_stake_api::stake_opcode;
-use morgan_storage_api::poc_opcode;
+use morgan_poc_agnt::poc_opcode;
 use morgan_storage_controller::genesis_block_util::GenesisBlockUtil;
 use morgan_vote_api::vote_opcode;
 use morgan_vote_api::vote_state::VoteState;

@@ -27,8 +27,8 @@ use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::timing::timestamp;
 use morgan_interface::transaction::Transaction;
 use morgan_interface::transport::TransportError;
-use morgan_storage_api::poc_opcode;
-use morgan_storage_api::pgm_id::{
+use morgan_poc_agnt::poc_opcode;
+use morgan_poc_agnt::pgm_id::{
     get_segment_from_slot,
     SLOTS_PER_SEGMENT,
 };

@@ -1,5 +1,5 @@
 [package]
-name = "morgan-storage-api"
+name = "morgan-poc-agnt"
 version = "0.15.3"
 description = "Morgan Storage program API"
 authors = ["Morgan Maintainers <maintainers@morgan.com>"]
@@ -23,5 +23,5 @@ assert_matches = "1.3.0"
 morgan-runtime = { path = "../../runtime", version = "0.15.3"     }
 
 [lib]
-name = "morgan_storage_api"
+name = "morgan_poc_agnt"
 crate-type = ["lib"]

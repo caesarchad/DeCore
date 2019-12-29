@@ -20,9 +20,9 @@ use morgan_interface::context::Context;
 use morgan_interface::bvm_address::BvmAddr;
 use morgan_interface::signature::{Keypair, KeypairUtil, Signature};
 use morgan_interface::transaction::Transaction;
-use morgan_storage_api::poc_pact::{VeriPocSig, PocSig, PocSeal};
-use morgan_storage_api::poc_opcode::{self,verify_poc_sig, PocOpCode};
-use morgan_storage_api::pgm_id::get_segment_from_slot;
+use morgan_poc_agnt::poc_pact::{VeriPocSig, PocSig, PocSeal};
+use morgan_poc_agnt::poc_opcode::{self,verify_poc_sig, PocOpCode};
+use morgan_poc_agnt::pgm_id::get_segment_from_slot;
 use std::collections::HashMap;
 use std::io;
 use std::mem::size_of;
@@ -491,7 +491,7 @@ impl StoragePhase {
                             for instruction in tx.context.instructions.iter() {
                                 let program_id =
                                     tx.context.account_keys[instruction.program_ids_index as usize];
-                                if morgan_storage_api::pgm_id::check_id(&program_id) {
+                                if morgan_poc_agnt::pgm_id::check_id(&program_id) {
                                     let storage_account_key =
                                         tx.context.account_keys[instruction.accounts[0] as usize];
                                     Self::process_storage_transaction(
@@ -592,7 +592,7 @@ mod tests {
     use morgan_interface::hash::{Hash, Hasher};
     use morgan_interface::bvm_address::BvmAddr;
     use morgan_interface::signature::{Keypair, KeypairUtil};
-    use morgan_storage_api::pgm_id::SLOTS_PER_SEGMENT;
+    use morgan_poc_agnt::pgm_id::SLOTS_PER_SEGMENT;
     use std::cmp::{max, min};
     use std::fs::remove_dir_all;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
