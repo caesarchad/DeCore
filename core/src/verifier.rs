@@ -199,7 +199,7 @@ impl Validator {
         };
 
         let ip_echo_server =
-            morgan_netutil::ip_echo_server(node.sockets.gossip.local_addr().unwrap().port());
+            crate::ip_echo_server::ip_echo_server(node.sockets.gossip.local_addr().unwrap().port());
 
         let subscriptions = Arc::new(RpcSubscriptions::default());
         let rpc_pubsub_service = if node.info.rpc_pubsub.port() == 0 {

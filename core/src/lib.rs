@@ -70,6 +70,8 @@ pub mod transaction_verify_centre;
 pub mod verifier;
 pub mod spot_transmit_service;
 pub mod bvm_types;
+#[macro_use]
+pub mod ip_echo_server;
 
 #[macro_use]
 extern crate morgan_budget_controller;
